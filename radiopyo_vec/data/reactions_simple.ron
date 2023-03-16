@@ -1,0 +1,14 @@
+(
+    k_reactions: [
+        (
+            reactants: ["e_aq", "H2O"],
+            products: ["H_r", "OH_minus"],
+            k_value: 1.9e1
+        ),
+        (
+            reactants: ["e_aq", "e_aq"],
+            products: ["H2", "OH_minus", "OH_minus"],
+            k_value: 1.1e10
+        ),
+  ],
+)

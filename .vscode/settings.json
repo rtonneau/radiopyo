@@ -1,0 +1,21 @@
+{
+  "cSpell.words": [
+    "cumtime",
+    "dydt",
+    "jacobians",
+    "jacs",
+    "kreactions",
+    "LSODA",
+    "Radiolytic",
+    "radiolytics",
+    "radiopyo",
+    "stoi",
+    "stoichio",
+    "MichaelisMenten",
+    "michaelis",
+    "µmol",
+    "micha",
+  ],
+  "python.terminal.activateEnvironment": true,
+  "python.defaultInterpreterPath": "~/mambaforge/envs/radiobio/python"
+}

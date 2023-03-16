@@ -1,0 +1,196 @@
+(
+    bio_param: (
+        pH: 7,
+    ),
+    fixed_concentrations:{ // Unit is [mol]/[l]
+        "H2O": 55,
+    },
+    initial_concentrations:{ // Unit is [mol]/[l]
+        "O2": 75e-6,
+    },
+    radiolytic: { // Unit is [radical / 100eV / incident particle]
+        "e_aq": 2.8,
+        "OH_r": 2.8,
+        "H_r"  : 0.62,
+        "H2"  : 0.47,
+        "H2O2": 0.73,
+    },
+    acid_base: [
+        (
+            acid: "OH_r",
+            base: "O_r_minus",
+            pKa: 11.9,
+        ),
+        (
+            acid: "H2O2",
+            base: "HO2_minus",
+            pKa: 11.7,
+        ),
+        (
+            acid: "HO2_r",
+            base: "O2_r_minus",
+            pKa: 4.9,
+        ),
+    ],
+
+    //List of all reactions with e_aq as reactants
+    //For [X].[X] -> ... reactions, 2k value is given
+    k_reactions: [
+        //1) e_aq + H2O -> H_r + OH_minus
+        (
+            reactants: ["e_aq", "H2O"],
+            products: ["H_r", "OH_minus"],
+            k_value: 1.9e1
+        ),
+        //2) e_aq + e_aq -> H2 + 2 OH_minus
+        (
+            reactants: ["e_aq", "e_aq"],
+            products: ["H2", "OH_minus", "OH_minus"],
+            k_value: 1.1e10
+        ),
+        //3) e_aq + H_r -> H2 + OH_minus
+        (
+            reactants: ["e_aq", "H_r"],
+            products: ["H2", "OH_minus"],
+            k_value: 1.1e10
+        ),
+        //4) e_aq + OH_r -> OH_minus
+        (
+            reactants: ["e_aq", "OH_r"],
+            products: ["OH_minus"],
+            k_value: 3.0e10
+        ),
+        //5) e_aq + O_r_minus -> 2 OH_minus
+        (
+            reactants: ["e_aq", "O_r_minus"],
+            products: ["OH_minus", "OH_minus"],
+            k_value: 2.2e10
+        ),
+        //6) e_aq +  H_plus -> H_r
+        (
+            reactants: ["e_aq", "H_plus"],
+            products: ["H_r"],
+            k_value: 2.3e10
+        ),
+        //7) e_aq + H2O2 -> OH_minus + OH_r
+        (
+            reactants: ["e_aq", "H2O2"],
+            products: ["OH_minus", "OH_r"],
+            k_value: 1.1e10
+        ),
+        //8) e_aq + HO2_minus -> 2 OH_minus + OH_r
+        (
+            reactants: ["e_aq", "HO2_minus"],
+            products: ["OH_minus", "OH_minus", "OH_r"],
+            k_value: 3.5e9
+        ),
+        //9) e_aq + O2 -> O2_r_minus
+        (
+            reactants: ["e_aq", "O2"],
+            products: ["O2_r_minus"],
+            k_value: 1.9e10
+        ),
+        //10) e_aq + O2_r_minus -> O2_minus_minus
+        (
+            reactants: ["e_aq", "O2_r_minus"],
+            products: ["O2_minus_minus"],
+            k_value: 1.3e10
+        ),
+
+    // Reactions involving H_r as reactant:
+        //11) H_r + H2O -> H2 + OH_r
+        (
+            reactants: ["H_r", "H2O"],
+            products: ["H2", "OH_r"],
+            k_value: 1.0e1
+        ),
+        //12) H_r + H_r -> H2
+        (
+            reactants: ["H_r", "H_r"],
+            products: ["H2"],
+            k_value: 1.55e10
+        ),
+        //13) H_r + OH_r -> H2O
+        (
+            reactants: ["H_r", "OH_r"],
+            products: ["H2O"],
+            k_value: 7e9
+        ),
+        //14) H_r + OH_minus -> e_aq (+ H2O)
+        (
+            reactants: ["H_r", "OH_minus"],
+            products: ["e_aq"],
+            k_value: 2.2e7
+        ),
+        //15) H_r + H2O2 -> OH_r + H2O
+        (
+            reactants: ["H_r", "H2O2"],
+            products: ["OH_r", "H2O"],
+            k_value: 9.0e7
+        ),
+        //16) H_r + O2 -> HO2_r
+        (
+            reactants: ["H_r", "O2"],
+            products: ["HO2_r"],
+            k_value: 2.1e10
+        ),
+        //17) H_r + HO2_r -> H2O2
+        (
+            reactants: ["H_r", "HO2_r"],
+            products: ["H2O2"],
+            k_value: 1.0e10
+        ),
+
+    //Reactions involving OH_r as reactant:
+        //18) OH_r + OH_r -> H2O2
+        (
+            reactants: ["OH_r", "OH_r"],
+            products: ["H2O2"],
+            k_value: 1.1e10
+        ),
+        //19) OH_r + H2 -> H_r + H2O
+        (
+            reactants: ["OH_r", "H2"],
+            products: ["H_r", "H2O"],
+            k_value: 4.2e7
+        ),
+        //20) OH_r + OH_Minus -> O_r_minus + H2O
+        (
+            reactants: ["OH_r", "OH_minus"],
+            products: ["O_r_minus", "H2O"],
+            k_value: 4.2e7
+        ),
+        //21) OH_r + HO2_minus -> OH_minus + HO2_r
+        (
+            reactants: ["OH_r", "HO2_minus"],
+            products: ["OH_minus", "HO2_r"],
+            k_value: 7.5e9
+        ),
+        //22) OH_r + O2_r_minus -> OH_minus + O2
+        (
+            reactants: ["OH_r", "O2_r_minus"],
+            products: ["OH_minus", "O2"],
+            k_value: 8.0e9
+        ),
+
+    //Reactions involving O_r_minus as reactant:
+        //23) O_r_minus + H2O -> OH_minus + OH_r
+        (
+            reactants: ["O_r_minus", "H2O"],
+            products: ["OH_minus", "OH_r"],
+            k_value: 1.8e6
+        ),
+        //24) O_r_minus + O2 -> O3_minus
+        (
+            reactants: ["O_r_minus", "O2"],
+            products: ["O3_minus"],
+            k_value: 3.6e9
+        ),
+        //25) O_r_minus + O2_r_minus -> 2 OH_minus + O2
+        (
+            reactants: ["O_r_minus", "O2_r_minus"],
+            products: ["OH_minus", "OH_minus", "O2"],
+            k_value: 6.0e8
+        ),
+  ],
+)
