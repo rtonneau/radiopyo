@@ -18,11 +18,11 @@ from typing import (
 )
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry import ABCouple, ABPartner, CstSpecies, KReaction
-from radiopyo.chemistry.michaelis import MichaelisMenten
-from radiopyo.chemistry.radiolytic import RadiolyticReaction
-from radiopyo.chemistry.species import TrackedSpecies
-from radiopyo.utils.collections import MappedSpecies, SnapSpecies
+from radiopyo_vec.chemistry import ABCouple, ABPartner, CstSpecies, KReaction
+from radiopyo_vec.chemistry.michaelis import MichaelisMenten
+from radiopyo_vec.chemistry.radiolytic import RadiolyticReaction
+from radiopyo_vec.chemistry.species import TrackedSpecies
+from radiopyo_vec.utils.collections import MappedSpecies, SnapSpecies
 
 # ------------------------------------------------------------------------------------ #
 #                               TYPE CHECKING ONLY IMPORT                              #
@@ -30,7 +30,7 @@ from radiopyo.utils.collections import MappedSpecies, SnapSpecies
 if TYPE_CHECKING:
     import pathlib
 
-    from radiopyo.chemistry.species import SimSpecies
+    from radiopyo_vec.chemistry.species import SimSpecies
 
 # ------------------------------------------------------------------------------------ #
 #                                      DECORATORS                                      #

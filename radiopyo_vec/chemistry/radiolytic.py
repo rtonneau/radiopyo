@@ -9,12 +9,13 @@ from typing import (
 import numpy as np
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
-from radiopyo.chemistry.base_chemistry import BaseChemicalReaction, ReactionSpecies
+from radiopyo_vec.chemistry.base_chemistry import BaseChemicalReaction
+from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies, CstSpecies
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.utils.collections import MappedSpecies
+    from radiopyo_vec.utils.collections import MappedSpecies
 
 __all__ = ["ge_to_kr",
            "RadiolyticReaction",
@@ -44,11 +45,8 @@ class RadiolyticReaction(BaseChemicalReaction):
     """
     _reaction_cst: float
 
-    def __init__(self, species: List[ReactionSpecies], reaction_cst: float):
-        if len(species) > 1:
-            raise TypeError(
-                f"A radiolytic reaction can contain only one product! ({species})")
-        super().__init__(species)
+    def __init__(self, reaction_cst: float):
+        super().__init__()
         self._reaction_cst = reaction_cst
 
     def label(self) -> str:
@@ -61,7 +59,11 @@ class RadiolyticReaction(BaseChemicalReaction):
         return kr_to_ge(self._reaction_cst)
 
     @classmethod
-    def new_from_ge(cls, species: str, ge: float) -> RadiolyticReaction:
+    def new_from_dict(cls,
+                      product: str,
+                      ge: float,
+                      list_sp: ListSpecies,
+                      ) -> RadiolyticReaction:
         """new_from_ge _summary_
 
         Args:
@@ -71,7 +73,9 @@ class RadiolyticReaction(BaseChemicalReaction):
         Returns:
             RadiolyticReaction: _description_
         """
-        return cls([ReactionSpecies.new_product(species),], ge_to_kr(ge))
+        new = cls(ge_to_kr(ge))
+        new.add_as_product(list_sp.get_or_create_sim_species(product))
+        return new
 
     # ----- Implement Protocol IsChemicalReaction from base_chemistry.py ----- #
     def compute_reaction(self,
@@ -86,7 +90,7 @@ class RadiolyticReaction(BaseChemicalReaction):
         return np.zeros(species.number_tracked_species)
     # ------------------------------------------------------------------------ #
 
-    def add_as_reactant(self, sp: str) -> None:
+    def add_as_reactant(self, sp: SimSpecies) -> None:
         NotImplementedError("Not implemented for Radiolytic Reactions")
 
     def __str__(self) -> str:

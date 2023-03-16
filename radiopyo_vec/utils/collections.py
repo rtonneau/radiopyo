@@ -11,7 +11,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from radiopyo.chemistry.acid_base import ABPartition
+    from radiopyo_vec.chemistry.acid_base import ABPartition
 
 __all__ = [
     "MappedSpecies",

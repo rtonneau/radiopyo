@@ -9,17 +9,16 @@ from typing import (
 
 import numpy as np
 
-from radiopyo.chemistry.base_chemistry import (
+from radiopyo_vec.chemistry.base_chemistry import (
     BaseChemicalReaction,
-    ReactionSpecies,
-    ReactionSpeciesEnum,
 )
+from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.utils.collections import MappedSpecies
+    from radiopyo_vec.utils.collections import MappedSpecies
 
 __all__ = [
     "MichaelisMenten",
@@ -33,28 +32,16 @@ __all__ = [
 class MichaelisMenten(BaseChemicalReaction):
     k_value: float
     k_micha: float
-    _substrate: ReactionSpecies
-    _enzyme: ReactionSpecies
+    substrate: SimSpecies
+    enzyme: SimSpecies
 
     def __init__(self,
-                 species: List[ReactionSpecies],
-                 stoichio: List[int],
                  k_value: float,
                  k_micha: float,
                  ):
-        super().__init__(species)
+        super().__init__()
         self.k_value = k_value
         self.k_micha = k_micha
-        self.stoichio = stoichio
-
-    @classmethod
-    def new_empty(cls) -> MichaelisMenten:
-        """new_empty _summary_
-
-        Returns:
-            MichaelisMenten: _description_
-        """
-        return cls([], [], 0.0, 0.0,)
 
     @classmethod
     def from_dict(cls,
@@ -63,6 +50,7 @@ class MichaelisMenten(BaseChemicalReaction):
                   products: List[str],
                   k_value: float,
                   k_micha: float,
+                  list_sp: ListSpecies,
                   ) -> MichaelisMenten:
         """Create a KReaction from a dictionary
 
@@ -74,10 +62,9 @@ class MichaelisMenten(BaseChemicalReaction):
         Returns:
             KReaction
         """
-        new = cls.new_empty()
-        new.set_k_value(k_value)
-        new.set_k_micha(k_micha)
-        new._enzyme = ReactionSpecies.new_enzyme(enzyme)
+        new = cls(k_value, k_micha)
+
+        new.enzyme = list_sp.get_or_create_cst_species(enzyme)
         if isinstance(substrate, str):
             substrate = [substrate]
         elif len(substrate) > 1 and len(set(substrate)) > 1:
@@ -86,30 +73,14 @@ class MichaelisMenten(BaseChemicalReaction):
                 f" must all be the same if provide as list. Found: {substrate}"
             )
 
-        new._substrate = ReactionSpecies.new_reactant(substrate[0])
+        new.substrate = list_sp.get_or_create_sim_species(substrate[0])
 
         for sp in substrate:
-            new.add_as_reactant(sp)
+            new.add_as_reactant(list_sp.get_or_create_sim_species(sp))
 
         for sp in products:
-            new.add_as_product(sp)
+            new.add_as_product(list_sp.get_or_create_sim_species(sp))
         return new
-
-    def set_k_value(self, k_value: float) -> None:
-        """set_k_value _summary_
-
-        Args:
-            k_value (float): _description_
-        """
-        self.k_value = float(k_value)
-
-    def set_k_micha(self, k_micha: float) -> None:
-        """set_k_value _summary_
-
-        Args:
-            k_value (float): _description_
-        """
-        self.k_micha = float(k_micha)
 
     def compute_reaction(self,
                          dose_rate: float,
@@ -119,9 +90,9 @@ class MichaelisMenten(BaseChemicalReaction):
         Reaction rate: R = k_value * [enzyme] * [substrate] / (k_m + [substrate])
         Enzyme => UntrackedSpecies.
         """
-        res = species[self._enzyme.label].cc * \
-            species[self._substrate.label].cc
-        res /= (self.k_micha + species[self._substrate.label].cc)
+        res = species[self.enzyme.label].cc * \
+            species[self.substrate.label].cc
+        res /= (self.k_micha + species[self.substrate.label].cc)
         return self._rate_vec * self.k_value * res
 
     def compute_jacobian(self,
@@ -137,11 +108,11 @@ class MichaelisMenten(BaseChemicalReaction):
         Returns:
             NDArray[np.float64]: _description_
         """
-        res = self.k_value * self.k_micha * species[self._enzyme.label].cc
-        res /= (species[self._substrate.label].cc+self.k_micha)
-        res /= (species[self._substrate.label].cc+self.k_micha)
+        res = self.k_value * self.k_micha * species[self.enzyme.label].cc
+        res /= (species[self.substrate.label].cc+self.k_micha)
+        res /= (species[self.substrate.label].cc+self.k_micha)
         # d_R/dCt => (d_R/dsp) * (dsp/dCt)
-        return self._rate_vec * species[self._substrate.label].ab_derive * res
+        return self._rate_vec * species[self.substrate.label].ab_derive * res
 
     def __str__(self) -> str:
         out = ""

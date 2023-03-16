@@ -10,17 +10,17 @@ from typing import (
 
 import numpy as np
 
-from radiopyo.chemistry.base_chemistry import (
+from radiopyo_vec.chemistry.base_chemistry import (
     BaseChemicalReaction,
-    ReactionSpecies,
-    ReactionSpeciesEnum,
 )
+
+from radiopyo_vec.chemistry.species import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.utils.collections import MappedSpecies
+    from radiopyo_vec.utils.collections import MappedSpecies
 
 __all__ = [
     "ReactionSpeciesEnum",
@@ -37,28 +37,17 @@ class KReaction(BaseChemicalReaction):
     k_value: float
 
     def __init__(self,
-                 species: List[ReactionSpecies],
                  k_value: float,
-                 stoichio: List[int]
                  ):
-        super().__init__(species)
+        super().__init__()
         self.k_value = k_value
-        self.stoichio = stoichio
-
-    @classmethod
-    def new_empty(cls) -> KReaction:
-        """new_empty _summary_
-
-        Returns:
-            KReaction: _description_
-        """
-        return cls([], 0.0, [])
 
     @classmethod
     def from_dict(cls,
                   reactants: List[str],
                   products: List[str],
-                  k_value: float
+                  k_value: float,
+                  list_sp: ListSpecies,
                   ) -> KReaction:
         """Create a KReaction from a dictionary
 
@@ -70,32 +59,25 @@ class KReaction(BaseChemicalReaction):
         Returns:
             KReaction
         """
-        new = cls.new_empty()
-        new.set_k_value(k_value)
+        new = cls(k_value)
         for sp in reactants:
-            new.add_as_reactant(sp)
+            sim_sp = list_sp.get_or_create_sim_species(sp)
+            new.add_as_reactant(sim_sp)
 
         # Case of n*A -> B, then n*k is measured/given
         if len(new.reactants) == 1:
             # Compute k: divide by reactant's stoichio
-            new.set_k_value(k_value/new.stoi_reactants[0])
+            new.k_value /= new.stoi_reactants[0]
 
         for sp in products:
-            new.add_as_product(sp)
+            sim_sp = list_sp.get_or_create_sim_species(sp)
+            new.add_as_product(sim_sp)
         return new
 
-    def set_k_value(self, k_value: float) -> None:
-        """set_k_value _summary_
-
-        Args:
-            k_value (float): _description_
-        """
-        self.k_value = float(k_value)
-
     def compute_reaction(self,
-                          dose_rate: float,
-                          species: MappedSpecies,
-                          ) -> NDArray[np.float64]:
+                         dose_rate: float,
+                         species: MappedSpecies,
+                         ) -> NDArray[np.float64]:
         """Compute the reaction rate of a reaction"""
 
         res = reduce(mul, [species[sp.label].cc**stoi

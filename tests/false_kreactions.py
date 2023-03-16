@@ -1,6 +1,6 @@
 
-from radiopyo.chemistry.k_reactions import ReactionSpecies, KReaction
-from radiopyo.chemistry import RawSpecies
+from radiopyo_vec.chemistry.k_reactions import ReactionSpecies, KReaction
+from radiopyo_vec.chemistry import RawSpecies
 
 new = KReaction.new_empty()
 
@@ -20,4 +20,3 @@ print(f"Is instance RawSpecies: ", isinstance(sp, RawSpecies))
 print(f"Equality with 'e_aq' : ", sp == "e_aq")
 
 print(f"Get idx of 'e_aq': ", new._get_reactant_idx("e_aq"))
-

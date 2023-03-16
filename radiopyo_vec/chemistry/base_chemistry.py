@@ -14,13 +14,13 @@ from typing import (
 
 import numpy as np
 
-from radiopyo.chemistry.species import RawSpecies
+from radiopyo_vec.chemistry.species import RawSpecies, SimSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.utils.collections import MappedSpecies
+    from radiopyo_vec.utils.collections import MappedSpecies
 
 __all__ = [
     "ReactionRate",
@@ -67,60 +67,6 @@ class ReactionRate(NamedTuple):
         return cls(ReactionRateEnum.Consumption, reaction_index)
 
 
-class ReactionSpeciesEnum(Enum):
-    """"""
-    Product = 1
-    Reactant = 2
-    Enzyme = 3
-
-
-class ReactionSpecies(RawSpecies):
-    """"""
-    role: ReactionSpeciesEnum
-
-    def __init__(self, label: str, role: ReactionSpeciesEnum):
-        super().__init__(label)
-        self.role = role
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-    def __str__(self) -> str:
-        out = []
-        if self.role is ReactionSpeciesEnum.Product:
-            out.append("Product<")
-        else:
-            out.append("Reactant<")
-        out.append(f"{self.label}>")
-        return "".join(out)
-
-    @classmethod
-    def new_product(cls, label: str) -> ReactionSpecies:
-        """Create a new ReactionSpecies as product"""
-        return cls(label, ReactionSpeciesEnum.Product)
-
-    @classmethod
-    def new_reactant(cls, label: str) -> ReactionSpecies:
-        """Create a new ReactionSpecies as reactant"""
-        return cls(label, ReactionSpeciesEnum.Reactant)
-
-    @classmethod
-    def new_enzyme(cls, label: str) -> ReactionSpecies:
-        """Create a new ReactionSpecies as Enzyme"""
-        return cls(label, ReactionSpeciesEnum.Enzyme)
-
-    def is_product(self) -> bool:
-        """Check if the species is defined as a product """
-        return self.role is ReactionSpeciesEnum.Product
-
-    def is_reactant(self) -> bool:
-        """Check if the species is defined as a reactant """
-        return self.role is ReactionSpeciesEnum.Reactant
-
-    def is_enzyme(self) -> bool:
-        """Check if the species is defined as a reactant """
-        return self.role is ReactionSpeciesEnum.Enzyme
-
 # ---------------------------------------------------------------------------- #
 #                          BASIC CHEMISTRY DEFINITIONS                         #
 # ---------------------------------------------------------------------------- #
@@ -128,8 +74,8 @@ class ReactionSpecies(RawSpecies):
 
 class IsChemicalReaction(Protocol):
     """ """
-    reactants: List[ReactionSpecies]
-    products: List[ReactionSpecies]
+    reactants: List[SimSpecies]
+    products: List[SimSpecies]
     stoi_reactants: List[int]
     stoi_products: List[int]
     reactants_idx: List[int | None]
@@ -150,7 +96,7 @@ class IsChemicalReaction(Protocol):
                          ) -> NDArray[np.float64]:
         """Compute the jacobian of the reaction rate"""
 
-    def iter_species(self) -> Iterable[ReactionSpecies]:
+    def iter_species(self) -> Iterable[SimSpecies]:
         """Iter over species involved in the reaction"""
 
     def iter_reactants(self) -> Iterable[Tuple[RawSpecies, int]]:
@@ -162,15 +108,15 @@ class IsChemicalReaction(Protocol):
 
 class BaseChemicalReaction():
     """"""
-    reactants: List[ReactionSpecies]
-    products: List[ReactionSpecies]
+    reactants: List[SimSpecies]
+    products: List[SimSpecies]
     stoi_reactants: List[int]
     stoi_products: List[int]
     reactants_idx: List[int | None]
     products_idx: List[int | None]
     _rate_vec: NDArray[np.float64]
 
-    def __init__(self, species: List[ReactionSpecies]):
+    def __init__(self) -> None:
         self.reactants = []
         self.products = []
         self.stoi_products = []
@@ -178,33 +124,22 @@ class BaseChemicalReaction():
         self.reactants_idx = []
         self.products_idx = []
 
-        for elt in species:
-            if elt.is_product():
-                self.add_as_product(elt.label)
-            else:
-                self.add_as_reactant(elt.label)
-
     def __contains__(self, other: object) -> bool:
         """"""
         if isinstance(other, (str, RawSpecies)):
             return len([elt for elt in self.iter_species() if elt == other]) > 0
         raise NotImplementedError
 
-    @classmethod
-    def new_empty(cls) -> BaseChemicalReaction:
-        """"""
-        return cls([])
-
     def init_rate_vec(self, species: MappedSpecies) -> None:
         self._rate_vec = np.zeros(species.number_tracked_species)
         for idx, stoi in zip(self.reactants_idx, self.stoi_reactants):
-            if idx is None: # No need to add it, related to an untracked species
+            if idx is None:  # No need to add it, related to an untracked species
                 continue
-            self._rate_vec[idx] -= stoi # Reactants are consumed!
+            self._rate_vec[idx] -= stoi  # Reactants are consumed!
         for idx, stoi in zip(self.products_idx, self.stoi_products):
-            if idx is None: # No need to add it, related to an untracked species
+            if idx is None:  # No need to add it, related to an untracked species
                 continue
-            self._rate_vec[idx] += stoi # Products are ... produced!
+            self._rate_vec[idx] += stoi  # Products are ... produced!
 
     def compute_reaction(self,
                          dose_rate: float,
@@ -219,15 +154,15 @@ class BaseChemicalReaction():
         """Compute the jacobian of the reaction rate"""
         raise NotImplementedError
 
-    def iter_species(self) -> Iterable[ReactionSpecies]:
+    def iter_species(self) -> Iterable[SimSpecies]:
         """Iter over species involved in the reaction"""
         return chain(self.reactants, self.products)
 
-    def iter_reactants(self) -> Iterable[Tuple[ReactionSpecies, int]]:
+    def iter_reactants(self) -> Iterable[Tuple[SimSpecies, int]]:
         """ Iter over reactants only"""
         return zip(self.reactants, self.stoi_reactants)
 
-    def iter_products(self) -> Iterable[Tuple[ReactionSpecies, int]]:
+    def iter_products(self) -> Iterable[Tuple[SimSpecies, int]]:
         """Iter over products only"""
         return zip(self.products, self.stoi_products)
 
@@ -259,34 +194,40 @@ class BaseChemicalReaction():
         """"""
         return len([elt for elt in self.iter_products() if elt == sp]) > 0
 
-    def _get_product_idx(self, product: str) -> int:
+    def _get_product_idx(self, product: SimSpecies | str) -> int:
         """"""
+        key = product
+        if isinstance(product, SimSpecies):
+            key = product.label
         for idx, (sp, _) in enumerate(self.iter_products()):
-            if sp == product:
+            if sp.label == key:
                 return idx
         raise KeyError
 
-    def _get_reactant_idx(self, reactant: str) -> int:
+    def _get_reactant_idx(self, reactant: SimSpecies | str) -> int:
         """"""
+        key = reactant
+        if isinstance(reactant, SimSpecies):
+            key = reactant.label
         for idx, (sp, _) in enumerate(self.iter_reactants()):
-            if sp == reactant:
+            if sp.label == key:
                 return idx
         raise KeyError
 
-    def add_as_product(self, sp: str) -> None:
+    def add_as_product(self, sp: SimSpecies) -> None:
         """"""
         try:
             index = self._get_product_idx(sp)
             self.stoi_products[index] += 1
         except KeyError:
-            self.products.append(ReactionSpecies.new_product(sp))
+            self.products.append(sp)
             self.stoi_products.append(1)
 
-    def add_as_reactant(self, sp: str) -> None:
+    def add_as_reactant(self, sp: SimSpecies) -> None:
         """"""
         try:
             index = self._get_reactant_idx(sp)
             self.stoi_reactants[index] += 1
         except KeyError:
-            self.reactants.append(ReactionSpecies.new_reactant(sp))
+            self.reactants.append(sp)
             self.stoi_reactants.append(1)

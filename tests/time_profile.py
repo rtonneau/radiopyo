@@ -5,12 +5,12 @@ from pathlib import Path
 
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
-import radiopyo as rp
-from radiopyo.ode_solver import derive, jac
+import radiopyo_vec as rp
+from radiopyo_vec.ode_solver import derive, jac
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.physics.beam import ConstantBeam, PulsedBeam
-from radiopyo.sim_env import SimEnv
+from radiopyo_vec.physics.beam import ConstantBeam, PulsedBeam
+from radiopyo_vec.sim_env import SimEnv
 
 file = Path(rf"{rp.__path__[0]}\data\reactions.ron")
 

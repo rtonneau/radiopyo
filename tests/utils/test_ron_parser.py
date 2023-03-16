@@ -2,8 +2,8 @@ import pathlib
 
 import pytest
 
-import radiopyo as rp
-from radiopyo.utils.ron_parser import RonFileParser
+import radiopyo_vec as rp
+from radiopyo_vec.utils.ron_parser import RonFileParser
 
 
 def test_file_parser():

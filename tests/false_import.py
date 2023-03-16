@@ -1,18 +1,14 @@
 
-import radiopyo as rp
-from radiopyo.utils.ron_parser import RonFileParser
 import pathlib
 
+import radiopyo_vec as rp
+from radiopyo_vec.physics.beam import ConstantBeam
+from radiopyo_vec.sim_env import SimEnv
 
 file = pathlib.Path(rf"{rp.__path__[0]}\data\reactions_bio.ron")
 
-parser = RonFileParser(file)
-parser.parse_file()
+if __name__ == "__main__":
+    beam = ConstantBeam("e", 5)
+    env = SimEnv.from_ron_file(file)
 
-x, y = parser.build_species_list()
-
-for elt in y:
-    print(elt)
-
-for elt in x:
-    print(elt)
+    env.make_kreaction_matrix()

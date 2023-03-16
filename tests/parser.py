@@ -1,9 +1,9 @@
 
 import pathlib
 
-import radiopyo as rp
-from radiopyo.chemistry.species import TrackedSpecies
-from radiopyo.sim_env import SimEnv
+import radiopyo_vec as rp
+from radiopyo_vec.chemistry.species import TrackedSpecies
+from radiopyo_vec.sim_env import SimEnv
 
 file = pathlib.Path(rf"{rp.__path__[0]}\data\reactions.ron")
 

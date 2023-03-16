@@ -1,6 +1,6 @@
 import pytest
 
-from radiopyo.physics import beam
+from radiopyo_vec.physics import beam
 
 
 class TestCstTimer():

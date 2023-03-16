@@ -14,9 +14,12 @@ from typing import (
 import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry.acid_base import ABCouple
-from radiopyo.chemistry.species import CstSpecies, TrackedSpecies
-from radiopyo.utils.ron_parser import RonFileParser
+from radiopyo_vec.chemistry.acid_base import ABCouple
+from radiopyo_vec.chemistry.k_reactions import KReaction
+from radiopyo_vec.chemistry.michaelis import MichaelisMenten
+from radiopyo_vec.chemistry.radiolytic import RadiolyticReaction
+from radiopyo_vec.chemistry.species import CstSpecies, ListSpecies, SimSpecies
+from radiopyo_vec.utils.ron_parser import RonFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
@@ -24,9 +27,8 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from radiopyo.chemistry.base_chemistry import IsChemicalReaction
-    from radiopyo.chemistry.species import SimSpecies
-    from radiopyo.utils.collections import MappedSpecies
+    from radiopyo_vec.chemistry.base_chemistry import IsChemicalReaction
+    from radiopyo_vec.utils.collections import MappedSpecies
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",
@@ -35,6 +37,14 @@ __all__ = ["SimEnv",
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
+
+
+@dataclass
+class ReactionsList:
+    acid_base: List[ABCouple]
+    k_reaction: List[KReaction]
+    enzymatic: List[MichaelisMenten]
+    radiolytic: List[RadiolyticReaction]
 
 
 @ dataclass
@@ -46,23 +56,20 @@ class SimEnv():
                     sorted so that all tracked species are at the begin.
 
     """
-    reactions: Collection[IsChemicalReaction]
-    species: List[SimSpecies]
+    reactions: ReactionsList
+    species: ListSpecies
     sp_data: MappedSpecies
     bio_param: Dict[str, float]
     initial_cc: Dict[str, float]
 
     def iter_ABCouple(self) -> Iterable[ABCouple]:
-        return [reaction for reaction in self.species if isinstance(reaction,
-                                                                    ABCouple)]
+        return iter(self.reactions.acid_base)
 
-    def iter_TrackedSpecies(self) -> Iterable[TrackedSpecies]:
-        return [reaction for reaction in self.species
-                if isinstance(reaction, TrackedSpecies)]
+    def iter_SimSpecies(self) -> Iterable[SimSpecies]:
+        return self.species.iter_sim_species()
 
     def iter_CstSpecies(self) -> Iterable[CstSpecies]:
-        return [reaction for reaction in self.species
-                if isinstance(reaction, CstSpecies)]
+        return self.species.iter_cst_species()
 
     def number_tracked_species(self) -> int:
         """number_tracked_species _summary_
@@ -120,34 +127,8 @@ class SimEnv():
                    initial_cc=initial_cc,
                    )
 
-    def update_cc_species(self, y: NDArray[np.float64]) -> MappedSpecies:
-        out = self.sp_data.clone()
-        # Copy cc of TrackedSpecies from ODE Solver
-        for (idx, sp) in enumerate(self.iter_TrackedSpecies()):
-            # Force positive concentrations & Convert [µ-mol] / [l] to [mol] / [l]
-            out[sp.label].update_cc(y[idx] * 1e-6 if y[idx] > 0 else 0.0)
-        # Still need to compute acid/base
-        return self.compute_acid_base(out)
-
     def compute_acid_base(self, sp_data: MappedSpecies) -> MappedSpecies:
-        for ab in self.iter_ABCouple():
-            # Compute partitions
-            part = ab.compute_partition(sp_data[ab.label].cc,
-                                        sp_data["H_plus"].cc)
-            sp_data[ab.acid.label].update_acid_from_partition(part)
-            sp_data[ab.base.label].update_base_from_partition(part)
-        return sp_data
-
-    def compute_reactions(self,
-                          dose_rate: float,
-                          sp_data: MappedSpecies,
-                          ) -> NDArray[np.float64]:
-        return reduce(np.add, [elt.compute_reaction(dose_rate, sp_data)
-                               for elt in self.reactions])
-
-    def compute_jacobians(self, sp_data: MappedSpecies) -> List[NDArray]:
-
-        return [elt.compute_jacobian(sp_data) for elt in self.reactions]
+        pass
 
     def initial_values(self) -> NDArray[np.float64]:
         """initial_values _summary_
@@ -156,7 +137,7 @@ class SimEnv():
             NDArray[np.float64]: _description_
         """
         out = np.zeros(self.sp_data.number_tracked_species, dtype=np.float64)
-        for species in self.iter_TrackedSpecies():
+        for species in self.species.iter_sim_species():
             if species.label not in self.initial_cc:
                 continue
             idx = self.sp_data[species.label].index
@@ -169,9 +150,14 @@ class SimEnv():
         return out
 
     def species_labels(self) -> List[str]:
-        out = []
-        for sp in self.species:
-            if not isinstance(sp, TrackedSpecies):
-                break
-            out.append(sp.label)
-        return out
+        pass
+
+    def make_kreaction_matrix(self) -> None:
+        # Step 1 -> Find the highest species's stoichio
+        max_stoichio = 0
+        for reaction in self.reactions.k_reaction:
+            max_stoichio = max(max_stoichio,
+                               max(reaction.stoi_products),
+                               max(reaction.stoi_reactants),
+                               )
+        #u = np.zeros(self.s)

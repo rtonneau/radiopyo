@@ -3,55 +3,12 @@ from __future__ import annotations
 import enum
 from typing import NamedTuple
 
-from .species import TrackedSpecies, UnTrackedSpecies
+from radiopyo_vec.chemistry.species import SimSpecies, ListSpecies
 
 __all__ = [
-    "Chemical",
     "ABPartition",
-    "ABPartner",
     "ABCouple",
 ]
-
-# ---------------------------------------------------------------------------- #
-#                          SPECIFIC SPECIES DEFINITION                         #
-# ---------------------------------------------------------------------------- #
-
-
-class Chemical(enum.Enum):
-    Acid = 1
-    Base = 2
-
-
-class ABPartner(UnTrackedSpecies):
-    """"""
-    label: str
-    role: Chemical
-
-    def __init__(self, label: str, role: Chemical):
-        super().__init__(label)
-        self.role = role
-
-    @classmethod
-    def new_acid(cls, label: str) -> ABPartner:
-        """Create a new Acid ABPartner"""
-        return cls(label, Chemical.Acid)
-
-    @classmethod
-    def new_base(cls, label: str) -> ABPartner:
-        """Create a new Acid ABPartner"""
-        return cls(label, Chemical.Base)
-
-    def __str__(self) -> str:
-        out = []
-        if self.role is Chemical.Acid:
-            out.append("Acid<")
-        else:
-            out.append("Base<")
-        out.append(f"{self.label}>")
-        return "".join(out)
-
-    def __repr__(self) -> str:
-        return self.__str__()
 
 # ---------------------------------------------------------------------------- #
 #                         ACID BASE PARTITION DEFINITION                       #
@@ -82,26 +39,29 @@ class ABPartition(NamedTuple):
 # ---------------------------------------------------------------------------- #
 
 
-class ABCouple(TrackedSpecies):
+class ABCouple():
     """"""
-    acid: ABPartner
-    base: ABPartner
+    acid: SimSpecies
+    base: SimSpecies
     pKa: float
     ka: float
 
-    def __init__(self, acid: ABPartner, base: ABPartner, pKa: float, index: int):
+    def __init__(self, acid: SimSpecies, base: SimSpecies, pKa: float):
         self.pKa = pKa
         self.ka = 10**(-self.pKa)
         self.acid = acid
         self.base = base
-        super().__init__(label=f"{acid.label}/{base.label}", index=index)
 
     @classmethod
-    def from_dict(cls, acid: str, base: str, pKa: float, index: int = -1) -> ABCouple:
-        return cls(acid=ABPartner.new_acid(acid),
-                   base=ABPartner.new_base(base),
+    def from_dict(cls,
+                  acid: str,
+                  base: str,
+                  pKa: float,
+                  list_sp: ListSpecies,
+                  ) -> ABCouple:
+        return cls(acid=list_sp.get_or_create_sim_species(acid),
+                   base=list_sp.get_or_create_sim_species(base),
                    pKa=pKa,
-                   index=index,
                    )
 
     def compute_partition(self, cc_tot: float, cc_H_plus: float) -> ABPartition:

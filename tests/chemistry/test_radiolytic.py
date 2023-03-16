@@ -1,6 +1,6 @@
 import pytest
 
-from radiopyo.chemistry import radiolytic
+from radiopyo_vec.chemistry import radiolytic
 
 
 def test_conversion():
