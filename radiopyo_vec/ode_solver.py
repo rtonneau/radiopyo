@@ -35,7 +35,12 @@ def jac(t: float,
 
 def derive(t: float,
            y: NDArray[np.float64],
-           env: SimEnv,
+           Ri: NDArray[np.float64],
+           Riy: NDArray[np.int8],
+           Gi: NDArray[np.float64],
+           En_enzy: NDArray[np.int8],
+           En_subs: NDArray[np.int8],
+           En_kmki: NDArray[np.float64],
            beam: ParticleBeam
            ) -> NDArray[np.float64]:
     pass

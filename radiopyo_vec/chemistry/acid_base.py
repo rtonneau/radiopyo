@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import enum
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
-from radiopyo_vec.chemistry.species import SimSpecies, ListSpecies
+if TYPE_CHECKING:
+    from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies
 
 __all__ = [
     "ABPartition",
@@ -59,8 +59,8 @@ class ABCouple():
                   pKa: float,
                   list_sp: ListSpecies,
                   ) -> ABCouple:
-        return cls(acid=list_sp.get_or_create_sim_species(acid),
-                   base=list_sp.get_or_create_sim_species(base),
+        return cls(acid=list_sp.get_or_create_dyn_species(acid),
+                   base=list_sp.get_or_create_dyn_species(base),
                    pKa=pKa,
                    )
 
@@ -73,7 +73,7 @@ class ABCouple():
         )
 
     def __str__(self) -> str:
-        return f"{self.acid}/{self.base}"
+        return f"{self.acid.label}/{self.base.label}"
 
     def __repr__(self) -> str:
         return f"AcidBase<{self.acid}, {self.base}, pKa: {self.pKa}>"

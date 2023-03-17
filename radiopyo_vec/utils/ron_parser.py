@@ -15,22 +15,25 @@ from typing import (
     Pattern,
     Tuple,
     Union,
+    TypedDict,
 )
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo_vec.chemistry import ABCouple, ABPartner, CstSpecies, KReaction
-from radiopyo_vec.chemistry.michaelis import MichaelisMenten
-from radiopyo_vec.chemistry.radiolytic import RadiolyticReaction
-from radiopyo_vec.chemistry.species import TrackedSpecies
-from radiopyo_vec.utils.collections import MappedSpecies, SnapSpecies
+from radiopyo_vec.chemistry import (
+    ABCouple,
+    CstSpecies,
+    KReaction,
+    ListSpecies,
+    MichaelisMenten,
+    RadiolyticReaction,
+    SimSpecies,
+)
 
 # ------------------------------------------------------------------------------------ #
 #                               TYPE CHECKING ONLY IMPORT                              #
 # ------------------------------------------------------------------------------------ #
 if TYPE_CHECKING:
     import pathlib
-
-    from radiopyo_vec.chemistry.species import SimSpecies
 
 # ------------------------------------------------------------------------------------ #
 #                                      DECORATORS                                      #
@@ -328,6 +331,36 @@ class RonBlock():
         return (name, res, txt)
 
 
+class AcidBaseDict(TypedDict):
+    acid: str
+    base: str
+    pKa: float
+
+
+class KReactionDict(TypedDict):
+    reactants: List[str]
+    products: List[List]
+    k_values: float
+
+
+class EnzymaticDict(TypedDict):
+    enzyme: str
+    substrate: str | List[str]
+    products: List[str]
+    k_value: float
+    k_micha: float
+
+
+class ParsedItems(TypedDict, total=False):
+    bio_param: Dict[str, float]
+    initial_concentrations: Dict[str, float]
+    fixed_concentrations: Dict[str, float]
+    acid_base: List[KReactionDict]
+    k_reactions: List[KReactionDict]
+    radiolytic: Dict[str, float]
+    enzymatic_reactions: List[EnzymaticDict]
+
+
 class RonFileParser(object):
     """
     Class parsing RON files.
@@ -368,7 +401,7 @@ class RonFileParser(object):
             self.items[name] = RonBlock(name, struct).recursive_walk2(struct)
 
     def _try_key_in_items(self, key: str) -> None:
-        """_try_key_in_items 
+        """_try_key_in_items
 
         Args:
             key (str): _description_
@@ -381,7 +414,7 @@ class RonFileParser(object):
                 f"Unable to locate {key} in file {self.path}")
 
     def build_bio_parameters(self) -> Dict:
-        """build_bio_parameters 
+        """build_bio_parameters
 
         Returns:
             Dict: biological parameters as dict.
@@ -405,7 +438,9 @@ class RonFileParser(object):
         self._try_key_in_items(key)
         return self.items[key]
 
-    def build_radiolytics(self) -> List[RadiolyticReaction]:
+    def build_radiolytics(self,
+                          sim_sp: ListSpecies = None,
+                          ) -> Tuple[List[RadiolyticReaction], ListSpecies]:
         """build_radiolytics _summary_
 
         Returns:
@@ -413,10 +448,13 @@ class RonFileParser(object):
         """
         key = "radiolytic"
         self._try_key_in_items(key)
-        return [RadiolyticReaction.new_from_ge(species, ge)
-                for (species, ge) in self.items[key].items()]
+        if sim_sp is None:
+            sim_sp = ListSpecies()
+        return ([RadiolyticReaction.new_from_dict(species, ge, sim_sp)
+                for (species, ge) in self.items[key].items()],
+                sim_sp)
 
-    def build_cst_species(self) -> List[CstSpecies]:
+    def build_cst_species(self, sim_sp: ListSpecies) -> ListSpecies:
         """build_cst_species _summary_
 
         Returns:
@@ -424,9 +462,13 @@ class RonFileParser(object):
         """
         key = "fixed_concentrations"
         self._try_key_in_items(key)
-        return [CstSpecies(species, cc) for (species, cc) in self.items[key].items()]
+        for species, cc in self.items[key].items():
+            sim_sp.add_cst_species(species, cc)
+        return sim_sp
 
-    def build_acid_base(self) -> List[ABCouple]:
+    def build_acid_base(self,
+                        sim_sp: ListSpecies = None,
+                        ) -> Tuple[List[ABCouple], ListSpecies]:
         """build_acid_base _summary_
 
         Returns:
@@ -434,9 +476,15 @@ class RonFileParser(object):
         """
         key = "acid_base"
         self._try_key_in_items(key)
-        return [ABCouple.from_dict(**reaction) for reaction in self.items[key]]
+        if sim_sp is None:
+            sim_sp = ListSpecies()
+        return ([ABCouple.from_dict(list_sp=sim_sp, **reaction)
+                 for reaction in self.items[key]],
+                sim_sp)
 
-    def build_k_reactions(self) -> List[KReaction]:
+    def build_k_reactions(self,
+                          sim_sp: ListSpecies = None,
+                          ) -> Tuple[List[KReaction], ListSpecies]:
         """build_k_reactions
 
         Raises:
@@ -447,10 +495,15 @@ class RonFileParser(object):
         """
         key = "k_reactions"
         self._try_key_in_items(key)
-        return [KReaction.from_dict(**reaction)
-                for reaction in self.items[key]]
+        if sim_sp is None:
+            sim_sp = ListSpecies()
+        return ([KReaction.from_dict(list_sp=sim_sp, **reaction)
+                for reaction in self.items[key]],
+                sim_sp)
 
-    def build_enzymatic(self) -> List[MichaelisMenten]:
+    def build_enzymatic(self,
+                        sim_sp: ListSpecies = None,
+                        ) -> Tuple[List[MichaelisMenten], ListSpecies]:
         """build_enzymatic
 
         Raises:
@@ -461,40 +514,29 @@ class RonFileParser(object):
         """
         key = "enzymatic_reactions"
         self._try_key_in_items(key)
-        return [MichaelisMenten.from_dict(**reaction)
-                for reaction in self.items[key]]
+        if sim_sp is None:
+            sim_sp = ListSpecies()
+        return ([MichaelisMenten.from_dict(list_sp=sim_sp, **reaction)
+                for reaction in self.items[key]],
+                sim_sp)
 
-    def build_species_list(self) -> Tuple[List[SimSpecies], MappedSpecies]:
+    def build_species_list(self) -> ListSpecies:
         """build_species _summary_
 
         Returns:
             Dict: _description_
-        """
         self._try_key_in_items("acid_base")
         self._try_key_in_items("fixed_concentrations")
 
-        index: int = 0
         pH = self.build_bio_parameters()["pH"]
-        untracked: List[SimSpecies] = []
-        sp_data = MappedSpecies()
-        out: List[SimSpecies] = []
-
+        out = ListSpecies()
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        untracked.append(CstSpecies("H_plus", 10**(-pH)))
-        untracked.append(CstSpecies("OH_minus", 10**(-14+pH)))
+        out.add_cst_species("H_plus", 10**(-pH))
+        out.add_cst_species("OH_minus", 10**(-14+pH))
 
         # Add also the Acid/Base couples with it
         for reaction in self.items["acid_base"]:
-            reaction["index"] = index
-            out.append(ABCouple.from_dict(**reaction))
-            sp_data.add_tracked(SnapSpecies(out[-1].label, index=index))
-            # Create both Acid and Base "RawSpecies" which will later be
-            # appended to the final vector with all species
-            sp_data.add_untracked(SnapSpecies(reaction["acid"], index=index))
-            sp_data.add_untracked(SnapSpecies(reaction["base"], index=index))
-            untracked.append(ABPartner.new_acid(reaction["acid"]))
-            untracked.append(ABPartner.new_base(reaction["base"]))
-            index += 1
+            out.add_sim_species(ABCouple.from_dict(**reaction))
 
         k_reaction = self.build_k_reactions()
         try:
@@ -544,7 +586,4 @@ class RonFileParser(object):
                 sp_data.add_untracked(SnapSpecies(elt.label, cc))
 
         return out, sp_data
-
-
-def map_all_species(species: List[SimSpecies]) -> Dict[str, int]:
-    return {sp.label: idx for (idx, sp) in enumerate(species)}
+        """

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import reduce
-from itertools import repeat
 from operator import mul
 from typing import (
     TYPE_CHECKING,
@@ -10,11 +9,7 @@ from typing import (
 
 import numpy as np
 
-from radiopyo_vec.chemistry.base_chemistry import (
-    BaseChemicalReaction,
-)
-
-from radiopyo_vec.chemistry.species import ListSpecies
+from .base_chemistry import BaseChemicalReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
@@ -22,9 +17,9 @@ if TYPE_CHECKING:
 
     from radiopyo_vec.utils.collections import MappedSpecies
 
+    from .species import ListSpecies
+
 __all__ = [
-    "ReactionSpeciesEnum",
-    "ReactionSpecies",
     "KReaction",
 ]
 
@@ -61,59 +56,18 @@ class KReaction(BaseChemicalReaction):
         """
         new = cls(k_value)
         for sp in reactants:
-            sim_sp = list_sp.get_or_create_sim_species(sp)
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
             new.add_as_reactant(sim_sp)
 
         # Case of n*A -> B, then n*k is measured/given
         if len(new.reactants) == 1:
             # Compute k: divide by reactant's stoichio
-            new.k_value /= new.stoi_reactants[0]
+            new.k_value /= new.stoi_reactants[sp]
 
         for sp in products:
-            sim_sp = list_sp.get_or_create_sim_species(sp)
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
             new.add_as_product(sim_sp)
         return new
-
-    def compute_reaction(self,
-                         dose_rate: float,
-                         species: MappedSpecies,
-                         ) -> NDArray[np.float64]:
-        """Compute the reaction rate of a reaction"""
-
-        res = reduce(mul, [species[sp.label].cc**stoi
-                           for sp, stoi in self.iter_reactants()])
-
-        return self._rate_vec * res * self.k_value
-
-    def compute_jacobian(self,
-                         species: MappedSpecies,
-                         ) -> NDArray[np.float64]:
-        """_summary_
-
-        Args:
-            species   (Dict[str, float]): _description_
-            indexes   (Dict[str, int]): _description_
-            ab_derive (Dict[str, float]): _description_
-
-        Returns:
-            NDArray[np.float64]: _description_
-        """
-        out = np.zeros(species.number_tracked_species)
-        # First loop is the derivation species
-        for sp, stoi in self.iter_reactants():
-            idx = species[sp.label].index
-            if idx is None:  # idx is None (not a tracked species then)
-                continue
-            # Actual derive
-            out[idx] = self.k_value * stoi * \
-                np.power(species[sp.label].cc, stoi-1)
-            # d_R/dCt => (d_R/dsp) * (dsp/dCt)
-            out[idx] *= species[sp.label].ab_derive
-
-            # Loop on the other species
-            for sp2, stoi2 in filter(lambda x: x[0] != sp, self.iter_reactants()):
-                out[idx] *= (species[sp2.label].cc ** stoi2)
-        return out
 
     def __str__(self) -> str:
         out = ""

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from functools import reduce
-from operator import mul
 from typing import (
     TYPE_CHECKING,
     List,
@@ -9,16 +7,15 @@ from typing import (
 
 import numpy as np
 
-from radiopyo_vec.chemistry.base_chemistry import (
-    BaseChemicalReaction,
-)
-from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies
+from .base_chemistry import BaseChemicalReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo_vec.utils.collections import MappedSpecies
+
+    from .species import ListSpecies, SimSpecies
 
 __all__ = [
     "MichaelisMenten",
@@ -73,46 +70,14 @@ class MichaelisMenten(BaseChemicalReaction):
                 f" must all be the same if provide as list. Found: {substrate}"
             )
 
-        new.substrate = list_sp.get_or_create_sim_species(substrate[0])
+        new.substrate = list_sp.get_or_create_dyn_species(substrate[0])
 
         for sp in substrate:
-            new.add_as_reactant(list_sp.get_or_create_sim_species(sp))
+            new.add_as_reactant(list_sp.get_or_create_dyn_species(sp))
 
         for sp in products:
-            new.add_as_product(list_sp.get_or_create_sim_species(sp))
+            new.add_as_product(list_sp.get_or_create_dyn_species(sp))
         return new
-
-    def compute_reaction(self,
-                         dose_rate: float,
-                         species: MappedSpecies,
-                         ) -> NDArray[np.float64]:
-        """Compute the reaction rate of an enzymatic reaction.
-        Reaction rate: R = k_value * [enzyme] * [substrate] / (k_m + [substrate])
-        Enzyme => UntrackedSpecies.
-        """
-        res = species[self.enzyme.label].cc * \
-            species[self.substrate.label].cc
-        res /= (self.k_micha + species[self.substrate.label].cc)
-        return self._rate_vec * self.k_value * res
-
-    def compute_jacobian(self,
-                         species: MappedSpecies,
-                         ) -> NDArray[np.float64]:
-        """
-        d_R/d_subs = k_val * [enzyme] * ([subs]+k_m - [subs]) / ([subs]+k_m)**2
-        d_R/d_subs = k_val * [enzyme] * k_m / ([subs]+k_m)**2
-
-        Args:
-            species   (MappedSpecies): _description_
-
-        Returns:
-            NDArray[np.float64]: _description_
-        """
-        res = self.k_value * self.k_micha * species[self.enzyme.label].cc
-        res /= (species[self.substrate.label].cc+self.k_micha)
-        res /= (species[self.substrate.label].cc+self.k_micha)
-        # d_R/dCt => (d_R/dsp) * (dsp/dCt)
-        return self._rate_vec * species[self.substrate.label].ab_derive * res
 
     def __str__(self) -> str:
         out = ""

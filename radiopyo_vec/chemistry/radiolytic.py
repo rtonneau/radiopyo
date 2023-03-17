@@ -3,18 +3,17 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
-    List,
 )
 
 import numpy as np
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
-from radiopyo_vec.chemistry.base_chemistry import BaseChemicalReaction
-from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies, CstSpecies
+from .base_chemistry import BaseChemicalReaction
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from radiopyo_vec.chemistry.species import CstSpecies, ListSpecies, SimSpecies
     from radiopyo_vec.utils.collections import MappedSpecies
 
 __all__ = ["ge_to_kr",
@@ -50,7 +49,7 @@ class RadiolyticReaction(BaseChemicalReaction):
         self._reaction_cst = reaction_cst
 
     def label(self) -> str:
-        return self.products[0].label
+        return list(self.products.keys())[0]
 
     def kr(self) -> float:
         return self._reaction_cst
@@ -74,27 +73,16 @@ class RadiolyticReaction(BaseChemicalReaction):
             RadiolyticReaction: _description_
         """
         new = cls(ge_to_kr(ge))
-        new.add_as_product(list_sp.get_or_create_sim_species(product))
+        new.add_as_product(list_sp.get_or_create_dyn_species(product))
         return new
 
-    # ----- Implement Protocol IsChemicalReaction from base_chemistry.py ----- #
-    def compute_reaction(self,
-                         dose_rate: float,
-                         species: MappedSpecies,
-                         ) -> NDArray[np.float64]:
-        return self._rate_vec * self.kr() * dose_rate
-
-    def compute_jacobian(self,
-                         species: MappedSpecies,
-                         ) -> NDArray[np.float64]:
-        return np.zeros(species.number_tracked_species)
     # ------------------------------------------------------------------------ #
 
     def add_as_reactant(self, sp: SimSpecies) -> None:
         NotImplementedError("Not implemented for Radiolytic Reactions")
 
     def __str__(self) -> str:
-        return f"Radiolytic<{self.products[0].label}, Ge:{self.ge():.2f}>"
+        return f"Radiolytic<{self.label()}, Ge:{self.ge():.2f}>"
 
     def __repr__(self) -> str:
         return self.__str__()

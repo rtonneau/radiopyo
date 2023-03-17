@@ -1,17 +1,27 @@
 {
-	"folders": [
-		{
-			"path": "."
-		}
-	],
-	"settings": {
-		"cSpell.words": [
-			"arange",
-			"atol",
-			"kreaction",
-			"Menten",
-			"michaelis",
-			"Michaelis"
-		]
-	}
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "cSpell.words": [
+      "arange",
+      "atol",
+      "enzymatics",
+      "kreaction",
+      "kreactions",
+      "Menten",
+      "micha",
+      "michaelis",
+      "Michaelis",
+      "Radiolytic",
+      "radiolytics",
+      "radiopyo",
+      "stoi",
+      "stoichio",
+      "umol",
+      "µmol"
+    ]
+  }
 }
