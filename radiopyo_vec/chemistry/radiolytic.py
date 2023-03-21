@@ -5,16 +5,12 @@ from typing import (
     TYPE_CHECKING,
 )
 
-import numpy as np
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
 from .base_chemistry import BaseChemicalReaction
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from radiopyo_vec.chemistry.species import CstSpecies, ListSpecies, SimSpecies
-    from radiopyo_vec.utils.collections import MappedSpecies
+    from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies
 
 __all__ = ["ge_to_kr",
            "RadiolyticReaction",

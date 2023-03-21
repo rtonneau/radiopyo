@@ -1,7 +1,8 @@
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-from dataclasses import dataclass
+from contextlib import suppress
+from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -13,18 +14,20 @@ from typing import (
 import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
-from .chemistry.acid_base import ABCouple
-from .chemistry.k_reactions import KReaction
-from .chemistry.michaelis import MichaelisMenten
-from .chemistry.radiolytic import RadiolyticReaction
-from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
+from .chemistry.species import CstSpecies, DynSpecies, ListSpecies
 from .utils.ron_parser import RonFileParser
+from .utils.units import SimUnit, Units
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from pathlib import Path
 
     from numpy.typing import NDArray
+
+    from .chemistry.acid_base import ABCouple
+    from .chemistry.k_reactions import KReaction
+    from .chemistry.michaelis import MichaelisMenten
+    from .chemistry.radiolytic import RadiolyticReaction
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",
@@ -56,6 +59,7 @@ class SimEnv():
     species: ListSpecies
     bio_param: Dict[str, float]
     initial_cc: Dict[str, float]
+    sim_unit: SimUnit = field(default=SimUnit(Units.MICRO))
 
     def iter_ABCouple(self) -> Iterable[ABCouple]:
         return iter(self.reactions.acid_base)
@@ -89,17 +93,39 @@ class SimEnv():
 
         list_sp = ListSpecies()
         bio_param = parser.build_bio_parameters()
-        initial_cc = parser.build_initial_conditions()
 
-        # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
-        list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
         list_sp = parser.build_cst_species(list_sp)
+        # Manually add H_plus & OH_minus as constant A/B partners (pH related)
+        if "H2O" in list_sp:
+            list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
+            list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
 
-        ab, list_sp = parser.build_acid_base(list_sp)
-        kr, list_sp = parser.build_k_reactions(list_sp)
-        rad, list_sp = parser.build_radiolytics(list_sp)
-        enz, list_sp = parser.build_enzymatic(list_sp)
+        try:
+            ab, list_sp = parser.build_acid_base(list_sp)
+        except KeyError:
+            ab = []
+
+        try:
+            kr, list_sp = parser.build_k_reactions(list_sp)
+        except KeyError:
+            kr = []
+
+        try:
+            rad, list_sp = parser.build_radiolytics(list_sp)
+        except KeyError:
+            rad = []
+
+        try:
+            enz, list_sp = parser.build_enzymatic(list_sp)
+        except KeyError:
+            enz = []
+
+        initial_cc = parser.build_initial_conditions()
+        for label, value in initial_cc.items():
+            with suppress(KeyError):
+                sp = list_sp[label]
+                if isinstance(sp, DynSpecies):
+                    sp.set_initial_cc(value)
 
         return cls(reactions=ReactionsList(ab, kr, enz, rad),
                    species=list_sp,
@@ -107,33 +133,20 @@ class SimEnv():
                    initial_cc=initial_cc,
                    )
 
-    def compute_acid_base(self) -> None:
-        pass
-
     def initial_values(self) -> NDArray[np.float64]:
-        """initial_values _summary_
-
-        Returns:
-            NDArray[np.float64]: _description_
-
-        out = np.zeros(self.sp_data.number_tracked_species, dtype=np.float64)
-        for species in self.species.iter_sim_species():
-            if species.label not in self.initial_cc:
-                continue
-            idx = self.sp_data[species.label].index
-            if idx is None:
-                raise IndexError(
-                    f"Can't find index of tracked species:{species}")
-            out[idx] = self.initial_cc[species.label] * \
-                1e6  # Convert Units to [µmol/L]
-            self.sp_data[species.label].update_cc(out[idx])
+        out = np.zeros(len(self.species), dtype=np.float64)
+        for species in self.species:
+            out[species.index] = species.initial_cc()
+            # out[species.index] = self.sim_unit.convert_from(species.initial_cc(),
+            #                                                Units.UNITY)
         return out
-        """
 
     def species_labels(self) -> List[str]:
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
 
-    def make_kreaction_matrix(self) -> Tuple[int, NDArray, NDArray]:
+    def make_kreaction_matrix(self) -> Tuple[NDArray[np.float64],
+                                             NDArray[np.int8],
+                                             NDArray[np.float64]]:
         # Step 1 -> Find the highest species's stoichio
         max_stoichio = 0
         for reaction in self.reactions.k_reaction:
@@ -142,16 +155,19 @@ class SimEnv():
                                max(reaction.stoi_reactants.values()),
                                )
 
-        # Make Ri matrix and Riy simultaneously
-        Ri = np.zeros([(len(self.species)*max_stoichio)+1,
-                       len(self.reactions.k_reaction)],
-                       dtype=np.float64)
+        Ki = np.zeros(len(self.reactions.k_reaction), dtype=np.float64)
+        Riy = np.zeros([len(self.species), len(self.reactions.k_reaction)],
+                       dtype=np.int8)
 
-        Riy=np.zeros([len(self.species), len(self.reactions.k_reaction)],
-                       dtype = np.int8)
+        Rki = np.zeros([len(self.species),
+                        len(self.reactions.k_reaction),
+                        max_stoichio],
+                        dtype=np.float64)
 
         for col, reaction in enumerate(self.reactions.k_reaction):
-            Ri[0, col]=reaction.k_value
+            Ki[col] = reaction.k_value
+            # Ri[0, col] = self.sim_unit.convert_from(reaction.k_value,
+            #                                        Units.UNITY)
 
             # Loop over all reaction's reactants
             for sp, stoi in reaction.iter_reactants():
@@ -159,9 +175,10 @@ class SimEnv():
                 if isinstance(sp, CstSpecies):
                     continue
                 Riy[sp.index, col] -= stoi
-                for elt in range(stoi):
-                    line=(elt*len(self.species)) + sp.index + 1
-                    Ri[line, col] -= 1
+                for idx in range(stoi):
+                    Rki[sp.index, col, idx] = 1
+                if stoi < max_stoichio:
+                    Rki[:,col,stoi+1:] = np.inf
 
             # Loop over all reaction's products
             for sp, stoi in reaction.iter_products():
@@ -170,17 +187,21 @@ class SimEnv():
                     continue
                 Riy[sp.index, col] += stoi
 
-        return max_stoichio, Ri, Riy
+        return (Ki, Riy, Rki)
 
     def make_radiolytic_vector(self) -> NDArray:
-        Gi=np.zeros([len(self.species), len(self.reactions.radiolytic)],
+        Gi = np.zeros([len(self.species), len(self.reactions.radiolytic)],
                       dtype=np.float64)
         for col, radiolytic in enumerate(self.reactions.radiolytic):
             for sp, _ in radiolytic.iter_products():
                 Gi[sp.index, col] = radiolytic.kr()
+                # Gi[sp.index, col] = self.sim_unit.convert_from(radiolytic.kr(),
+                #                                               Units.UNITY)
         return Gi.sum(axis=1)
 
-    def make_enzymatic_vector(self) -> Tuple[NDArray, NDArray, NDArray]:
+    def make_enzymatic_matrix(self) -> Tuple[NDArray[np.int8],
+                                             NDArray[np.int8],
+                                             NDArray[np.float64]]:
         """
         Tricks to keep in mind: 
             * np.divide(1, x, out=np.zeros_like(x), where= x!=0)
@@ -199,7 +220,32 @@ class SimEnv():
         for col, enzymatic in enumerate(self.reactions.enzymatic):
             Ez_substrate[enzymatic.substrate.index, col] = 1
             Ez_enzyme[enzymatic.enzyme.index, col] = 1
-            Ez_kmki[0, col] = enzymatic.k_micha
-            Ez_kmki[1, col] = enzymatic.k_value
+            Ez_kmki[0, col] = self.sim_unit.convert_from(enzymatic.k_micha,
+                                                         Units.UNITY)
+            Ez_kmki[1, col] = self.sim_unit.convert_from(enzymatic.k_value,
+                                                         Units.UNITY)
 
         return Ez_substrate, Ez_enzyme, Ez_kmki
+
+    def make_acidBase_matrix(self) -> Tuple[NDArray[np.int8],
+                                            NDArray[np.int8],
+                                            NDArray[np.float64]]:
+        ABi = np.zeros([len(self.species), len(self.reactions.acid_base)],
+                       dtype=np.int8)
+        ABo = np.zeros_like(ABi, dtype=np.float64)
+        ABy = np.zeros(len(self.species), dtype=np.int8)
+        cc_H_plus = self.species.cst_sp["H_plus"].cc_value
+        for col, reaction in enumerate(self.reactions.acid_base):
+            ABi[reaction.acid.index, col] = 1
+            ABi[reaction.base.index, col] = 1
+
+            # Get AB partition with cc_tot = 1
+            part = reaction.compute_partition(1, cc_H_plus)
+            ABo[reaction.acid.index, col] = part.acid
+            ABo[reaction.base.index, col] = part.base
+
+        # To remember: operator '^' is bitwise XOR
+        # ABy will be use to reset cc values of acid and base in y (see derive)
+        ABy = np.logical_and.reduce(ABi ^ 1, axis=1).astype(np.int8)
+
+        return (ABy, ABi, ABo)

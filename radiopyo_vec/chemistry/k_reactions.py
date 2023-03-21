@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-from functools import reduce
-from operator import mul
 from typing import (
     TYPE_CHECKING,
     List,
 )
 
-import numpy as np
-
 from .base_chemistry import BaseChemicalReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from radiopyo_vec.utils.collections import MappedSpecies
-
     from .species import ListSpecies
 
 __all__ = [

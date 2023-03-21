@@ -7,7 +7,7 @@ import radiopyo_vec as rp
 from radiopyo_vec.physics.beam import ConstantBeam
 from radiopyo_vec.sim_env import SimEnv
 
-file = pathlib.Path(rf"{rp.__path__[0]}\data\reactions_bio.ron")
+file = pathlib.Path(rf"{rp.__path__[0]}\data\reactions_water.ron")
 
 if __name__ == "__main__":
     beam = ConstantBeam("e", 5)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     Gi = env.make_radiolytic_vector()
     np.savetxt(".//tests//output//Gi_matrix.csv", Gi, delimiter=",")
 
-    Ez_subs, Ez_enz, Ez_kmki = env.make_enzymatic_vector()
+    Ez_subs, Ez_enz, Ez_kmki = env.make_enzymatic_matrix()
     np.savetxt(".//tests//output//Enz_subs_matrix.csv",
                Ez_subs,
                delimiter=",",

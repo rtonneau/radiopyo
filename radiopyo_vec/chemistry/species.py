@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from itertools import chain
 from typing import (
     Dict,
     Iterable,
     Iterator,
+    Optional,
     Protocol,
 )
 
@@ -27,6 +29,7 @@ class SimSpecies(Protocol):
 
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
+    def initial_cc(self) -> float: ...
 
 
 # ------------------------------------------------------------------------------------ #
@@ -55,17 +58,25 @@ class RawSpecies():
 
 class DynSpecies(RawSpecies):
     """"""
+    cc_init: float  # Store initial value
     index: int
 
-    def __init__(self, label: str, index: int) -> None:
+    def __init__(self, label: str, index: int, cc_init: float = 0) -> None:
         super().__init__(label)
         self.index = index
+        self.cc_init = cc_init
 
     def __str__(self) -> str:
         return f"SimSpecies<{self.label}, index={self.index}>"
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def initial_cc(self) -> float:
+        return self.cc_init
+
+    def set_initial_cc(self, value: float) -> None:
+        self.cc_init = float(value)
 
 
 class CstSpecies(RawSpecies):
@@ -87,6 +98,8 @@ class CstSpecies(RawSpecies):
     def __repr__(self) -> str:
         return self.__str__()
 
+    def initial_cc(self) -> float:
+        return self.cc_value
 
 class ListSpecies():
     dyn_sp: Dict[str, DynSpecies]
@@ -106,11 +119,18 @@ class ListSpecies():
     def __len__(self) -> int:
         return len(self.dyn_sp) + len(self.cst_sp)
 
-    def get(self, label: str) -> SimSpecies:
-        try:
-            return self.dyn_sp[label]
-        except KeyError:
-            return self.cst_sp[label]
+    def __getitem__(self, item: str) -> SimSpecies:
+        with suppress(KeyError):
+            return self.dyn_sp[item]
+        return self.cst_sp[item]
+
+    def get(self,
+            label: str,
+            default: Optional[SimSpecies] = None,
+            ) -> Optional[SimSpecies]:
+        with suppress(KeyError):
+            self.__getitem__(label)
+        return default
 
     def _add_species(self, species: DynSpecies | CstSpecies) -> None:
         if isinstance(species, DynSpecies) and species not in self.dyn_sp:
@@ -137,22 +157,20 @@ class ListSpecies():
     def get_or_create_dyn_species(self,
                                   label: str,
                                   ) -> SimSpecies:
-        if label not in self.dyn_sp:
-            try:
-                self.add_dyn_species(label)
-            except radiopyo_exceptions.IsConstantSpeciesError:
-                return self.cst_sp[label]
-        return self.dyn_sp[label]
+        with suppress(KeyError):
+            return self.dyn_sp[label]
+        with suppress(radiopyo_exceptions.IsConstantSpeciesError):
+            self.add_dyn_species(label)
+        return self.__getitem__(label)
 
     def get_or_create_cst_species(self,
                                   label: str,
                                   ) -> SimSpecies:
-        if label not in self.cst_sp:
-            try:
-                self.add_cst_species(label, 0.0)
-            except radiopyo_exceptions.IsSimSpeciesError:
-                return self.dyn_sp[label]
-        return self.cst_sp[label]
+        with suppress(KeyError):
+            return self.cst_sp[label]
+        with suppress(radiopyo_exceptions.IsSimSpeciesError):
+            self.add_cst_species(label, 0.0)
+        return self.__getitem__(label)
 
     def iter_cst_species(self) -> Iterable[CstSpecies]:
         return iter(self.cst_sp.values())

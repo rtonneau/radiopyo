@@ -1,10 +1,11 @@
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Optional,
+    Tuple,
 )
 
 import numpy as np
@@ -35,15 +36,57 @@ def jac(t: float,
 
 def derive(t: float,
            y: NDArray[np.float64],
-           Ri: NDArray[np.float64],
-           Riy: NDArray[np.int8],
-           Gi: NDArray[np.float64],
-           En_enzy: NDArray[np.int8],
-           En_subs: NDArray[np.int8],
-           En_kmki: NDArray[np.float64],
-           beam: ParticleBeam
+           ab_mat: Tuple[NDArray[np.int8],
+                         NDArray[np.int8],
+                         NDArray[np.float64]],
+           ki_mat: Tuple[int,
+                         NDArray[np.float64],
+                         NDArray[np.int8]],
+           Gi_mat: NDArray[np.float64],
+           beam: ParticleBeam,
+           Enzi: Optional[Tuple[NDArray[np.int8],
+                                NDArray[np.int8],
+                                NDArray[np.float64],
+                                ]] = None,
            ) -> NDArray[np.float64]:
-    pass
+
+    #print(f"\nTime is {t}")
+    # Force negative cc values to 0
+    y = y.clip(min=0.0,) * 1e6
+    #print(f" ===> Before A/B: {y}")
+    # First step ==> Handling acid/base equilibrium
+    # ABy, ABi, ABo => ab_mat
+    y = ab_mat[0]*y + np.matmul(ab_mat[2], np.matmul(y, ab_mat[1]).T)
+    #print(f"\n===> After A/B: {y}")
+
+    # Build u vector => [1, y(t), y(t),...] n times y(t) with n = max
+    # stoichiometry of reactants specie s (max_stoi).
+    # max_stoi, Ri, Riy => ki_mat
+    #u = np.append([1], np.tile(y, ki_mat[0]))
+    Ri = np.einsum("j, jik -> ik ", y, ki_mat[2])
+    Ri[Ri == np.inf] = 1
+
+    # Compute dydt, first only with k reactions term:
+    dydt = np.matmul(ki_mat[1], (np.prod(Ri, axis=1) * ki_mat[0]).T)
+    #print("\n===> From kreactions")
+    # print(dydt)
+    # print()
+
+    # Add Radiolytic term ==> Need deposition rate!
+    # => Only term function of time... probably need refactorization => TODO
+    dydt += Gi_mat * beam.at(t).dose_rate()  # [vector with shape y]
+    #print("\n===> From radiolytics")
+    # print(dydt)
+    # print()
+    # Add Enzymatic term
+    if Enzi is not None:
+        # En_enzy, En_subs, En_kmki => Enzi[0], Enzi[1], Enzi[2]
+        # Extract substrate cc of each enzymatic reaction.
+        S = np.matmul(y, Enzi[1])
+        beta = np.matmul(Enzi[2][0, :] * Enzi[2][1, :], Enzi[0])
+        dydt += ((Enzi[2][0, :] + S) / beta)
+
+    return dydt * 1e-6
 
 
 if __name__ == "__main__":
@@ -55,4 +98,4 @@ if __name__ == "__main__":
     yinit = env.initial_values()
     method = "Radau"
     sol = solve_ivp(derive, t_span, yinit, method,
-                    rtol=1e-5, args=(env, beam), jac=partial(jac, env=env, beam=beam))
+                    rtol=1e-5, args=(env, beam))

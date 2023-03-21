@@ -4,7 +4,6 @@ from __future__ import annotations
 import enum
 import os.path
 import re
-from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -14,19 +13,17 @@ from typing import (
     Optional,
     Pattern,
     Tuple,
-    Union,
     TypedDict,
+    Union,
 )
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo_vec.chemistry import (
     ABCouple,
-    CstSpecies,
     KReaction,
     ListSpecies,
     MichaelisMenten,
     RadiolyticReaction,
-    SimSpecies,
 )
 
 # ------------------------------------------------------------------------------------ #
