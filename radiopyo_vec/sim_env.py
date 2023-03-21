@@ -14,7 +14,7 @@ from typing import (
 import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
-from .chemistry.species import CstSpecies, DynSpecies, ListSpecies
+from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
 from .utils.ron_parser import RonFileParser
 from .utils.units import SimUnit, Units
 
@@ -70,6 +70,9 @@ class SimEnv():
     def iter_CstSpecies(self) -> Iterable[CstSpecies]:
         return self.species.iter_cst_species()
 
+    def iter_species(self) -> Iterable[SimSpecies]:
+        return sorted(self.species, key=lambda x: x.index)
+
     def number_dyn_species(self) -> int:
         """number_tracked_species _summary_
 
@@ -111,21 +114,21 @@ class SimEnv():
             kr = []
 
         try:
-            rad, list_sp = parser.build_radiolytics(list_sp)
-        except KeyError:
-            rad = []
-
-        try:
             enz, list_sp = parser.build_enzymatic(list_sp)
         except KeyError:
             enz = []
+
+        try:
+            rad, list_sp = parser.build_radiolytics(list_sp)
+        except KeyError:
+            rad = []
 
         initial_cc = parser.build_initial_conditions()
         for label, value in initial_cc.items():
             with suppress(KeyError):
                 sp = list_sp[label]
                 if isinstance(sp, DynSpecies):
-                    sp.set_initial_cc(value)
+                    sp.set_initial_cc(value*1e6)
 
         return cls(reactions=ReactionsList(ab, kr, enz, rad),
                    species=list_sp,
@@ -137,8 +140,6 @@ class SimEnv():
         out = np.zeros(len(self.species), dtype=np.float64)
         for species in self.species:
             out[species.index] = species.initial_cc()
-            # out[species.index] = self.sim_unit.convert_from(species.initial_cc(),
-            #                                                Units.UNITY)
         return out
 
     def species_labels(self) -> List[str]:
@@ -162,13 +163,10 @@ class SimEnv():
         Rki = np.zeros([len(self.species),
                         len(self.reactions.k_reaction),
                         max_stoichio],
-                        dtype=np.float64)
+                       dtype=np.float64)
 
         for col, reaction in enumerate(self.reactions.k_reaction):
             Ki[col] = reaction.k_value
-            # Ri[0, col] = self.sim_unit.convert_from(reaction.k_value,
-            #                                        Units.UNITY)
-
             # Loop over all reaction's reactants
             for sp, stoi in reaction.iter_reactants():
                 # If declared as cst, keep it 0
@@ -178,7 +176,7 @@ class SimEnv():
                 for idx in range(stoi):
                     Rki[sp.index, col, idx] = 1
                 if stoi < max_stoichio:
-                    Rki[:,col,stoi+1:] = np.inf
+                    Rki[:, col, stoi+1:] = np.inf
 
             # Loop over all reaction's products
             for sp, stoi in reaction.iter_products():
@@ -195,8 +193,6 @@ class SimEnv():
         for col, radiolytic in enumerate(self.reactions.radiolytic):
             for sp, _ in radiolytic.iter_products():
                 Gi[sp.index, col] = radiolytic.kr()
-                # Gi[sp.index, col] = self.sim_unit.convert_from(radiolytic.kr(),
-                #                                               Units.UNITY)
         return Gi.sum(axis=1)
 
     def make_enzymatic_matrix(self) -> Tuple[NDArray[np.int8],

@@ -448,7 +448,8 @@ class RonFileParser(object):
         if sim_sp is None:
             sim_sp = ListSpecies()
         return ([RadiolyticReaction.new_from_dict(species, ge, sim_sp)
-                for (species, ge) in self.items[key].items()],
+                for (species, ge) in self.items[key].items()
+                if species in sim_sp],
                 sim_sp)
 
     def build_cst_species(self, sim_sp: ListSpecies) -> ListSpecies:
