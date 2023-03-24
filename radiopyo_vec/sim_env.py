@@ -128,7 +128,7 @@ class SimEnv():
             with suppress(KeyError):
                 sp = list_sp[label]
                 if isinstance(sp, DynSpecies):
-                    sp.set_initial_cc(value*1e6)
+                    sp.set_initial_cc(value)
 
         return cls(reactions=ReactionsList(ab, kr, enz, rad),
                    species=list_sp,
@@ -139,7 +139,7 @@ class SimEnv():
     def initial_values(self) -> NDArray[np.float64]:
         out = np.zeros(len(self.species), dtype=np.float64)
         for species in self.species:
-            out[species.index] = species.initial_cc()
+            out[species.index] = species.initial_cc()*1e6
         return out
 
     def species_labels(self) -> List[str]:
@@ -149,12 +149,10 @@ class SimEnv():
                                              NDArray[np.int8],
                                              NDArray[np.float64]]:
         # Step 1 -> Find the highest species's stoichio
-        max_stoichio = 0
+        max_reactants = 0
         for reaction in self.reactions.k_reaction:
-            max_stoichio = max(max_stoichio,
-                               max(reaction.stoi_products.values()),
-                               max(reaction.stoi_reactants.values()),
-                               )
+            max_reactants = max(max_reactants,
+                                reaction.tot_number_reactants())
 
         Ki = np.zeros(len(self.reactions.k_reaction), dtype=np.float64)
         Riy = np.zeros([len(self.species), len(self.reactions.k_reaction)],
@@ -162,21 +160,26 @@ class SimEnv():
 
         Rki = np.zeros([len(self.species),
                         len(self.reactions.k_reaction),
-                        max_stoichio],
+                        max_reactants],
                        dtype=np.float64)
 
         for col, reaction in enumerate(self.reactions.k_reaction):
+            #print(f"Dealing with {reaction} [col={col}]")
             Ki[col] = reaction.k_value
             # Loop over all reaction's reactants
+            idx_reactant = 0
             for sp, stoi in reaction.iter_reactants():
                 # If declared as cst, keep it 0
-                if isinstance(sp, CstSpecies):
-                    continue
-                Riy[sp.index, col] -= stoi
-                for idx in range(stoi):
-                    Rki[sp.index, col, idx] = 1
-                if stoi < max_stoichio:
-                    Rki[:, col, stoi+1:] = np.inf
+                if not isinstance(sp, CstSpecies):
+                    Riy[sp.index, col] -= stoi
+                for _ in range(stoi):
+                    # print(
+                    #    f"<{sp.label}> set 1 to Rki[{sp.index}, {col}, {idx_reactant}]")
+                    Rki[sp.index, col, idx_reactant] = 1
+                    idx_reactant += 1
+            if idx_reactant < max_reactants:
+                #print("Need to add inf")
+                Rki[:, col, idx_reactant:] = np.nan
 
             # Loop over all reaction's products
             for sp, stoi in reaction.iter_products():
@@ -216,10 +219,8 @@ class SimEnv():
         for col, enzymatic in enumerate(self.reactions.enzymatic):
             Ez_substrate[enzymatic.substrate.index, col] = 1
             Ez_enzyme[enzymatic.enzyme.index, col] = 1
-            Ez_kmki[0, col] = self.sim_unit.convert_from(enzymatic.k_micha,
-                                                         Units.UNITY)
-            Ez_kmki[1, col] = self.sim_unit.convert_from(enzymatic.k_value,
-                                                         Units.UNITY)
+            Ez_kmki[0, col] = enzymatic.k_micha
+            Ez_kmki[1, col] = enzymatic.k_value
 
         return Ez_substrate, Ez_enzyme, Ez_kmki
 
@@ -230,7 +231,7 @@ class SimEnv():
                        dtype=np.int8)
         ABo = np.zeros_like(ABi, dtype=np.float64)
         ABy = np.zeros(len(self.species), dtype=np.int8)
-        cc_H_plus = self.species.cst_sp["H_plus"].cc_value
+        cc_H_plus = self.species.cst_sp["H_plus"].cc_value  # mol/l
         for col, reaction in enumerate(self.reactions.acid_base):
             ABi[reaction.acid.index, col] = 1
             ABi[reaction.base.index, col] = 1

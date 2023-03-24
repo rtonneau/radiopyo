@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from functools import reduce
 from itertools import chain
+from operator import add
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -68,6 +70,9 @@ class BaseChemicalReaction():
         if isinstance(other, (str, RawSpecies)):
             return len([elt for elt in self.iter_species() if elt == other]) > 0
         raise NotImplementedError
+
+    def tot_number_reactants(self) -> int:
+        return reduce(add, list(self.stoi_reactants.values()))
 
     def iter_species(self) -> Iterable[SimSpecies]:
         """Iter over species involved in the reaction"""

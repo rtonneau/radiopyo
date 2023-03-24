@@ -27,6 +27,16 @@ if TYPE_CHECKING:
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
 
+
+def matprint(mat: NDArray, fmt: str = "g") -> None:
+    col_maxes = [max([len(("{:"+fmt+"}").format(x))
+                     for x in col]) for col in mat.T]
+    for x in mat:
+        for i, y in enumerate(x):
+            print(("{:"+str(col_maxes[i])+fmt+"}").format(y), end="  ")
+        print("")
+
+
 def jac(t: float,
         y: NDArray[np.float64],
         env: SimEnv,
@@ -53,29 +63,34 @@ def derive(t: float,
 
     #print(f"\nTime is {t}")
     # Force negative cc values to 0
-    #print(f"\ny(t={t:.2g}) = {y[3:]} (before clipping)")
+    np.set_printoptions(precision=1)
+    print(f"\ny(t={t:.2g}) = {y*1e-6} (before clipping)")
     y = y.clip(min=0.0,) * 1e-6
     #print(f"===> Before A/B: {y}")
     # First step ==> Handling acid/base equilibrium
     # ABy, ABi, ABo => ab_mat
     y = ab_mat[0]*y + np.matmul(ab_mat[2], np.matmul(y, ab_mat[1]).T)
-    #print(f"===> After A/B: {y}")
+    print(f"===> After A/B: {y}")
 
     # Build u vector => [1, y(t), y(t),...] n times y(t) with n = max
     # stoichiometry of reactants specie s (max_stoi).
     # max_stoi, Ri, Riy => ki_mat
     #u = np.append([1], np.tile(y, ki_mat[0]))
-    Ri = np.einsum("j, jik -> ik ", y, ki_mat[2])
-    Ri[Ri == np.inf] = 1
+    #print(f"y is: {y}")
+    Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, ki_mat[2]), nan=1)
+    # matprint(Rki)
 
     # Compute dydt, first only with k reactions term:
-    dydt = np.matmul(ki_mat[1], (np.prod(Ri, axis=1) * ki_mat[0]).T)
-    #print(f"===> dydt From kreactions : {dydt[3:]}")
+    dydt = np.matmul(ki_mat[1], (np.prod(Rki, axis=1) * ki_mat[0]).T)
+    print(f"===> dydt From kreactions : {dydt[3:13]}")
 
     # Add Radiolytic term ==> Need deposition rate!
     # => Only term function of time... probably need refactorization => TODO
-    dydt += Gi_mat * beam.at(t).dose_rate()
+    dydt_radio = Gi_mat * beam.at(t).dose_rate()
 
+    print(f"===> dydt From Radiolytics : {dydt_radio}")
+
+    dydt += dydt_radio
     # Add Enzymatic term
     if Enzi is not None:
         # En_enzy, En_subs, En_kmki => Enzi[0], Enzi[1], Enzi[2]
@@ -114,9 +129,8 @@ def reconstruct_Ri_from_res(time: NDArray,
         y = ab_mat[0]*y + np.matmul(ab_mat[2], np.matmul(y, ab_mat[1]).T)
 
         # K Reactions
-        Ri = np.einsum("j, jik -> ik ", y, ki_mat[2])
-        Ri[Ri == np.inf] = 1
-        Rki = np.prod(Ri, axis=1) * ki_mat[0]
+        Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, ki_mat[2]), nan=1)
+        Rki = np.prod(Rki, axis=1) * ki_mat[0]
         out.iloc[idx, :] = Rki
     return out
 
