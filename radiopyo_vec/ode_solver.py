@@ -42,7 +42,7 @@ def jac(t: float,
         env: SimEnv,
         beam: ParticleBeam
         ) -> NDArray[np.float64]:
-    pass
+    return np.array([])
 
 
 def derive(t: float,
