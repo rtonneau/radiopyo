@@ -110,7 +110,7 @@
             products: ["H2"],
             k_value: 1.55e10
         ),
-        //13) H_r + OH_r -> H2O
+        //13) H_r + OH_r -> H2O 
         (
             reactants: ["H_r", "OH_r"],
             products: ["H2O"],

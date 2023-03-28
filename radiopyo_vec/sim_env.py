@@ -147,7 +147,8 @@ class SimEnv():
 
     def make_kreaction_matrix(self) -> Tuple[NDArray[np.float64],
                                              NDArray[np.int8],
-                                             NDArray[np.float64]]:
+                                             NDArray[np.float32],
+                                             NDArray[np.float32],]:
         # Step 1 -> Find the highest species's stoichio
         max_reactants = 0
         for reaction in self.reactions.k_reaction:
@@ -158,37 +159,66 @@ class SimEnv():
         Riy = np.zeros([len(self.species), len(self.reactions.k_reaction)],
                        dtype=np.int8)
 
-        Rki = np.zeros([len(self.species),
-                        len(self.reactions.k_reaction),
-                        max_reactants],
-                       dtype=np.float64)
+        Rki = np.full([len(self.species),
+                       len(self.reactions.k_reaction),
+                       max_reactants],
+                      fill_value=np.nan,
+                      dtype=np.float32)
 
-        for col, reaction in enumerate(self.reactions.k_reaction):
-            #print(f"Dealing with {reaction} [col={col}]")
-            Ki[col] = reaction.k_value
+        JRki = np.full([len(self.species),
+                        len(self.reactions.k_reaction),
+                        max_reactants,
+                        len(self.species),
+                        ],
+                       fill_value=np.nan,
+                       dtype=np.float32)
+
+        for idx_r, reaction in enumerate(self.reactions.k_reaction):
+            Ki[idx_r] = reaction.k_value
             # Loop over all reaction's reactants
             idx_reactant = 0
             for sp, stoi in reaction.iter_reactants():
                 # If declared as cst, keep it 0
                 if not isinstance(sp, CstSpecies):
-                    Riy[sp.index, col] -= stoi
+                    Riy[sp.index, idx_r] -= stoi
                 for _ in range(stoi):
-                    # print(
-                    #    f"<{sp.label}> set 1 to Rki[{sp.index}, {col}, {idx_reactant}]")
-                    Rki[sp.index, col, idx_reactant] = 1
+                    Rki[:, idx_r, idx_reactant] = 0
+                    Rki[sp.index, idx_r, idx_reactant] = 1
                     idx_reactant += 1
-            if idx_reactant < max_reactants:
-                #print("Need to add inf")
-                Rki[:, col, idx_reactant:] = np.nan
 
             # Loop over all reaction's products
             for sp, stoi in reaction.iter_products():
                 # If declared as cst, keep it 0
                 if isinstance(sp, CstSpecies):
                     continue
-                Riy[sp.index, col] += stoi
+                Riy[sp.index, idx_r] += stoi
 
-        return (Ki, Riy, Rki)
+            # Jacobian related loops:
+            for sp in self.iter_species():
+                # sp not involved in reaction => derivative = 0
+                if not reaction.is_reactant(sp) or isinstance(sp, CstSpecies):
+                    JRki[:, idx_r, :, sp.index] = 0
+                    continue
+
+                idx_reactant = 0
+                for reactant, stoi in reaction.iter_reactants():
+                    if reactant != sp:
+                        for _ in range(stoi):
+                            JRki[:, idx_r, idx_reactant, sp.index] = 0
+                            JRki[reactant.index, idx_r,
+                                 idx_reactant, sp.index] = 1
+                            idx_reactant += 1
+                        continue
+                    derive = stoi - 1
+                    for _ in range(derive):
+                        JRki[:, idx_r, idx_reactant, sp.index] = 0
+                        index = (reactant.index, idx_r, idx_reactant, sp.index)
+                        JRki[index] = 1
+                        if _ == 0:
+                            JRki[index] = stoi
+                        idx_reactant += 1
+
+        return (Ki, Riy, Rki, JRki)
 
     def make_radiolytic_vector(self) -> NDArray:
         Gi = np.zeros([len(self.species), len(self.reactions.radiolytic)],
