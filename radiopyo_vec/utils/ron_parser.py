@@ -436,7 +436,7 @@ class RonFileParser(object):
         return self.items[key]
 
     def build_radiolytics(self,
-                          sim_sp: ListSpecies = None,
+                          sim_sp: Optional[ListSpecies] = None,
                           ) -> Tuple[List[RadiolyticReaction], ListSpecies]:
         """build_radiolytics _summary_
 
@@ -465,7 +465,7 @@ class RonFileParser(object):
         return sim_sp
 
     def build_acid_base(self,
-                        sim_sp: ListSpecies = None,
+                        sim_sp: Optional[ListSpecies] = None,
                         ) -> Tuple[List[ABCouple], ListSpecies]:
         """build_acid_base _summary_
 
@@ -481,7 +481,7 @@ class RonFileParser(object):
                 sim_sp)
 
     def build_k_reactions(self,
-                          sim_sp: ListSpecies = None,
+                          sim_sp: Optional[ListSpecies] = None,
                           ) -> Tuple[List[KReaction], ListSpecies]:
         """build_k_reactions
 
@@ -500,7 +500,7 @@ class RonFileParser(object):
                 sim_sp)
 
     def build_enzymatic(self,
-                        sim_sp: ListSpecies = None,
+                        sim_sp: Optional[ListSpecies] = None,
                         ) -> Tuple[List[MichaelisMenten], ListSpecies]:
         """build_enzymatic
 
@@ -517,71 +517,3 @@ class RonFileParser(object):
         return ([MichaelisMenten.from_dict(list_sp=sim_sp, **reaction)
                 for reaction in self.items[key]],
                 sim_sp)
-
-    def build_species_list(self) -> ListSpecies:
-        """build_species _summary_
-
-        Returns:
-            Dict: _description_
-        self._try_key_in_items("acid_base")
-        self._try_key_in_items("fixed_concentrations")
-
-        pH = self.build_bio_parameters()["pH"]
-        out = ListSpecies()
-        # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        out.add_cst_species("H_plus", 10**(-pH))
-        out.add_cst_species("OH_minus", 10**(-14+pH))
-
-        # Add also the Acid/Base couples with it
-        for reaction in self.items["acid_base"]:
-            out.add_sim_species(ABCouple.from_dict(**reaction))
-
-        k_reaction = self.build_k_reactions()
-        try:
-            enzymatic = self.build_enzymatic()
-        except KeyError:
-            enzymatic = []
-
-        # Loop over all k reactions to add all their reactants (not products)
-        for reaction in chain(k_reaction, enzymatic):
-            # if enzymatic, check enzyme is included in fixed_cc
-            if isinstance(reaction, MichaelisMenten):
-                enzyme = reaction._enzyme.label
-                if enzyme not in self.items["fixed_concentrations"]:
-                    raise KeyError(f"enzyme species ({enzyme}) must be "
-                                   "defined in fixed_concentration of .ron file.")
-                untracked.append(CstSpecies(
-                    enzyme, self.items["fixed_concentrations"][enzyme]))
-
-            for r_species, _ in reaction.iter_reactants():
-                species = r_species.label
-                # First check if involved in a A/B reaction => skipped
-                if species in untracked:
-                    continue
-
-                # Second check if Species is declared as constant
-                if species in self.items["fixed_concentrations"]:
-                    untracked.append(CstSpecies(
-                        species, self.items["fixed_concentrations"][species]))
-                    continue
-
-                # Third check if already added in final vector
-                if species in out:
-                    continue
-
-                # Then create the new species and append it to the final vector
-                out.append(TrackedSpecies(species, index))
-                sp_data.add_tracked(SnapSpecies(species, index=index))
-                index += 1
-
-        # Finally append the Untracked Species by consuming untracked
-        for elt in untracked:
-            out.append(elt)
-            if elt.label not in sp_data:
-                cc = 0.0
-                if isinstance(elt, CstSpecies):
-                    cc = elt.cc_value
-                sp_data.add_untracked(SnapSpecies(elt.label, cc))
-
-        return out, sp_data
-        """
