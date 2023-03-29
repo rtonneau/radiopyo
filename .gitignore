@@ -11,4 +11,5 @@ __pycache__
 /_pics
 *.png
 /.VSCodeCounter
-/jupytest
+/.jupytest
+/.ipynb_checkpoints
