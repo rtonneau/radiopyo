@@ -39,10 +39,25 @@ def matprint(mat: NDArray, fmt: str = "g") -> None:
 
 def jac(t: float,
         y: NDArray[np.float64],
-        env: SimEnv,
-        beam: ParticleBeam
+        ab_mat: Tuple[NDArray[np.int8],
+                      NDArray[np.int8],
+                      NDArray[np.float64]],
+        ki_mat: Tuple[NDArray[np.float64],
+                      NDArray[np.int8],
+                      NDArray[np.float32],
+                      NDArray[np.float32]],
+        Gi_mat: NDArray[np.float64],
+        beam: ParticleBeam,
+        Enzi: Optional[Tuple[NDArray[np.int8],
+                             NDArray[np.int8],
+                             NDArray[np.float64],
+                             ]] = None,
         ) -> NDArray[np.float64]:
-    return np.array([])
+    y = y.clip(min=0.0,) * 1e-6
+    res = np.nan_to_num(np.einsum("j, jikl -> ikl ", y, ki_mat[3]), nan=1)
+    res = np.prod(res, axis=1).T * ki_mat[0]
+    res = np.matmul(ki_mat[1], res.T)
+    return res
 
 
 def derive(t: float,
@@ -65,13 +80,13 @@ def derive(t: float,
     #print(f"\nTime is {t}")
     # Force negative cc values to 0
     np.set_printoptions(precision=1)
-    print(f"\ny(t={t:.2g}) = {y*1e-6} (before clipping)")
+    #print(f"\ny(t={t:.2g}) = {y*1e-6} (before clipping)")
     y = y.clip(min=0.0,) * 1e-6
     #print(f"===> Before A/B: {y}")
     # First step ==> Handling acid/base equilibrium
     # ABy, ABi, ABo => ab_mat
     y = ab_mat[0]*y + np.matmul(ab_mat[2], np.matmul(y, ab_mat[1]).T)
-    print(f"===> After A/B: {y}")
+    #print(f"===> After A/B: {y}")
 
     # Build u vector => [1, y(t), y(t),...] n times y(t) with n = max
     # stoichiometry of reactants specie s (max_stoi).
@@ -83,13 +98,13 @@ def derive(t: float,
 
     # Compute dydt, first only with k reactions term:
     dydt = np.matmul(ki_mat[1], (np.prod(Rki, axis=1) * ki_mat[0]).T)
-    print(f"===> dydt From kreactions : {dydt[3:13]}")
+    #print(f"===> dydt From kreactions : {dydt[3:13]}")
 
     # Add Radiolytic term ==> Need deposition rate!
     # => Only term function of time... probably need refactorization => TODO
     dydt_radio = Gi_mat * beam.at(t).dose_rate()
 
-    print(f"===> dydt From Radiolytics : {dydt_radio}")
+    #print(f"===> dydt From Radiolytics : {dydt_radio}")
 
     dydt += dydt_radio
     # Add Enzymatic term

@@ -6,7 +6,7 @@
         "H2O": 55,
     },
     initial_concentrations:{ // Unit is [mol]/[l]
-        "O2": 75e-6,
+        "O2": 50e-6,
     },
     radiolytic: { // Unit is [radical / 100eV / incident particle]
         "e_aq": 2.8,
