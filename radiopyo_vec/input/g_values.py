@@ -1,21 +1,8 @@
-import re
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    List,
-)
+from typing import Dict
 
-import numpy as np
 import pandas as pd  # type: ignore[import]
-from lmfit.models import SplineModel  # type: ignore[import]
-from more_itertools import grouper
 from scipy.interpolate import interp1d  # type: ignore[import]
-
-# ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
 
 __all__ = [
     "GValuesBoscolo",
