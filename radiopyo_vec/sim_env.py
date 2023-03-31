@@ -45,6 +45,14 @@ class ReactionsList:
     enzymatic: List[MichaelisMenten]
     radiolytic: List[RadiolyticReaction]
 
+    def __post_init__(self) -> None:
+        for idx, kreaction in enumerate(self.k_reaction):
+            kreaction.set_index(idx)
+        for idx, greaction in enumerate(self.radiolytic):
+            greaction.set_index(idx)
+        for idx, ereaction in enumerate(self.enzymatic):
+            ereaction.set_index(idx)
+
 
 @ dataclass
 class SimEnv():
@@ -228,31 +236,46 @@ class SimEnv():
                 Gi[sp.index, col] = radiolytic.kr()
         return Gi.sum(axis=1)
 
-    def make_enzymatic_matrix(self) -> Tuple[NDArray[np.int8],
-                                             NDArray[np.int8],
-                                             NDArray[np.float64]]:
+    def make_enzymatic_matrix(self) -> Tuple[NDArray[np.float32],
+                                             NDArray[np.float32],
+                                             NDArray[np.float64],
+                                             NDArray[np.int8]]:
         """
         Tricks to keep in mind: 
             * np.divide(1, x, out=np.zeros_like(x), where= x!=0)
             => Invert x. where x=0 -> result=0 as well 
         """
-        Ez_substrate = np.zeros([len(self.species),
-                                 len(self.reactions.enzymatic)],
-                                dtype=np.int8)
-        Ez_enzyme = np.zeros([len(self.species),
-                              len(self.reactions.enzymatic)],
-                             dtype=np.int8)
+        Ez_substrate = np.full([len(self.species),
+                                len(self.reactions.enzymatic)],
+                               fill_value=0,
+                               dtype=np.float32)
+        Ez_enzyme = np.full([len(self.species),
+                             len(self.reactions.enzymatic)],
+                            fill_value=0,
+                            dtype=np.float32)
 
         Ez_kmki = np.zeros([2, len(self.reactions.enzymatic)],
                            dtype=np.float64)
+
+        Ez_iy = np.zeros([len(self.species),
+                          len(self.reactions.enzymatic)],
+                         dtype=np.int8,
+                         )
 
         for col, enzymatic in enumerate(self.reactions.enzymatic):
             Ez_substrate[enzymatic.substrate.index, col] = 1
             Ez_enzyme[enzymatic.enzyme.index, col] = 1
             Ez_kmki[0, col] = enzymatic.k_micha
             Ez_kmki[1, col] = enzymatic.k_value
-
-        return Ez_substrate, Ez_enzyme, Ez_kmki
+            for sp, stoi in enzymatic.iter_reactants():
+                if isinstance(sp, CstSpecies):
+                    continue
+                Ez_iy[sp.index, col] = -stoi
+            for sp, stoi in enzymatic.iter_products():
+                if isinstance(sp, CstSpecies):
+                    continue
+                Ez_iy[sp.index, col] = stoi
+        return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
 
     def make_acidBase_matrix(self) -> Tuple[NDArray[np.int8],
                                             NDArray[np.int8],
@@ -276,3 +299,18 @@ class SimEnv():
         ABy = np.logical_and.reduce(ABi ^ 1, axis=1).astype(np.int8)
 
         return (ABy, ABi, ABo)
+
+    def kreactions_involving(self,
+                             species: str | SimSpecies,
+                             ) -> List[KReaction]:
+        return [r for r in self.reactions.k_reaction if species in r]
+
+    def kreactions_involving_reactant(self,
+                                      species: str | SimSpecies,
+                                      ) -> List[KReaction]:
+        return [r for r in self.reactions.k_reaction if r.is_reactant(species)]
+
+    def kreactions_involving_product(self,
+                                     species: str | SimSpecies,
+                                     ) -> List[KReaction]:
+        return [r for r in self.reactions.k_reaction if r.is_product(species)]

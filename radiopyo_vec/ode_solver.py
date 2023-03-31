@@ -48,11 +48,12 @@ def jac(t: float,
                       NDArray[np.float32]],
         Gi_mat: NDArray[np.float64],
         beam: ParticleBeam,
-        Enzi: Optional[Tuple[NDArray[np.int8],
-                             NDArray[np.int8],
+        Enzi: Optional[Tuple[NDArray[np.float32],
+                             NDArray[np.float32],
                              NDArray[np.float64],
                              ]] = None,
         ) -> NDArray[np.float64]:
+    # TODO ==> Take into account acid-base!!!! useless otherwise...
     y = y.clip(min=0.0,) * 1e-6
     res = np.nan_to_num(np.einsum("j, jikl -> ikl ", y, ki_mat[3]), nan=1)
     res = np.prod(res, axis=1).T * ki_mat[0]
@@ -71,22 +72,16 @@ def derive(t: float,
                          NDArray[np.float32]],
            Gi_mat: NDArray[np.float64],
            beam: ParticleBeam,
-           Enzi: Optional[Tuple[NDArray[np.int8],
-                                NDArray[np.int8],
+           Enzi: Optional[Tuple[NDArray[np.float32],
+                                NDArray[np.float32],
                                 NDArray[np.float64],
+                                NDArray[np.int8],
                                 ]] = None,
            ) -> NDArray[np.float64]:
 
     #print(f"\nTime is {t}")
     # Force negative cc values to 0
-    np.set_printoptions(precision=1)
-    #print(f"\ny(t={t:.2g}) = {y*1e-6} (before clipping)")
     y = y.clip(min=0.0,) * 1e-6
-    #print(f"===> Before A/B: {y}")
-    # First step ==> Handling acid/base equilibrium
-    # ABy, ABi, ABo => ab_mat
-    y = ab_mat[0]*y + np.matmul(ab_mat[2], np.matmul(y, ab_mat[1]).T)
-    #print(f"===> After A/B: {y}")
 
     # Build u vector => [1, y(t), y(t),...] n times y(t) with n = max
     # stoichiometry of reactants specie s (max_stoi).
@@ -109,36 +104,42 @@ def derive(t: float,
     dydt += dydt_radio
     # Add Enzymatic term
     if Enzi is not None:
-        # En_enzy, En_subs, En_kmki => Enzi[0], Enzi[1], Enzi[2]
+        # En_subs, En_enzy, En_kmki => Enzi[0], Enzi[1], Enzi[2]
         # Extract substrate cc of each enzymatic reaction.
-        S = np.matmul(y, Enzi[1])
-        beta = np.matmul(Enzi[2][0, :] * Enzi[2][1, :], Enzi[0])
-        dydt += ((Enzi[2][0, :] + S) / beta)
+        E = np.matmul(y, Enzi[1])
+        S = np.matmul(y, Enzi[0])
+        MM = Enzi[2][1, :] * E * S / (Enzi[2][0, :] + S)
+        dydt += np.matmul(Enzi[3], MM.T)
     #print(f"===> dydt From radiolytics: {dydt[3:]}")
+
+    # Last step ==> Handling acid/base equilibrium
+    # => Force relation ship between total dydt
+    # ABy, ABi, ABo => ab_mat
+    dydt = ab_mat[0]*dydt + np.matmul(ab_mat[2], np.matmul(dydt, ab_mat[1]).T)
     return dydt * 1e6
 
 
-def reconstruct_Ri_from_res(time: NDArray,
-                            res: NDArray,
-                            env: SimEnv,
-                            ab_mat: Tuple[NDArray[np.int8],
-                                          NDArray[np.int8],
-                                          NDArray[np.float64]],
-                            ki_mat: Tuple[int,
-                                          NDArray[np.float64],
-                                          NDArray[np.int8]],
-                            Gi_mat: NDArray[np.float64],
-                            beam: ParticleBeam,
-                            Enzi: Optional[Tuple[NDArray[np.int8],
-                                                 NDArray[np.int8],
-                                                 NDArray[np.float64],
-                                                 ]] = None,
-                            ) -> pd.DataFrame:
-    out = pd.DataFrame(columns=[f"R_{idx:d}" for idx in
+def reconstruct_KRi_from_res(time: NDArray,
+                             res: NDArray,
+                             env: SimEnv,
+                             ab_mat: Tuple[NDArray[np.int8],
+                                           NDArray[np.int8],
+                                           NDArray[np.float64]],
+                             ki_mat: Tuple[int,
+                                           NDArray[np.float64],
+                                           NDArray[np.int8]],
+                             Gi_mat: NDArray[np.float64],
+                             beam: ParticleBeam,
+                             Enzi: Optional[Tuple[NDArray[np.float32],
+                                                  NDArray[np.float32],
+                                                  NDArray[np.float64],
+                                                  ]] = None,
+                             ) -> pd.DataFrame:
+    out = pd.DataFrame(columns=[f"KR_{idx:d}" for idx in
                                 range(len(env.reactions.k_reaction))],
                        index=time,
                        )
-    for ((idx, t), y) in zip(enumerate(time), res.T):
+    for ((idx, _), y) in zip(enumerate(time), res.T):
         y = y.clip(min=0.0,) * 1e-6
 
         # Acid/Base

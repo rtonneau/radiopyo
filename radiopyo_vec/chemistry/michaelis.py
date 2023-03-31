@@ -107,5 +107,7 @@ class MichaelisMenten(BaseChemicalReaction):
         for (elt, stoi) in self.iter_products():
             out.append(f"{elt.label},"*stoi)
         out[-1] = out[-1].strip(",")
-        out.append(f"], kValue: {self.k_value:.2e}>")
+        out.append(f"], kValue: {self.k_value:.2e}")
+        out.append(f", index: {self.index}")
+        out.append(">")
         return "".join(out)

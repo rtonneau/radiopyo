@@ -4,24 +4,17 @@ from functools import reduce
 from itertools import chain
 from operator import add
 from typing import (
-    TYPE_CHECKING,
     Dict,
     Iterable,
     List,
+    Optional,
     Protocol,
     Tuple,
 )
 
-import numpy as np
-
 import radiopyo_vec.chemistry.exceptions as radiopyo_exception
 
 from .species import RawSpecies, SimSpecies
-
-# ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
 
 __all__ = [
     "BaseChemicalReaction",
@@ -58,12 +51,14 @@ class BaseChemicalReaction():
     products: Dict[str, SimSpecies]
     stoi_reactants: Dict[str, int]
     stoi_products: Dict[str, int]
+    index: Optional[int]
 
     def __init__(self) -> None:
         self.reactants = {}
         self.products = {}
         self.stoi_products = {}
         self.stoi_reactants = {}
+        self.index = None
 
     def __contains__(self, other: object) -> bool:
         """"""

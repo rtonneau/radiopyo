@@ -29,6 +29,11 @@ class KReaction(BaseChemicalReaction):
         super().__init__()
         self.k_value = k_value
 
+    def as_label(self) -> str:
+        if self.index is not None:
+            return f"KR_{self.index}"
+        raise KeyError("Unknown reaction index. Cannot make a label.")
+    
     @classmethod
     def from_dict(cls,
                   reactants: List[str],
@@ -89,5 +94,7 @@ class KReaction(BaseChemicalReaction):
         for (elt, stoi) in self.iter_products():
             out.append(f"{elt.label},"*stoi)
         out[-1] = out[-1].strip(",")
-        out.append(f"], kValue: {self.k_value:.2e}>")
+        out.append(f"], kValue: {self.k_value:.2e}")
+        out.append(f", index: {self.index}")
+        out.append(">")
         return "".join(out)

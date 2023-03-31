@@ -78,7 +78,11 @@ class RadiolyticReaction(BaseChemicalReaction):
         NotImplementedError("Not implemented for Radiolytic Reactions")
 
     def __str__(self) -> str:
-        return f"Radiolytic<{self.label()}, Ge:{self.ge():.2f}>"
+        return (f"Radiolytic<"
+                    f"{self.label()}, "
+                    f"Ge:{self.ge():.2f}, "
+                    f"index:{self.index}"
+                ">")
 
     def __repr__(self) -> str:
         return self.__str__()
