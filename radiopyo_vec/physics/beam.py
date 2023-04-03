@@ -66,7 +66,6 @@ class Timer(NamedTuple):
 
 @dataclass
 class ParticleBeam():
-    particle: str
     dose_rate: float
     timer: Timer
     max_dose: float = float("inf")
@@ -111,12 +110,10 @@ class ParticleBeam():
 
 class ConstantBeam(ParticleBeam):
     def __init__(self,
-                 particle: str,
                  dose_rate: float,
                  max_dose: float = float("inf"),
                  ):
-        super().__init__(particle,
-                         dose_rate,
+        super().__init__(dose_rate,
                          Timer.new_constant(),
                          max_dose,
                          )
@@ -124,14 +121,38 @@ class ConstantBeam(ParticleBeam):
 
 class PulsedBeam(ParticleBeam):
     def __init__(self,
-                 particle: str,
                  dose_rate: float,
                  period: float,
                  on_time: float,
                  max_dose: float = float("inf"),
                  ):
-        super().__init__(particle,
-                         dose_rate,
+        super().__init__(dose_rate,
                          Timer.new_pulsed(period, on_time),
                          max_dose,
                          )
+
+    @classmethod
+    def from_peak_dose_rate(cls,
+                            peak_dr: float,
+                            period: float,
+                            on_time: float,
+                            max_dose: float = float("inf")
+                            ) -> PulsedBeam:
+        timer = Timer.new_pulsed(period, on_time)
+        return cls(dose_rate=timer.duty_cycle() * peak_dr,
+                   period=period,
+                   on_time=on_time,
+                   max_dose=max_dose,
+                   )
+
+    @classmethod
+    def from_dose_per_pulse(cls,
+                            pulse_dose: float,
+                            period: float,
+                            on_time: float,
+                            max_dose: float = float("inf")
+                            ) -> PulsedBeam:
+        return PulsedBeam.from_peak_dose_rate(peak_dr=pulse_dose / on_time,
+                                              period=period,
+                                              on_time=on_time,
+                                              max_dose=max_dose,)

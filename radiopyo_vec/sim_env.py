@@ -8,6 +8,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Optional,
     Tuple,
 )
 
@@ -32,6 +33,14 @@ if TYPE_CHECKING:
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",
            ]
+
+# ------------------------------------------------------------------------------------ #
+#                                 EXCEPTION DEFINITIONS                                #
+# ------------------------------------------------------------------------------------ #
+
+
+class RadioPyoError(Exception):
+    """Generic Module Related Exception"""
 
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
@@ -236,16 +245,19 @@ class SimEnv():
                 Gi[sp.index, col] = radiolytic.kr()
         return Gi.sum(axis=1)
 
-    def make_enzymatic_matrix(self) -> Tuple[NDArray[np.float32],
-                                             NDArray[np.float32],
-                                             NDArray[np.float64],
-                                             NDArray[np.int8],
-                                             ]:
+    def make_enzymatic_matrix(self) -> Optional[Tuple[NDArray[np.float32],
+                                                      NDArray[np.float32],
+                                                      NDArray[np.float64],
+                                                      NDArray[np.int8],
+                                                      ]]:
         """
         Tricks to keep in mind: 
             * np.divide(1, x, out=np.zeros_like(x), where= x!=0)
             => Invert x. where x=0 -> result=0 as well 
         """
+        if len(self.reactions.enzymatic) == 0:
+            return None
+
         Ez_substrate = np.full([len(self.species),
                                 len(self.reactions.enzymatic)],
                                fill_value=0,

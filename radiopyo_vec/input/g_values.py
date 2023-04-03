@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Iterable
 
 import pandas as pd  # type: ignore[import]
 from scipy.interpolate import interp1d  # type: ignore[import]
@@ -30,3 +30,6 @@ class GValuesBoscolo():
 
     def values_at(self, species: str, let: float) -> float:
         return self.interpol[species](let)
+
+    def species(self) -> Iterable[str]:
+        return iter(self.df.columns)

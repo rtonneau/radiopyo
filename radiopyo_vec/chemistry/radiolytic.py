@@ -44,6 +44,9 @@ class RadiolyticReaction(BaseChemicalReaction):
         super().__init__()
         self._reaction_cst = reaction_cst
 
+    def species(self) -> SimSpecies:
+        return self.products[self.label()]
+
     def label(self) -> str:
         return list(self.products.keys())[0]
 
@@ -52,6 +55,9 @@ class RadiolyticReaction(BaseChemicalReaction):
 
     def ge(self) -> float:
         return kr_to_ge(self._reaction_cst)
+
+    def update_from_ge(self, value: float) -> None:
+        self._reaction_cst = ge_to_kr(value)
 
     @classmethod
     def new_from_dict(cls,
@@ -79,9 +85,9 @@ class RadiolyticReaction(BaseChemicalReaction):
 
     def __str__(self) -> str:
         return (f"Radiolytic<"
-                    f"{self.label()}, "
-                    f"Ge:{self.ge():.2f}, "
-                    f"index:{self.index}"
+                f"{self.label()}, "
+                f"Ge:{self.ge():.2f}, "
+                f"index:{self.index}"
                 ">")
 
     def __repr__(self) -> str:

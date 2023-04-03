@@ -1,4 +1,5 @@
 
+from radiopyo_vec.exceptions import RadioPyoError
 
 __all__ = ["IsConstantSpeciesError",
            "IsSimSpeciesError",
@@ -7,18 +8,17 @@ __all__ = ["IsConstantSpeciesError",
            ]
 
 
-class RadioPyoError(Exception):
-    """Generic Module Related Exception"""
-
-
-class IsConstantSpeciesError(RadioPyoError):
+class ChemistryError(RadioPyoError):
     """"""
 
-class IsSimSpeciesError(RadioPyoError):
+class IsConstantSpeciesError(ChemistryError):
     """"""
 
-class NotReactionReactant(RadioPyoError):
+class IsSimSpeciesError(ChemistryError):
     """"""
 
-class NotReactionProduct(RadioPyoError):
+class NotReactionReactant(ChemistryError):
+    """"""
+
+class NotReactionProduct(ChemistryError):
     """"""
