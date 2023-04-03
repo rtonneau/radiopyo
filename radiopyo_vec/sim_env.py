@@ -239,7 +239,8 @@ class SimEnv():
     def make_enzymatic_matrix(self) -> Tuple[NDArray[np.float32],
                                              NDArray[np.float32],
                                              NDArray[np.float64],
-                                             NDArray[np.int8]]:
+                                             NDArray[np.int8],
+                                             ]:
         """
         Tricks to keep in mind: 
             * np.divide(1, x, out=np.zeros_like(x), where= x!=0)

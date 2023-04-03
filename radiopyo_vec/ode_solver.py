@@ -51,13 +51,31 @@ def jac(t: float,
         Enzi: Optional[Tuple[NDArray[np.float32],
                              NDArray[np.float32],
                              NDArray[np.float64],
+                             NDArray[np.int8],
                              ]] = None,
         ) -> NDArray[np.float64]:
-    # TODO ==> Take into account acid-base!!!! useless otherwise...
     y = y.clip(min=0.0,) * 1e-6
+
+    # K Reactions component
     res = np.nan_to_num(np.einsum("j, jikl -> ikl ", y, ki_mat[3]), nan=1)
     res = np.prod(res, axis=1).T * ki_mat[0]
     res = np.matmul(ki_mat[1], res.T)
+
+    # Enzymatic Component
+    if Enzi is not None:
+        # En_subs, En_enzy, En_kmki => Enzi[0], Enzi[1], Enzi[2]
+        # En_kmki[0,:] => Km & kmki[1,:] => k_val
+        E = np.matmul(y, Enzi[1])
+        S = np.matmul(y, Enzi[0]) + Enzi[2][0, :]
+        JEnzi = np.prod(Enzi[2], axis=0) * E / S / S  # Vector...
+        JEnzi = np.multiply(Enzi[0], JEnzi[None, :])
+        JEnzi = np.matmul(Enzi[3], JEnzi.T)
+        res += JEnzi
+
+    # Take into account Acid/Base
+    #Jab = ab_mat[0] + ab_mat[2].sum(axis=1)
+    #res = np.multiply(res, Jab[None, :])
+
     return res
 
 
