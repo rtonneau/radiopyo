@@ -200,81 +200,81 @@
         ),
 
     // --------------------------- Biological Reactions --------------------------------
-        // Super Oxide Dismutase action on  O2_r_minus (H_plus?)
+        //26) Super Oxide Dismutase action on  O2_r_minus (H_plus?)
         (
             reactants: ["O2_r_minus", "O2_r_minus"],
             products: ["H2O2", "O2"],
             k_value: 2e9
         ),
-        // Same but Spontaneous reaction (no SOD involved)
+        //27) Same but Spontaneous reaction (no SOD involved)
         (
             reactants: ["O2_r_minus", "O2_r_minus"],
             products: ["H2O2", "O2"],
             k_value: 2e5
         ),
         //------------------------------------------------------------------------------
-        // Fenton Reactions
+        //28) Fenton Reactions
         (
             reactants: ["Fe_plus_plus", "H2O"],
             products: ["Fe_plus_plus_plus", "OH_minus", "HO_r"],
             k_value: 1e3
         ),
         //------------------------------------------------------------------------------
-        // Reaction of H_r with biological molecules (RdH in R.Labarbe)
+        //29) Reaction of H_r with biological molecules (RdH in R.Labarbe)
         (
             reactants: ["RH", "H_r"],
             products: ["RH_r"],
             k_value: 1e8
         ),
-        // Reaction of e_aq with biological molecules (Rde in R.Labarbe)
+        //30) Reaction of e_aq with biological molecules (Rde in R.Labarbe)
         (
             reactants: ["RH", "e_aq"],
             products: ["RH_r"],
             k_value: 1.4e8
         ),
-        // Reaction of HO^. with thiols (RdOH in R.Labarbe)
+        //31) Reaction of HO^. with thiols (RdOH in R.Labarbe)
         (
             reactants: ["OH_r", "GSH"],
             products: ["RH_r"],
             k_value: 1e10
         ),
-        // Hydrogen abstraction by OH_r (Rb2 in R.Labarbe)
+        //32) Hydrogen abstraction by OH_r (Rb2 in R.Labarbe)
         (
             reactants: ["OH_r", "RH"],
             products: ["R_r"],
             k_value: 1e9
         ),
-        // Reaction of Alkyl, R_r with O2 to form alkylperoxyl radicals ROO_r (Rb3 in R.Labarbe)
+        //33) Reaction of Alkyl, R_r with O2 to form alkylperoxyl radicals ROO_r (Rb3 in R.Labarbe)
         (
             reactants: ["R_r", "O2"],
             products: ["ROO_r"],
             k_value: 5e7
         ),
-        // decay of alkyl radiacl by other routes than oxygen (Rbr in R.Labarbe)
+        //34) decay of alkyl radiacl by other routes than oxygen (Rbr in R.Labarbe)
         (
             reactants: ["R_r"],
             products: ["trash"],
             k_value: 300
         ),
-        // R^. + R^. --> R-R   1e5 < k < 1e9 M^-1s^-1 (Rbr2 in R.Labarbe)
+        //35) R^. + R^. --> R-R   1e5 < k < 1e9 M^-1s^-1 (Rbr2 in R.Labarbe)
         (
             reactants: ["R_r", "R_r"],
             products: ["trash"],
             k_value: 5e7
         ),
-        // self reaction of ROO_r (Rb6 in R.Labarbe)
+        //36) self reaction of ROO_r (Rb6 in R.Labarbe)
         (
             reactants: ["ROO_r", "ROO_r"],
             products: ["O2", "ROH", "RO"],
             k_value: 1e4
         ),
-        // Life time of ROO_r ~ 17 s (k~ln(2)/17) (Rb8 in R.Labarbe)-
+        //37) Life time of ROO_r ~ 17 s (k~ln(2)/17) (Rb8 in R.Labarbe)-
         (
             reactants: ["ROO_r"],
             products: ["trash"],
             k_value: 0.0408
         ),
-        // ROO_r react with unsaturated lipids RH to initiate nex radical chain  (Rb11 in R.Labarbe)
+        //38) ROO_r react with unsaturated lipids RH to initiate nex radical chain  (Rb11 in R.Labarbe)
         (
             reactants: ["ROO_r", "unsat_lipid"],
             products: ["ROOH", "R_r"],

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 def jac(t: float,
         y: NDArray[np.float64],
         beam: ParticleBeam,
+        cst_sp: NDArray[np.float64],
         ab_mat: Tuple[NDArray[np.int8],
                       NDArray[np.int8],
                       NDArray[np.float64]],
@@ -38,6 +39,7 @@ def jac(t: float,
                              ]] = None,
         ) -> NDArray[np.float64]:
     y = y.clip(min=0.0,) * 1e-6
+    y = np.append(y, cst_sp)
 
     # K Reactions component
     res = np.nan_to_num(np.einsum("j, jikl -> ikl ", y, ki_mat[3]), nan=1)
@@ -59,12 +61,13 @@ def jac(t: float,
     # Jab => ab_mat[0] + ab_mat[2].sum(axis=1)
     # res => np.multiply(res, Jab[None, :])
 
-    return res
+    return res[:-len(cst_sp), :-len(cst_sp)]
 
 
 def derive(t: float,
            y: NDArray[np.float64],
            beam: ParticleBeam,
+           cst_sp: NDArray[np.float64],
            ab_mat: Tuple[NDArray[np.int8],
                          NDArray[np.int8],
                          NDArray[np.float64]],
@@ -82,7 +85,7 @@ def derive(t: float,
 
     # Force negative cc values to 0
     y = y.clip(min=0.0,) * 1e-6
-
+    y = np.append(y, cst_sp)
     # Build u vector => [1, y(t), y(t),...] n times y(t) with n = max
     # stoichiometry of reactants specie s (max_stoi).
     # max_stoi, Ri, Riy => ki_mat
@@ -108,4 +111,4 @@ def derive(t: float,
     # => Force relation ship between total dydt for A/B Partners
     # ABy, ABi, ABo => ab_mat
     dydt = ab_mat[0]*dydt + np.matmul(ab_mat[2], np.matmul(dydt, ab_mat[1]).T)
-    return dydt * 1e6
+    return dydt[:-len(cst_sp)] * 1e6

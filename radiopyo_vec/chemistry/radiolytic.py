@@ -83,6 +83,11 @@ class RadiolyticReaction(BaseChemicalReaction):
     def add_as_reactant(self, sp: SimSpecies) -> None:
         NotImplementedError("Not implemented for Radiolytic Reactions")
 
+    def as_label(self) -> str:
+        if self.index is not None:
+            return f"G_{self.species().label}"
+        raise KeyError("Unknown reaction index. Cannot make a label.")
+
     def __str__(self) -> str:
         return (f"Radiolytic<"
                 f"{self.label()}, "

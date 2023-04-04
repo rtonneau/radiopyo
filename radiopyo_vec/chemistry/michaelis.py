@@ -79,6 +79,11 @@ class MichaelisMenten(BaseChemicalReaction):
             new.add_as_product(list_sp.get_or_create_dyn_species(sp))
         return new
 
+    def as_label(self) -> str:
+        if self.index is not None:
+            return f"EZ_{self.index}"
+        raise KeyError("Unknown reaction index. Cannot make a label.")
+
     def __str__(self) -> str:
         out = ""
         for idx, (elt, stoi) in enumerate(self.iter_reactants()):

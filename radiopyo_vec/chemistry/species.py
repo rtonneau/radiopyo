@@ -72,6 +72,9 @@ class DynSpecies(RawSpecies):
     def __repr__(self) -> str:
         return self.__str__()
 
+    def __copy__(self) -> DynSpecies:
+        return DynSpecies(self.label, self.index, self.cc_init)
+
     def initial_cc(self) -> float:
         return self.cc_init
 
@@ -98,31 +101,70 @@ class CstSpecies(RawSpecies):
     def __repr__(self) -> str:
         return self.__str__()
 
+    def __copy__(self) -> CstSpecies:
+        return CstSpecies(self.label, self.index, self.cc_value)
+
     def initial_cc(self) -> float:
         return self.cc_value
+
 
 class ListSpecies():
     dyn_sp: Dict[str, DynSpecies]
     cst_sp: Dict[str, CstSpecies]
-    index: int
+    next_index: int
+    sorted: bool
 
     def __init__(self) -> None:
         self.dyn_sp, self.cst_sp = {}, {}
-        self.index = 0
+        self.next_index = 0
+        self.sorted = False
 
     def __contains__(self, key: str) -> bool:
         return key in self.dyn_sp or key in self.cst_sp
 
     def __iter__(self) -> Iterator[SimSpecies]:
-        return chain(self.cst_sp.values(), self.dyn_sp.values())
+        return chain(self.dyn_sp.values(), self.cst_sp.values())
 
     def __len__(self) -> int:
-        return len(self.dyn_sp) + len(self.cst_sp)
+        return self.len_cst_species() + self.len_dyn_species()
 
     def __getitem__(self, item: str) -> SimSpecies:
         with suppress(KeyError):
             return self.dyn_sp[item]
         return self.cst_sp[item]
+
+    def __deepcopy__(self) -> ListSpecies:
+        out = ListSpecies()
+        out.next_index = self.next_index
+        for label, dyn_sp in self.dyn_sp.items():
+            out.dyn_sp[label] = dyn_sp.__copy__()
+        for label, cst_sp in self.cst_sp.items():
+            out.cst_sp[label] = cst_sp.__copy__()
+        return out
+
+    def len_cst_species(self) -> int:
+        return len(self.cst_sp)
+
+    def len_dyn_species(self) -> int:
+        return len(self.dyn_sp)
+
+    def _convert_to_CstSpecies(self, item: str | SimSpecies) -> None:
+        if isinstance(item, str):
+            item = self.__getitem__(item)
+        if isinstance(item, CstSpecies):
+            return
+        self.dyn_sp.pop(item.label)
+        self._add_species(CstSpecies(
+            item.label, item.index, item.initial_cc()))
+        self.sorted = False
+
+    def _add_species(self, species: DynSpecies | CstSpecies) -> None:
+        if isinstance(species, DynSpecies) and species.label not in self.dyn_sp:
+            self.dyn_sp[species.label] = species
+        elif isinstance(species, CstSpecies) and species.label not in self.cst_sp:
+            self.cst_sp[species.label] = species
+        else:
+            raise TypeError(f"Unknown species type: {type(species)}")
 
     def get(self,
             label: str,
@@ -132,27 +174,21 @@ class ListSpecies():
             self.__getitem__(label)
         return default
 
-    def _add_species(self, species: DynSpecies | CstSpecies) -> None:
-        if isinstance(species, DynSpecies) and species not in self.dyn_sp:
-            self.dyn_sp[species.label] = species
-        elif isinstance(species, CstSpecies) and species not in self.cst_sp:
-            self.cst_sp[species.label] = species
-
     def add_dyn_species(self, label: str) -> None:
         if label in self.cst_sp:
             raise radiopyo_exceptions.IsConstantSpeciesError(
                 f"{label} is already recorded as CstSpecies")
         if label not in self.dyn_sp:
-            self.dyn_sp[label] = DynSpecies(label, self.index)
-            self.index += 1
+            self.dyn_sp[label] = DynSpecies(label, self.next_index)
+            self.next_index += 1
 
     def add_cst_species(self, label: str, cc: float) -> None:
         if label in self.cst_sp:
             raise radiopyo_exceptions.IsSimSpeciesError(
                 f"{label} is already recorded as SimSpecies")
         if label not in self.dyn_sp:
-            self.cst_sp[label] = CstSpecies(label, self.index, cc)
-            self.index += 1
+            self.cst_sp[label] = CstSpecies(label, self.next_index, cc)
+            self.next_index += 1
 
     def get_or_create_dyn_species(self,
                                   label: str,
@@ -177,3 +213,11 @@ class ListSpecies():
 
     def iter_dyn_species(self) -> Iterable[DynSpecies]:
         return iter(self.dyn_sp.values())
+
+    def sort(self, inplace: bool = True) -> Optional[ListSpecies]:
+        out = self.__deepcopy__() if not inplace else self
+        for idx, key in enumerate(chain(out.dyn_sp.keys(), out.cst_sp.keys())):
+            out[key].index = idx
+        out.next_index = idx + 1
+        out.sorted = True
+        return out if not inplace else None

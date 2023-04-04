@@ -1,6 +1,7 @@
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+from itertools import chain
 from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import (
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from .chemistry.acid_base import ABCouple
+    from .chemistry.base_chemistry import IsChemicalReaction
     from .chemistry.k_reactions import KReaction
     from .chemistry.michaelis import MichaelisMenten
     from .chemistry.radiolytic import RadiolyticReaction
@@ -55,12 +57,17 @@ class ReactionsList:
     radiolytic: List[RadiolyticReaction]
 
     def __post_init__(self) -> None:
-        for idx, kreaction in enumerate(self.k_reaction):
-            kreaction.set_index(idx)
-        for idx, greaction in enumerate(self.radiolytic):
-            greaction.set_index(idx)
-        for idx, ereaction in enumerate(self.enzymatic):
-            ereaction.set_index(idx)
+        for idx, k_reaction in enumerate(self.k_reaction):
+            k_reaction.set_index(idx)
+        for idx, g_reaction in enumerate(self.radiolytic):
+            g_reaction.set_index(idx)
+        for idx, e_reaction in enumerate(self.enzymatic):
+            e_reaction.set_index(idx)
+
+    def iter_isChemicalReaction(self) -> Iterable[IsChemicalReaction]:
+        return chain.from_iterable([self.k_reaction,
+                                    self.radiolytic,
+                                    self.enzymatic])
 
 
 @ dataclass
@@ -146,6 +153,10 @@ class SimEnv():
                 sp = list_sp[label]
                 if isinstance(sp, DynSpecies):
                     sp.set_initial_cc(value)
+        # Sort species so that all constant species are at the end.
+        with suppress(KeyError):
+            list_sp._convert_to_CstSpecies("trash")
+        list_sp.sort(inplace=True)
 
         return cls(reactions=ReactionsList(ab, kr, enz, rad),
                    species=list_sp,
@@ -154,8 +165,8 @@ class SimEnv():
                    )
 
     def initial_values(self) -> NDArray[np.float64]:
-        out = np.zeros(len(self.species), dtype=np.float64)
-        for species in self.species:
+        out = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
+        for species in self.species.iter_dyn_species():
             out[species.index] = species.initial_cc()*1e6
         return out
 
@@ -213,7 +224,7 @@ class SimEnv():
             # Jacobian related loops:
             for sp in self.iter_species():
                 # sp not involved in reaction => derivative = 0
-                if not reaction.is_reactant(sp) or isinstance(sp, CstSpecies):
+                if not reaction.has_reactant(sp) or isinstance(sp, CstSpecies):
                     JRki[:, idx_r, :, sp.index] = 0
                     continue
 
@@ -313,6 +324,14 @@ class SimEnv():
 
         return (ABy, ABi, ABo)
 
+    def make_cst_species_vector(self) -> NDArray:
+        out = np.zeros(self.species.len_cst_species(),
+                       dtype=np.float64)
+        len_dyn = self.species.len_dyn_species()
+        for sp in self.iter_CstSpecies():
+            out[sp.index-len_dyn] = sp.initial_cc()
+        return out
+
     def kreactions_involving(self,
                              species: str | SimSpecies,
                              ) -> List[KReaction]:
@@ -321,9 +340,36 @@ class SimEnv():
     def kreactions_involving_reactant(self,
                                       species: str | SimSpecies,
                                       ) -> List[KReaction]:
-        return [r for r in self.reactions.k_reaction if r.is_reactant(species)]
+        return [r for r in self.reactions.k_reaction if r.has_reactant(species)]
 
     def kreactions_involving_product(self,
                                      species: str | SimSpecies,
                                      ) -> List[KReaction]:
-        return [r for r in self.reactions.k_reaction if r.is_product(species)]
+        return [r for r in self.reactions.k_reaction if r.has_product(species)]
+
+    def reactions_involving(self,
+                            species: str | SimSpecies,
+                            ) -> List[IsChemicalReaction]:
+        out: List[IsChemicalReaction] = []
+        for reaction in self.reactions.iter_isChemicalReaction():
+            if species in reaction:
+                out.append(reaction)
+        return out
+
+    def reactions_involving_reactant(self,
+                                     species: str | SimSpecies,
+                                     ) -> List[IsChemicalReaction]:
+        out: List[IsChemicalReaction] = []
+        for reaction in self.reactions.iter_isChemicalReaction():
+            if reaction.has_reactant(species):
+                out.append(reaction)
+        return out
+
+    def reactions_involving_product(self,
+                                    species: str | SimSpecies,
+                                    ) -> List[IsChemicalReaction]:
+        out: List[IsChemicalReaction] = []
+        for reaction in self.reactions.iter_isChemicalReaction():
+            if reaction.has_product(species):
+                out.append(reaction)
+        return out

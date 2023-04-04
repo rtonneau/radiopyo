@@ -26,7 +26,7 @@ from .exceptions import NoBeamDefineError
 from .input.g_values import GValuesBoscolo
 from .ode_solver import derive, jac
 from .sim_env import SimEnv
-from .sim_utils import reconstruct_KRi_from_res
+from .sim_utils import reconstruct_reactions_from_res
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -57,8 +57,9 @@ class SimMatrices(TypedDict):
     ki_mat: Tuple[NDArray[np.float64], NDArray[np.int8],
                   NDArray[np.float32], NDArray[np.float32]]
     Gi_mat: NDArray[np.float64]
-    Enzi: Optional[Tuple[NDArray[np.float32], NDArray[np.float32],
-                         NDArray[np.float64], NDArray[np.int8],]]
+    Ez_mat: Optional[Tuple[NDArray[np.float32], NDArray[np.float32],
+                           NDArray[np.float64], NDArray[np.int8],]]
+    cst_sp: NDArray[np.float64]
 
 
 class Simulation(object):
@@ -79,7 +80,8 @@ class Simulation(object):
             ab_mat=self.env.make_acidBase_matrix(),
             ki_mat=self.env.make_kreaction_matrix(),
             Gi_mat=self.env.make_radiolytic_vector(),
-            Enzi=self.env.make_enzymatic_matrix(),
+            Ez_mat=self.env.make_enzymatic_matrix(),
+            cst_sp=self.env.make_cst_species_vector(),
         )
         self.beam = beam
         self.exec_time = -1
@@ -113,10 +115,12 @@ class Simulation(object):
                         t_span,
                         self.env.initial_values(),
                         args=(self.beam,
+                              self.mat["cst_sp"],
                               self.mat["ab_mat"],
                               self.mat["ki_mat"],
                               self.mat["Gi_mat"],
-                              self.mat["Enzi"]),
+                              self.mat["Ez_mat"],
+                              ),
                         t_eval=t_sol,
                         # jac=jac,
                         atol=1e-15,
@@ -127,10 +131,34 @@ class Simulation(object):
         self.exec_time = t1 - t0
         return sol
 
-    def reconstruct_KRi(self, sol: Any) -> pd.DataFrame:
-        return reconstruct_KRi_from_res(sol.t,
-                                        sol.y,
-                                        self.env,
-                                        self.mat["ab_mat"],
-                                        self.mat["ki_mat"],
-                                        )
+    @with_beam
+    def reconstruct_reactions(self, sol: Any) -> pd.DataFrame:
+        return reconstruct_reactions_from_res(
+            sol.t,
+            sol.y,
+            self.env,
+            self.beam,  # type: ignore[arg-type]
+            self.mat["cst_sp"],
+            self.mat["ab_mat"],
+            self.mat["ki_mat"],
+            self.mat["Gi_mat"],
+            self.mat["Ez_mat"],
+        )
+
+    @with_beam
+    def species_balance_evolution(self, sol: Any) -> pd.DataFrame:
+        rr = self.reconstruct_reactions(sol)
+        out = pd.DataFrame(index=sol.t,
+                           columns=[elt.label
+                                    for elt in self.env.iter_DynSpecies()],
+                           )
+        out.iloc[:, :] = 0
+
+        for species in self.env.iter_DynSpecies():
+            for reaction in self.env.reactions_involving_product(species):
+                stoi = reaction.stoi_products[species.label]
+                out.loc[:, species.label] += rr[reaction.as_label()] * stoi
+            for reaction in self.env.reactions_involving_reactant(species):
+                stoi = reaction.stoi_reactants[species.label]
+                out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
+        return out

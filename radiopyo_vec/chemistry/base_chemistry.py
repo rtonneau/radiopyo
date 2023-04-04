@@ -28,21 +28,32 @@ __all__ = [
 
 class IsChemicalReaction(Protocol):
     """ """
-    reactants: List[SimSpecies]
-    products: List[SimSpecies]
-    stoi_reactants: List[int]
-    stoi_products: List[int]
-    reactants_idx: List[int | None]
-    products_idx: List[int | None]
+    reactants: Dict[str, SimSpecies]
+    products: Dict[str, SimSpecies]
+    stoi_reactants: Dict[str, int]
+    stoi_products: Dict[str, int]
+    index: Optional[int]
+
+    def __contains__(self, other: object) -> bool:
+        """"""
 
     def iter_species(self) -> Iterable[SimSpecies]:
         """Iter over species involved in the reaction"""
 
-    def iter_reactants(self) -> Iterable[Tuple[RawSpecies, int]]:
+    def iter_reactants(self) -> Iterable[Tuple[SimSpecies, int]]:
         """ Iter over reactants only"""
 
-    def iter_products(self) -> Iterable[Tuple[RawSpecies, int]]:
+    def iter_products(self) -> Iterable[Tuple[SimSpecies, int]]:
         """Iter over products only"""
+
+    def as_label(self) -> str:
+        """ """
+
+    def has_product(self, product: SimSpecies | str) -> int:
+        """"""
+
+    def has_reactant(self, product: SimSpecies | str) -> int:
+        """"""
 
 
 class BaseChemicalReaction():
@@ -95,13 +106,13 @@ class BaseChemicalReaction():
         """Count the number of reactants involved"""
         return len(list(self.iter_products()))
 
-    def is_product(self, product: SimSpecies | str) -> int:
+    def has_product(self, product: SimSpecies | str) -> int:
         """"""
         if isinstance(product, str):
             return self.stoi_products.get(product, 0)
         return self.stoi_products.get(product.label, 0)
 
-    def is_reactant(self, reactant: SimSpecies | str) -> int:
+    def has_reactant(self, reactant: SimSpecies | str) -> int:
         """"""
         if isinstance(reactant, str):
             return self.stoi_reactants.get(reactant, 0)
@@ -142,3 +153,6 @@ class BaseChemicalReaction():
         else:
             self.reactants[sp.label] = sp
             self.stoi_reactants[sp.label] = 1
+
+    def as_label(self) -> str:
+        raise NotImplementedError
