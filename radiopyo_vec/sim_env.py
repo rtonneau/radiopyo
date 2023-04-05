@@ -1,9 +1,9 @@
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-from itertools import chain
 from contextlib import suppress
 from dataclasses import dataclass, field
+from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Dict,

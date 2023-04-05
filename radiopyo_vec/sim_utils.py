@@ -4,84 +4,117 @@ from __future__ import annotations
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
-    Optional,
-    Tuple,
+    Any,
 )
 
 import numpy as np
 import pandas as pd  # type: ignore[import]
 
+# --------------------------------- Internal Imports --------------------------------- #
+from radiopyo_vec.ode_solver import jacobian
+
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from radiopyo_vec.physics.beam import ParticleBeam
-
-    from .sim_env import SimEnv
-
+    from radiopyo_vec.sim_hand import Simulation
 
 __all__ = [
-    "reconstruct_reactions_from_res",
+    "SimUtils",
 ]
 
 
-def reconstruct_reactions_from_res(t: NDArray,
-                                   res: NDArray,
-                                   env: SimEnv,
-                                   beam: ParticleBeam,
-                                   cst_sp: NDArray[np.float64],
-                                   ab_mat: Tuple[NDArray[np.int8],
-                                                 NDArray[np.int8],
-                                                 NDArray[np.float64]],
-                                   ki_mat: Tuple[NDArray[np.float64],
-                                                 NDArray[np.int8],
-                                                 NDArray[np.float32],
-                                                 NDArray[np.float32]],
-                                   Gi_mat: NDArray[np.float64],
-                                   Enzi: Optional[Tuple[NDArray[np.float32],
-                                                        NDArray[np.float32],
-                                                        NDArray[np.float64],
-                                                        NDArray[np.int8],
-                                                        ]] = None,
-                                   ) -> pd.DataFrame:
-    # Compute column names and Pre compute slices to ease access in the dataframe
-    # columns
-    cols_kr = [kr.as_label() for kr in env.reactions.k_reaction]
-    idx_kr = slice(0, len(cols_kr))
+class SimUtils(object):
+    """Class gathering useful operations on sim results.
+    This one should contains only static methods"""
 
-    cols_gi = [gr.as_label() for gr in env.reactions.radiolytic]
-    idx_gi = slice(idx_kr.stop, idx_kr.stop+len(cols_gi))
+    @staticmethod
+    def reconstruct_reactions(sim: Simulation, sol: Any) -> pd.DataFrame:
+        # Compute column names and Pre compute slices to ease access in the dataframe
+        # columns
+        cols_kr = [kr.as_label() for kr in sim.env.reactions.k_reaction]
+        idx_kr = slice(0, len(cols_kr))
 
-    if Enzi is not None:
-        cols_ez = [er.as_label() for er in env.reactions.enzymatic]
-        idx_ez = slice(idx_gi.stop, idx_gi.stop+len(cols_ez))
+        cols_gi = [gr.as_label() for gr in sim.env.reactions.radiolytic]
+        idx_gi = slice(idx_kr.stop, idx_kr.stop+len(cols_gi))
 
-    out = pd.DataFrame(columns=list(chain.from_iterable([cols_kr,
-                                                         cols_gi,
-                                                         cols_ez])),
-                       index=t,)
+        if sim.mat["Ez_mat"] is not None:
+            cols_ez = [er.as_label() for er in sim.env.reactions.enzymatic]
+            idx_ez = slice(idx_gi.stop, idx_gi.stop+len(cols_ez))
+        else:
+            cols_ez = []
 
-    # Prefill values for radiolytic reactions
-    for label, reaction in zip(cols_gi, env.reactions.radiolytic):
-        out.loc[:, label] = reaction.kr()
+        out = pd.DataFrame(columns=list(chain.from_iterable([cols_kr,
+                                                             cols_gi,
+                                                             cols_ez])),
+                           index=sol.t,
+                           dtype=np.float64,
+                           )
 
-    for ((idx, t_val), y) in zip(enumerate(t), res.T):
-        y = y.clip(min=0.0,) * 1e-6
-        y = np.append(y, cst_sp)
+        # Prefill values for radiolytic reactions
+        for label, reaction in zip(cols_gi, sim.env.reactions.radiolytic):
+            out.loc[:, label] = reaction.kr()
 
-        # K Reactions
-        Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, ki_mat[2]), nan=1)
-        Rki = np.prod(Rki, axis=1) * ki_mat[0]
-        out.iloc[idx, idx_kr] = Rki
+        for ((idx, t_val), y) in zip(enumerate(sol.t), sol.y.T):
+            y = y.clip(min=0.0,) * 1e-6
+            y = np.append(y, sim.mat["cst_sp"])
 
-        # Radiolytic Reactions
-        out.iloc[idx, idx_gi] *= beam.at(t_val).dose_rate()
+            # K Reactions
+            Rki = np.nan_to_num(
+                np.einsum("j, jik -> ik ", y, sim.mat["Ki_mat"][2]), nan=1)
+            Rki = np.prod(Rki, axis=1) * sim.mat["Ki_mat"][0]
+            out.iloc[idx, idx_kr] = Rki
 
-        # Enzimatic reactions
-        if Enzi is not None:
-            E = np.matmul(y, Enzi[1])
-            S = np.matmul(y, Enzi[0])
-            MM = Enzi[2][1, :] * E * S / (Enzi[2][0, :] + S)
-            out.iloc[idx, idx_ez] = MM
+            # Radiolytic Reactions
+            dr = 0.0
+            if sim.beam is not None:
+                dr = sim.beam.at(t_val).dose_rate()
+            out.iloc[idx, idx_gi] *= dr
 
-    return out
-    
+            # Enzimatic reactions
+            if sim.mat["Ez_mat"] is not None:
+                E = np.matmul(y, sim.mat["Ez_mat"][1])
+                S = np.matmul(y, sim.mat["Ez_mat"][0])
+                MM = sim.mat["Ez_mat"][2][1, :] * E * \
+                    S / (sim.mat["Ez_mat"][2][0, :] + S)
+                out.iloc[idx, idx_ez] = MM
+        return out
+
+    @staticmethod
+    def species_balance_evolution(sim: Simulation, sol: Any) -> pd.DataFrame:
+        rr = SimUtils.reconstruct_reactions(sim, sol)
+        out = pd.DataFrame(index=sol.t,
+                           columns=[elt.label
+                                    for elt in sim.env.iter_DynSpecies()],
+                           dtype=np.float64,
+                           )
+        out.iloc[:, :] = 0
+
+        for species in sim.env.iter_DynSpecies():
+            for reaction in sim.env.reactions_involving_product(species):
+                stoi = reaction.stoi_products[species.label]
+                out.loc[:, species.label] += rr[reaction.as_label()] * stoi
+            for reaction in sim.env.reactions_involving_reactant(species):
+                stoi = reaction.stoi_reactants[species.label]
+                out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
+        return out
+
+    @staticmethod
+    def reconstruct_jacobian(sim: Simulation, sol: Any) -> pd.DataFrame:
+        if sim.beam is None:
+            raise TypeError("Beam is None, unable to compute jacobian")
+        sp_label = [elt.label for elt in sim.env.iter_DynSpecies()]
+        dsp_label = ["".join(["d", elt]) for elt in sp_label]
+
+        out = pd.DataFrame(index=sol.t,
+                           columns=pd.MultiIndex.from_product([sp_label, dsp_label],
+                                                              names=["sp", "dsp"]),
+                           dtype=np.float64,)
+
+        for (idx, t_val) in enumerate(sol.t):
+            jac = jacobian(t_val, sol.y[:, idx],
+                           sim.beam,
+                           **sim.mat,
+                           )
+            # check for nan in jacobian
+            if np.isnan(np.min(jac)):
+                print(idx)
+            out.iloc[idx, :] = jac.flatten()
+        return out

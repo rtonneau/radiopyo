@@ -16,22 +16,19 @@ from typing import (
     TypeVar,
 )
 
-import numpy as np
-import pandas as pd  # type: ignore[import]
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from .chemistry.species import CstSpecies
 from .exceptions import NoBeamDefineError
 from .input.g_values import GValuesBoscolo
-from .ode_solver import derive, jac
+from .ode_solver import derive, jacobian
 from .sim_env import SimEnv
-from .sim_utils import reconstruct_reactions_from_res
 
 if TYPE_CHECKING:
+    import numpy as np
     from numpy.typing import NDArray
 
-    from .chemistry.species import SimSpecies
     from .physics.beam import ParticleBeam
 
 # ----------------------------- Define useful decorators ----------------------------- #
@@ -53,8 +50,8 @@ def with_beam(func: Callable[Concatenate[Simulation, P], R],
 
 
 class SimMatrices(TypedDict):
-    ab_mat: Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]]
-    ki_mat: Tuple[NDArray[np.float64], NDArray[np.int8],
+    AB_mat: Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]]
+    Ki_mat: Tuple[NDArray[np.float64], NDArray[np.int8],
                   NDArray[np.float32], NDArray[np.float32]]
     Gi_mat: NDArray[np.float64]
     Ez_mat: Optional[Tuple[NDArray[np.float32], NDArray[np.float32],
@@ -77,8 +74,8 @@ class Simulation(object):
         self.file = Path(file)
         self.env = SimEnv.from_ron_file(self.file)
         self.mat = SimMatrices(
-            ab_mat=self.env.make_acidBase_matrix(),
-            ki_mat=self.env.make_kreaction_matrix(),
+            AB_mat=self.env.make_acidBase_matrix(),
+            Ki_mat=self.env.make_kreaction_matrix(),
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
@@ -108,6 +105,7 @@ class Simulation(object):
     def run(self,
             t_span: Tuple[float, float],
             t_sol: Optional[NDArray] = None,
+            use_jac:bool=False
             ) -> Any:
 
         t0 = time.time()
@@ -116,13 +114,13 @@ class Simulation(object):
                         self.env.initial_values(),
                         args=(self.beam,
                               self.mat["cst_sp"],
-                              self.mat["ab_mat"],
-                              self.mat["ki_mat"],
+                              self.mat["AB_mat"],
+                              self.mat["Ki_mat"],
                               self.mat["Gi_mat"],
                               self.mat["Ez_mat"],
                               ),
                         t_eval=t_sol,
-                        # jac=jac,
+                        jac=jacobian if use_jac else None,
                         atol=1e-15,
                         method="LSODA",
                         first_step=1e-12,
@@ -130,35 +128,3 @@ class Simulation(object):
         t1 = time.time()
         self.exec_time = t1 - t0
         return sol
-
-    @with_beam
-    def reconstruct_reactions(self, sol: Any) -> pd.DataFrame:
-        return reconstruct_reactions_from_res(
-            sol.t,
-            sol.y,
-            self.env,
-            self.beam,  # type: ignore[arg-type]
-            self.mat["cst_sp"],
-            self.mat["ab_mat"],
-            self.mat["ki_mat"],
-            self.mat["Gi_mat"],
-            self.mat["Ez_mat"],
-        )
-
-    @with_beam
-    def species_balance_evolution(self, sol: Any) -> pd.DataFrame:
-        rr = self.reconstruct_reactions(sol)
-        out = pd.DataFrame(index=sol.t,
-                           columns=[elt.label
-                                    for elt in self.env.iter_DynSpecies()],
-                           )
-        out.iloc[:, :] = 0
-
-        for species in self.env.iter_DynSpecies():
-            for reaction in self.env.reactions_involving_product(species):
-                stoi = reaction.stoi_products[species.label]
-                out.loc[:, species.label] += rr[reaction.as_label()] * stoi
-            for reaction in self.env.reactions_involving_reactant(species):
-                stoi = reaction.stoi_reactants[species.label]
-                out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
-        return out
