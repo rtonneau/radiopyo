@@ -14,7 +14,7 @@ import pandas as pd  # type: ignore[import]
 from radiopyo_vec.ode_solver import jacobian
 
 if TYPE_CHECKING:
-    from radiopyo_vec.sim_hand import Simulation
+    from radiopyo_vec.sim_hand import UnitCell
 
 __all__ = [
     "SimUtils",
@@ -26,7 +26,7 @@ class SimUtils(object):
     This one should contains only static methods"""
 
     @staticmethod
-    def reconstruct_reactions(sim: Simulation, sol: Any) -> pd.DataFrame:
+    def reconstruct_reactions(sim: UnitCell, sol: Any) -> pd.DataFrame:
         # Compute column names and Pre compute slices to ease access in the dataframe
         # columns
         cols_kr = [kr.as_label() for kr in sim.env.reactions.k_reaction]
@@ -78,7 +78,7 @@ class SimUtils(object):
         return out
 
     @staticmethod
-    def species_balance_evolution(sim: Simulation, sol: Any) -> pd.DataFrame:
+    def species_balance_evolution(sim: UnitCell, sol: Any) -> pd.DataFrame:
         rr = SimUtils.reconstruct_reactions(sim, sol)
         out = pd.DataFrame(index=sol.t,
                            columns=[elt.label
@@ -97,7 +97,7 @@ class SimUtils(object):
         return out
 
     @staticmethod
-    def reconstruct_jacobian(sim: Simulation, sol: Any) -> pd.DataFrame:
+    def reconstruct_jacobian(sim: UnitCell, sol: Any) -> pd.DataFrame:
         if sim.beam is None:
             raise TypeError("Beam is None, unable to compute jacobian")
         sp_label = [elt.label for elt in sim.env.iter_DynSpecies()]

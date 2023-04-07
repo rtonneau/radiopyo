@@ -13,7 +13,6 @@ from typing import (
 )
 
 import numpy as np
-from numba import jit  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 
@@ -59,6 +58,12 @@ class Timer(NamedTuple):
     @classmethod
     def new_pulsed(cls, period: float, on_time: float) -> Timer:
         return cls(period, on_time)
+
+    def is_continuous(self) -> bool:
+        return self.period == float("inf") and self.on_time == float("inf")
+
+    def is_mono_pulse(self) -> bool:
+        return self.period == float("inf") and 0 < self.on_time < float("inf")
 
     def duty_cycle(self) -> float:
         out = self.on_time / self.period
@@ -117,7 +122,6 @@ class ParticleBeam():
         )
 
     def make_beam_func(self) -> Callable[[float], float]:
-        @jit(nopython=True)
         def beam_func(time: float) -> float:
             if (time % self.timer.period) <= self.timer.on_time:
                 return self.peak_dose_rate
@@ -125,21 +129,15 @@ class ParticleBeam():
         return beam_func
 
     def make_matrix(self, start: float, stop: float) -> NDArray[np.float64]:
-        times = np.empty([int((stop-start)/self.timer.period)+2, 2],
-                         dtype=np.float64)
-        times[:, 1] = np.arange(times.shape[0]-1, -1, -1) * self.timer.period
-        times[:, 0] = times[:, 1] + self.timer.on_time
+        raise NotImplementedError
 
-        dr = np.zeros_like(times)
-        dr[:, 1] = self.peak_dose_rate
-
-        out = np.empty([dr.shape[0]*2, 2])
-        out[:, 0] = times.flatten()
-        out[:, 1] = dr.flatten()
-
-        while out[-2, 0] < start:
-            out = np.delete(out, (-1), axis=0)
-
+    def make_time_intervals(self,
+                            start: float,
+                            stop: float,
+                            ) -> NDArray[np.float64]:
+        out = self.make_matrix(start, stop)
+        if out.shape[0] <= 2:
+            return out[:, 0]
         return out
 
 
@@ -152,6 +150,17 @@ class ConstantBeam(ParticleBeam):
                          Timer.new_constant(),
                          max_dose,
                          )
+
+    def make_matrix(self, start: float, stop: float) -> NDArray[np.float64]:
+        if start >= self.time_at_max_dose:
+            return np.array([[start, 0.0],
+                             [stop, 0.0]])
+        if stop < self.time_at_max_dose:
+            return np.array([[start, self.peak_dose_rate],
+                             [stop, self.peak_dose_rate]])
+        return np.array([[start, self.peak_dose_rate],
+                         [self.timer.on_time, 0.0],
+                         [stop, 0.0]])
 
 
 class PulsedBeam(ParticleBeam):
@@ -166,7 +175,52 @@ class PulsedBeam(ParticleBeam):
                          max_dose,
                          )
 
-    @classmethod
+    def make_matrix(self, start: float, stop: float) -> NDArray[np.float64]:
+        times = np.empty([int((stop-start)/self.timer.period)+2, 2],
+                         dtype=np.float64)
+        times[:, 1] = np.arange(times.shape[0]-1, -1, -1) * self.timer.period
+        times[:, 0] = times[:, 1] + self.timer.on_time
+
+        dr = np.zeros_like(times)
+        indexes = (np.where(times[:, 1] <= self.time_at_max_dose)[0], [1])
+        dr[indexes] = self.peak_dose_rate
+
+        out = np.empty([dr.shape[0]*2, 2])
+        out[:, 0] = times.flatten()
+        out[:, 1] = dr.flatten()
+
+        while out[-2, 0] < start:
+            out = np.delete(out, (-1), axis=0)
+        while out[1, 1] <= 0.0:
+            out = np.delete(out, (1), axis=0)
+        return out
+
+    def make_time_intervals(self,
+                            start: float,
+                            stop: float,
+                            ) -> NDArray[np.float64]:
+        out = self.make_matrix(start, stop)
+        if out.shape[0] <= 2:
+            return out[:, 0]
+        delta = self.timer.on_time*0.05
+        if delta >= (self.timer.period - self.timer.on_time):
+            delta = (self.timer.period - self.timer.on_time)*0.05
+        indexes = np.where(out[:, 1] > 0.0)[0], [0]
+        if indexes[0][0] == 0:
+            indexes = (indexes[0][1:], indexes[1])
+        if indexes[0][-1] == out.shape[0]-1:
+            indexes = (indexes[0][0:-1], indexes[1])
+        out[indexes] = out[indexes] - delta
+
+        indexes = np.where(out[:, 1] == 0.0)[0], [0]
+        if indexes[0][0] == 0:
+            indexes = (indexes[0][1:], indexes[1])
+        if indexes[0][-1] == out.shape[0]-1:
+            indexes = (indexes[0][0:-1], indexes[1])
+        out[indexes] = out[indexes] + delta
+        return out[:, 0]
+
+    @ classmethod
     def from_peak_dose_rate(cls,
                             peak_dr: float,
                             period: float,
@@ -180,7 +234,7 @@ class PulsedBeam(ParticleBeam):
                    max_dose=max_dose,
                    )
 
-    @classmethod
+    @ classmethod
     def from_dose_per_pulse(cls,
                             pulse_dose: float,
                             period: float,
@@ -191,3 +245,7 @@ class PulsedBeam(ParticleBeam):
                                               period=period,
                                               on_time=on_time,
                                               max_dose=max_dose,)
+
+
+class MonoPulsedBeam(PulsedBeam):
+    pass

@@ -3,8 +3,11 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
+    Any,
+    List,
     Optional,
     Tuple,
+    Protocol,
 )
 
 import numpy as np
@@ -111,3 +114,79 @@ def derive(t: float,
     # ABy, ABi, ABo => ab_mat
     dydt = AB_mat[0]*dydt + np.matmul(AB_mat[2], np.matmul(dydt, AB_mat[1]).T)
     return dydt[:-len(cst_sp)] * 1e6
+
+
+class ScipyODEResult(Protocol):
+    t: NDArray[np.float64]
+    y: NDArray[np.float64]
+    sol: Optional[Any]
+    t_events: Optional[List[NDArray[np.float64]]]
+    y_events: Optional[List[NDArray[np.float64]]]
+    nfev: int
+    njev: int
+    nlu: int
+    status: int
+    message: str
+    success: bool
+
+
+class ODEResult(object):
+    # Properties of the bunch object sent by scipy.integrate.solve_ivp
+    t: NDArray[np.float64]
+    y: NDArray[np.float64]
+    sol: List[Any]
+    t_events: List[Optional[List[NDArray[np.float64]]]]
+    y_events: List[Optional[List[NDArray[np.float64]]]]
+    nfev: List[int]
+    njev: List[int]
+    nlu: List[int]
+    status: List[int]
+    message: List[str]
+    success: List[bool]
+
+    # Add new useful properties
+    n_points: List[int]
+    exec_time: List[Optional[float]]
+
+    def __init__(self, sol: Optional[ScipyODEResult] = None) -> None:
+        self._default_init()
+        if sol is not None:
+            self.append_sol(sol)
+
+    def __len__(self):
+        """Number of simulation run"""
+        return len(self.n_points)
+
+    @property
+    def shape(self):
+        return self.y.shape
+
+    def _default_init(self):
+        self.t = np.array([], dtype=np.float64)
+        self.y = np.array([], dtype=np.float64)
+        self.sol = []
+        self.t_events, self.y_events = [], []
+        self.nfev, self.njev, self.nlu = [], [], []
+        self.status, self.message, self.success = [], [], []
+        self.n_points, self.exec_time = [], []
+
+    def append_sol(self,
+                   sol: ScipyODEResult,
+                   exec_time: Optional[float] = None,
+                   ) -> None:
+        self.t = np.append(self.t, sol.t)
+        if len(self.y) == 0:
+            self.y = sol.y
+        else:
+            self.y = np.hstack([self.y, sol.y])
+        self.sol.append(sol.sol)
+        self.t_events.append(sol.t_events)
+        self.y_events.append(sol.y_events)
+        self.nfev.append(sol.nfev)
+        self.njev.append(sol.njev)
+        self.nlu.append(sol.nlu)
+        self.status.append(sol.status)
+        self.message.append(sol.message)
+        self.success.append(sol.success)
+        self.n_points.append(len(sol.t))
+        self.exec_time.append(exec_time)
