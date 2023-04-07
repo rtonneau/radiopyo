@@ -218,7 +218,8 @@ class PulsedBeam(ParticleBeam):
         if indexes[0][-1] == out.shape[0]-1:
             indexes = (indexes[0][0:-1], indexes[1])
         out[indexes] = out[indexes] + delta
-        return out[:, 0]
+        out[:, 1] /= self.peak_dose_rate
+        return out
 
     @ classmethod
     def from_peak_dose_rate(cls,

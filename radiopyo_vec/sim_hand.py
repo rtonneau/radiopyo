@@ -136,9 +136,6 @@ class UnitCell(object):
             raise ValueError(f"t_chunks (len={len(t_chunks)}) and max_step "
                              f"(len={len(list(max_step))}) must have the same "
                              f"length if max_step is a list or and array")
-        else:
-            raise TypeError(
-                f"Unsupported type for max_step ({type(max_step)})")
 
         # Check up t_eval
         iter_t_eval: Iterable | List
@@ -172,8 +169,8 @@ class UnitCell(object):
                            atol=atol,
                            max_step=step_size,
                            t_eval=_t_eval,
-                           y0=sol.y[:,-1] if len(sol) > 0 else None,
+                           y0=sol.y[:, -1] if len(sol) > 0 else None,
                            )
-            sol.append_sol(res)
+            sol.append_sol(res, exec_time=self.last_exec_time)
 
         return sol
