@@ -29,7 +29,7 @@ class TestPulsedTimer():
 
 class TestCstBeam():
     dose_rate = 5
-    test_beam = beam.ConstantBeam("e", dose_rate)
+    test_beam = beam.ConstantBeam(dose_rate)
 
     def test_average_dose_rate(self):
         assert self.test_beam.average_dose_rate() == self.dose_rate
@@ -47,8 +47,7 @@ class TestPulsedBeam():
     dose_rate = 5
     period = 5
     on_time = 2
-    test_beam = beam.PulsedBeam(particle="e",
-                                dose_rate=dose_rate,
+    test_beam = beam.PulsedBeam(dose_rate=dose_rate,
                                 period=period,
                                 on_time=on_time
                                 )
@@ -77,8 +76,7 @@ class TestPulsedBeamMaxed(TestPulsedBeam):
     period = 5
     on_time = 2
     max_dose = (dose_rate * period) * 1.5
-    test_beam = beam.PulsedBeam(particle="e",
-                                dose_rate=dose_rate,
+    test_beam = beam.PulsedBeam(dose_rate=dose_rate,
                                 period=period,
                                 on_time=on_time,
                                 max_dose=max_dose,

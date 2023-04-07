@@ -164,10 +164,16 @@ class SimEnv():
                    initial_cc=initial_cc,
                    )
 
-    def initial_values(self) -> NDArray[np.float64]:
-        out = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
+    def initial_values(self, all: bool = False) -> NDArray[np.float64]:
+        len_out = self.species.len_dyn_species()
+        if all:
+            len_out += self.species.len_cst_species()
+        out = np.zeros(len_out, dtype=np.float64)
         for species in self.species.iter_dyn_species():
             out[species.index] = species.initial_cc()*1e6
+        if all:
+            for cst_species in self.species.iter_cst_species():
+                out[cst_species.index] = cst_species.initial_cc()*1e6
         return out
 
     def species_labels(self) -> List[str]:

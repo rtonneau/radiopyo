@@ -8,7 +8,6 @@ from typing import (
 )
 
 import numpy as np
-import pandas as pd  # type: ignore[import]
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:

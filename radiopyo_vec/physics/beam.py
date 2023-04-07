@@ -5,12 +5,21 @@ from dataclasses import dataclass, field
 from enum import Enum
 from math import isinf, isnan
 from typing import (
+    TYPE_CHECKING,
+    Callable,
+    List,
     NamedTuple,
+    Tuple,
 )
+
+import numpy as np
+from numba import jit  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["TimeMessage",
@@ -106,6 +115,32 @@ class ParticleBeam():
             time=time,
             current_dose_rate=dr,
         )
+
+    def make_beam_func(self) -> Callable[[float], float]:
+        @jit(nopython=True)
+        def beam_func(time: float) -> float:
+            if (time % self.timer.period) <= self.timer.on_time:
+                return self.peak_dose_rate
+            return 0.0
+        return beam_func
+
+    def make_matrix(self, start: float, stop: float) -> NDArray[np.float64]:
+        times = np.empty([int((stop-start)/self.timer.period)+2, 2],
+                         dtype=np.float64)
+        times[:, 1] = np.arange(times.shape[0]-1, -1, -1) * self.timer.period
+        times[:, 0] = times[:, 1] + self.timer.on_time
+
+        dr = np.zeros_like(times)
+        dr[:, 1] = self.peak_dose_rate
+
+        out = np.empty([dr.shape[0]*2, 2])
+        out[:, 0] = times.flatten()
+        out[:, 1] = dr.flatten()
+
+        while out[-2, 0] < start:
+            out = np.delete(out, (-1), axis=0)
+
+        return out
 
 
 class ConstantBeam(ParticleBeam):

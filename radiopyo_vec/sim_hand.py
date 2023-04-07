@@ -63,13 +63,13 @@ class Simulation(object):
     file: Path
     env: SimEnv
     mat: SimMatrices
-    beam: Optional[ParticleBeam]
+    beam: ParticleBeam
     exec_time: float
     g_val: GValuesBoscolo
 
     def __init__(self,
                  file: str | Path,
-                 beam: Optional[ParticleBeam] = None,
+                 beam: ParticleBeam,
                  ) -> None:
         self.file = Path(file)
         self.env = SimEnv.from_ron_file(self.file)
@@ -104,8 +104,9 @@ class Simulation(object):
     @with_beam
     def run(self,
             t_span: Tuple[float, float],
-            t_sol: Optional[NDArray] = None,
-            use_jac:bool=False
+            t_eval: Optional[NDArray] = None,
+            use_jac: bool = False,
+            method: str = "LSODA",
             ) -> Any:
 
         t0 = time.time()
@@ -119,10 +120,10 @@ class Simulation(object):
                               self.mat["Gi_mat"],
                               self.mat["Ez_mat"],
                               ),
-                        t_eval=t_sol,
+                        t_eval=t_eval,
                         jac=jacobian if use_jac else None,
                         atol=1e-15,
-                        method="LSODA",
+                        method=method,
                         first_step=1e-12,
                         )
         t1 = time.time()
