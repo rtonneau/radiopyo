@@ -171,7 +171,7 @@ class ListSpecies():
             default: Optional[SimSpecies] = None,
             ) -> Optional[SimSpecies]:
         with suppress(KeyError):
-            self.__getitem__(label)
+            return self.__getitem__(label)
         return default
 
     def add_dyn_species(self, label: str) -> None:

@@ -100,7 +100,17 @@ class ParticleBeam():
         # How many pulses to reach max_dose?
         #   ==> (max dose) / (dose per pulse)
         n = self.max_dose / self.dose_per_pulse
-        return int(n) * self.timer.period + (n-int(n)) * self.timer.on_time
+        n_remainder = self.max_dose % self.dose_per_pulse
+        # n is a float number
+        if n > 1.0 and n_remainder > 0.0:
+            return (int(n) * self.timer.period +
+                    (n-int(n)) * self.timer.on_time)
+        # n is int. Then the last pulse just need the on_time
+        if n > 1.0 and n_remainder == 0.0:
+            return((n-1)*self.timer.period + self.timer.on_time)
+
+        # Less than a single period.
+        return n * self.timer.on_time
 
     def _compute_peak_dose_rate(self) -> float:
         return (self.dose_rate / self.timer.duty_cycle())
@@ -128,12 +138,12 @@ class ParticleBeam():
             return 0.0
         return beam_func
 
-    def make_matrix(self, start: float, stop: float) -> NDArray[np.float64]:
+    def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
         raise NotImplementedError
 
     def make_time_intervals(self,
-                            start: float,
                             stop: float,
+                            start: float = 0.0
                             ) -> NDArray[np.float64]:
         out = self.make_matrix(start, stop)
         if out.shape[0] <= 2:
@@ -151,7 +161,7 @@ class ConstantBeam(ParticleBeam):
                          max_dose,
                          )
 
-    def make_matrix(self, start: float, stop: float) -> NDArray[np.float64]:
+    def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
         if start >= self.time_at_max_dose:
             return np.array([[start, 0.0],
                              [stop, 0.0]])
@@ -175,36 +185,65 @@ class PulsedBeam(ParticleBeam):
                          max_dose,
                          )
 
-    def make_matrix(self, start: float, stop: float) -> NDArray[np.float64]:
-        times = np.empty([int((stop-start)/self.timer.period)+2, 2],
+    def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
+        # If sim starts after beam off:
+        if start >= self.time_at_max_dose:
+            return np.array([[start, 0.0], [stop, 0.0]], dtype=np.float64)
+
+        # If sim ends in less than one on_time:
+        if stop < self.timer.on_time:
+            return np.array([[start, self.peak_dose_rate],
+                             [stop, 0.0]],
+                            dtype=np.float64)
+
+        # If total dose is delivered in less than one pulse:
+        if self.time_at_max_dose < self.timer.on_time:
+            return np.array([[start, self.peak_dose_rate],
+                             [self.time_at_max_dose, 0.0],
+                             [stop, 0.0]],
+                            dtype=np.float64)
+
+        # Else ...
+        start_period: int = int(start//self.timer.period)
+        stop_period: int
+        if stop > self.time_at_max_dose:
+            stop_period = int(self.time_at_max_dose//self.timer.period)+1
+        else:
+            stop_period = int(stop//self.timer.period)+1
+        times = np.empty([stop_period-start_period, 2],
                          dtype=np.float64)
-        times[:, 1] = np.arange(times.shape[0]-1, -1, -1) * self.timer.period
-        times[:, 0] = times[:, 1] + self.timer.on_time
+        times[:, 0] = np.arange(start_period, stop_period) * self.timer.period
+        times[:, 1] = times[:, 0] + self.timer.on_time
 
         dr = np.zeros_like(times)
-        indexes = (np.where(times[:, 1] <= self.time_at_max_dose)[0], [1])
+        indexes = (np.where(times[:, 0] < self.time_at_max_dose)[0], [0])
         dr[indexes] = self.peak_dose_rate
 
         out = np.empty([dr.shape[0]*2, 2])
         out[:, 0] = times.flatten()
         out[:, 1] = dr.flatten()
 
-        while out[-2, 0] < start:
-            out = np.delete(out, (-1), axis=0)
-        while out[1, 1] <= 0.0:
-            out = np.delete(out, (1), axis=0)
+        # Trim the beginning based on start/stop times:
+        if out[1, 0] > start:
+            out[0, 0] = start
+        if out[-1, 0] < stop:
+            out = np.vstack([out, [stop, 0.0]])
+
         return out
 
     def make_time_intervals(self,
-                            start: float,
                             stop: float,
+                            start: float = 0.0,
                             ) -> NDArray[np.float64]:
-        out = self.make_matrix(start, stop)
-        if out.shape[0] <= 2:
-            return out[:, 0]
-        delta = self.timer.on_time*0.05
+        out = self.make_matrix(stop, start)
+        if out.shape[0] == 3:
+            out[0, 1] = 1.0
+            return out
+        if out.shape[0] == 2:
+            return out
+        delta = self.timer.on_time*0.1
         if delta >= (self.timer.period - self.timer.on_time):
-            delta = (self.timer.period - self.timer.on_time)*0.05
+            delta = (self.timer.period - self.timer.on_time)*0.1
         indexes = np.where(out[:, 1] > 0.0)[0], [0]
         if indexes[0][0] == 0:
             indexes = (indexes[0][1:], indexes[1])

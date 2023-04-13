@@ -9,6 +9,7 @@ from typing import (
     TYPE_CHECKING,
     Iterable,
     List,
+    NamedTuple,
     Optional,
     Tuple,
     TypedDict,
@@ -44,6 +45,8 @@ class SimMatrices(TypedDict):
 
 
 class UnitCell(object):
+    FIRST_STEP: float = 1e-12
+
     file: Path
     env: SimEnv
     mat: SimMatrices
@@ -97,6 +100,11 @@ class UnitCell(object):
 
         if y0 is None:
             y0 = self.env.initial_values()
+
+        first_step = self.FIRST_STEP
+        if first_step >= max_step:
+            first_step = max_step / 10
+
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(derive,
                                         t_span,
@@ -113,7 +121,7 @@ class UnitCell(object):
                                         atol=atol,
                                         method=method,
                                         max_step=max_step,
-                                        first_step=1e-12,
+                                        first_step=first_step,
                                         )
         t1 = time.time()
         self.last_exec_time = t1 - t0
@@ -124,7 +132,7 @@ class UnitCell(object):
                     t_eval: Optional[NDArray[np.float64]] = None,
                     use_jac: bool = False,
                     method: str = "LSODA",
-                    atol: float = 1e-8,
+                    atol: float = 1e-10,
                     max_step: float | Iterable[float] = np.inf,
                     ) -> ODEResult:
         sol = ODEResult()
@@ -137,7 +145,7 @@ class UnitCell(object):
                              f"(len={len(list(max_step))}) must have the same "
                              f"length if max_step is a list or and array")
 
-        # Check up t_eval
+        # Checkup t_eval
         iter_t_eval: Iterable | List
         if t_eval is None:
             iter_t_eval = repeat(None, len(t_chunks)-1)
@@ -172,5 +180,86 @@ class UnitCell(object):
                            y0=sol.y[:, -1] if len(sol) > 0 else None,
                            )
             sol.append_sol(res, exec_time=self.last_exec_time)
-
         return sol
+
+    def prepare_chunked_run(self,
+                            t_chunks: NDArray[np.float64],
+                            use_jac: bool = False,
+                            method: str = "LSODA",
+                            atol: float = 1e-10,
+                            max_step: float | Iterable[float] = np.inf,
+                            ) -> SimChunksIter:
+
+        # Check up max_step
+        if isinstance(max_step, float):
+            max_step = repeat(max_step, len(t_chunks)-1)
+        elif t_chunks.shape[0] != len(list(max_step)):
+            raise ValueError(f"t_chunks (len={len(t_chunks)}) and max_step "
+                             f"(len={len(list(max_step))}) must have the same "
+                             f"length if max_step is a list or and array")
+
+        chunk_list: List[SimChunk] = []
+        for idx, (stop, step_size) in enumerate(zip(t_chunks[1:],
+                                                    max_step,),
+                                                start=0):
+            chunk = SimChunk(start=t_chunks[idx],
+                             stop=stop,
+                             max_step_size=step_size)
+            chunk_list.append(chunk)
+        return SimChunksIter(sim=self,
+                             chunks=chunk_list,
+                             atol=atol,
+                             use_jac=use_jac,
+                             method=method,)
+
+
+class SimChunk(NamedTuple):
+    start: float
+    stop: float
+    max_step_size: float
+
+
+class SimChunksIter():
+    sim: UnitCell
+    chunks: List[SimChunk]
+    sol: ODEResult
+    current: int
+    atol: float
+    use_jac: bool
+    method: str
+
+    def __init__(self, sim: UnitCell,
+                 chunks: List[SimChunk],
+                 atol: float = 1e-10,
+                 use_jac: bool = True,
+                 method: str = "LSODA",
+                 ):
+        self.sim = sim
+        self.chunks = chunks
+        self.sol = ODEResult()
+        self.atol = atol
+        self.use_jac = use_jac
+        self.method = method
+        self.current = -1
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.current += 1
+        try:
+            chunk = self.chunks[self.current]
+        except IndexError:
+            raise StopIteration from None
+        res = self.sim.run(t_span=(chunk.start, chunk.stop),
+                           use_jac=self.use_jac,
+                           method=self.method,
+                           atol=self.atol,
+                           max_step=chunk.max_step_size,
+                           y0=self.sol.y[:, -1] if self.current > 0 else None,
+                           )
+        self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
+        return self.sol
+
+    def __len__(self):
+        return len(self.chunks)
