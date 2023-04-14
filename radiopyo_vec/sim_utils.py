@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd  # type: ignore[import]
 
 # --------------------------------- Internal Imports --------------------------------- #
-from radiopyo_vec.ode_solver import jacobian
+from radiopyo_vec.ode_solver import jacobian, ODEResult
 
 if TYPE_CHECKING:
     from radiopyo_vec.sim_hand import UnitCell
@@ -118,3 +118,13 @@ class SimUtils(object):
                 print(idx)
             out.iloc[idx, :] = jac.flatten()
         return out
+
+    @staticmethod
+    def to_pandas(sim: UnitCell, sol: ODEResult) -> pd.DataFrame:
+        """
+        """
+        labels = [elt.label for elt in sim.env.species.iter_dyn_species()]
+        return pd.DataFrame(index=sol.t,
+                            columns=labels,
+                            dtype=np.float64,
+                            data=sol.y.T)

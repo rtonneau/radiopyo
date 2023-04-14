@@ -143,11 +143,32 @@ class ParticleBeam():
 
     def make_time_intervals(self,
                             stop: float,
-                            start: float = 0.0
+                            start: float = 0.0,
                             ) -> NDArray[np.float64]:
-        out = self.make_matrix(start, stop)
-        if out.shape[0] <= 2:
-            return out[:, 0]
+        out = self.make_matrix(stop, start)
+        if out.shape[0] == 3:
+            out[0, 1] = 1.0
+            out[1, 0] = out[1, 0] + (out[1, 0]-out[0, 0])*0.1
+            return out
+        if out.shape[0] == 2:
+            return out
+        delta = self.timer.on_time*0.1
+        if delta >= (self.timer.period - self.timer.on_time):
+            delta = (self.timer.period - self.timer.on_time)*0.1
+        indexes = np.where(out[:, 1] > 0.0)[0], [0]
+        if indexes[0][0] == 0:
+            indexes = (indexes[0][1:], indexes[1])
+        if indexes[0][-1] == out.shape[0]-1:
+            indexes = (indexes[0][0:-1], indexes[1])
+        out[indexes] = out[indexes] - delta
+
+        indexes = np.where(out[:, 1] == 0.0)[0], [0]
+        if indexes[0][0] == 0:
+            indexes = (indexes[0][1:], indexes[1])
+        if indexes[0][-1] == out.shape[0]-1:
+            indexes = (indexes[0][0:-1], indexes[1])
+        out[indexes] = out[indexes] + delta
+        out[:, 1] /= self.peak_dose_rate
         return out
 
 
@@ -169,7 +190,7 @@ class ConstantBeam(ParticleBeam):
             return np.array([[start, self.peak_dose_rate],
                              [stop, self.peak_dose_rate]])
         return np.array([[start, self.peak_dose_rate],
-                         [self.timer.on_time, 0.0],
+                         [self.time_at_max_dose, 0.0],
                          [stop, 0.0]])
 
 
@@ -229,35 +250,6 @@ class PulsedBeam(ParticleBeam):
         if out[-1, 0] < stop:
             out = np.vstack([out, [stop, 0.0]])
 
-        return out
-
-    def make_time_intervals(self,
-                            stop: float,
-                            start: float = 0.0,
-                            ) -> NDArray[np.float64]:
-        out = self.make_matrix(stop, start)
-        if out.shape[0] == 3:
-            out[0, 1] = 1.0
-            return out
-        if out.shape[0] == 2:
-            return out
-        delta = self.timer.on_time*0.1
-        if delta >= (self.timer.period - self.timer.on_time):
-            delta = (self.timer.period - self.timer.on_time)*0.1
-        indexes = np.where(out[:, 1] > 0.0)[0], [0]
-        if indexes[0][0] == 0:
-            indexes = (indexes[0][1:], indexes[1])
-        if indexes[0][-1] == out.shape[0]-1:
-            indexes = (indexes[0][0:-1], indexes[1])
-        out[indexes] = out[indexes] - delta
-
-        indexes = np.where(out[:, 1] == 0.0)[0], [0]
-        if indexes[0][0] == 0:
-            indexes = (indexes[0][1:], indexes[1])
-        if indexes[0][-1] == out.shape[0]-1:
-            indexes = (indexes[0][0:-1], indexes[1])
-        out[indexes] = out[indexes] + delta
-        out[:, 1] /= self.peak_dose_rate
         return out
 
     @ classmethod
