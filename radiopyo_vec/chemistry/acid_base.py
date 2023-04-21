@@ -1,7 +1,18 @@
+#!/usr/bin/env python3
+"""
+The acid_base submodule contains all class definitions related to acid-base equilibrium.
+
+Author:
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+"""
+# --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, NamedTuple
 
+# --------------------------------- Internal imports --------------------------------- #
+
+# ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies
 
@@ -10,12 +21,27 @@ __all__ = [
     "ABCouple",
 ]
 
-# ---------------------------------------------------------------------------- #
-#                         ACID BASE PARTITION DEFINITION                       #
-# ---------------------------------------------------------------------------- #
-
-
+# ------------------------------------------------------------------------------------ #
+#                                   CLASS DEFINITIONS                                  #
+# ------------------------------------------------------------------------------------ #
 class ABPartition(NamedTuple):
+    """
+    Acid-Base equilibrium results are stored in a NamedTuple. It is computed
+    from the total concentration of the Acid-Base couple. The class provides several
+    attributes for a more detailed usage. 
+
+    Attributes:
+        A: float
+            Base concentration
+        HA: float
+            Acid concentration
+        dA: float
+            Derivative of the base concentration with respect to the total concentration
+            of the acid/base couple
+        dHA: float
+            Derivative of the acid concentration with respect to the total concentration
+            of the acid/base couple        
+    """
     A: float
     HA: float
     dA: float
@@ -40,7 +66,27 @@ class ABPartition(NamedTuple):
 
 
 class ABCouple():
-    """"""
+    """
+    Acid/Base couple definition. An A/B couple is composed of 2 chemical species, one
+    base and one acid. The relative concentrations of both species is defined by the pKa
+    constant of the A/B reaction. The relative concentrations can be computed based on
+    the total concentration of both species and the concentration of H_plus ion.
+
+    Attributes:
+        acid: CstSpecies | DynSpecies
+        base: CstSpecies | DynSpecies
+        pKa: float
+        ka: float (computed from pKa)
+
+    Usage:
+        >>> from radiopyo_vec.species import ListSpecies
+        >>> list_of_species = ListSpecies()
+        >>> acid = list_of_species.get_or_create_dyn_species("OH_r")
+        >>> base = list_of_species.get_or_create_dyn_species("O_r_minus")
+        >>> ab = ABCouple(acid, base, pKa=11.9)
+        >>> partition = ab.compute_partition(cc_tot, cc_H_plus)
+
+    """
     acid: SimSpecies
     base: SimSpecies
     pKa: float
@@ -59,12 +105,43 @@ class ABCouple():
                   pKa: float,
                   list_sp: ListSpecies,
                   ) -> ABCouple:
+        """Class method to conveniently create a new Acid/Base couple from dictionary
+        destructuring (from input file parsing). The method also require an argument 
+        "list_sp" which keeps track of the currently existing species so that new
+        species can be created if necessary (assuming dynamic species).
+
+        Args:
+            acid: str
+                acid species name
+            base: str
+                base species name
+            pKa: float
+                pKa of the reaction
+            list_sp: ListSpecies
+                Collection of species already involved in the simulation. This
+                collection will grow if acid and/or base do not exist yet.
+
+        Returns:
+            ABCouple
+        """
         return cls(acid=list_sp.get_or_create_dyn_species(acid),
                    base=list_sp.get_or_create_dyn_species(base),
                    pKa=pKa,
                    )
 
     def compute_partition(self, cc_tot: float, cc_H_plus: float) -> ABPartition:
+        """
+        Method to compute the Acid/base partition.
+
+        Args:
+            cc_tot: float
+                Total concentration of species i.e. [acid] + [base]
+            cc_H_plus: float
+                Concentration of species H_plus
+
+        Returns:
+            ABPartition
+        """
         return ABPartition(
             cc_tot / (1.0 + cc_H_plus / self.ka),  # Base
             cc_tot / (1.0 + self.ka / cc_H_plus),  # Acid

@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+"""
+The michaelis submodule contains all class definitions related to enzymatic reactions
+treatment via the Michaelis-Menten kinetic.
+
+Author:
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+"""
+# --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
 from typing import (
@@ -5,28 +14,43 @@ from typing import (
     List,
 )
 
-import numpy as np
-
+# --------------------------------- Internal imports --------------------------------- #
 from .base_chemistry import BaseChemicalReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from radiopyo_vec.utils.collections import MappedSpecies
-
     from .species import ListSpecies, SimSpecies
+
+# ------------------------------------------------------------------------------------ #
 
 __all__ = [
     "MichaelisMenten",
 ]
 
-# ---------------------------------------------------------------------------- #
-#                             K REACTION DEFINITION                            #
-# ---------------------------------------------------------------------------- #
+# ------------------------------------------------------------------------------------ #
+#                                    CLASS DEFINITION                                  #
+# ------------------------------------------------------------------------------------ #
 
 
 class MichaelisMenten(BaseChemicalReaction):
+    """ 
+    Class implementing the Michaelis-Menten kinetic. Child class of BaseChemicalReaction
+    with few additions. In the Michaelis-Menten kinetic the reaction rate is defined by:
+        k_value * [enzyme] * [substrate] / (k_micha + [substrate])
+
+    This kinetic is really convenient as it ensures a positive denominator during
+    calculation (k_micha > 0).
+
+    Attributes:
+        k_value: float
+            reaction constant
+        k_micha: float
+            Michaelis-Menten constant
+        substrate: SimSpecies
+            Species used as substrate
+        enzyme: SimSpecies
+            Species used as enzyme
+    """
     k_value: float
     k_micha: float
     substrate: SimSpecies
@@ -49,15 +73,31 @@ class MichaelisMenten(BaseChemicalReaction):
                   k_micha: float,
                   list_sp: ListSpecies,
                   ) -> MichaelisMenten:
-        """Create a KReaction from a dictionary
+        """Create a MichaelisMenten from a dictionary (via destructuring)
 
         Args:
-            reactants (List[str]): List of reactants.
-            products (List[str]): List of products.
-            k_value (float): k value of the reactions.
+            enzyme: str
+                Name of the species used as enzyme
+            substrate: List[str]
+                Name of the species used as substrate. For some reaction, more than one
+                molecule of substrate are required, therefore a list is expected. For
+                instance if 2 molecule of H2 are needed: ["H2", "H2"]
+            products: List[str]
+                List of products
+            k_value: float
+                k value of the reaction
+            k_micha: float
+                Michaelis-Menten constant of the reaction
+            list_sp: ListSpecies
+                Collection of species already involved in the simulation. This
+                collection will grow if some reactants and/or products do not exist yet.
 
         Returns:
-            KReaction
+            MichaelisMenten
+
+        Raises:
+            TypeError:
+                if more than one substrate "kind" if defined.
         """
         new = cls(k_value, k_micha)
 
@@ -80,6 +120,19 @@ class MichaelisMenten(BaseChemicalReaction):
         return new
 
     def as_label(self) -> str:
+        """
+        This method is used for the data mining. It should be implemented by child
+        classes in order to easily define short labels for each reactions based on the
+        reaction type and the index of reaction. For instance, it can be used as column 
+        name in a pandas DataFrame.
+
+        Returns:
+            str
+            
+        Raises:
+            KeyError
+                If index is None.
+        """
         if self.index is not None:
             return f"EZ_{self.index}"
         raise KeyError("Unknown reaction index. Cannot make a label.")
