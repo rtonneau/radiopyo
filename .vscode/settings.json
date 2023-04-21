@@ -1,12 +1,13 @@
 {
-    "cSpell.words": [
-        "LSODA",
-        "Menten",
-        "micha",
-        "michaelis",
-        "nfev",
-        "njev",
-        "radiolytic",
-        "radiopyo"
-    ]
+  "cSpell.words": [
+    "Boscolo",
+    "LSODA",
+    "Menten",
+    "micha",
+    "michaelis",
+    "nfev",
+    "njev",
+    "radiolytic",
+    "radiopyo"
+  ]
 }
