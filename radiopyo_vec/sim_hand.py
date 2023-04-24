@@ -325,6 +325,27 @@ class SimChunk(NamedTuple):
 
 
 class SimChunksIter():
+    """ Iterable class performing a multi-step integration.
+
+    Attributes:
+        sim: UniCell
+            Simulation volume in which simulation takes place
+        chucks: List[SimChunk]
+            List of simulation steps/chunks
+        sol: ODEResult
+            Aggregate of ODE results from scipy.integrate.solve_ivp
+        current: int
+            Keeps tracks of the current integration step.
+        atol: float
+            Absolute tolerance used for scipy.integrate.solve_ivp
+        use_jac: bool
+            Whether jacobian is used with scipy.integrate.solve_ivp
+        method: str
+            Defines the ODE method used with scipy.integrate.solve_ivp
+
+    Usage:
+        >>> 
+    """
     sim: UnitCell
     chunks: List[SimChunk]
     sol: ODEResult
