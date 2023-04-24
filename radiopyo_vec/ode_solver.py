@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""
+The ode_solver submodule contains all functions used to resolve ODE system.
+
+Author:
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+"""
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -6,22 +13,32 @@ from typing import (
     Any,
     List,
     Optional,
-    Tuple,
     Protocol,
+    Tuple,
 )
 
 import numpy as np
 
+# --------------------------------- Internal imports --------------------------------- #
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo_vec.physics.beam import ParticleBeam
 
+# ----------------------------- Expose importable stuffs ----------------------------- #
+__all__ = [
+    "jacobian",
+    "derive",
+    "ScipyODEResult",
+    "ODEResult",
+]
 
 # ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
+#                                 FUNCTION DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
+
+
 def jacobian(t: float,
              y: NDArray[np.float64],
              beam: ParticleBeam,
@@ -40,6 +57,16 @@ def jacobian(t: float,
                                     NDArray[np.int8],
                                     ]] = None,
              ) -> NDArray[np.float64]:
+    """ Computes the jacobian dy/ds_i where s_i are species[i]
+    Returns:
+        NDArray[np.float64]: jacobian (square) matrix
+                 |   ds_0        ds_1    ....      ds_j
+        ---------|---------------------------------------
+            ds_0 | ds_0/ds_0   ds_0/ds_1 ....    ds_0/ds_j
+            ds_1 | ds_1/ds_0   ds_1/ds_1 ....    ds_1/ds_j
+            .... |    ....        ....   ....      ....
+            ds_i | ds_i/ds_0   ds_i/ds_1 ....    ds_i/ds_j
+    """
     y = y.clip(min=0.0,) * 1e-6
     y = np.append(y, cst_sp)
 
@@ -84,39 +111,48 @@ def derive(t: float,
                                   NDArray[np.int8],
                                   ]] = None,
            ) -> NDArray[np.float64]:
-
-    # Force negative cc values to 0
+    """ Compute the time derivative of species concentration """
+    # Force negative cc values to 0 + convert to [mol/l]
     y = y.clip(min=0.0,) * 1e-6
     y = np.append(y, cst_sp)
-    # Build u vector => [1, y(t), y(t),...] n times y(t) with n = max
-    # stoichiometry of reactants specie s (max_stoi).
-    # max_stoi, Ri, Riy => ki_mat
+
+    # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
 
     # Compute dydt, first only with k reactions term:
     dydt = np.matmul(Ki_mat[1], (np.prod(Rki, axis=1) * Ki_mat[0]).T)
 
-    # Add Radiolytic term ==> Need deposition rate!
-    # => Only term function of time... probably need refactorization => TODO
+    # Add the Time dependent Radiolytic term
     dydt += Gi_mat * beam.at(t).dose_rate()
 
     # Add Enzymatic term
     if Ez_mat is not None:
         # En_subs, En_enzy, En_kmki => Enzi[0], Enzi[1], Enzi[2]
-        # Extract substrate cc of each enzymatic reaction.
+        # Extract Enzyme cc of each enzymatic reactions.
         E = np.matmul(y, Ez_mat[1])
+        # Extract substrate cc of each enzymatic reactions.
         S = np.matmul(y, Ez_mat[0])
+        # Compute the reaction rate of all enzymatic reactions.
         MM = Ez_mat[2][1, :] * E * S / (Ez_mat[2][0, :] + S)
+        # Add this term to the total
         dydt += np.matmul(Ez_mat[3], MM.T)
 
     # Last step ==> Handling acid/base equilibrium
-    # => Force relation ship between total dydt for A/B Partners
+    # => Force relationship between the total dydt's for A/B Partners
     # ABy, ABi, ABo => ab_mat
     dydt = AB_mat[0]*dydt + np.matmul(AB_mat[2], np.matmul(dydt, AB_mat[1]).T)
+    # select only the DynSpecies and convert to [µmol/l]
     return dydt[:-len(cst_sp)] * 1e6
+
+# ------------------------------------------------------------------------------------ #
+#                                  CLASS DEFINITIONS                                   #
+# ------------------------------------------------------------------------------------ #
 
 
 class ScipyODEResult(Protocol):
+    """
+    Protocol mapping the output of scipy.integrate.solve_ivp
+    """
     t: NDArray[np.float64]
     y: NDArray[np.float64]
     sol: Optional[Any]
@@ -131,6 +167,10 @@ class ScipyODEResult(Protocol):
 
 
 class ODEResult(object):
+    """
+    Collection storing the results from scipy.integrate.solve_ivp in order to easily
+    append together the results from several integration steps.
+    """
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
     y: NDArray[np.float64]
