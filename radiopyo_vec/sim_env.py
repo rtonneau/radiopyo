@@ -11,7 +11,7 @@ Author:
 from __future__ import annotations
 
 from contextlib import suppress
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
@@ -27,7 +27,6 @@ import numpy as np
 # --------------------------------- Internal imports --------------------------------- #
 from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
 from .utils.ron_parser import RonFileParser
-from .utils.units import SimUnit, Units
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
