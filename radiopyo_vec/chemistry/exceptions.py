@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Definition of some Chemistry level exceptions.

@@ -502,7 +502,7 @@ class PulsedBeam(ParticleBeam):
         if out[1, 0] > start:
             out[0, 0] = start
         if out[-1, 0] < stop:
-            out = np.vstack([out, [stop, 0.0]])
+            return np.vstack([out, [stop, 0.0]])
 
         return out
 

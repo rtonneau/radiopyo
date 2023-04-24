@@ -1,4 +1,11 @@
+#!/usr/bin/env python3
+"""
+The unit submodule contains class definitions to handle scientific unit conversion.
 
+Author:
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+"""
+# --------------------------------- External imports --------------------------------- #
 from enum import Enum
 
 __all__ = [

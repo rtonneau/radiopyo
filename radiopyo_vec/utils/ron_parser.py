@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+"""
+The beam ron_parser contains all the logic for parse .ron input files.
+TODO:
+    - This module could use some heavy re-lifting
+    - Want to keep RON file format?
+
+Author:
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+"""
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -42,6 +52,9 @@ if TYPE_CHECKING:
 
 
 class RonTokens():
+    """ 
+    RonTokens => an entry. Either in a list or in a dict like structure.
+    """
 
     OPEN_TOKENS = ["[", "(", "{"]
     CLOSE_TOKENS = ["]", ")", "}"]
