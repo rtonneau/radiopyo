@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+"""
+The sim_env submodule contains all classes related to the construction of the
+Physico-Chemico-Biological model. The start point should be some file parser. Currently
+only RON files are supported.
+
+Author:
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+"""
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -37,20 +46,15 @@ __all__ = ["SimEnv",
            ]
 
 # ------------------------------------------------------------------------------------ #
-#                                 EXCEPTION DEFINITIONS                                #
-# ------------------------------------------------------------------------------------ #
-
-
-class RadioPyoError(Exception):
-    """Generic Module Related Exception"""
-
-# ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
 
 
 @dataclass
 class ReactionsList:
+    """Collection class to store all reactions and apply some changes on its 
+    e.g. indexing. Also expose methods to ease iteration.
+    """
     acid_base: List[ABCouple]
     k_reaction: List[KReaction]
     enzymatic: List[MichaelisMenten]
@@ -72,48 +76,59 @@ class ReactionsList:
 
 @ dataclass
 class SimEnv():
-    """SimEnv _summary_
-        reactions   => List of all chemical reactions involved i.e. radiolytics &
-                    kreactions.
-        species     => List of all species involved, Tracked and Untracked. This list is
-                    sorted so that all tracked species are at the begin.
+    """Environment class storing all pieces of information to build the matrices to
+    solve the ODE.
+
+    Attributes:
+        reactions: ReactionsList
+            List of all chemical reactions involved
+        species: ListSpecies
+            List of all species involved, cst and dyn
+        bio_param: Dict[str, float]
+            Dictionary with some biological parameter like pH
+        initial_cc: Dict[str, float]
+            Dictionary with the initial concentration of some species
 
     """
     reactions: ReactionsList
     species: ListSpecies
     bio_param: Dict[str, float]
     initial_cc: Dict[str, float]
-    sim_unit: SimUnit = field(default=SimUnit(Units.MICRO))
 
     def iter_ABCouple(self) -> Iterable[ABCouple]:
+        """Get iterable over all A/B couples/reactions"""
         return iter(self.reactions.acid_base)
 
     def iter_DynSpecies(self) -> Iterable[DynSpecies]:
+        """Get iterable over all the Dynamic Species"""
         return self.species.iter_dyn_species()
 
     def iter_CstSpecies(self) -> Iterable[CstSpecies]:
+        """Get iterable over all the Cst Species"""
         return self.species.iter_cst_species()
 
     def iter_species(self) -> Iterable[SimSpecies]:
+        """Get (sorted) iterable over all the Species"""
         return sorted(self.species, key=lambda x: x.index)
 
     def number_dyn_species(self) -> int:
-        """number_tracked_species _summary_
+        """Get the total number of DynSpecies 
 
         Returns:
-            int: _description_
+            int
         """
-        return len(self.species.dyn_sp)
+        return self.species.len_dyn_species()
 
     @ classmethod
     def from_ron_file(cls, file: str | Path) -> SimEnv:
-        """from_ron_file _summary_
+        """Create a Simulation Environment from a RON file:
 
         Args:
-            file (str | Path): _description_
+            file: str | Path
+                Path to the RON file
 
         Returns:
-            SimEnv: _description_
+            SimEnv
         """
         parser = RonFileParser(file)
         parser.parse_file()
@@ -127,35 +142,23 @@ class SimEnv():
             list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
             list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
 
-        try:
-            ab, list_sp = parser.build_acid_base(list_sp)
-        except KeyError:
-            ab = []
-
-        try:
-            kr, list_sp = parser.build_k_reactions(list_sp)
-        except KeyError:
-            kr = []
-
-        try:
-            enz, list_sp = parser.build_enzymatic(list_sp)
-        except KeyError:
-            enz = []
-
-        try:
-            rad, list_sp = parser.build_radiolytics(list_sp)
-        except KeyError:
-            rad = []
-
+        ab, list_sp = parser.build_acid_base(list_sp)
+        kr, list_sp = parser.build_k_reactions(list_sp)
+        enz, list_sp = parser.build_enzymatic(list_sp)
+        rad, list_sp = parser.build_radiolytics(list_sp)
         initial_cc = parser.build_initial_conditions()
+
         for label, value in initial_cc.items():
             with suppress(KeyError):
                 sp = list_sp[label]
                 if isinstance(sp, DynSpecies):
                     sp.set_initial_cc(value)
-        # Sort species so that all constant species are at the end.
+
+        # Convert the "trash" species, if presents, to Cst.
         with suppress(KeyError):
             list_sp._convert_to_CstSpecies("trash")
+
+        # Sort species so that all constant species are at the end.
         list_sp.sort(inplace=True)
 
         return cls(reactions=ReactionsList(ab, kr, enz, rad),
@@ -165,24 +168,42 @@ class SimEnv():
                    )
 
     def initial_values(self, all: bool = False) -> NDArray[np.float64]:
-        len_out = self.species.len_dyn_species()
-        if all:
-            len_out += self.species.len_cst_species()
-        out = np.zeros(len_out, dtype=np.float64)
+        """ Construct the vector containing initial concentrations values of species
+
+        Args:
+            all: bool, optional
+                if False, vector only contains initial cc of DynSpecies (default=False)
+
+        Returns:
+            NDArray[np.float64]: vector with initial concentrations in [µmol/l]
+        """
+        out_dyn = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
         for species in self.species.iter_dyn_species():
-            out[species.index] = species.initial_cc()*1e6
+            out_dyn[species.index] = species.initial_cc()*1e6
+
+        out_cst = np.array([], dtype=np.float64)
         if all:
+            out_cst = np.zeros(
+                self.species.len_cst_species(), dtype=np.float64)
             for cst_species in self.species.iter_cst_species():
-                out[cst_species.index] = cst_species.initial_cc()*1e6
-        return out
+                out_cst[cst_species.index] = cst_species.initial_cc()*1e6
+        return np.append(out_dyn, out_cst)
 
     def species_labels(self) -> List[str]:
+        """Get (index ordered) list of species name
+
+        Returns:
+            List[str]
+        """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
 
     def make_kreaction_matrix(self) -> Tuple[NDArray[np.float64],
                                              NDArray[np.int8],
                                              NDArray[np.float32],
                                              NDArray[np.float32],]:
+        """ Construct all matrices necessary to compute the variation of the species
+        concentrations due to all k reactions.
+        """
         # Step 1 -> Find the highest species's stoichio
         max_reactants = 0
         for reaction in self.reactions.k_reaction:
@@ -255,6 +276,9 @@ class SimEnv():
         return (Ki, Riy, Rki, JRki)
 
     def make_radiolytic_vector(self) -> NDArray:
+        """ Construct matrix necessary to compute the variation of the species
+        concentrations due irradiation via GValues.
+        """
         Gi = np.zeros([len(self.species), len(self.reactions.radiolytic)],
                       dtype=np.float64)
         for col, radiolytic in enumerate(self.reactions.radiolytic):
@@ -267,7 +291,8 @@ class SimEnv():
                                                       NDArray[np.float64],
                                                       NDArray[np.int8],
                                                       ]]:
-        """
+        """ Construct all matrices necessary to compute the variation of the species
+        concentrations due enzymatic reactions.
         Tricks to keep in mind: 
             * np.divide(1, x, out=np.zeros_like(x), where= x!=0)
             => Invert x. where x=0 -> result=0 as well 
@@ -310,6 +335,9 @@ class SimEnv():
     def make_acidBase_matrix(self) -> Tuple[NDArray[np.int8],
                                             NDArray[np.int8],
                                             NDArray[np.float64]]:
+        """ Construct matrix necessary to compute to account for Acid/Base equilibrium 
+        during the computation of the cc values variations.
+        """
         ABi = np.zeros([len(self.species), len(self.reactions.acid_base)],
                        dtype=np.int8)
         ABo = np.zeros_like(ABi, dtype=np.float64)
@@ -330,7 +358,12 @@ class SimEnv():
 
         return (ABy, ABi, ABo)
 
-    def make_cst_species_vector(self) -> NDArray:
+    def make_cst_species_vector(self) -> NDArray[np.float64]:
+        """ Create cc vector of Cst Species
+
+        Returns:
+            NDArray[np.float64]
+        """
         out = np.zeros(self.species.len_cst_species(),
                        dtype=np.float64)
         len_dyn = self.species.len_dyn_species()

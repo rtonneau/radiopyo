@@ -14,6 +14,7 @@ from __future__ import annotations
 import enum
 import os.path
 import re
+from contextlib import suppress
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -430,13 +431,15 @@ class RonFileParser(object):
             Dict: biological parameters as dict.
         """
         key = "bio_param"
-        self._try_key_in_items(key)
-        if "pH" not in self.items[key]:
-            import warnings
-            warnings.warn(
-                f"pH is not defines in RON file: {self.path}\nAssuming pH=7")
-            self.items[key]["pH"] = 7.0
-        return self.items[key]
+        try:
+            if "pH" not in self.items[key]:
+                import warnings
+                warnings.warn(
+                    f"pH is not defines in RON file: {self.path}\nAssuming pH=7")
+                self.items[key]["pH"] = 7.0
+            return self.items[key]
+        except KeyError:
+            return {}
 
     def build_initial_conditions(self) -> Dict[str, float]:
         """Parse initial conditions (species's concentration)
@@ -445,8 +448,10 @@ class RonFileParser(object):
             Dict: species: cc
         """
         key = "initial_concentrations"
-        self._try_key_in_items(key)
-        return self.items[key]
+        try:
+            return self.items[key]
+        except KeyError:
+            return {}
 
     def build_radiolytics(self,
                           sim_sp: Optional[ListSpecies] = None,
@@ -457,13 +462,15 @@ class RonFileParser(object):
             List[RadiolyticReaction]: _description_
         """
         key = "radiolytic"
-        self._try_key_in_items(key)
         if sim_sp is None:
             sim_sp = ListSpecies()
-        return ([RadiolyticReaction.new_from_dict(species, ge, sim_sp)
-                for (species, ge) in self.items[key].items()
-                if species in sim_sp],
-                sim_sp)
+        try:
+            return ([RadiolyticReaction.new_from_dict(species, ge, sim_sp)
+                    for (species, ge) in self.items[key].items()
+                    if species in sim_sp],
+                    sim_sp)
+        except KeyError:
+            return [], sim_sp
 
     def build_cst_species(self, sim_sp: ListSpecies) -> ListSpecies:
         """build_cst_species _summary_
@@ -472,9 +479,10 @@ class RonFileParser(object):
             List[CstSpecies]: _description_
         """
         key = "fixed_concentrations"
-        self._try_key_in_items(key)
-        for species, cc in self.items[key].items():
-            sim_sp.add_cst_species(species, cc)
+
+        with suppress(KeyError):
+            for species, cc in self.items[key].items():
+                sim_sp.add_cst_species(species, cc)
         return sim_sp
 
     def build_acid_base(self,
@@ -486,12 +494,16 @@ class RonFileParser(object):
             List[AcidBase]: _description_
         """
         key = "acid_base"
-        self._try_key_in_items(key)
+
         if sim_sp is None:
             sim_sp = ListSpecies()
-        return ([ABCouple.from_dict(list_sp=sim_sp, **reaction)
-                 for reaction in self.items[key]],
-                sim_sp)
+
+        try:
+            return ([ABCouple.from_dict(list_sp=sim_sp, **reaction)
+                    for reaction in self.items[key]],
+                    sim_sp)
+        except KeyError:
+            return [], sim_sp
 
     def build_k_reactions(self,
                           sim_sp: Optional[ListSpecies] = None,
@@ -505,12 +517,16 @@ class RonFileParser(object):
             List[KReaction]: _description_
         """
         key = "k_reactions"
-        self._try_key_in_items(key)
+
         if sim_sp is None:
             sim_sp = ListSpecies()
-        return ([KReaction.from_dict(list_sp=sim_sp, **reaction)
-                for reaction in self.items[key]],
-                sim_sp)
+
+        try:
+            return ([KReaction.from_dict(list_sp=sim_sp, **reaction)
+                    for reaction in self.items[key]],
+                    sim_sp)
+        except KeyError:
+            return [], sim_sp
 
     def build_enzymatic(self,
                         sim_sp: Optional[ListSpecies] = None,
@@ -524,9 +540,13 @@ class RonFileParser(object):
             List[KReaction]: _description_
         """
         key = "enzymatic_reactions"
-        self._try_key_in_items(key)
+
         if sim_sp is None:
             sim_sp = ListSpecies()
-        return ([MichaelisMenten.from_dict(list_sp=sim_sp, **reaction)
-                for reaction in self.items[key]],
-                sim_sp)
+
+        try:
+            return ([MichaelisMenten.from_dict(list_sp=sim_sp, **reaction)
+                    for reaction in self.items[key]],
+                    sim_sp)
+        except KeyError:
+            return [], sim_sp

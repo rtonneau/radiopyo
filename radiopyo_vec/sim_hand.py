@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+"""
+The sim_hand submodule contains class(es) to easily handle simulation. This one should
+be the entry point for lambda user.
+
+Author:
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+"""
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -24,17 +32,28 @@ from .input.g_values import GValuesBoscolo
 from .ode_solver import ODEResult, ScipyODEResult, derive, jacobian
 from .sim_env import SimEnv
 
+# ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from .physics.beam import ParticleBeam
 
-# ----------------------------- Define useful decorators ----------------------------- #
+# ----------------------------- Expose importable stuffs ----------------------------- #
+__all__ = [
+    "UnitCell",
+    "SimChunk",
+    "SimChunksIter",
+]
+# ------------------------------------------------------------------------------------ #
 
+# ------------------------------------------------------------------------------------ #
+#                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
 
 
 class SimMatrices(TypedDict):
+    """Convenient TypedDict use to leverage type checking and store matrices used in ODE
+    solver."""
     AB_mat: Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]]
     Ki_mat: Tuple[NDArray[np.float64], NDArray[np.int8],
                   NDArray[np.float32], NDArray[np.float32]]
@@ -45,6 +64,28 @@ class SimMatrices(TypedDict):
 
 
 class UnitCell(object):
+    """ 
+    Class UnitCell represents the tiniest simulation volume. All concentrations are
+    assumed to be homogenous in it. It also defines method to solve ODE's in order to
+    compute the evolution of concentration over time.
+
+    Attributes:
+        file: path
+            Path to input file
+        env: SimEnv
+            SimEnv build from the input file
+        mat: SimMatrices
+            Collections of matrices used to solve the ODE's
+        beam: ParticleBeam
+            Radiation source to use for the simulation
+        last_exec_time: float
+            Time duration of last simulation step
+        g_val: GValuesBoscolo
+            GValues from the literature to possibly update the LET
+        FIRST_STEP: float
+            Initial time step of all simulation (default=1e-12)
+
+    """
     FIRST_STEP: float = 1e-12
 
     file: Path
@@ -72,20 +113,34 @@ class UnitCell(object):
         self.g_val = GValuesBoscolo()
 
     def set_beam(self, beam: ParticleBeam) -> None:
+        """Define Radiation Source structure/parameters
+
+        Args:
+            beam: ParticleBeam
+
+        Returns:
+            None
+        """
         self.beam = beam
 
     def change_LET(self, let: float) -> None:
-        """Update the radiolytic yields from the simulation env.
+        """Update the radiolytic yields from the simulation env according to literature
+        values.
+
         Args:
-            let (float): in [kev/µm] and in range [0.14, 150]
+            let: float
+                LET in [kev/µm] and in range [0.14, 150]
+
+        Returns:
+            None
         """
-        available_sp = list(self.g_val.species())
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
-            if sp.label not in available_sp or isinstance(sp, CstSpecies):
+            if sp.label not in self.g_val or isinstance(sp, CstSpecies):
                 continue
-
             reaction.update_from_ge(self.g_val.values_at(sp.label, let))
+
+        # Recompute the Gi_mat accordingly
         self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
 
     def run(self,
@@ -97,11 +152,33 @@ class UnitCell(object):
             max_step: float = np.inf,
             y0: Optional[NDArray[np.float64]] = None,
             ) -> ScipyODEResult:
+        """ Solve ODE over t_span
+        Args:
+            t_span: Tuple[float, float]
+                t_span[0] -> start time, in seconds
+                t_span[1] -> End time, in seconds
+            t_eval: [NDArray[np.float64], optional
+                Force function evaluation on t_eval (default: None)
+            use_jac: bool
+                Use the Jacobian ?
+            method: str
+                Which ODE solver to use? Define in scipy.integrate.solve_ivp
+            atol: float, optional
+                Absolute Tolerance of the ODE Solver (default: 1e-8)
+            max_step: float, optional
+                Larger authorized time step for the ODE solver (default: inf)
+            y0: NDArray[np.float64], optional
+                Initial concentration of DynSpecies (default: None). If None, calls 
+                EnvSim.initial_values()
 
+        Returns:
+            ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
+        """
         if y0 is None:
             y0 = self.env.initial_values()
 
         first_step = self.FIRST_STEP
+        # Check if first step is lower than the defined max_step
         if first_step >= max_step:
             first_step = max_step / 10
 
@@ -135,6 +212,7 @@ class UnitCell(object):
                     atol: float = 1e-10,
                     max_step: float | Iterable[float] = np.inf,
                     ) -> ODEResult:
+        """TODO: Clean and remove"""
         sol = ODEResult()
 
         # Check up max_step
@@ -189,7 +267,24 @@ class UnitCell(object):
                             atol: float = 1e-10,
                             max_step: float | Iterable[float] = np.inf,
                             ) -> SimChunksIter:
+        """ Method used to prepare a multi step ODE integration
+        Args:
+            t_chunks: NDArray[np.float64]
+                Simulation time chunks to use
+            use_jac: bool, optional
+                Whether to use the jacobian along with the ODE solver (default:False)
+            method: str, optional
+                Which ODE solver to use? Define in scipy.integrate.solve_ivp
+            atol: float, optional
+                Absolute Tolerance of the ODE Solver (default: 1e-10)
+            max_step: float| Iterable[float], optional
+                Larger authorized time step for the ODE solver (default: inf). If
+                provides as a List, assume it is same length as t_chunks - 1 and defines
+                the larger step per chunk.
 
+        Returns:
+            SimChunksIter: Iterable object performing the ODE integration
+        """
         # Check up max_step
         if isinstance(max_step, float):
             max_step = repeat(max_step, len(t_chunks)-1)
@@ -214,6 +309,16 @@ class UnitCell(object):
 
 
 class SimChunk(NamedTuple):
+    """Convenient (immutable) container defining a chunk/ step of ODE integration.
+
+    Attributes:
+        start: float
+            Start time, in seconds
+        stop: float
+            Stop time, in seconds
+        max_step_size: float
+            Max step size allowed over this integration step
+    """
     start: float
     stop: float
     max_step_size: float
