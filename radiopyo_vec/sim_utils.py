@@ -8,10 +8,10 @@ from typing import (
 )
 
 import numpy as np
-import pandas as pd  # type: ignore[import]
+import pandas as pd
 
 # --------------------------------- Internal Imports --------------------------------- #
-from radiopyo_vec.ode_solver import jacobian, ODEResult
+from radiopyo_vec.ode_solver import ODEResult, jacobian
 
 if TYPE_CHECKING:
     from radiopyo_vec.sim_hand import UnitCell
@@ -113,9 +113,6 @@ class SimUtils(object):
                            sim.beam,
                            **sim.mat,
                            )
-            # check for nan in jacobian
-            if np.isnan(np.min(jac)):
-                print(idx)
             out.iloc[idx, :] = jac.flatten()
         return out
 

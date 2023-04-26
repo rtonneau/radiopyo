@@ -10,7 +10,7 @@ Author:
 from pathlib import Path
 from typing import Dict, Iterable
 
-import pandas as pd  # type: ignore[import]
+import pandas as pd
 from scipy.interpolate import interp1d  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
@@ -55,11 +55,11 @@ class GValuesBoscolo():
         self.df = pd.read_csv(_data_dir/GValuesBoscolo.DATA,
                               index_col=0,
                               header=0)
-        self.interpol = {col: interp1d(x=self.df.index,
-                                       y=self.df[col],
-                                       kind="quadratic",
-                                       bounds_error=True,
-                                       ) for col in self.df}
+        self.interpol = {str(col): interp1d(x=self.df.index,
+                                            y=self.df[col],
+                                            kind="quadratic",
+                                            bounds_error=True,
+                                            ) for col in self.df}
 
     def __contains__(self, key: str) -> bool:
         return key in self.interpol
@@ -85,4 +85,4 @@ class GValuesBoscolo():
         Returns:
             Iterable[str]: iterable over all species available.
         """
-        return iter(self.df.columns)
+        return iter([str(elt) for elt in self.df.columns])

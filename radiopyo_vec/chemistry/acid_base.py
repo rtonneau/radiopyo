@@ -24,6 +24,8 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 #                                   CLASS DEFINITIONS                                  #
 # ------------------------------------------------------------------------------------ #
+
+
 class ABPartition(NamedTuple):
     """
     Acid-Base equilibrium results are stored in a NamedTuple. It is computed

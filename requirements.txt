@@ -1,0 +1,28 @@
+appdirs==1.4.4
+Bottleneck @ file:///C:/ci_311/bottleneck_1676500016583/work
+brotlipy==0.7.0
+certifi @ file:///C:/ci_311/certifi_1676421629969/work/certifi
+cffi @ file:///C:/ci_311/cffi_1676423759166/work
+charset-normalizer @ file:///tmp/build/80754af9/charset-normalizer_1630003229654/work
+cryptography @ file:///C:/ci_311/cryptography_1679419210767/work
+idna @ file:///C:/ci_311/idna_1676424932545/work
+mkl-fft==1.3.1
+mkl-random @ file:///C:/ci_311/mkl_random_1676481991689/work
+mkl-service==2.4.0
+numexpr @ file:///C:/ci_311_rebuilds/numexpr_1679001276672/work
+numpy @ file:///C:/ci_311/numpy_and_numpy_base_1676426421739/work
+packaging @ file:///C:/b/abs_ed_kb9w6g4/croot/packaging_1678965418855/work
+pandas @ file:///C:/ci_311_rebuilds/pandas_1679004481142/work
+pandas-stubs @ file:///C:/ci_311/pandas-stubs_1676484000543/work
+pooch @ file:///tmp/build/80754af9/pooch_1623324770023/work
+pycparser @ file:///tmp/build/80754af9/pycparser_1636541352034/work
+pyOpenSSL @ file:///C:/b/abs_de215ipd18/croot/pyopenssl_1678965319166/work
+PySocks @ file:///C:/ci_311/pysocks_1676425991111/work
+python-dateutil @ file:///tmp/build/80754af9/python-dateutil_1626374649649/work
+pytz @ file:///C:/ci_311/pytz_1676427070848/work
+requests @ file:///C:/ci_311/requests_1679434043851/work
+scipy==1.10.1
+six @ file:///tmp/build/80754af9/six_1644875935023/work
+types-pytz @ file:///C:/ci_311/types-pytz_1676457653447/work
+urllib3 @ file:///C:/b/abs_3ce53vrdcr/croot/urllib3_1680254693505/work
+win-inet-pton @ file:///C:/ci_311/win_inet_pton_1676425458225/work
