@@ -1,7 +1,7 @@
-# Radiobiology Python Module
+# radiopyo: Python Module dedicated to Radiobiology
 
 This python3 module allows you to perform radiobiology related simulations. The embedded
-science (Physics, Chemistry & Biology) has the purpose to solve systems of Ordinary
+science (all Physics, Chemistry & Biology) has the purpose to solve systems of Ordinary
 Differential Equations (a.k.a. ODE) based on equations provided via an input file.
 
 
@@ -12,22 +12,24 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 1. Clone or download the repository to your local machine.
 
     ```bash
-    git clone url-here
+    git clone https://github.com/SpringNO26/radiopyo.git
     ```
 
 2. Enter the working directory.
 
    ```bash
-   cd RPM
+   cd radiopyo_vec
    ```
 
-3. Use pip to install the required libraries.
+3. Install the required libraries.
 
    ```bash
    pip install -r requirements.txt
-
+   # Or if you use mamba 
    mamba install -r requirements.txt
    ```
+
+4. You are good to go.
 
 ## Usage
 
@@ -39,5 +41,4 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 
 ### Acknowledgement
 
-* This module is inspired by R. Labarbe MatLab code and validated in the following:
-[https://doi.org/10.1016/j.radonc.2020.06.001]
+* This module is inspired by R. Labarbe MatLab code and validated [here](https://doi.org/10.1016/j.radonc.2020.06.001)
