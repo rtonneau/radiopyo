@@ -423,6 +423,12 @@ class SimChunksIter():
     def __len__(self):
         return len(self.chunks)
 
+    def run_all(self):
+        """Run all simulation chunks"""
+        for sol in self:
+            pass
+        return sol
+
 
 class ODEResult(object):
     """

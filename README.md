@@ -55,27 +55,27 @@ For the moment, the only way to load simulation configuration is via
 [ron](https://github.com/ron-rs/ron) files. The configuration file consists of several
 sections: 
 
-#### bio_param
+#### -> bio_param
 
 Dictionary like structure holding the main biological parameters (pH)
 
-#### fixed_concentrations
+#### -> fixed_concentrations
 
 Dictionary like structure holding the concentrations of species supposed to be constant.
 => If a species is recorded in this section, its concentration will be forced constant.
 
-#### initial_concentrations
+#### -> initial_concentrations
 
 Dictionary like structure holding the initial concentrations of the species.
 => If a species is not recorded in this section, its initial concentration will be
 assumed as 0.0 mol/l.
 
-#### radiolytic
+#### -> radiolytic
 
 Dictionary like structure holding the G values of the species created by the radiation
 source. The unit is [radical/100eV/incident particle].
 
-#### acid_base
+#### -> acid_base
 
 List like structure holding all the acid/base reactions involved in the model. Each list
 entry must defined 3 fields: "acid", "base" & "pKa".
@@ -89,7 +89,7 @@ For example:
 ),
 ```
 
-#### k_reactions
+#### -> k_reactions
 
 List like structure holding all the simple chemical reactions involved in the model.
 Each list entry must defined 3 fields: "reactants", "products" & "k_value".
@@ -104,7 +104,7 @@ For example:
 ),
 ```
 
-#### enzymatic_reactions
+#### -> enzymatic_reactions
 
 List like structure holding all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
@@ -123,7 +123,50 @@ For example:
 
 ### Ways of Running Simulation
 
-## Project Organization
+The module currently supports 2 ways of running simulations:
+
+- run in one single block
+
+   ```python
+   import radiopyo as rp 
+
+   # Beam Definition
+   dose_rate  = 1000 # Gy/s
+   max_dose = 10 # Gy
+   beam = rp.ConstantBeam(dose_rate, max_dose)
+
+   # Simulation handler
+   sim = rp.UnitCell.from_ron_file(rp.LABARBE_CONFIG_FILE, beam)
+   res = sim.run(t_span=[1e-9, 10]) #Run simulation from 1e-9 s to 10 s.
+
+   ```
+
+- run is several chunks (useful for pulsed beams)
+
+   ```python
+   import radiopyo as rp 
+
+   # Beam Definition
+   peak_dose_rate  = 1000 # Gy/s
+   max_dose        = 10   # Gy
+   period          = 1e-3 # seconds
+   on_time         = 5e-6 # seconds
+   beam = rp.PulsedBeam.from_peak_dose_rate(peak_dose_rate, period, on_time, max_dose)
+
+   # Simulation handler
+   sim = rp.UnitCell.from_ron_file(rp.LABARBE_CONFIG_FILE, beam)
+
+   chunks = sim.beam.make_time_intervals(start=1e-9,stop=500)
+   #chunks[:, 1] contains the max_step variable of ODE solver
+   chunks[np.where(chunks[:,1]>0)[0], 1] = sim.beam.timer.on_time / 1e4
+   chunks[np.where(chunks[:,1]==0)[0], 1] = (sim.beam.timer.period-sim.beam.timer.on_time) / 1e2
+   if chunks[-1,0] > sim.beam.time_at_max_dose:
+      chunks[-2:,1] = 0.01 
+   to_run = sim.prepare_chunked_run(chunks[:,0], max_step=chunks[:,1], use_jac=True,
+   method="LSODA", atol=1e-10)
+   res = ro_tun.run_all()
+
+   ```
 
 ### Acknowledgement
 
