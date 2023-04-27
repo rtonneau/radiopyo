@@ -81,7 +81,7 @@ List like structure holding all the acid/base reactions involved in the model. E
 entry must defined 3 fields: "acid", "base" & "pKa".
 For example:
 
-```text
+```json
 (
    acid: "OH_r",
    base: "O_r_minus",
@@ -95,7 +95,7 @@ List like structure holding all the simple chemical reactions involved in the mo
 Each list entry must defined 3 fields: "reactants", "products" & "k_value".
 For example:
 
-```text
+```json
 //O_r_minus + O2_r_minus -> 2 OH_minus + O2
 (
    reactants: ["O_r_minus", "O2_r_minus"],
@@ -111,7 +111,7 @@ enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
 entry must defined 5 fields: "enzyme", "substrate", "products", "k_value" & "k_micha".
 For example:
 
-```text
+```json
 (
    enzyme: "catalase",
    substrate: ["H2O2", "H2O2"],
