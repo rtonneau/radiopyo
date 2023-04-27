@@ -99,7 +99,7 @@ class UnitCell(object):
                  env: SimEnv,
                  beam: ParticleBeam,
                  ) -> None:
-
+        self.env = env
         self.mat = SimMatrices(
             AB_mat=self.env.make_acidBase_matrix(),
             Ki_mat=self.env.make_kreaction_matrix(),
@@ -197,7 +197,7 @@ class UnitCell(object):
     def run(self,
             t_span: Tuple[float, float],
             t_eval: Optional[NDArray[np.float64]] = None,
-            use_jac: bool = False,
+            use_jac: bool = True,
             method: str = "LSODA",
             atol: float = 1e-8,
             max_step: float = np.inf,
@@ -240,7 +240,7 @@ class UnitCell(object):
     def run_chunked(self,
                     t_chunks: NDArray[np.float64],
                     t_eval: Optional[NDArray[np.float64]] = None,
-                    use_jac: bool = False,
+                    use_jac: bool = True,
                     method: str = "LSODA",
                     atol: float = 1e-10,
                     max_step: float | Iterable[float] = np.inf,
@@ -295,7 +295,7 @@ class UnitCell(object):
 
     def prepare_chunked_run(self,
                             t_chunks: NDArray[np.float64],
-                            use_jac: bool = False,
+                            use_jac: bool = True,
                             method: str = "LSODA",
                             atol: float = 1e-10,
                             max_step: float | Iterable[float] = np.inf,
