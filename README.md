@@ -51,6 +51,76 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 
 ### Configuring Simulation
 
+For the moment, the only way to load simulation configuration is via
+[ron](https://github.com/ron-rs/ron) files. The configuration file consists of several
+sections: 
+
+#### bio_param
+
+Dictionary like structure holding the main biological parameters (pH)
+
+#### fixed_concentrations
+
+Dictionary like structure holding the concentrations of species supposed to be constant.
+=> If a species is recorded in this section, its concentration will be forced constant.
+
+#### initial_concentrations
+
+Dictionary like structure holding the initial concentrations of the species.
+=> If a species is not recorded in this section, its initial concentration will be
+assumed as 0.0 mol/l.
+
+#### radiolytic
+
+Dictionary like structure holding the G values of the species created by the radiation
+source. The unit is [radical/100eV/incident particle].
+
+#### acid_base
+
+List like structure holding all the acid/base reactions involved in the model. Each list
+entry must defined 3 fields: "acid", "base" & "pKa".
+For example:
+
+```text
+(
+   acid: "OH_r",
+   base: "O_r_minus",
+   pKa: 11.9,
+),
+```
+
+#### k_reactions
+
+List like structure holding all the simple chemical reactions involved in the model.
+Each list entry must defined 3 fields: "reactants", "products" & "k_value".
+For example:
+
+```text
+//O_r_minus + O2_r_minus -> 2 OH_minus + O2
+(
+   reactants: ["O_r_minus", "O2_r_minus"],
+   products: ["OH_minus", "OH_minus", "O2"],
+   k_value: 6.0e8
+),
+```
+
+#### enzymatic_reactions
+
+List like structure holding all the Enzymatic reactions involved in the model. The
+enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
+entry must defined 5 fields: "enzyme", "substrate", "products", "k_value" & "k_micha".
+For example:
+
+```text
+(
+   enzyme: "catalase",
+   substrate: ["H2O2", "H2O2"],
+   products: ["O2", "H2O", "H2O"],
+   k_value: 6.62e7, // [1/s]
+   k_micha: 1.1, // [mol/l]
+),
+```
+
 ### Ways of Running Simulation
 
 ## Project Organization
