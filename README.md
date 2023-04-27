@@ -34,7 +34,7 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 ## Usage
 
    ```python
-   from radiopyo import UnitCell, LABARBE_CONFIG
+   from radiopyo import UnitCell, LABARBE_CONFIG_FILE
 
    # Beam Definition
    dose_rate  = 1000 # Gy/s
@@ -42,13 +42,12 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
    beam = Constantbeam(dose_rate, max_dose)
 
    # Simulation handler
-   sim = UnitCell.from_ron_file(LABARBE_CONFIG, beam)
+   sim = UnitCell.from_ron_file(LABARBE_CONFIG_FILE, beam)
    res = sim.run(t_span=[1e-9, 10]) #Run simulation from 1e-9 s to 10 s.
 
    # Extract results to a nice pandas DataFrame.
-   df = SimUtils.to_pandas(sim, res) 
+   df = res.to_pandas() 
    ```
-   
 
 ### Configuring Simulation
 

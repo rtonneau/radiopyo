@@ -9,12 +9,14 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import copy
 import time
 from contextlib import suppress
-from itertools import repeat
+from itertools import chain, repeat
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     Iterable,
     List,
     NamedTuple,
@@ -24,12 +26,13 @@ from typing import (
 )
 
 import numpy as np
+import pandas as pd
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from .chemistry.species import CstSpecies
 from .input.g_values import GValuesBoscolo
-from .ode_solver import ODEResult, ScipyODEResult, derive, jacobian
+from .ode_solver import ScipyODEResult, derive, jacobian
 from .sim_env import SimEnv
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
@@ -70,8 +73,6 @@ class UnitCell(object):
     compute the evolution of concentration over time.
 
     Attributes:
-        file: path
-            Path to input file
         env: SimEnv
             SimEnv build from the input file
         mat: SimMatrices
@@ -88,7 +89,6 @@ class UnitCell(object):
     """
     FIRST_STEP: float = 1e-12
 
-    file: Path
     env: SimEnv
     mat: SimMatrices
     beam: ParticleBeam
@@ -113,6 +113,13 @@ class UnitCell(object):
 
     @classmethod
     def from_ron_file(cls, file: str | Path, beam: ParticleBeam) -> UnitCell:
+        """ 
+        Args:
+            file: path
+                Path to input file
+            beam: ParticleBeam
+                Radiation source to use for the simulation
+        """
         return cls(env=SimEnv.from_ron_file(Path(file)),
                    beam=beam)
 
@@ -147,44 +154,23 @@ class UnitCell(object):
         # Recompute the Gi_mat accordingly
         self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
 
-    def run(self,
-            t_span: Tuple[float, float],
-            t_eval: Optional[NDArray[np.float64]] = None,
-            use_jac: bool = False,
-            method: str = "LSODA",
-            atol: float = 1e-8,
-            max_step: float = np.inf,
-            y0: Optional[NDArray[np.float64]] = None,
-            ) -> ScipyODEResult:
-        """ Solve ODE over t_span
-        Args:
-            t_span: Tuple[float, float]
-                t_span[0] -> start time, in seconds
-                t_span[1] -> End time, in seconds
-            t_eval: [NDArray[np.float64], optional
-                Force function evaluation on t_eval (default: None)
-            use_jac: bool
-                Use the Jacobian ?
-            method: str
-                Which ODE solver to use? Define in scipy.integrate.solve_ivp
-            atol: float, optional
-                Absolute Tolerance of the ODE Solver (default: 1e-8)
-            max_step: float, optional
-                Larger authorized time step for the ODE solver (default: inf)
-            y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None). If None, calls 
-                EnvSim.initial_values()
-
-        Returns:
-            ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
-        """
-        if y0 is None:
-            y0 = self.env.initial_values()
+    def _raw_run(self,
+                 t_span: Tuple[float, float],
+                 use_jac: bool,
+                 method: str,
+                 atol: float,
+                 max_step: float,
+                 y0: Optional[NDArray[np.float64]] = None,
+                 t_eval: Optional[NDArray[np.float64]] = None,
+                 ) -> ScipyODEResult:
 
         first_step = self.FIRST_STEP
         # Check if first step is lower than the defined max_step
         if first_step >= max_step:
             first_step = max_step / 10
+
+        if y0 is None:
+            y0 = self.env.initial_values()
 
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(derive,
@@ -208,6 +194,49 @@ class UnitCell(object):
         self.last_exec_time = t1 - t0
         return sol
 
+    def run(self,
+            t_span: Tuple[float, float],
+            t_eval: Optional[NDArray[np.float64]] = None,
+            use_jac: bool = False,
+            method: str = "LSODA",
+            atol: float = 1e-8,
+            max_step: float = np.inf,
+            y0: Optional[NDArray[np.float64]] = None,
+            ) -> ODEResult:
+        """ Solve ODE over t_span
+        Args:
+            t_span: Tuple[float, float]
+                t_span[0] -> start time, in seconds
+                t_span[1] -> End time, in seconds
+            t_eval: [NDArray[np.float64], optional
+                Force function evaluation on t_eval (default: None)
+            use_jac: bool
+                Use the Jacobian ?
+            method: str
+                Which ODE solver to use? Define in scipy.integrate.solve_ivp
+            atol: float, optional
+                Absolute Tolerance of the ODE Solver (default: 1e-8)
+            max_step: float, optional
+                Larger authorized time step for the ODE solver (default: inf)
+            y0: NDArray[np.float64], optional
+                Initial concentration of DynSpecies (default: None). If None, calls 
+                EnvSim.initial_values()
+
+        Returns:
+            ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
+        """
+
+        sol = self._raw_run(t_span,
+                            use_jac,
+                            method,
+                            atol,
+                            max_step,
+                            y0,
+                            t_eval,
+                            )
+
+        return ODEResult(self.env, self.beam, sol)
+
     def run_chunked(self,
                     t_chunks: NDArray[np.float64],
                     t_eval: Optional[NDArray[np.float64]] = None,
@@ -217,7 +246,7 @@ class UnitCell(object):
                     max_step: float | Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
-        sol = ODEResult()
+        sol = ODEResult(self.env, self.beam)
 
         # Check up max_step
         if isinstance(max_step, float):
@@ -253,14 +282,14 @@ class UnitCell(object):
                                                              max_step,
                                                              iter_t_eval,),
                                                          start=0):
-            res = self.run(t_span=(t_chunks[idx], stop),
-                           use_jac=use_jac,
-                           method=method,
-                           atol=atol,
-                           max_step=step_size,
-                           t_eval=_t_eval,
-                           y0=sol.y[:, -1] if len(sol) > 0 else None,
-                           )
+            res = self._raw_run(y0=sol.y[:, -1] if len(sol) > 0 else None,
+                                t_span=(t_chunks[idx], stop),
+                                use_jac=use_jac,
+                                method=method,
+                                atol=atol,
+                                max_step=step_size,
+                                t_eval=_t_eval,
+                                )
             sol.append_sol(res, exec_time=self.last_exec_time)
         return sol
 
@@ -366,7 +395,7 @@ class SimChunksIter():
                  ):
         self.sim = sim
         self.chunks = chunks
-        self.sol = ODEResult()
+        self.sol = ODEResult(self.sim.env, self.sim.beam)
         self.atol = atol
         self.use_jac = use_jac
         self.method = method
@@ -393,3 +422,199 @@ class SimChunksIter():
 
     def __len__(self):
         return len(self.chunks)
+
+
+class ODEResult(object):
+    """
+    Collection storing the results from scipy.integrate.solve_ivp in order to easily
+    append together the results from several integration steps.
+    """
+    # Keep track of the original sim env
+    env: SimEnv
+    beam: ParticleBeam
+
+    # Properties of the bunch object sent by scipy.integrate.solve_ivp
+    t: NDArray[np.float64]
+    y: NDArray[np.float64]
+    sol: List[Any]
+    t_events: List[Optional[List[NDArray[np.float64]]]]
+    y_events: List[Optional[List[NDArray[np.float64]]]]
+    nfev: List[int]
+    njev: List[int]
+    nlu: List[int]
+    status: List[int]
+    message: List[str]
+    success: List[bool]
+
+    # Add new useful properties
+    n_points: List[int]
+    exec_time: List[Optional[float]]
+
+    def __init__(self,
+                 env: SimEnv,
+                 beam: ParticleBeam,
+                 sol: Optional[ScipyODEResult] = None,
+                 ) -> None:
+        self.env = copy.deepcopy(env)
+        self.beam = copy.deepcopy(beam)
+        self._default_init()
+        if sol is not None:
+            self.append_sol(sol)
+
+    def __len__(self):
+        """Number of simulation run"""
+        return len(self.n_points)
+
+    @classmethod
+    def from_cell(cls, cell: UnitCell, sol: Optional[ScipyODEResult] = None):
+        return cls(cell.env, cell.beam, sol)
+
+    @property
+    def shape(self):
+        return self.y.shape
+
+    def _default_init(self):
+        self.t = np.array([], dtype=np.float64)
+        self.y = np.array([], dtype=np.float64)
+        self.sol = []
+        self.t_events, self.y_events = [], []
+        self.nfev, self.njev, self.nlu = [], [], []
+        self.status, self.message, self.success = [], [], []
+        self.n_points, self.exec_time = [], []
+
+    def append_sol(self,
+                   sol: ScipyODEResult,
+                   exec_time: Optional[float] = None,
+                   ) -> None:
+        self.t = np.append(self.t, sol.t)
+        if len(self.y) == 0:
+            self.y = sol.y
+        else:
+            self.y = np.hstack([self.y, sol.y])
+        self.sol.append(sol.sol)
+        self.t_events.append(sol.t_events)
+        self.y_events.append(sol.y_events)
+        self.nfev.append(sol.nfev)
+        self.njev.append(sol.njev)
+        self.nlu.append(sol.nlu)
+        self.status.append(sol.status)
+        self.message.append(sol.message)
+        self.success.append(sol.success)
+        self.n_points.append(len(sol.t))
+        self.exec_time.append(exec_time)
+
+    # --------------------------------- Utils methods -------------------------------- #
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        """
+        labels = [elt.label for elt in self.env.species.iter_dyn_species()]
+        return pd.DataFrame(index=self.t,
+                            columns=labels,
+                            dtype=np.float64,
+                            data=self.y.T)
+
+    def reconstruct_jacobian(self) -> pd.DataFrame:
+        if self.beam is None:
+            raise TypeError("Beam is None, unable to compute jacobian")
+
+        # (Re)Build used matrices
+        mat = SimMatrices(
+            AB_mat=self.env.make_acidBase_matrix(),
+            Ki_mat=self.env.make_kreaction_matrix(),
+            Gi_mat=self.env.make_radiolytic_vector(),
+            Ez_mat=self.env.make_enzymatic_matrix(),
+            cst_sp=self.env.make_cst_species_vector(),
+        )
+        sp_label = [elt.label for elt in self.env.iter_DynSpecies()]
+        dsp_label = ["".join(["d", elt]) for elt in sp_label]
+
+        out = pd.DataFrame(index=self.t,
+                           columns=pd.MultiIndex.from_product([sp_label, dsp_label],
+                                                              names=["sp", "dsp"]),
+                           dtype=np.float64,)
+
+        for (idx, t_val) in enumerate(self.t):
+            jac = jacobian(t_val, self.y[:, idx],
+                           self.beam,
+                           **mat,
+                           )
+            out.iloc[idx, :] = jac.flatten()
+        return out
+
+    def reconstruct_reactions(self) -> pd.DataFrame:
+        # (Re)Build used matrices
+        mat = SimMatrices(
+            AB_mat=self.env.make_acidBase_matrix(),
+            Ki_mat=self.env.make_kreaction_matrix(),
+            Gi_mat=self.env.make_radiolytic_vector(),
+            Ez_mat=self.env.make_enzymatic_matrix(),
+            cst_sp=self.env.make_cst_species_vector(),
+        )
+
+        # Compute column names and Pre compute slices to ease access in the dataframe
+        # columns
+        cols_kr = [kr.as_label() for kr in self.env.reactions.k_reaction]
+        idx_kr = slice(0, len(cols_kr))
+
+        cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
+        idx_gi = slice(idx_kr.stop, idx_kr.stop+len(cols_gi))
+
+        if mat["Ez_mat"] is not None:
+            cols_ez = [er.as_label() for er in self.env.reactions.enzymatic]
+            idx_ez = slice(idx_gi.stop, idx_gi.stop+len(cols_ez))
+        else:
+            cols_ez = []
+
+        out = pd.DataFrame(columns=list(chain.from_iterable([cols_kr,
+                                                             cols_gi,
+                                                             cols_ez])),
+                           index=self.t,
+                           dtype=np.float64,
+                           )
+
+        # Prefill values for radiolytic reactions
+        for label, reaction in zip(cols_gi, self.env.reactions.radiolytic):
+            out.loc[:, label] = reaction.kr()
+
+        for ((idx, t_val), y) in zip(enumerate(self.t), self.y.T):
+            y = y.clip(min=0.0,) * 1e-6
+            y = np.append(y, mat["cst_sp"])
+
+            # K Reactions
+            Rki = np.nan_to_num(
+                np.einsum("j, jik -> ik ", y, mat["Ki_mat"][2]), nan=1)
+            Rki = np.prod(Rki, axis=1) * mat["Ki_mat"][0]
+            out.iloc[idx, idx_kr] = Rki
+
+            # Radiolytic Reactions
+            dr = 0.0
+            if self.beam is not None:
+                dr = self.beam.at(t_val).dose_rate()
+            out.iloc[idx, idx_gi] *= dr
+
+            # Enzimatic reactions
+            if mat["Ez_mat"] is not None:
+                E = np.matmul(y, mat["Ez_mat"][1])
+                S = np.matmul(y, mat["Ez_mat"][0])
+                MM = mat["Ez_mat"][2][1, :] * E * \
+                    S / (mat["Ez_mat"][2][0, :] + S)
+                out.iloc[idx, idx_ez] = MM
+        return out
+
+    def species_balance_evolution(self) -> pd.DataFrame:
+        rr = self.reconstruct_reactions()
+        out = pd.DataFrame(index=self.t,
+                           columns=[elt.label
+                                    for elt in self.env.iter_DynSpecies()],
+                           dtype=np.float64,
+                           )
+        out.iloc[:, :] = 0
+
+        for species in self.env.iter_DynSpecies():
+            for reaction in self.env.reactions_involving_product(species):
+                stoi = reaction.stoi_products[species.label]
+                out.loc[:, species.label] += rr[reaction.as_label()] * stoi
+            for reaction in self.env.reactions_involving_reactant(species):
+                stoi = reaction.stoi_reactants[species.label]
+                out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
+        return out

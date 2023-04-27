@@ -8,7 +8,8 @@
     "nfev",
     "njev",
     "radiolytic",
-    "radiopyo"
+    "radiopyo",
+    "stoi"
   ],
   "[python]": {
     "editor.defaultFormatter": "ms-python.autopep8"

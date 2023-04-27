@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import copy
 from contextlib import suppress
 from itertools import chain
 from typing import (
@@ -175,15 +176,6 @@ class ListSpecies():
         with suppress(KeyError):
             return self.dyn_sp[item]
         return self.cst_sp[item]
-
-    def __deepcopy__(self) -> ListSpecies:
-        out = ListSpecies()
-        out.next_index = self.next_index
-        for label, dyn_sp in self.dyn_sp.items():
-            out.dyn_sp[label] = dyn_sp.__copy__()
-        for label, cst_sp in self.cst_sp.items():
-            out.cst_sp[label] = cst_sp.__copy__()
-        return out
 
     def len_cst_species(self) -> int:
         """
@@ -383,7 +375,7 @@ class ListSpecies():
             None if inplace = True
             ListSpecies if inplace = False
         """
-        out = self.__deepcopy__() if not inplace else self
+        out = copy.deepcopy(self) if not inplace else self
         for idx, key in enumerate(chain(out.dyn_sp.keys(), out.cst_sp.keys())):
             out[key].index = idx
         out.next_index = idx + 1
