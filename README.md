@@ -18,7 +18,7 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 2. Enter the working directory.
 
    ```bash
-   cd radiopyo_vec
+   cd radiopyo
    ```
 
 3. Install the required libraries.
@@ -32,6 +32,23 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 4. You are good to go.
 
 ## Usage
+
+   ```python
+   from radiopyo import UnitCell, LABARBE_CONFIG
+
+   # Beam Definition
+   dose_rate  = 1000 # Gy/s
+   max_dose = 10 # Gy
+   beam = Constantbeam(dose_rate, max_dose)
+
+   # Simulation handler
+   sim = UnitCell.from_ron_file(LABARBE_CONFIG, beam)
+   res = sim.run(t_span=[1e-9, 10]) #Run simulation from 1e-9 s to 10 s.
+
+   # Extract results to a nice pandas DataFrame.
+   df = SimUtils.to_pandas(sim, res) 
+   ```
+   
 
 ### Configuring Simulation
 

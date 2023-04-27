@@ -96,11 +96,10 @@ class UnitCell(object):
     g_val: GValuesBoscolo
 
     def __init__(self,
-                 file: str | Path,
+                 env: SimEnv,
                  beam: ParticleBeam,
                  ) -> None:
-        self.file = Path(file)
-        self.env = SimEnv.from_ron_file(self.file)
+
         self.mat = SimMatrices(
             AB_mat=self.env.make_acidBase_matrix(),
             Ki_mat=self.env.make_kreaction_matrix(),
@@ -111,6 +110,11 @@ class UnitCell(object):
         self.beam = beam
         self.last_exec_time = -1
         self.g_val = GValuesBoscolo()
+
+    @classmethod
+    def from_ron_file(cls, file: str | Path, beam: ParticleBeam) -> UnitCell:
+        return cls(env=SimEnv.from_ron_file(Path(file)),
+                   beam=beam)
 
     def set_beam(self, beam: ParticleBeam) -> None:
         """Define Radiation Source structure/parameters
