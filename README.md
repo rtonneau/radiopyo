@@ -7,6 +7,16 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 
 ## Getting Started
 
+This documentation assumes you already have or now to install a new python3 environement on
+your local machine. If it is not yet the case, we suggest you to install one via the
+[mamba project](https://mamba.readthedocs.io/en/latest/).
+
+Currently the main dependencies of this modules are:
+
+- numpy
+- pandas
+- pandas-stubs
+
 ## Installation
 
 1. Clone or download the repository to your local machine.
