@@ -24,7 +24,7 @@ import numpy as np
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo_vec.physics.beam import ParticleBeam
+    from radiopyo.physics.beam import ParticleBeam
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [

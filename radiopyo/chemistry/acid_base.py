@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
-    from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies
+    from radiopyo.chemistry.species import ListSpecies, SimSpecies
 
 __all__ = [
     "ABPartition",
@@ -81,7 +81,7 @@ class ABCouple():
         ka: float (computed from pKa)
 
     Usage:
-        >>> from radiopyo_vec.species import ListSpecies
+        >>> from radiopyo.species import ListSpecies
         >>> list_of_species = ListSpecies()
         >>> acid = list_of_species.get_or_create_dyn_species("OH_r")
         >>> base = list_of_species.get_or_create_dyn_species("O_r_minus")

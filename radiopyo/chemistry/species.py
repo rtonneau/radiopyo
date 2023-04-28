@@ -21,7 +21,7 @@ from typing import (
 )
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo_vec.chemistry import exceptions as radiopyo_exceptions
+from radiopyo.chemistry import exceptions as radiopyo_exceptions
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 # ------------------------------------------------------------------------------------ #

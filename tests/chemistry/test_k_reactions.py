@@ -1,6 +1,6 @@
 import pytest
 
-from radiopyo_vec.chemistry.k_reactions import KReaction
+from radiopyo.chemistry.k_reactions import KReaction
 
 
 @pytest.fixture

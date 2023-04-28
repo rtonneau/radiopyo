@@ -32,7 +32,7 @@ class GValuesBoscolo():
     resolution.
 
     Usage:
-        >>> from radiopyo_vec.input.g_values import GValuesBoscolo
+        >>> from radiopyo.input.g_values import GValuesBoscolo
         >>> g_values = GValuesBoscolo()
         >>> species = "e_aq"
         >>> LET = 12.5  # keV/µm

@@ -25,7 +25,7 @@ from .base_chemistry import BaseChemicalReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
-    from radiopyo_vec.chemistry.species import ListSpecies, SimSpecies
+    from radiopyo.chemistry.species import ListSpecies, SimSpecies
 
 # ------------------------------------------------------------------------------------ #
 

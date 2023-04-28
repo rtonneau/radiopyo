@@ -29,7 +29,7 @@ from typing import (
 )
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo_vec.chemistry import (
+from radiopyo.chemistry import (
     ABCouple,
     KReaction,
     ListSpecies,
