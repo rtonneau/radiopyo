@@ -215,8 +215,8 @@
         //------------------------------------------------------------------------------
         //28) Fenton Reactions
         (
-            reactants: ["Fe_plus_plus", "H2O"],
-            products: ["Fe_plus_plus_plus", "OH_minus", "HO_r"],
+            reactants: ["Fe_plus_plus", "H2O2"],
+            products: ["Fe_plus_plus_plus", "OH_minus", "OH_r"],
             k_value: 1e3
         ),
         //------------------------------------------------------------------------------

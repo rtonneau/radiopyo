@@ -24,8 +24,8 @@ export_env = 'conda env export -n radiobio  | findstr -v "prefix pip radiopyo" >
 import_env = 'mamba env create --file .env/radiobio.yaml'
 clean_env = 'mamba env remove -n radiobio'
 
-[tool.hatch.build.targets.wheel.hooks.mypyc]
-dependencies = ["hatch-mypyc"]
+# [tool.hatch.build.targets.wheel.hooks.mypyc]
+# dependencies = ["hatch-mypyc"]
 
 [tool.hatch.build]
 exclude = [

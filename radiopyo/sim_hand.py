@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import collections
 import copy
 import time
 from contextlib import suppress
@@ -98,6 +99,7 @@ class UnitCell(object):
     def __init__(self,
                  env: SimEnv,
                  beam: ParticleBeam,
+                 use_g_val: bool = False,
                  ) -> None:
         self.env = env
         self.mat = SimMatrices(
@@ -109,7 +111,8 @@ class UnitCell(object):
         )
         self.beam = beam
         self.last_exec_time = -1
-        self.g_val = GValuesBoscolo()
+        if use_g_val:
+            self.g_val = GValuesBoscolo()
 
     @classmethod
     def from_ron_file(cls, file: str | Path, beam: ParticleBeam) -> UnitCell:
@@ -401,33 +404,33 @@ class SimChunksIter():
         self.method = method
         self.current = -1
 
-    def __iter__(self):
+    def __iter__(self) -> SimChunksIter:
         return self
 
-    def __next__(self):
+    def __next__(self) -> ODEResult:
         self.current += 1
         try:
             chunk = self.chunks[self.current]
         except IndexError:
             raise StopIteration from None
-        res = self.sim.run(t_span=(chunk.start, chunk.stop),
-                           use_jac=self.use_jac,
-                           method=self.method,
-                           atol=self.atol,
-                           max_step=chunk.max_step_size,
-                           y0=self.sol.y[:, -1] if self.current > 0 else None,
-                           )
+        res = self.sim._raw_run(
+            t_span=(chunk.start, chunk.stop),
+            use_jac=self.use_jac,
+            method=self.method,
+            atol=self.atol,
+            max_step=chunk.max_step_size,
+            y0=self.sol.y[:, -1] if self.current > 0 else None,
+        )
         self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
+        print(f"Chunk: {self.current} done!")
         return self.sol
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.chunks)
 
-    def run_all(self):
+    def run_all(self) -> ODEResult:
         """Run all simulation chunks"""
-        for sol in self:
-            pass
-        return sol
+        return collections.deque(self, maxlen=1).pop()
 
 
 class ODEResult(object):
@@ -467,19 +470,19 @@ class ODEResult(object):
         if sol is not None:
             self.append_sol(sol)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Number of simulation run"""
         return len(self.n_points)
 
     @classmethod
-    def from_cell(cls, cell: UnitCell, sol: Optional[ScipyODEResult] = None):
+    def from_cell(cls, cell: UnitCell, sol: Optional[ScipyODEResult] = None) -> ODEResult:
         return cls(cell.env, cell.beam, sol)
 
     @property
-    def shape(self):
+    def shape(self) -> Tuple:
         return self.y.shape
 
-    def _default_init(self):
+    def _default_init(self) -> None:
         self.t = np.array([], dtype=np.float64)
         self.y = np.array([], dtype=np.float64)
         self.sol = []
@@ -510,6 +513,11 @@ class ODEResult(object):
         self.exec_time.append(exec_time)
 
     # --------------------------------- Utils methods -------------------------------- #
+    def initial_cc(self) -> NDArray[np.float64]:
+        """
+        """
+        return self.env.initial_values(all=True)
+
     def to_pandas(self) -> pd.DataFrame:
         """
         """
