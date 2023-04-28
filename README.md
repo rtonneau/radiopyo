@@ -12,7 +12,7 @@ Differential Equations (a.k.a. ODE) based on equations provided via an input fil
 1. Clone or download the repository to your local machine.
 
     ```bash
-    git clone https://github.com/SpringNO26/radiopyo.git
+    git clone https://gitlab.unamur.be/rtonneau/radiopyo.git
     ```
 
 2. Enter the working directory.
