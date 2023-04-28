@@ -13,6 +13,7 @@ your local machine. If it is not yet the case, we suggest you to install one via
 
 Currently the main dependencies of this modules are:
 
+- scipy
 - numpy
 - pandas
 - pandas-stubs
