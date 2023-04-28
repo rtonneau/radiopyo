@@ -95,7 +95,7 @@ List like structure holding all the simple chemical reactions involved in the mo
 Each list entry must defined 3 fields: "reactants", "products" & "k_value".
 For example:
 
-```yaml
+```json
 //O_r_minus + O2_r_minus -> 2 OH_minus + O2
 (
    reactants: ["O_r_minus", "O2_r_minus"],
@@ -141,7 +141,7 @@ The module currently supports 2 ways of running simulations:
 
    ```
 
-- run is several chunks (useful for pulsed beams)
+- run in several chunks (useful for pulsed beams)
 
    ```python
    import radiopyo as rp 
@@ -170,5 +170,5 @@ The module currently supports 2 ways of running simulations:
 
 ### Acknowledgement
 
-* This module was originally inspired by R. Labarbe
+- This module was originally inspired by R. Labarbe
   [validated](https://doi.org/10.1016/j.radonc.2020.06.001) MatLab code.
