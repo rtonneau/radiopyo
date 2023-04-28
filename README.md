@@ -95,7 +95,7 @@ List like structure holding all the simple chemical reactions involved in the mo
 Each list entry must defined 3 fields: "reactants", "products" & "k_value".
 For example:
 
-```json
+```yaml
 //O_r_minus + O2_r_minus -> 2 OH_minus + O2
 (
    reactants: ["O_r_minus", "O2_r_minus"],
