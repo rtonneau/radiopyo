@@ -1,10 +1,9 @@
 # radiopyo: Python Module dedicated to Radiobiology
 
 ![version](https://img.shields.io/badge/version-0.1.0-blue)
-[![npm license](https://img.shields.io/npm/l/badge-maker.svg)](https://npmjs.org/package/badge-maker)
+![License](https://img.shields.io/badge/License-LGPL3-radiopyo.svg)
 ![maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)](https://github.com/charliermarsh/ruff)
-[![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
+![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)
 
 This python3 module allows you to perform radiobiology related simulations. The embedded
 science (all Physics, Chemistry & Biology) has the purpose to solve systems of Ordinary
@@ -55,7 +54,7 @@ Currently the main dependencies of this modules are:
 
 For the moment, the only way to load simulation configuration is via
 [ron](https://github.com/ron-rs/ron) files. The configuration file consists of several
-sections: 
+sections:
 
 #### -> bio_param
 
