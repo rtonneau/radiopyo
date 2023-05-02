@@ -422,7 +422,6 @@ class SimChunksIter():
             y0=self.sol.y[:, -1] if self.current > 0 else None,
         )
         self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
-        print(f"Chunk: {self.current} done!")
         return self.sol
 
     def __len__(self) -> int:

@@ -4,25 +4,36 @@ build-backend = "hatchling.build"
 
 [project]
 name = "radiopyo"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
   { name="Romain Tonneau", email="romain.tonneau@unamur.be" },
 ]
 description = "A small module to perform FLASH simulations with resolution of ODE's"
 readme = "README.md"
 requires-python = ">=3.9"
+license="LGPL-3.0-only"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+  "pandas~=1.5.3",
+  "pandas-stubs~=1.5.3",
+  "numpy~=1.24.3",
+  "scipy~=1.10.1",
+  "mypy~=0.981",
+]
+
+[project.urls]
+"Source" = "https://gitlab.unamur.be/rtonneau/radiopyo"
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
 parser = "python tests/parser.py"
 export_env = 'conda env export -n radiobio  | findstr -v "prefix pip radiopyo" > .env/radiobio.yaml'
-import_env = 'mamba env create --file .env/radiobio.yaml'
-clean_env = 'mamba env remove -n radiobio'
+import_env = 'conda env create --file .env/radiobio.yaml'
+clean_env = 'conda env remove -n radiobio'
 
 # [tool.hatch.build.targets.wheel.hooks.mypyc]
 # dependencies = ["hatch-mypyc"]
@@ -34,10 +45,14 @@ exclude = [
   "tests",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["radiopyo"]
+
 [tool.pytest.ini_options]
 addopts = [
     "--import-mode=importlib",
 ]
+
 
 [tool.mypy]
 disallow_untyped_defs = true
