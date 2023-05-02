@@ -1,8 +1,8 @@
 # radiopyo: Python Module dedicated to Radiobiology
 
-<p align="center">
-<a href="" alt="Maintained-YES"><img src="https://img.shields.io/badge/Maintained%3F-yes-green.svg" /></a>
-</p>
+![version](https://img.shields.io/badge/version-0.1.0-blue)
+![maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
+![Science](http://ForTheBadge.com/images/badges/built-with-science.svg)
 
 This python3 module allows you to perform radiobiology related simulations. The embedded
 science (all Physics, Chemistry & Biology) has the purpose to solve systems of Ordinary
