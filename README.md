@@ -1,15 +1,18 @@
 # radiopyo: Python Module dedicated to Radiobiology
 
+<p align="center">
+<a href="" alt="Maintained-YES"><img src="https://img.shields.io/badge/Maintained%3F-yes-green.svg" /></a>
+</p>
+
 This python3 module allows you to perform radiobiology related simulations. The embedded
 science (all Physics, Chemistry & Biology) has the purpose to solve systems of Ordinary
 Differential Equations (a.k.a. ODE) based on equations provided via an input file.
 
-
 ## Getting Started
 
-This documentation assumes you already have or now to install a new python3 environement on
-your local machine. If it is not yet the case, we suggest you to install one via the
-[mamba project](https://mamba.readthedocs.io/en/latest/).
+This documentation assumes you already have or know how to install a new python3
+environment on your local machine. If it is not yest the suggest, I suggest to check
+[this](https://www.anaconda.com/) out.
 
 Currently the main dependencies of this modules are:
 
@@ -20,27 +23,13 @@ Currently the main dependencies of this modules are:
 
 ## Installation
 
-1. Clone or download the repository to your local machine.
-
-    ```bash
-    git clone https://gitlab.unamur.be/rtonneau/radiopyo.git
-    ```
-
-2. Enter the working directory.
+1. Run:
 
    ```bash
-   cd radiopyo
+   pip install git+https://gitlab.unamur.be/rtonneau/radiopyo.git
    ```
 
-3. Install the required libraries.
-
-   ```bash
-   pip install -r requirements.txt
-   # Or if you use mamba 
-   mamba install -r requirements.txt
-   ```
-
-4. You are good to go.
+2. You are good to go.
 
 ## Usage
 
