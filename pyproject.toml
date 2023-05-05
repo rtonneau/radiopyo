@@ -14,7 +14,6 @@ requires-python = ">=3.9"
 license="LGPL-3.0-only"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -43,6 +42,7 @@ exclude = [
   ".env",
   ".vscode",
   "tests",
+  "doc",
 ]
 
 [tool.hatch.build.targets.wheel]
