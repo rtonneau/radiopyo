@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     List,
+    TypedDict,
 )
 
 # --------------------------------- Internal imports --------------------------------- #
@@ -169,3 +170,10 @@ class MichaelisMenten(BaseChemicalReaction):
         out.append(f", index: {self.index}")
         out.append(">")
         return "".join(out)
+
+class MichaelisMentenDict(TypedDict):
+    enzyme: str
+    substrate: List[str] | str
+    products: List[str]
+    k_value: float
+    k_micha: float

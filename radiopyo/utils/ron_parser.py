@@ -465,7 +465,7 @@ class RonFileParser(object):
         if sim_sp is None:
             sim_sp = ListSpecies()
         try:
-            return ([RadiolyticReaction.new_from_dict(species, ge, sim_sp)
+            return ([RadiolyticReaction.from_dict(species, ge, sim_sp)
                     for (species, ge) in self.items[key].items()
                     if species in sim_sp],
                     sim_sp)

@@ -20,9 +20,15 @@ from typing import (
     List,
     Optional,
     Tuple,
+    TypedDict,
 )
 
 import numpy as np
+
+from .chemistry.acid_base import ABCouple
+from .chemistry.k_reactions import KReaction
+from .chemistry.michaelis import MichaelisMenten
+from .chemistry.radiolytic import RadiolyticReaction
 
 # --------------------------------- Internal imports --------------------------------- #
 from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
@@ -34,11 +40,11 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from .chemistry.acid_base import ABCouple
+    from .chemistry.acid_base import ABDict
     from .chemistry.base_chemistry import IsChemicalReaction
-    from .chemistry.k_reactions import KReaction
-    from .chemistry.michaelis import MichaelisMenten
-    from .chemistry.radiolytic import RadiolyticReaction
+    from .chemistry.k_reactions import KReactionDict
+    from .chemistry.michaelis import MichaelisMentenDict
+    from .chemistry.radiolytic import RadiolyticReactionDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",
@@ -117,6 +123,53 @@ class SimEnv():
             int
         """
         return self.species.len_dyn_species()
+
+    @classmethod
+    def from_dict(cls, config: ConfigDict) -> SimEnv:
+        list_sp = constant_species_from_dict(config["concentrations"]["fixed"])
+        bio_param = config["bio_param"]
+        initial_cc = config["concentrations"]["initial"]
+        # Manually add H_plus & OH_minus as constant A/B partners (pH related)
+        if "H2O" in list_sp:
+            list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
+            list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
+        ab, list_sp = acid_base_from_dict(config["reactions"]["acid_base"], list_sp)
+        kr, list_sp = kreaction_from_dict(config["reactions"]["k_reaction"], list_sp)
+        enz, list_sp = michaelis_from_dict(config["reactions"]["enzymatic"], list_sp)
+        rad, list_sp = radiolytic_from_dict(config["reactions"]["radiolytic"], list_sp)
+        for label, value in initial_cc.items():
+            with suppress(KeyError):
+                sp = list_sp[label]
+                if isinstance(sp, DynSpecies):
+                    sp.set_initial_cc(value)
+
+        # Convert the "trash" species, if presents, to Cst.
+        with suppress(KeyError):
+            list_sp._convert_to_CstSpecies("trash")
+
+        # Sort species so that all constant species are at the end.
+        list_sp.sort(inplace=True)
+
+        return cls(reactions=ReactionsList(ab, kr, enz, rad),
+                   species=list_sp,
+                   bio_param=bio_param,
+                   initial_cc=initial_cc,
+                   )
+
+    @classmethod
+    def from_toml_file(cls, file: str|Path) -> SimEnv:
+        """Create a Simulation Environment from a TOML file:
+
+        Args:
+            file: str | Path
+                Path to the TOML file
+
+        Returns:
+            SimEnv
+        """
+        import toml  # type: ignore[import]
+        config = toml.load(file)
+        return SimEnv.from_dict(config)
 
     @ classmethod
     def from_ron_file(cls, file: str | Path) -> SimEnv:
@@ -411,3 +464,71 @@ class SimEnv():
             if reaction.has_product(species):
                 out.append(reaction)
         return out
+
+class ConcentrationDict(TypedDict):
+    fixed: Dict[str, float]
+    initial: Dict[str, float]
+
+class ReactionsDict(TypedDict):
+    radiolytic: RadiolyticReactionDict
+    acid_base: List[ABDict]
+    k_reaction: List[KReactionDict]
+    enzymatic: List[MichaelisMentenDict]
+
+class ConfigDict(TypedDict):
+    bio_param: Dict[str, float]
+    concentrations: ConcentrationDict
+    reactions: ReactionsDict
+
+# ------------------------------------------------------------------------------------ #
+#                                 FUNCTION DEFINITIONS                                 #
+# ------------------------------------------------------------------------------------ #
+def acid_base_from_dict(reactions: List[ABDict],
+                        sim_sp: Optional[ListSpecies] = None,
+                        )-> Tuple[List[ABCouple], ListSpecies]:
+    if sim_sp is None:
+        sim_sp = ListSpecies()
+
+    return ([ABCouple.from_dict(list_sp=sim_sp, **reaction)
+            for reaction in reactions],
+            sim_sp)
+
+def kreaction_from_dict(reactions: List[KReactionDict],
+                        sim_sp: Optional[ListSpecies] = None,
+                        )-> Tuple[List[KReaction], ListSpecies]:
+    if sim_sp is None:
+        sim_sp = ListSpecies()
+
+    return ([KReaction.from_dict(list_sp=sim_sp, **reaction)
+            for reaction in reactions],
+            sim_sp)
+
+def michaelis_from_dict(reactions: List[MichaelisMentenDict],
+                        sim_sp: Optional[ListSpecies] = None,
+                        )-> Tuple[List[MichaelisMenten], ListSpecies]:
+    if sim_sp is None:
+        sim_sp = ListSpecies()
+
+    return ([MichaelisMenten.from_dict(list_sp=sim_sp, **reaction)
+            for reaction in reactions],
+            sim_sp)
+
+def radiolytic_from_dict(reactions: RadiolyticReactionDict,
+                        sim_sp: Optional[ListSpecies] = None,
+                        )-> Tuple[List[RadiolyticReaction], ListSpecies]:
+    if sim_sp is None:
+        sim_sp = ListSpecies()
+
+    return ([RadiolyticReaction.from_dict(product, ge, sim_sp)
+            for product, ge in reactions.items()],
+            sim_sp)
+
+def constant_species_from_dict(species:Dict[str,float],
+                               sim_sp: Optional[ListSpecies] = None,
+                               ) -> ListSpecies:
+    if sim_sp is None:
+        sim_sp = ListSpecies()
+    for sp, cc in species.items():
+        sim_sp.add_cst_species(sp, cc)
+    return sim_sp
+

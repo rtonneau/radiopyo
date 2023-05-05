@@ -8,7 +8,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, TypedDict
 
 # --------------------------------- Internal imports --------------------------------- #
 
@@ -156,3 +156,8 @@ class ABCouple():
 
     def __repr__(self) -> str:
         return f"AcidBase<{self.acid}, {self.base}, pKa: {self.pKa}>"
+
+class ABDict(TypedDict):
+    acid:str
+    base:str
+    pKa:float

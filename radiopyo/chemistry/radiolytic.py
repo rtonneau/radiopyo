@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
+    Dict,
 )
 
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
@@ -31,7 +32,8 @@ if TYPE_CHECKING:
 
 __all__ = ["ge_to_kr",
            "RadiolyticReaction",
-           "umol_per_joule_to_ge"
+           "umol_per_joule_to_ge",
+           "RadiolyticReactionDict",
            ]
 
 # ------------------------------------------------------------------------------------ #
@@ -92,7 +94,7 @@ class RadiolyticReaction(BaseChemicalReaction):
         self._reaction_cst = ge_to_kr(value)
 
     @classmethod
-    def new_from_dict(cls,
+    def from_dict(cls,
                       product: str,
                       ge: float,
                       list_sp: ListSpecies,
@@ -147,3 +149,5 @@ class RadiolyticReaction(BaseChemicalReaction):
 
     def __repr__(self) -> str:
         return self.__str__()
+
+RadiolyticReactionDict = Dict[str, float]
