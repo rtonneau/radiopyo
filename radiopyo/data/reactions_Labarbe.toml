@@ -3,31 +3,27 @@ pH = 7
 
 # [beam.pulsed]
 # dose_rate_avg  = 1e3      # Mean dose rate [Gy/s]
-# LET            = 10.0     # Linear Energy Transfer [keV / µm],
-                            # optionnal if G values provided.
 # period         = 50       # Time [seconds] (used only for Pulsed beam)
 # on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
 # max_dose       = 10       # Dose [Gy], optionnal
 
 # [beam.pulsed]
 # dose_rate_peak = 1e3      # Peak dose rate for pulsed beam [Gy/s]
-# LET            = 10.0     # Linear Energy Transfer [keV / µm],
-                            # optionnal if G values provided.
 # period         = 50       # Time [seconds] (used only for Pulsed beam)
 # on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
 # max_dose       = 10       # Dose [Gy], optionnal
 
 # [beam.pulsed]
 # pulse_dose     = 1e3      # Dose per pulse for pulsed beam [Gy]
-# LET            = 10.0     # Linear Energy Transfer [keV / µm],
-                            # optionnal if G values provided.
 # period         = 50       # Time [seconds] (used only for Pulsed beam)
 # on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
 # max_dose       = 10       # Dose [Gy], optionnal
 
 [beam.constant]
 dose_rate      = 1e7      # Mean dose rate [Gy/s]
-max_dose       = 10       # Dose [Gy], optionnal.
+max_dose       = 10       # Dose [Gy], optionnal
+LET            = 10.0     # Linear Energy Transfer [keV / µm],
+                          # optionnal if G values provided.
 
 [concentrations.fixed] # Unit is [mol]/[l]
 H2O = 55

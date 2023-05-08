@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from math import isinf, isnan
@@ -18,6 +19,7 @@ from typing import (
     Dict,
     NamedTuple,
     Optional,
+    Tuple,
 )
 
 import numpy as np
@@ -614,7 +616,8 @@ class MonoPulsedBeam(PulsedBeam):
     """
 
 
-def beam_from_dict(param: Dict[str, Dict[str, float]]) -> ParticleBeam:
+def beam_from_dict(param: Dict[str, Dict[str, float]],
+                   ) -> Tuple[ParticleBeam, Optional[float]]:
     """ 
     Construct beam from a dictionary.
 
@@ -624,18 +627,25 @@ def beam_from_dict(param: Dict[str, Dict[str, float]]) -> ParticleBeam:
             type.
 
     Returns:
-        ParticleBeam
+        ParticleBeam:
+            Beam class.
+        float:
+            LET.
+
     """
     if len(param) > 1 :
         raise ParameterError(f"Found more than one beam definition ({param})")
-    
     beam_type, config = param.popitem()
+    
+    LET:Optional[float] = None
+    with suppress(KeyError):
+        LET = config.pop("LET")
 
     if beam_type.lower() == "constant":
-        return ConstantBeam.from_dict(config)
+        return ConstantBeam.from_dict(config), LET
     
     if beam_type.lower() == "pulsed":
-        return PulsedBeam.from_dict(config)
+        return PulsedBeam.from_dict(config), LET
     
     raise NotImplementedError(f"Unknown beam type: {beam_type}")
 

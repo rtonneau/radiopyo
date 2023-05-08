@@ -134,11 +134,14 @@ class UnitCell(object):
         beam: Optional[ParticleBeam] = None
 
         if len(config["beam"]) > 0:
-            beam = beam_from_dict(config["beam"])
+            beam, LET = beam_from_dict(config["beam"])
 
-        return UnitCell(env=SimEnv.from_dict(config),
-                        beam=beam,
-                        )
+        out = UnitCell(env=SimEnv.from_dict(config),
+                        beam=beam)
+        
+        if LET is not None:
+            out.change_LET(LET)
+        return out
 
     @ classmethod
     def from_ron_file(cls, file: str | Path) -> UnitCell:
@@ -155,12 +158,14 @@ class UnitCell(object):
         beam: Optional[ParticleBeam] = None
 
         if len(config["beam"]) > 0:
-            beam = beam_from_dict(config["beam"])
+            beam, LET = beam_from_dict(config["beam"])
         
-        return UnitCell(env=SimEnv.from_dict(config),
-                        beam=beam,
-                        )
-
+        out = UnitCell(env=SimEnv.from_dict(config),
+                       beam=beam,)
+        if LET is not None:
+            out.change_LET(LET)
+        return out
+    
     def set_beam(self, beam: ParticleBeam) -> None:
         """Define Radiation Source structure/parameters
 
