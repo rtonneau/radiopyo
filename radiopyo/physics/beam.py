@@ -190,7 +190,7 @@ class ParticleBeam():
     """
     dose_rate: float
     timer: Timer
-    max_dose: float = float("inf")
+    max_dose: float = field(default=float("inf"))
     time_at_max_dose: float = field(init=False)
     dose_per_pulse: float = field(init=False)
     peak_dose_rate: float = field(init=False)
@@ -585,7 +585,8 @@ class PulsedBeam(ParticleBeam):
         if "period" not in param:
             raise ParameterError("PulsedBeam must be defined with a 'period' parameter")
         if "on_time" not in param:
-            raise ParameterError("PulsedBeam must be defined with a 'on_time' parameter")
+            raise ParameterError("PulsedBeam must be defined with an "
+                                  "'on_time' parameter")
         if "dose_rate_peak" in param:
             return PulsedBeam.from_peak_dose_rate(param["dose_rate_peak"],
                                                   period=param["period"],
