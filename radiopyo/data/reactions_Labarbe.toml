@@ -1,6 +1,34 @@
 [bio_param]
 pH = 7
 
+# [beam.pulsed]
+# dose_rate_avg  = 1e3      # Mean dose rate [Gy/s]
+# LET            = 10.0     # Linear Energy Transfer [keV / µm],
+                            # optionnal if G values provided.
+# period         = 50       # Time [seconds] (used only for Pulsed beam)
+# on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
+# max_dose       = 10       # Dose [Gy], optionnal
+
+# [beam.pulsed]
+# dose_rate_peak = 1e3      # Peak dose rate for pulsed beam [Gy/s]
+# LET            = 10.0     # Linear Energy Transfer [keV / µm],
+                            # optionnal if G values provided.
+# period         = 50       # Time [seconds] (used only for Pulsed beam)
+# on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
+# max_dose       = 10       # Dose [Gy], optionnal
+
+# [beam.pulsed]
+# pulse_dose     = 1e3      # Dose per pulse for pulsed beam [Gy]
+# LET            = 10.0     # Linear Energy Transfer [keV / µm],
+                            # optionnal if G values provided.
+# period         = 50       # Time [seconds] (used only for Pulsed beam)
+# on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
+# max_dose       = 10       # Dose [Gy], optionnal
+
+[beam.constant]
+dose_rate      = 1e7      # Mean dose rate [Gy/s]
+max_dose       = 10       # Dose [Gy], optionnal.
+
 [concentrations.fixed] # Unit is [mol]/[l]
 H2O = 55
 catalase = 8.0e-8
@@ -80,143 +108,143 @@ products = ["H_r",]
 k_value = 2.3e10
 
 [[reactions.k_reaction]]  # 7) e_aq + H2O2 -> OH_minus + OH_r
-reactants = ["e_aq"," H2O2",]
-products = ["OH_minus"," OH_r",]
+reactants = ["e_aq", "H2O2",]
+products = ["OH_minus", "OH_r",]
 k_value = 1.1e10
 
 [[reactions.k_reaction]]  # 8) e_aq + HO2_minus -> 2 OH_minus + OH_r
-reactants = ["e_aq"," HO2_minus",]
-products = ["OH_minus"," OH_minus"," OH_r",]
+reactants = ["e_aq", "HO2_minus",]
+products = ["OH_minus", "OH_minus", "OH_r",]
 k_value = 3.5e9
 
 [[reactions.k_reaction]]  # 9) e_aq + O2 -> O2_r_minus
-reactants = ["e_aq"," O2",]
+reactants = ["e_aq", "O2",]
 products = ["O2_r_minus",]
 k_value = 1.9e10
 
 [[reactions.k_reaction]]  # 10) e_aq + O2_r_minus -> O2_minus_minus
-reactants = ["e_aq"," O2_r_minus",]
+reactants = ["e_aq", "O2_r_minus",]
 products = ["O2_minus_minus",]
 k_value = 1.3e10
 
 # ---------------------- Reactions involving H_r as reactant -----------------------
 [[reactions.k_reaction]]  # 11) H_r + H2O -> H2 + OH_r
-reactants = ["H_r"," H2O",]
-products = ["H2"," OH_r",]
+reactants = ["H_r", "H2O",]
+products = ["H2", "OH_r",]
 k_value = 1.0e1
 
 [[reactions.k_reaction]]  # 12) H_r + H_r -> H2
-reactants = ["H_r"," H_r",]
+reactants = ["H_r", "H_r",]
 products = ["H2",]
 k_value = 1.55e10
 
 [[reactions.k_reaction]]  # 13) H_r + OH_r -> H2O
-reactants = ["H_r"," OH_r",]
+reactants = ["H_r", "OH_r",]
 products = ["H2O",]
 k_value = 7e9
 
 [[reactions.k_reaction]]  # 14) H_r + OH_minus -> e_aq (+ H2O)
-reactants = ["H_r"," OH_minus",]
+reactants = ["H_r", "OH_minus",]
 products = ["e_aq",]
 k_value = 2.2e7
 
 [[reactions.k_reaction]]  # 15) H_r + H2O2 -> OH_r + H2O
-reactants = ["H_r"," H2O2",]
-products = ["OH_r"," H2O",]
+reactants = ["H_r", "H2O2",]
+products = ["OH_r", "H2O",]
 k_value = 9.0e7
 
 [[reactions.k_reaction]]  # 16) H_r + O2 -> HO2_r
-reactants = ["H_r"," O2",]
+reactants = ["H_r", "O2",]
 products = ["HO2_r",]
 k_value = 2.1e10
 
 [[reactions.k_reaction]]  # 17) H_r + HO2_r -> H2O2
-reactants = ["H_r"," HO2_r",]
+reactants = ["H_r", "HO2_r",]
 products = ["H2O2",]
 k_value = 1.0e10
 
 # --------------------- Reactions involving OH_r as reactant  ----------------------
 [[reactions.k_reaction]]  # 18) OH_r + OH_r -> H2O2
-reactants = ["OH_r"," OH_r",]
+reactants = ["OH_r", "OH_r",]
 products = ["H2O2",]
 k_value = 1.1e10
 
 [[reactions.k_reaction]]  # 19) OH_r + H2 -> H_r + H2O
-reactants = ["OH_r"," H2",]
-products = ["H_r"," H2O",]
+reactants = ["OH_r", "H2",]
+products = ["H_r", "H2O",]
 k_value = 4.2e7
 
 [[reactions.k_reaction]]  # 20) OH_r + OH_Minus -> O_r_minus + H2O
-reactants = ["OH_r"," OH_minus",]
-products = ["O_r_minus"," H2O",]
+reactants = ["OH_r", "OH_minus",]
+products = ["O_r_minus", "H2O",]
 k_value = 4.2e7
 
 [[reactions.k_reaction]]  # 21) OH_r + HO2_minus -> OH_minus + HO2_r
-reactants = ["OH_r"," HO2_minus",]
-products = ["OH_minus"," HO2_r",]
+reactants = ["OH_r", "HO2_minus",]
+products = ["OH_minus", "HO2_r",]
 k_value = 7.5e9
 
 [[reactions.k_reaction]]  # 22) OH_r + O2_r_minus -> OH_minus + O2
-reactants = ["OH_r"," O2_r_minus",]
-products = ["OH_minus"," O2",]
+reactants = ["OH_r", "O2_r_minus",]
+products = ["OH_minus", "O2",]
 k_value = 8.0e9
 
 # ------------------- Reactions involving O_r_minus as reactant --------------------
 [[reactions.k_reaction]]  # 23) O_r_minus + H2O -> OH_minus + OH_r
-reactants = ["O_r_minus"," H2O",]
-products = ["OH_minus"," OH_r",]
+reactants = ["O_r_minus", "H2O",]
+products = ["OH_minus", "OH_r",]
 k_value = 1.8e6
 
 [[reactions.k_reaction]]  # 24) O_r_minus + O2 -> O3_minus
-reactants = ["O_r_minus"," O2",]
+reactants = ["O_r_minus", "O2",]
 products = ["O3_minus",]
 k_value = 3.6e9
 
 [[reactions.k_reaction]]  # 25) O_r_minus + O2_r_minus -> 2 OH_minus + O2
-reactants = ["O_r_minus"," O2_r_minus",]
-products = ["OH_minus"," OH_minus"," O2",]
+reactants = ["O_r_minus", "O2_r_minus",]
+products = ["OH_minus", "OH_minus"," O2",]
 k_value = 6.0e8
 
 #  --------------------------- Biological Reactions --------------------------------
 [[reactions.k_reaction]]  # 26) Super Oxide Dismutase action on  O2_r_minus (H_plus?)
-reactants = ["O2_r_minus"," O2_r_minus",]
-products = ["H2O2"," O2",]
+reactants = ["O2_r_minus", "O2_r_minus",]
+products = ["H2O2", "O2",]
 k_value = 2e9
 
 [[reactions.k_reaction]]  # 27) Same but Spontaneous reaction (no SOD involved)
-reactants = ["O2_r_minus"," O2_r_minus",]
-products = ["H2O2"," O2",]
+reactants = ["O2_r_minus", "O2_r_minus",]
+products = ["H2O2", "O2",]
 k_value = 2e5
 
 # ----------------------------------------------------------------------------------
 [[reactions.k_reaction]]  # 28) Fenton Reactions
-reactants = ["Fe_plus_plus"," H2O2",]
-products = ["Fe_plus_plus_plus"," OH_minus"," OH_r",]
+reactants = ["Fe_plus_plus", "H2O2",]
+products = ["Fe_plus_plus_plus", "OH_minus", "OH_r",]
 k_value = 1e3
 
 # ----------------------------------------------------------------------------------
 [[reactions.k_reaction]]  # 29) Reaction of H_r with biological molecules (RdH in R.Labarbe)
-reactants = ["RH"," H_r",]
+reactants = ["RH", "H_r",]
 products = ["RH_r",]
 k_value = 1e8
 
 [[reactions.k_reaction]]  # 30) Reaction of e_aq with biological molecules (Rde in R.Labarbe)
-reactants = ["RH"," e_aq",]
+reactants = ["RH", "e_aq",]
 products = ["RH_r",]
 k_value = 1.4e8
 
 [[reactions.k_reaction]]  # 31) Reaction of HO^. with thiols (RdOH in R.Labarbe)
-reactants = ["OH_r"," GSH",]
+reactants = ["OH_r", "GSH",]
 products = ["RH_r",]
 k_value = 1e10
 
 [[reactions.k_reaction]]  # 32) Hydrogen abstraction by OH_r (Rb2 in R.Labarbe)
-reactants = ["OH_r"," RH",]
+reactants = ["OH_r", "RH",]
 products = ["R_r",]
 k_value = 1e9
 
 [[reactions.k_reaction]]  # 33) Reaction of Alkyl R_r with O2 to form alkylperoxyl radicals ROO_r (Rb3 in R.Labarbe)
-reactants = ["R_r"," O2",]
+reactants = ["R_r", "O2",]
 products = ["ROO_r",]
 k_value = 5e7
 
@@ -226,13 +254,13 @@ products = ["trash",]
 k_value = 300
 
 [[reactions.k_reaction]]  # 35) R^. + R^. --> R-R   1e5 < k < 1e9 M^-1s^-1 (Rbr2 in R.Labarbe)
-reactants = ["R_r"," R_r",]
+reactants = ["R_r", "R_r",]
 products = ["trash",]
 k_value = 5e7
 
 [[reactions.k_reaction]]  # 36) self reaction of ROO_r (Rb6 in R.Labarbe)
-reactants = ["ROO_r"," ROO_r",]
-products = ["O2"," ROH"," RO",]
+reactants = ["ROO_r", "ROO_r",]
+products = ["O2", "ROH", "RO",]
 k_value = 1e4
 
 [[reactions.k_reaction]]  # 37) Life time of ROO_r ~ 17 s (k~ln(2)/17) (Rb8 in R.Labarbe)
@@ -241,8 +269,8 @@ products = ["trash",]
 k_value = 0.0408
 
 [[reactions.k_reaction]]  # 38) ROO_r react with unsaturated lipids RH to initiate nex radical chain  (Rb11 in R.Labarbe)
-reactants = ["ROO_r"," unsat_lipid",]
-products = ["ROOH"," R_r",]
+reactants = ["ROO_r", "unsat_lipid",]
+products = ["ROOH", "R_r",]
 k_value = 20
 
 
@@ -253,7 +281,7 @@ k_value = 20
 
 [[reactions.enzymatic]] #  (Rb10 in R.Labarbe)
 enzyme =" catalase"
-substrate = ["H2O2"," H2O2",]
-products = ["O2"," H2O"," H2O",]
+substrate = ["H2O2", " H2O2",]
+products = ["O2", "H2O", "H2O",]
 k_value = 6.62e7 #  [1/s]
 k_micha = 1.1 #  [mol/l]

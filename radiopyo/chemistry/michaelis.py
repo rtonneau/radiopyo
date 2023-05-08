@@ -102,22 +102,22 @@ class MichaelisMenten(BaseChemicalReaction):
         """
         new = cls(k_value, k_micha)
 
-        new.enzyme = list_sp.get_or_create_cst_species(enzyme)
+        new.enzyme = list_sp.get_or_create_cst_species(enzyme.strip())
         if isinstance(substrate, str):
-            substrate = [substrate]
-        elif len(substrate) > 1 and len(set(substrate)) > 1:
+            substrate = [substrate.strip()]
+        elif len(substrate) > 1 and len({elt.strip() for elt in substrate}) > 1:
             raise TypeError(
                 f"Substrate in Michaelis Menten reaction"
                 f" must all be the same if provide as list. Found: {substrate}"
             )
 
-        new.substrate = list_sp.get_or_create_dyn_species(substrate[0])
+        new.substrate = list_sp.get_or_create_dyn_species(substrate[0].strip())
 
         for sp in substrate:
-            new.add_as_reactant(list_sp.get_or_create_dyn_species(sp))
+            new.add_as_reactant(list_sp.get_or_create_dyn_species(sp.strip()))
 
         for sp in products:
-            new.add_as_product(list_sp.get_or_create_dyn_species(sp))
+            new.add_as_product(list_sp.get_or_create_dyn_species(sp.strip()))
         return new
 
     def as_label(self) -> str:

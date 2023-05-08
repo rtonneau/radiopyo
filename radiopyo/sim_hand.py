@@ -14,7 +14,6 @@ import copy
 import time
 from contextlib import suppress
 from itertools import chain, repeat
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,13 +30,18 @@ import pandas as pd
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
+from . import exceptions as rp_excep
 from .chemistry.species import CstSpecies
 from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
+from .physics.beam import NoBeam, beam_from_dict
 from .sim_env import SimEnv
+from .utils.ron_parser import RonFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from numpy.typing import NDArray
 
     from .physics.beam import ParticleBeam
@@ -98,8 +102,7 @@ class UnitCell(object):
 
     def __init__(self,
                  env: SimEnv,
-                 beam: ParticleBeam,
-                 use_g_val: bool = False,
+                 beam: Optional[ParticleBeam] = None,
                  ) -> None:
         self.env = env
         self.mat = SimMatrices(
@@ -109,22 +112,54 @@ class UnitCell(object):
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
         )
-        self.beam = beam
+
+        self.beam = beam or NoBeam()
         self.last_exec_time = -1
-        if use_g_val:
-            self.g_val = GValuesBoscolo()
+        self.g_val = GValuesBoscolo()
+
 
     @classmethod
-    def from_ron_file(cls, file: str | Path, beam: ParticleBeam) -> UnitCell:
-        """ 
+    def from_toml_file(cls, file: str|Path) -> UnitCell:
+        """Create a Simulation Environment from a TOML file:
+
         Args:
-            file: path
-                Path to input file
-            beam: ParticleBeam
-                Radiation source to use for the simulation
+            file: str | Path
+                Path to the TOML file
+
+        Returns:
+            UnitCell
         """
-        return cls(env=SimEnv.from_ron_file(Path(file)),
-                   beam=beam)
+        import toml  # type: ignore[import]
+        config = toml.load(file)
+        beam: Optional[ParticleBeam] = None
+
+        if len(config["beam"]) > 0:
+            beam = beam_from_dict(config["beam"])
+
+        return UnitCell(env=SimEnv.from_dict(config),
+                        beam=beam,
+                        )
+
+    @ classmethod
+    def from_ron_file(cls, file: str | Path) -> UnitCell:
+        """Create a Simulation Environment from a RON file:
+
+        Args:
+            file: str | Path
+                Path to the RON file
+
+        Returns:
+            UnitCell
+        """
+        config = RonFileParser(file).parse()
+        beam: Optional[ParticleBeam] = None
+
+        if len(config["beam"]) > 0:
+            beam = beam_from_dict(config["beam"])
+        
+        return UnitCell(env=SimEnv.from_dict(config),
+                        beam=beam,
+                        )
 
     def set_beam(self, beam: ParticleBeam) -> None:
         """Define Radiation Source structure/parameters
@@ -167,6 +202,8 @@ class UnitCell(object):
                  t_eval: Optional[NDArray[np.float64]] = None,
                  ) -> ScipyODEResult:
 
+        if self.beam is NoBeam:
+            rp_excep.NoBeamDefinedError("Simulation aborted.")
         first_step = self.FIRST_STEP
         # Check if first step is lower than the defined max_step
         if first_step >= max_step:
@@ -297,45 +334,52 @@ class UnitCell(object):
         return sol
 
     def prepare_chunked_run(self,
-                            t_chunks: NDArray[np.float64],
+                            t_span: Tuple[float, float],
                             use_jac: bool = True,
                             method: str = "LSODA",
                             atol: float = 1e-10,
-                            max_step: float | Iterable[float] = np.inf,
+                            max_step_size_on: float  = np.inf,
+                            max_step_size_off: float = np.inf,
+                            max_step_size_final: Optional[float] = None, 
                             ) -> SimChunksIter:
         """ Method used to prepare a multi step ODE integration
         Args:
-            t_chunks: NDArray[np.float64]
-                Simulation time chunks to use
+            t_span: Tuple[float, float]
+                t_span[0] -> start time, in seconds
+                t_span[1] -> End time, in seconds
             use_jac: bool, optional
                 Whether to use the jacobian along with the ODE solver (default:False)
             method: str, optional
                 Which ODE solver to use? Define in scipy.integrate.solve_ivp
             atol: float, optional
                 Absolute Tolerance of the ODE Solver (default: 1e-10)
-            max_step: float| Iterable[float], optional
-                Larger authorized time step for the ODE solver (default: inf). If
-                provides as a List, assume it is same length as t_chunks - 1 and defines
-                the larger step per chunk.
+            max_step_size_on: float, optional
+                Larger authorized time step for the ODE solver while beam is ON
+                (default: inf)
+            max_step_size_off: float, optional
+                Larger authorized time step for the ODE solver while beam is OFF
+                (default: inf)
+            max_step_size_final: float, optional
+                Larger authorized time step for the ODE solver for the very last
+                integration step (can be the larger if long sim time and few pulses).
+                If None, 'max_step_size_off|on' is used instead (default: None).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE integration
         """
-        # Check up max_step
-        if isinstance(max_step, float):
-            max_step = repeat(max_step, len(t_chunks)-1)
-        elif t_chunks.shape[0] != len(list(max_step)):
-            raise ValueError(f"t_chunks (len={len(t_chunks)}) and max_step "
-                             f"(len={len(list(max_step))}) must have the same "
-                             f"length if max_step is a list or and array")
+        if self.beam is NoBeam:
+            raise rp_excep.NoBeamDefinedError
+        chunks = self.beam.make_time_intervals(start=t_span[0], stop=t_span[1])
+        chunks[np.where(chunks[:,1]>0)[0], 1] = max_step_size_on
+        chunks[np.where(chunks[:,1]==0)[0], 1] = max_step_size_off
+        if max_step_size_final is not None:
+            chunks[-1, 1] = max_step_size_final
 
         chunk_list: List[SimChunk] = []
-        for idx, (stop, step_size) in enumerate(zip(t_chunks[1:],
-                                                    max_step,),
-                                                start=0):
-            chunk = SimChunk(start=t_chunks[idx],
-                             stop=stop,
-                             max_step_size=step_size)
+        for idx in range(len(chunks[0:-1, :])):
+            chunk = SimChunk(start=chunks[idx, 0],
+                             stop=chunks[idx+1, 0],
+                             max_step_size=chunks[idx, 1])
             chunk_list.append(chunk)
         return SimChunksIter(sim=self,
                              chunks=chunk_list,
@@ -431,6 +475,32 @@ class SimChunksIter():
         """Run all simulation chunks"""
         return collections.deque(self, maxlen=1).pop()
 
+    def subdivide_last_chunk(self,
+                             n:int,
+                             max_step_size:Optional[float]=None,
+                             scale:str="log",
+                             ) -> SimChunksIter:
+        last = self.chunks.pop()
+        if max_step_size is None or max_step_size < last.max_step_size:
+            max_step_size = last.max_step_size
+
+        if scale == "linear":
+            chunks = np.linspace(last.start, last.stop, num=n+1)
+            steps  =  np.linspace(last.max_step_size, max_step_size, num=n)
+        elif scale == "log":
+            chunks = np.logspace(np.log10(last.start),
+                                 np.log10(last.stop),
+                                 num=n+1)
+            steps  =  np.logspace(np.log10(last.max_step_size),
+                                  np.log10(max_step_size),
+                                  num=n)
+
+        for idx in range(n):
+            self.chunks.append(SimChunk(chunks[idx],
+                                        chunks[idx+1],
+                                        steps[idx],
+                                        ))
+        return self
 
 class ODEResult(object):
     """
@@ -474,7 +544,10 @@ class ODEResult(object):
         return len(self.n_points)
 
     @classmethod
-    def from_cell(cls, cell: UnitCell, sol: Optional[ScipyODEResult] = None) -> ODEResult:
+    def from_cell(cls,
+                  cell: UnitCell,
+                  sol: Optional[ScipyODEResult] = None,
+                  ) -> ODEResult:
         return cls(cell.env, cell.beam, sol)
 
     @property
@@ -517,14 +590,15 @@ class ODEResult(object):
         """
         return self.env.initial_values(all=True)
 
-    def to_pandas(self) -> pd.DataFrame:
+    def to_pandas(self, clip:bool=True) -> pd.DataFrame:
         """
         """
         labels = [elt.label for elt in self.env.species.iter_dyn_species()]
         return pd.DataFrame(index=self.t,
                             columns=labels,
                             dtype=np.float64,
-                            data=self.y.T)
+                            data=self.y.T,
+                            ).clip(0.0 if clip else None)
 
     def reconstruct_jacobian(self) -> pd.DataFrame:
         if self.beam is None:

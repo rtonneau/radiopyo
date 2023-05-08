@@ -97,7 +97,7 @@ class KReaction(BaseChemicalReaction):
         """
         new = cls(k_value)
         for sp in reactants:
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
             new.add_as_reactant(sim_sp)
 
         # Case of n*A -> B, then n*k is measured/given
@@ -106,7 +106,7 @@ class KReaction(BaseChemicalReaction):
             new.k_value /= new.stoi_reactants[sp]
 
         for sp in products:
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
             new.add_as_product(sim_sp)
         return new
 

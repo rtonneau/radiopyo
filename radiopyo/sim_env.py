@@ -32,12 +32,9 @@ from .chemistry.radiolytic import RadiolyticReaction
 
 # --------------------------------- Internal imports --------------------------------- #
 from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
-from .utils.ron_parser import RonFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from numpy.typing import NDArray
 
     from .chemistry.acid_base import ABDict
@@ -45,7 +42,8 @@ if TYPE_CHECKING:
     from .chemistry.k_reactions import KReactionDict
     from .chemistry.michaelis import MichaelisMentenDict
     from .chemistry.radiolytic import RadiolyticReactionDict
-
+    from .sim_types import ConfigDict
+    
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",
            ]
@@ -128,7 +126,19 @@ class SimEnv():
     def from_dict(cls, config: ConfigDict) -> SimEnv:
         list_sp = constant_species_from_dict(config["concentrations"]["fixed"])
         bio_param = config["bio_param"]
-        initial_cc = config["concentrations"]["initial"]
+        if "pH" not in bio_param:
+            import warnings
+            warnings.warn(
+                "pH is not defined in bio_param! Assuming pH=7",
+                stacklevel=2,
+                )
+            bio_param["pH"] = 7
+                
+        #Copy initial cc and strip species name on the fly.
+        initial_cc = {}
+        for key, cc in config["concentrations"]["initial"].items():
+            initial_cc[key.strip()] = cc
+
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
         if "H2O" in list_sp:
             list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
@@ -137,69 +147,6 @@ class SimEnv():
         kr, list_sp = kreaction_from_dict(config["reactions"]["k_reaction"], list_sp)
         enz, list_sp = michaelis_from_dict(config["reactions"]["enzymatic"], list_sp)
         rad, list_sp = radiolytic_from_dict(config["reactions"]["radiolytic"], list_sp)
-        for label, value in initial_cc.items():
-            with suppress(KeyError):
-                sp = list_sp[label]
-                if isinstance(sp, DynSpecies):
-                    sp.set_initial_cc(value)
-
-        # Convert the "trash" species, if presents, to Cst.
-        with suppress(KeyError):
-            list_sp._convert_to_CstSpecies("trash")
-
-        # Sort species so that all constant species are at the end.
-        list_sp.sort(inplace=True)
-
-        return cls(reactions=ReactionsList(ab, kr, enz, rad),
-                   species=list_sp,
-                   bio_param=bio_param,
-                   initial_cc=initial_cc,
-                   )
-
-    @classmethod
-    def from_toml_file(cls, file: str|Path) -> SimEnv:
-        """Create a Simulation Environment from a TOML file:
-
-        Args:
-            file: str | Path
-                Path to the TOML file
-
-        Returns:
-            SimEnv
-        """
-        import toml  # type: ignore[import]
-        config = toml.load(file)
-        return SimEnv.from_dict(config)
-
-    @ classmethod
-    def from_ron_file(cls, file: str | Path) -> SimEnv:
-        """Create a Simulation Environment from a RON file:
-
-        Args:
-            file: str | Path
-                Path to the RON file
-
-        Returns:
-            SimEnv
-        """
-        parser = RonFileParser(file)
-        parser.parse_file()
-
-        list_sp = ListSpecies()
-        bio_param = parser.build_bio_parameters()
-
-        list_sp = parser.build_cst_species(list_sp)
-        # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        if "H2O" in list_sp:
-            list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
-            list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
-
-        ab, list_sp = parser.build_acid_base(list_sp)
-        kr, list_sp = parser.build_k_reactions(list_sp)
-        enz, list_sp = parser.build_enzymatic(list_sp)
-        rad, list_sp = parser.build_radiolytics(list_sp)
-        initial_cc = parser.build_initial_conditions()
-
         for label, value in initial_cc.items():
             with suppress(KeyError):
                 sp = list_sp[label]
@@ -465,21 +412,6 @@ class SimEnv():
                 out.append(reaction)
         return out
 
-class ConcentrationDict(TypedDict):
-    fixed: Dict[str, float]
-    initial: Dict[str, float]
-
-class ReactionsDict(TypedDict):
-    radiolytic: RadiolyticReactionDict
-    acid_base: List[ABDict]
-    k_reaction: List[KReactionDict]
-    enzymatic: List[MichaelisMentenDict]
-
-class ConfigDict(TypedDict):
-    bio_param: Dict[str, float]
-    concentrations: ConcentrationDict
-    reactions: ReactionsDict
-
 # ------------------------------------------------------------------------------------ #
 #                                 FUNCTION DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
@@ -529,6 +461,6 @@ def constant_species_from_dict(species:Dict[str,float],
     if sim_sp is None:
         sim_sp = ListSpecies()
     for sp, cc in species.items():
-        sim_sp.add_cst_species(sp, cc)
+        sim_sp.add_cst_species(sp.strip(), cc)
     return sim_sp
 

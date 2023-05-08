@@ -126,8 +126,8 @@ class ABCouple():
         Returns:
             ABCouple
         """
-        return cls(acid=list_sp.get_or_create_dyn_species(acid),
-                   base=list_sp.get_or_create_dyn_species(base),
+        return cls(acid=list_sp.get_or_create_dyn_species(acid.strip()),
+                   base=list_sp.get_or_create_dyn_species(base.strip()),
                    pKa=pKa,
                    )
 

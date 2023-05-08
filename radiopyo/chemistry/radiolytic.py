@@ -113,7 +113,7 @@ class RadiolyticReaction(BaseChemicalReaction):
             RadiolyticReaction
         """
         new = cls(ge_to_kr(ge))
-        new.add_as_product(list_sp.get_or_create_dyn_species(product))
+        new.add_as_product(list_sp.get_or_create_dyn_species(product.strip()))
         return new
 
     # ------------------------------------------------------------------------ #

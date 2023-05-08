@@ -12,9 +12,7 @@ Author:
 from __future__ import annotations
 
 import enum
-import os.path
 import re
-from contextlib import suppress
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -24,24 +22,19 @@ from typing import (
     Optional,
     Pattern,
     Tuple,
-    TypedDict,
     Union,
 )
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry import (
-    ABCouple,
-    KReaction,
-    ListSpecies,
-    MichaelisMenten,
-    RadiolyticReaction,
-)
+from radiopyo.sim_types import ConfigDict, FileParser
 
 # ------------------------------------------------------------------------------------ #
 #                               TYPE CHECKING ONLY IMPORT                              #
 # ------------------------------------------------------------------------------------ #
 if TYPE_CHECKING:
-    import pathlib
+    from radiopyo.chemistry.acid_base import ABDict
+    from radiopyo.chemistry.k_reactions import KReactionDict
+    from radiopyo.chemistry.michaelis import MichaelisMentenDict
 
 # ------------------------------------------------------------------------------------ #
 #                                      DECORATORS                                      #
@@ -342,49 +335,11 @@ class RonBlock():
         return (name, res, txt)
 
 
-class AcidBaseDict(TypedDict):
-    acid: str
-    base: str
-    pKa: float
-
-
-class KReactionDict(TypedDict):
-    reactants: List[str]
-    products: List[List]
-    k_values: float
-
-
-class EnzymaticDict(TypedDict):
-    enzyme: str
-    substrate: str | List[str]
-    products: List[str]
-    k_value: float
-    k_micha: float
-
-
-class ParsedItems(TypedDict, total=False):
-    bio_param: Dict[str, float]
-    initial_concentrations: Dict[str, float]
-    fixed_concentrations: Dict[str, float]
-    acid_base: List[KReactionDict]
-    k_reactions: List[KReactionDict]
-    radiolytic: Dict[str, float]
-    enzymatic_reactions: List[EnzymaticDict]
-
-
-class RonFileParser(object):
+class RonFileParser(FileParser):
     """
     Class parsing RON files.
     """
-    path: str | pathlib.Path
     items: dict
-
-    def __init__(self, path: str | pathlib.Path):
-        self.path = path
-        if not os.path.exists(self.path):
-            raise FileNotFoundError(self.path)
-        self.items = {}
-        self.parse_file()
 
     def parse_file(self) -> None:
         """
@@ -424,55 +379,63 @@ class RonFileParser(object):
             raise KeyError(
                 f"Unable to locate {key} in file {self.path}")
 
-    def build_bio_parameters(self) -> Dict:
+    def parse(self) -> ConfigDict:
+        """ 
+        """
+        self.parse_file()
+
+        return {"bio_param": self.build_bio_parameters(),
+                
+                "concentrations": {
+                    "fixed": self.build_cst_species(),
+                    "initial": self.build_initial_concentrations()
+                    },
+
+                "reactions": {
+                    "acid_base": self.build_acid_base(),
+                    "k_reaction": self.build_k_reactions(),
+                    "radiolytic": self.build_radiolytics(),
+                    "enzymatic": self.build_enzymatic(),
+                    },
+
+                "beam": {},
+
+                }
+
+    def build_bio_parameters(self) -> Dict[str, float]:
         """build_bio_parameters
 
         Returns:
             Dict: biological parameters as dict.
         """
-        key = "bio_param"
         try:
-            if "pH" not in self.items[key]:
-                import warnings
-                warnings.warn(
-                    f"pH is not defines in RON file: {self.path}\nAssuming pH=7")
-                self.items[key]["pH"] = 7.0
-            return self.items[key]
+            return self.items["bio_param"]
         except KeyError:
             return {}
 
-    def build_initial_conditions(self) -> Dict[str, float]:
+    def build_initial_concentrations(self) -> Dict[str, float]:
         """Parse initial conditions (species's concentration)
 
         Returns:
             Dict: species: cc
         """
-        key = "initial_concentrations"
         try:
-            return self.items[key]
+            return self.items["initial_concentrations"]
         except KeyError:
             return {}
 
-    def build_radiolytics(self,
-                          sim_sp: Optional[ListSpecies] = None,
-                          ) -> Tuple[List[RadiolyticReaction], ListSpecies]:
+    def build_radiolytics(self) -> Dict[str, float]:
         """build_radiolytics _summary_
 
         Returns:
-            List[RadiolyticReaction]: _description_
+            Dict[str, float]: _description_
         """
-        key = "radiolytic"
-        if sim_sp is None:
-            sim_sp = ListSpecies()
         try:
-            return ([RadiolyticReaction.from_dict(species, ge, sim_sp)
-                    for (species, ge) in self.items[key].items()
-                    if species in sim_sp],
-                    sim_sp)
+            return self.items["radiolytic"]
         except KeyError:
-            return [], sim_sp
+            return {}
 
-    def build_cst_species(self, sim_sp: ListSpecies) -> ListSpecies:
+    def build_cst_species(self) -> Dict[str, float]:
         """build_cst_species _summary_
 
         Returns:
@@ -480,73 +443,46 @@ class RonFileParser(object):
         """
         key = "fixed_concentrations"
 
-        with suppress(KeyError):
-            for species, cc in self.items[key].items():
-                sim_sp.add_cst_species(species, cc)
-        return sim_sp
+        try:
+            return self.items[key]
+        except KeyError:
+            return {}
 
-    def build_acid_base(self,
-                        sim_sp: Optional[ListSpecies] = None,
-                        ) -> Tuple[List[ABCouple], ListSpecies]:
+    def build_acid_base(self) -> List[ABDict]:
         """build_acid_base _summary_
 
         Returns:
-            List[AcidBase]: _description_
+            List[ABDict]: _description_
         """
-        key = "acid_base"
-
-        if sim_sp is None:
-            sim_sp = ListSpecies()
-
         try:
-            return ([ABCouple.from_dict(list_sp=sim_sp, **reaction)
-                    for reaction in self.items[key]],
-                    sim_sp)
+            return self.items["acid_base"]
         except KeyError:
-            return [], sim_sp
+            return []
 
-    def build_k_reactions(self,
-                          sim_sp: Optional[ListSpecies] = None,
-                          ) -> Tuple[List[KReaction], ListSpecies]:
+    def build_k_reactions(self) -> List[KReactionDict]:
         """build_k_reactions
 
         Raises:
             KeyError: _description_
 
         Returns:
-            List[KReaction]: _description_
+            List[KReactionDict]: _description_
         """
-        key = "k_reactions"
-
-        if sim_sp is None:
-            sim_sp = ListSpecies()
-
         try:
-            return ([KReaction.from_dict(list_sp=sim_sp, **reaction)
-                    for reaction in self.items[key]],
-                    sim_sp)
+            return self.items["k_reactions"]
         except KeyError:
-            return [], sim_sp
+            return []
 
-    def build_enzymatic(self,
-                        sim_sp: Optional[ListSpecies] = None,
-                        ) -> Tuple[List[MichaelisMenten], ListSpecies]:
+    def build_enzymatic(self,) -> List[MichaelisMentenDict]:
         """build_enzymatic
 
         Raises:
             KeyError: _description_
 
         Returns:
-            List[KReaction]: _description_
+            List[MichaelisMentenDict]: _description_
         """
-        key = "enzymatic_reactions"
-
-        if sim_sp is None:
-            sim_sp = ListSpecies()
-
         try:
-            return ([MichaelisMenten.from_dict(list_sp=sim_sp, **reaction)
-                    for reaction in self.items[key]],
-                    sim_sp)
+            return self.items["enzymatic_reactions"]
         except KeyError:
-            return [], sim_sp
+            return []

@@ -2,6 +2,14 @@
     bio_param: (
         pH: 7,
     ),
+
+    beam: (
+        "type" = "pulsed",  // Either Pulsed or Constant
+        "LET" = 10.0,       // keV / µm
+        "period" = 50,      // seconds (used only for Pulsed beam)
+        "on_time" = 100e-3, // seconds (used only for Pulsed beam)
+        "max_dose" = 10,    // Gy
+    ),
     fixed_concentrations:{ // Unit is [mol]/[l]
         "H2O": 55,
         "catalase": 0.08e-6,

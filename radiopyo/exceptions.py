@@ -29,5 +29,5 @@ class SimulationError(RadioPyoError):
     """"""
 
 
-class NoBeamDefineError(SimulationError):
+class NoBeamDefinedError(SimulationError):
     """"""
