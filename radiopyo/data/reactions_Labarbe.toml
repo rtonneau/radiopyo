@@ -22,7 +22,7 @@ pH = 7
 [beam.constant]
 dose_rate      = 1e7      # Mean dose rate [Gy/s]
 max_dose       = 10       # Dose [Gy], optionnal
-LET            = 10.0     # Linear Energy Transfer [keV / µm],
+#LET            = 10.0     # Linear Energy Transfer [keV / µm],
                           # optionnal if G values provided.
 
 [concentrations.fixed] # Unit is [mol]/[l]

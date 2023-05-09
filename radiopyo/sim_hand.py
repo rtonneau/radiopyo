@@ -512,12 +512,11 @@ class SimChunksIter():
         """
         logger.info("Running all simulation chunks")
         try:
-            try:
-                if (get_ipython().__class__.__name__ # type: ignore[name-defined]
-                    == "ZMQInteractiveShell"): 
-                    from tqdm.notebook import tqdm  # type: ignore[import]
-            except NameError:
-                from tqdm import tqdm  # type: ignore[import]
+            from tqdm import tqdm  # type: ignore[import]
+            with suppress(NameError):
+                gip = get_ipython()  # type: ignore[name-defined] # noqa: F821 
+                if (gip.__class__.__name__ == "ZMQInteractiveShell"): 
+                    from tqdm.notebook import tqdm  # type: ignore[import] # noqa: F811
             #Perform Simulation with TQDM.
             sim = tqdm(self)            
         except ImportError:
@@ -646,9 +645,10 @@ class ODEResult(object):
     def to_pandas(self, clip:bool=True) -> pd.DataFrame:
         """
         """
-        labels = [elt.label for elt in self.env.species.iter_dyn_species()]
+        labels = [(elt.label, elt.index) for elt in self.env.species.iter_dyn_species()]
+        labels = sorted(labels, key=lambda x: x[1])
         return pd.DataFrame(index=self.t,
-                            columns=labels,
+                            columns=[elt[0] for elt in labels],
                             dtype=np.float64,
                             data=self.y.T,
                             ).clip(0.0 if clip else None)
@@ -759,15 +759,12 @@ class ODEResult(object):
                 out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
         return out
 
-    def integrate_species(self, species:str) -> float:
+    def integrate_species(self) -> pd.Series:
         """ 
         """
-        sp = self.env.species.get(species)
-        if sp is None:
-            raise UnknownSpeciesError(species)
-        if isinstance(sp, CstSpecies):
-            logger.warning(f"Attempt to compute integral of a constant Species "
-                           f"({species})")
-            return self.env.initial_cc[species]*1e6
-        return simpson(y=self.y[sp.index,:],
-                       x=self.t)
+        labels = [(elt.label, elt.index) for elt in self.env.species.iter_dyn_species()]
+        out = pd.Series(index=[elt[0] for elt in sorted(labels, key=lambda x: x[1])],
+                        dtype=np.float64)
+        for idx in range(len(self.y)):
+            out.iloc[idx] = simpson(y=self.y[idx,:].clip(min=0), x=self.t)
+        return out
