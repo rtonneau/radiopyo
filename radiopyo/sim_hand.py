@@ -682,6 +682,10 @@ class ODEResult(object):
         return out
 
     def reconstruct_reactions(self) -> pd.DataFrame:
+        """ 
+        Rem: to integrate df
+            >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
+        """
         # (Re)Build used matrices
         mat = SimMatrices(
             AB_mat=self.env.make_acidBase_matrix(),
