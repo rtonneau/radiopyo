@@ -126,20 +126,24 @@ class SimEnv():
     @classmethod
     def from_dict(cls, config: ConfigDict) -> SimEnv:
         logger.info("CONFIG::Configuring Simulation Environment")
+        # Sanity check
         if "concentrations" not in config:
             logger.warn("CONFIG::No concentration section found in config. It means, no"
                         " species with constant concentration and all initial"
                         " set to 0.")
             config["concentrations"] = {"fixed":{}, "initial":{}}
         
+        # Sanity check
         if len(config["concentrations"]) > 2:
             extra = [elt for elt in config["concentrations"]
                      if elt not in ["fixed", "initial"]]
             logger.warn(f"CONFIG::Found unknown, extra, key(s) in 'concentrations'"
                         f"section: {extra}. These will not be used.")
 
+        # Read Constant species
         list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
 
+        # Read bio param
         bio_param = config.get("bio_param", {})
         if "pH" not in bio_param:
             logger.warning(
@@ -157,28 +161,34 @@ class SimEnv():
             list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
             list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
 
+        # Sanity check
         if "reactions" not in config:
             logger.warning("CONFIG::No 'reactions' section in the provided "
                            "configuration")
             config["reactions"] = {"acid_base": [], "k_reaction": [],
                                    "enzymatic": [], "radiolytic": {}}
-            
+        
+        # Read Acid/Base Reactions
         ab, list_sp = acid_base_from_dict(config["reactions"].get("acid_base", []),
                                           list_sp)
         logger.info(f"CONFIG::{len(ab)} Acid/Base reactions added")
 
+        # Read K-Reactions
         kr, list_sp = kreaction_from_dict(config["reactions"].get("k_reaction", []),
                                           list_sp)
         logger.info(f"CONFIG::{len(kr)} K-reactions added")
 
+        # Read Enzymatic Reactions
         enz, list_sp = michaelis_from_dict(config["reactions"].get("enzymatic", []),
                                            list_sp)
         logger.info(f"CONFIG::{len(enz)} Enzymatic reactions added")
 
+        # Read Radiolytic Reactions
         rad, list_sp = radiolytic_from_dict(config["reactions"].get("radiolytic", {}),
                                             list_sp)
         logger.info(f"CONFIG::{len(rad)} Radiolytic reactions added")
 
+        # Read and set initial concentrations
         for label, value in initial_cc.items():
             with suppress(KeyError):
                 sp = list_sp[label]
