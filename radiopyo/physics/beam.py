@@ -190,8 +190,8 @@ class ParticleBeam():
         peak_dose_rate: float
             Dose rate during on_time of the Timer.
     """
-    dose_rate: float
-    timer: Timer
+    dose_rate: float = field(init=True)
+    timer: Timer = field(init=True)
     max_dose: float = field(default=float("inf"))
     time_at_max_dose: float = field(init=False)
     dose_per_pulse: float = field(init=False)
@@ -429,6 +429,9 @@ class ConstantBeam(ParticleBeam):
                          Timer.new_constant(),
                          max_dose = max_dose or float("inf"),
                          )
+
+    def __str__(self) -> str:
+        return f"ConstantBeam(dose_rate={self.dose_rate:.2g}, max_dose={self.max_dose})"
 
     def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
         # If range after max dose was delivered.

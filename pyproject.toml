@@ -99,18 +99,29 @@ target-version = "py39"
 version=1
 disable_existing_loggers = true
 
+[tool.logging.filters]
+
 [tool.logging.formatters.formatter]
-#class = "logging.Formatter"
 format = "%(asctime)s::%(name)s::%(levelname)s::%(message)s"
 
-[tool.logging.handlers.console]
+[tool.logging.filters.InfoOnly]
+class = "radiopyo.utils.logging.InfoOnly"
+
+[tool.logging.handlers.info_handler]
+class = "radiopyo.utils.logging.InfoHandler"
+formatter = "formatter"
+stream = "ext://sys.stdout"
+level = "INFO"
+
+[tool.logging.handlers.err_console]
 class = "logging.StreamHandler" 
 formatter = "formatter"
-#args = "(sys.stdout,)"
+stream = "ext://sys.stderr"
+level = "ERROR"
 
 [tool.logging.loggers.radiopyo]
 level = "DEBUG"
-handlers = ["console"]
+handlers = ["info_handler", "err_console"]
 
 
 

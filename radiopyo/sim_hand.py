@@ -57,7 +57,6 @@ __all__ = [
 ]
 # ------------------------------------------------------------------------------------ #
 # Load logging configuration
-print(Path(__file__).parent.parent / "pyproject.toml")
 logConfig_from_pyproject(Path(__file__).parent.parent / "pyproject.toml")
 logger = logging.getLogger("radiopyo")
 
@@ -169,9 +168,9 @@ class UnitCell(object):
         try:
             import toml  # type: ignore[import]
         except ImportError:
-            logger.error("""To load config from toml file you need to install the toml
-                           lib (which should be part of standard python lib now, so 
-                           maybe just update your python version)""")
+            logger.exception("""To load config from toml file you need to install the
+                             toml lib (which should be part of standard python lib now,
+                             so maybe just update your python version)""")
             raise
         config = toml.load(file)
         logger.info("File is loaded")
@@ -226,9 +225,9 @@ class UnitCell(object):
         # Recompute the Gi_mat accordingly
         self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
 
-        logger.info("New G values [radical / 100eV / incident particle] are:")
+        logger.debug("New G values [radical / 100eV / incident particle] are:")
         for reaction in self.env.reactions.radiolytic:
-            logger.info(f"-> {reaction.label()}: {reaction.ge():.3f}")
+            logger.debug(f"-> {reaction.label()}: {reaction.ge():.3f}")
 
     def _raw_run(self,
                  t_span: Tuple[float, float],

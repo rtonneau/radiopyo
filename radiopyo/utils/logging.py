@@ -19,7 +19,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
-    "logConfig_from_pyproject"
+    "logConfig_from_pyproject",
+    "InfoOnly",
+    "InfoHandler",
 ]
 # ------------------------------------------------------------------------------------ #
 
@@ -27,7 +29,15 @@ __all__ = [
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
 
+class InfoHandler(logging.StreamHandler):
+    def __init__(self, *args, **kwargs) -> None: # type: ignore[no-untyped-def]
+        logging.StreamHandler.__init__(self, *args, **kwargs)
+        self.addFilter(InfoOnly())
 
+class InfoOnly(logging.Filter):
+    def filter(self, record:logging.LogRecord) -> bool:
+        return record.levelno == logging.INFO
+    
 def logConfig_from_pyproject(file: str| Path) -> None:
     """Reads (same way as logging.config.ConfigFile) logging config from pyproject.toml
     file.
