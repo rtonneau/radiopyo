@@ -16,6 +16,7 @@ __all__ = ["IsConstantSpeciesError",
            "IsSimSpeciesError",
            "NotReactionReactant",
            "NotReactionProduct",
+           "UnknownSpeciesError",
            ]
 
 # ------------------------------------------------------------------------------------ #
@@ -40,4 +41,6 @@ class NotReactionReactant(ChemistryError):
 
 
 class NotReactionProduct(ChemistryError):
+    """"""
+class UnknownSpeciesError(ChemistryError):
     """"""

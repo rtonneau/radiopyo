@@ -28,16 +28,18 @@ from typing import (
 
 import numpy as np
 import pandas as pd
-from scipy.integrate import solve_ivp  # type: ignore[import]
+from scipy.integrate import simpson, solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from . import exceptions as rp_excep
+from .chemistry.exceptions import UnknownSpeciesError
 from .chemistry.species import CstSpecies
 from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
 from .physics.beam import NoBeam, beam_from_dict
 from .sim_env import SimEnv
 from .utils.ron_parser import RonFileParser
+from .utils.toml_parser import TOMLFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
@@ -159,14 +161,7 @@ class UnitCell(object):
             UnitCell
         """
         logger.info(f"Loading config from TOML file: {file}")
-        try:
-            import toml  # type: ignore[import]
-        except ImportError:
-            logger.exception("""To load config from toml file you need to install the
-                             toml lib (which should be part of standard python lib now,
-                             so maybe just update your python version)""")
-            raise
-        config = toml.load(file)
+        config = TOMLFileParser(file).parse()
         logger.info("File is loaded")
         return UnitCell.from_config_dict(config)       
 
@@ -763,3 +758,16 @@ class ODEResult(object):
                 stoi = reaction.stoi_reactants[species.label]
                 out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
         return out
+
+    def integrate_species(self, species:str) -> float:
+        """ 
+        """
+        sp = self.env.species.get(species)
+        if sp is None:
+            raise UnknownSpeciesError(species)
+        if isinstance(sp, CstSpecies):
+            logger.warning(f"Attempt to compute integral of a constant Species "
+                           f"({species})")
+            return self.env.initial_cc[species]*1e6
+        return simpson(y=self.y[sp.index,:],
+                       x=self.t)

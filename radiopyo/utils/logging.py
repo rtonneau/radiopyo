@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
     "logConfig_from_pyproject",
-    "InfoOnly",
+    "InfoWarning",
     "InfoHandler",
 ]
 # ------------------------------------------------------------------------------------ #
@@ -54,9 +54,10 @@ def logConfig_from_pyproject(file: str| Path) -> None:
     KeyError
         If logging not found in tool table
     """
-    import toml  # type: ignore[import]
+    import tomllib  # type: ignore[import]
 
-    toml_dict = toml.load(file)
+    with open(file, mode="rb") as bf:
+        toml_dict = tomllib.load(bf)
 
     tool_table = toml_dict.get("tool", {})
 
