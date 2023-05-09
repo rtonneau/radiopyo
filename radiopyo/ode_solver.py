@@ -60,7 +60,7 @@ def jacobian(t: float,
     Returns:
         NDArray[np.float64]: jacobian (square) matrix
                  |   ds_0        ds_1    ....      ds_j
-        ---------|---------------------------------------
+        ---------+---------------------------------------
             ds_0 | ds_0/ds_0   ds_0/ds_1 ....    ds_0/ds_j
             ds_1 | ds_1/ds_0   ds_1/ds_1 ....    ds_1/ds_j
             .... |    ....        ....   ....      ....

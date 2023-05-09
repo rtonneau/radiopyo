@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import collections
 import copy
+import logging
 import time
 from contextlib import suppress
 from itertools import chain, repeat
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -36,15 +38,16 @@ from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
 from .physics.beam import NoBeam, beam_from_dict
 from .sim_env import SimEnv
+from .utils.logging import logConfig_from_pyproject
 from .utils.ron_parser import RonFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
-    from pathlib import Path
 
     from numpy.typing import NDArray
 
     from .physics.beam import ParticleBeam
+    from .sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
@@ -53,6 +56,10 @@ __all__ = [
     "SimChunksIter",
 ]
 # ------------------------------------------------------------------------------------ #
+# Load logging configuration
+print(Path(__file__).parent.parent / "pyproject.toml")
+logConfig_from_pyproject(Path(__file__).parent.parent / "pyproject.toml")
+logger = logging.getLogger("radiopyo")
 
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
@@ -119,6 +126,35 @@ class UnitCell(object):
 
 
     @classmethod
+    def from_config_dict(cls, config:ConfigDict) -> UnitCell:
+        """Create a Simulation Environment from a the generic ConfigDict:
+
+        Args:
+            config: ConfigDict
+                Dictionary (see radiopyo.sim_types.py) containing simulation parameters.
+
+        Returns:
+            UnitCell 
+        """
+        beam: Optional[ParticleBeam] = None
+
+        if len(config["beam"]) > 0:
+            logger.info("Beam configuration detected in config file")
+            beam, LET = beam_from_dict(config["beam"])
+            logger.info(f"Beam {beam} is setup")
+        else:
+            logger.info("No beam configuration detected")
+
+        logger.info("Creating simulation environment from config")
+        out = UnitCell(env=SimEnv.from_dict(config),
+                        beam=beam)
+        logger.info("Simulation environment created.")
+        
+        if LET is not None:
+            out.change_LET(LET)
+        return out
+    
+    @classmethod
     def from_toml_file(cls, file: str|Path) -> UnitCell:
         """Create a Simulation Environment from a TOML file:
 
@@ -129,19 +165,17 @@ class UnitCell(object):
         Returns:
             UnitCell
         """
-        import toml  # type: ignore[import]
+        logger.info(f"Loading config from TOML file: {file}")
+        try:
+            import toml  # type: ignore[import]
+        except ImportError:
+            logger.error("""To load config from toml file you need to install the toml
+                           lib (which should be part of standard python lib now, so 
+                           maybe just update your python version)""")
+            raise
         config = toml.load(file)
-        beam: Optional[ParticleBeam] = None
-
-        if len(config["beam"]) > 0:
-            beam, LET = beam_from_dict(config["beam"])
-
-        out = UnitCell(env=SimEnv.from_dict(config),
-                        beam=beam)
-        
-        if LET is not None:
-            out.change_LET(LET)
-        return out
+        logger.info("File is loaded")
+        return UnitCell.from_config_dict(config)       
 
     @ classmethod
     def from_ron_file(cls, file: str | Path) -> UnitCell:
@@ -154,17 +188,10 @@ class UnitCell(object):
         Returns:
             UnitCell
         """
+        logger.info(f"Loading config from RON file: {file}")
         config = RonFileParser(file).parse()
-        beam: Optional[ParticleBeam] = None
-
-        if len(config["beam"]) > 0:
-            beam, LET = beam_from_dict(config["beam"])
-        
-        out = UnitCell(env=SimEnv.from_dict(config),
-                       beam=beam,)
-        if LET is not None:
-            out.change_LET(LET)
-        return out
+        logger.info("File is loaded")
+        return UnitCell.from_config_dict(config)
     
     def set_beam(self, beam: ParticleBeam) -> None:
         """Define Radiation Source structure/parameters
@@ -176,6 +203,7 @@ class UnitCell(object):
             None
         """
         self.beam = beam
+        logger.info(f"Setting new beam definition: {beam}, done!")
 
     def change_LET(self, let: float) -> None:
         """Update the radiolytic yields from the simulation env according to literature
@@ -188,6 +216,7 @@ class UnitCell(object):
         Returns:
             None
         """
+        logger.info(f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
             if sp.label not in self.g_val or isinstance(sp, CstSpecies):
@@ -196,6 +225,10 @@ class UnitCell(object):
 
         # Recompute the Gi_mat accordingly
         self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
+
+        logger.info("New G values [radical / 100eV / incident particle] are:")
+        for reaction in self.env.reactions.radiolytic:
+            logger.info(f"-> {reaction.label()}: {reaction.ge():.3f}")
 
     def _raw_run(self,
                  t_span: Tuple[float, float],
@@ -270,7 +303,10 @@ class UnitCell(object):
         Returns:
             ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
         """
-
+        logger.info(
+            f"""Starting simulation with t_span: {t_span} 
+            (jacobian use: {use_jac})
+            """)
         sol = self._raw_run(t_span,
                             use_jac,
                             method,
@@ -279,7 +315,7 @@ class UnitCell(object):
                             y0,
                             t_eval,
                             )
-
+        logger.info("Simulation done!")
         return ODEResult(self.env, self.beam, sol)
 
     def run_chunked(self,
@@ -373,6 +409,7 @@ class UnitCell(object):
             SimChunksIter: Iterable object performing the ODE integration
         """
         if self.beam is NoBeam:
+            logger.error("No beam is defined for the simulation")
             raise rp_excep.NoBeamDefinedError
         chunks = self.beam.make_time_intervals(start=t_span[0], stop=t_span[1])
         chunks[np.where(chunks[:,1]>0)[0], 1] = max_step_size_on
@@ -386,6 +423,7 @@ class UnitCell(object):
                              stop=chunks[idx+1, 0],
                              max_step_size=chunks[idx, 1])
             chunk_list.append(chunk)
+        logger.info(f"Simulation divided in {len(chunk_list)} chunks")
         return SimChunksIter(sim=self,
                              chunks=chunk_list,
                              atol=atol,
@@ -477,8 +515,34 @@ class SimChunksIter():
         return len(self.chunks)
 
     def run_all(self) -> ODEResult:
-        """Run all simulation chunks"""
-        return collections.deque(self, maxlen=1).pop()
+        """Run all simulation chunks
+        Tries to import tqdm to give a nice progressbar to the user. But it can safely 
+        fail.
+        get_ipython().__class__.__name__ --> detect if python was started from a 
+        Jupyter Notebook (=="ZMQInteractiveShell").
+        If ran from a regular python, the call to "get_ipython()" produces a NameError.
+        """
+        logger.info("Running all simulation chunks")
+        try:
+            try:
+                if (get_ipython().__class__.__name__ # type: ignore[name-defined]
+                    == "ZMQInteractiveShell"): 
+                    from tqdm.notebook import tqdm  # type: ignore[import]
+            except NameError:
+                from tqdm import tqdm  # type: ignore[import]
+            #Perform Simulation with TQDM.
+            for res in tqdm(self):
+                pass
+            logger.info("Simulation done!")
+            return res
+            
+        except ImportError:
+            pass
+        
+        # Efficient way to consume the iterator while returning the last element.
+        res = collections.deque(self, maxlen=1).pop()
+        logger.info("Simulation done!")
+        return res
 
     def subdivide_last_chunk(self,
                              n:int,
