@@ -10,6 +10,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import logging
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import chain
@@ -48,10 +49,11 @@ __all__ = ["SimEnv",
            ]
 
 # ------------------------------------------------------------------------------------ #
+logger = logging.getLogger("radiopyo")
+
+# ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
-
-
 @dataclass
 class ReactionsList:
     """Collection class to store all reactions and apply some changes on its 
@@ -123,29 +125,60 @@ class SimEnv():
 
     @classmethod
     def from_dict(cls, config: ConfigDict) -> SimEnv:
-        list_sp = constant_species_from_dict(config["concentrations"]["fixed"])
-        bio_param = config["bio_param"]
+        logger.info("CONFIG::Configuring Simulation Environment")
+        if "concentrations" not in config:
+            logger.warn("CONFIG::No concentration section found in config. It means, no"
+                        " species with constant concentration and all initial"
+                        " set to 0.")
+            config["concentrations"] = {"fixed":{}, "initial":{}}
+        
+        if len(config["concentrations"]) > 2:
+            extra = [elt for elt in config["concentrations"]
+                     if elt not in ["fixed", "initial"]]
+            logger.warn(f"CONFIG::Found unknown, extra, key(s) in 'concentrations'"
+                        f"section: {extra}. These will not be used.")
+
+        list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
+
+        bio_param = config.get("bio_param", {})
         if "pH" not in bio_param:
-            import warnings
-            warnings.warn(
-                "pH is not defined in bio_param! Assuming pH=7",
-                stacklevel=2,
+            logger.warning(
+                "CONFIG::pH is not defined in bio_param! Assuming pH=7",
                 )
             bio_param["pH"] = 7
                 
         #Copy initial cc and strip species name on the fly.
         initial_cc = {}
-        for key, cc in config["concentrations"]["initial"].items():
+        for key, cc in config["concentrations"].get("initial", {}).items():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
         if "H2O" in list_sp:
             list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
             list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
-        ab, list_sp = acid_base_from_dict(config["reactions"]["acid_base"], list_sp)
-        kr, list_sp = kreaction_from_dict(config["reactions"]["k_reaction"], list_sp)
-        enz, list_sp = michaelis_from_dict(config["reactions"]["enzymatic"], list_sp)
-        rad, list_sp = radiolytic_from_dict(config["reactions"]["radiolytic"], list_sp)
+
+        if "reactions" not in config:
+            logger.warning("CONFIG::No 'reactions' section in the provided "
+                           "configuration")
+            config["reactions"] = {"acid_base": [], "k_reaction": [],
+                                   "enzymatic": [], "radiolytic": {}}
+            
+        ab, list_sp = acid_base_from_dict(config["reactions"].get("acid_base", []),
+                                          list_sp)
+        logger.info(f"CONFIG::{len(ab)} Acid/Base reactions added")
+
+        kr, list_sp = kreaction_from_dict(config["reactions"].get("k_reaction", []),
+                                          list_sp)
+        logger.info(f"CONFIG::{len(kr)} K-reactions added")
+
+        enz, list_sp = michaelis_from_dict(config["reactions"].get("enzymatic", []),
+                                           list_sp)
+        logger.info(f"CONFIG::{len(enz)} Enzymatic reactions added")
+
+        rad, list_sp = radiolytic_from_dict(config["reactions"].get("radiolytic", {}),
+                                            list_sp)
+        logger.info(f"CONFIG::{len(rad)} Radiolytic reactions added")
+
         for label, value in initial_cc.items():
             with suppress(KeyError):
                 sp = list_sp[label]
@@ -159,6 +192,9 @@ class SimEnv():
         # Sort species so that all constant species are at the end.
         list_sp.sort(inplace=True)
 
+        logger.info(f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
+        logger.info(f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
+        logger.info("CONFIG::Simulation Configuration done!")
         return cls(reactions=ReactionsList(ab, kr, enz, rad),
                    species=list_sp,
                    bio_param=bio_param,

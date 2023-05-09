@@ -15,7 +15,6 @@ import logging
 import time
 from contextlib import suppress
 from itertools import chain, repeat
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -38,11 +37,11 @@ from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
 from .physics.beam import NoBeam, beam_from_dict
 from .sim_env import SimEnv
-from .utils.logging import logConfig_from_pyproject
 from .utils.ron_parser import RonFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if TYPE_CHECKING:
+    from pathlib import Path
 
     from numpy.typing import NDArray
 
@@ -55,16 +54,13 @@ __all__ = [
     "SimChunk",
     "SimChunksIter",
 ]
+
 # ------------------------------------------------------------------------------------ #
-# Load logging configuration
-logConfig_from_pyproject(Path(__file__).parent.parent / "pyproject.toml")
 logger = logging.getLogger("radiopyo")
 
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
-
-
 class SimMatrices(TypedDict):
     """Convenient TypedDict use to leverage type checking and store matrices used in ODE
     solver."""
@@ -144,17 +140,15 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
-        logger.info("Creating simulation environment from config")
         out = UnitCell(env=SimEnv.from_dict(config),
                         beam=beam)
-        logger.info("Simulation environment created.")
         
         if LET is not None:
             out.change_LET(LET)
         return out
     
     @classmethod
-    def from_toml_file(cls, file: str|Path) -> UnitCell:
+    def from_toml(cls, file: str|Path) -> UnitCell:
         """Create a Simulation Environment from a TOML file:
 
         Args:
@@ -177,7 +171,7 @@ class UnitCell(object):
         return UnitCell.from_config_dict(config)       
 
     @ classmethod
-    def from_ron_file(cls, file: str | Path) -> UnitCell:
+    def from_ron(cls, file: str | Path) -> UnitCell:
         """Create a Simulation Environment from a RON file:
 
         Args:
@@ -240,7 +234,7 @@ class UnitCell(object):
                  ) -> ScipyODEResult:
 
         if self.beam is NoBeam:
-            rp_excep.NoBeamDefinedError("Simulation aborted.")
+            rp_excep.NoBeamDefinedError("Simulation aborted")
         first_step = self.FIRST_STEP
         # Check if first step is lower than the defined max_step
         if first_step >= max_step:
@@ -513,7 +507,7 @@ class SimChunksIter():
     def __len__(self) -> int:
         return len(self.chunks)
 
-    def run_all(self) -> ODEResult:
+    def run(self) -> ODEResult:
         """Run all simulation chunks
         Tries to import tqdm to give a nice progressbar to the user. But it can safely 
         fail.
@@ -530,16 +524,12 @@ class SimChunksIter():
             except NameError:
                 from tqdm import tqdm  # type: ignore[import]
             #Perform Simulation with TQDM.
-            for res in tqdm(self):
-                pass
-            logger.info("Simulation done!")
-            return res
-            
+            sim = tqdm(self)            
         except ImportError:
-            pass
+            sim = self
         
         # Efficient way to consume the iterator while returning the last element.
-        res = collections.deque(self, maxlen=1).pop()
+        res = collections.deque(sim, maxlen=1).pop()
         logger.info("Simulation done!")
         return res
 

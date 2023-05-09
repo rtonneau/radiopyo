@@ -32,11 +32,11 @@ __all__ = [
 class InfoHandler(logging.StreamHandler):
     def __init__(self, *args, **kwargs) -> None: # type: ignore[no-untyped-def]
         logging.StreamHandler.__init__(self, *args, **kwargs)
-        self.addFilter(InfoOnly())
+        self.addFilter(InfoWarning())
 
-class InfoOnly(logging.Filter):
+class InfoWarning(logging.Filter):
     def filter(self, record:logging.LogRecord) -> bool:
-        return record.levelno == logging.INFO
+        return record.levelno in [logging.INFO, logging.WARNING]
     
 def logConfig_from_pyproject(file: str| Path) -> None:
     """Reads (same way as logging.config.ConfigFile) logging config from pyproject.toml
