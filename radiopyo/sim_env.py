@@ -157,7 +157,7 @@ class SimEnv():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        if "H2O" in list_sp:
+        if "H2O" in list_sp or "H2O" in initial_cc:
             list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
             list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
 
