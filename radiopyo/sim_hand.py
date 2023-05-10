@@ -23,6 +23,7 @@ from typing import (
     NamedTuple,
     Optional,
     Tuple,
+    Type,
     TypedDict,
 )
 
@@ -32,7 +33,6 @@ from scipy.integrate import simpson, solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from . import exceptions as rp_excep
-from .chemistry.exceptions import UnknownSpeciesError
 from .chemistry.species import CstSpecies
 from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from .physics.beam import ParticleBeam
-    from .sim_types import ConfigDict
+    from .sim_types import ConfigDict, FileParser
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
@@ -150,11 +150,29 @@ class UnitCell(object):
         return out
     
     @classmethod
+    def from_parser(cls, file: str|Path, Parser:Type[FileParser]) -> UnitCell:
+        """Create a Simulation Environment from a user defined FileParser.
+
+        Args:
+            file: str | pathlib.Path
+                Path to the configuration file
+            parser: Type[FileParser]
+                USer defined parser to use to parse the provided file
+
+        Returns:
+            UnitCell
+        """
+        logger.info(f"Loading config from file: {file}")
+        config = Parser(file).parse()
+        logger.info("File is loaded")
+        return UnitCell.from_config_dict(config)
+
+    @classmethod
     def from_toml(cls, file: str|Path) -> UnitCell:
         """Create a Simulation Environment from a TOML file:
 
         Args:
-            file: str | Path
+            file: str | pathlib.Path
                 Path to the TOML file
 
         Returns:
@@ -170,7 +188,7 @@ class UnitCell(object):
         """Create a Simulation Environment from a RON file:
 
         Args:
-            file: str | Path
+            file: str | pathlib.Path
                 Path to the RON file
 
         Returns:
