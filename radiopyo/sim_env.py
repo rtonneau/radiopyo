@@ -24,6 +24,7 @@ from typing import (
 )
 
 import numpy as np
+from scipy.constants import Avogadro  # type: ignore[import]
 
 from .chemistry.acid_base import ABCouple
 from .chemistry.k_reactions import KReaction
@@ -240,6 +241,30 @@ class SimEnv():
             List[str]
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
+    
+    def make_O2_intake_matrix(self) -> Optional[Tuple[NDArray[np.float64],
+                                             NDArray[np.float64],]]:
+        """ 
+        Add here all terms related to environment interaction like O2 intake.
+        """
+        Evi = np.zeros(len(self.species), dtype=np.float64)
+        Evo = np.zeros(len(self.species), dtype=np.float64)
+        sp = self.species.get("O2")
+        if sp is None or isinstance(sp, CstSpecies):
+            return None
+
+        print("O2 intake enabled")
+        cell_memb_th = 10e-9 # Cell membrane thickness
+        cell_rad = 20e-6 # cell radius in µm
+        cell_surf = 4 * np.pi * cell_rad * cell_rad
+        cell_vol = cell_surf * cell_rad / 3
+        O2_diff = 1.7e-5*1e-4 # m²/s
+        x = O2_diff / cell_memb_th * cell_surf * Avogadro * 1e3 / cell_vol
+        x = O2_diff / cell_vol / cell_memb_th
+
+        Evi[sp.index] = x
+        Evo[sp.index] = x*sp.initial_cc()*1e6
+        return Evi, Evo
 
     def make_kreaction_matrix(self) -> Tuple[NDArray[np.float64],
                                              NDArray[np.int8],

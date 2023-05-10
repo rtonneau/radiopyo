@@ -73,6 +73,7 @@ class SimMatrices(TypedDict):
     Ez_mat: Optional[Tuple[NDArray[np.float32], NDArray[np.float32],
                            NDArray[np.float64], NDArray[np.int8],]]
     cst_sp: NDArray[np.float64]
+    O2_mat: Optional[Tuple[NDArray[np.float64], NDArray[np.float64]]]
 
 
 class UnitCell(object):
@@ -115,6 +116,7 @@ class UnitCell(object):
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
+            O2_mat=self.env.make_O2_intake_matrix(),
         )
 
         self.beam = beam or NoBeam()
@@ -266,6 +268,7 @@ class UnitCell(object):
                                               self.mat["Ki_mat"],
                                               self.mat["Gi_mat"],
                                               self.mat["Ez_mat"],
+                                              self.mat["O2_mat"],
                                               ),
                                         t_eval=t_eval,
                                         jac=jacobian if use_jac else None,
@@ -682,6 +685,7 @@ class ODEResult(object):
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
+            O2_mat=self.env.make_O2_intake_matrix(),
         )
         sp_label = [elt.label for elt in self.env.iter_DynSpecies()]
         dsp_label = ["".join(["d", elt]) for elt in sp_label]
@@ -711,6 +715,7 @@ class ODEResult(object):
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
+            O2_mat=self.env.make_O2_intake_matrix(),
         )
 
         # Compute column names and Pre compute slices to ease access in the dataframe

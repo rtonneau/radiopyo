@@ -55,6 +55,7 @@ def jacobian(t: float,
                                     NDArray[np.float64],
                                     NDArray[np.int8],
                                     ]] = None,
+             O2_mat: Tuple[NDArray[np.float64], NDArray[np.float64]] = None,
              ) -> NDArray[np.float64]:
     """ Computes the jacobian dy/ds_i where s_i are species[i]
     Returns:
@@ -109,6 +110,7 @@ def derive(t: float,
                                   NDArray[np.float64],
                                   NDArray[np.int8],
                                   ]] = None,
+           O2_mat: Tuple[NDArray[np.float64], NDArray[np.float64]] = None,
            ) -> NDArray[np.float64]:
     """ Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
@@ -142,6 +144,11 @@ def derive(t: float,
     # => Force relationship between the total dydt's for A/B Partners
     # ABy, ABi, ABo => ab_mat
     dydt = AB_mat[0]*dydt + np.matmul(AB_mat[2], np.matmul(dydt, AB_mat[1]).T)
+
+    # Add O2 intake
+    if O2_mat is not None:
+        dydt = dydt + (O2_mat[1]-dydt*O2_mat[0])
+
     # select only the DynSpecies and convert to [µmol/l]
     return dydt[:-len(cst_sp)] * 1e6
 
