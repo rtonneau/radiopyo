@@ -138,7 +138,7 @@ products = ["OH_minus", "OH_minus"," O2",]
 k_value = 6.0e8
 ```
 
-#### -> enzymatic_reactions
+#### -> reactions.enzymatic
 
 Contains all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
