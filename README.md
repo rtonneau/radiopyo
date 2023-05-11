@@ -37,92 +37,125 @@ Currently the main dependencies of this modules are:
    ```python
    import radiopyo as rp 
 
-   # Beam Definition
-   dose_rate  = 1000 # Gy/s
-   max_dose = 10 # Gy
-   beam = rp.ConstantBeam(dose_rate, max_dose)
-
    # Simulation handler
-   sim = rp.UnitCell.from_ron_file(rp.LABARBE_CONFIG_FILE, beam)
+   # rp.LABARBE_CONFIG_FILE contains environment and beam definitions
+   sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
    res = sim.run(t_span=[1e-9, 10]) #Run simulation from 1e-9 s to 10 s.
 
    # Extract results to a nice pandas DataFrame.
    df = res.to_pandas() 
+
+   # ---------- Same but change beam definition ----------
+   peak_dose_rate  = 1000 # Gy/s (dose rate during ON time)
+   max_dose = 10 # Gy
+   period = 10e-3 # seconds
+   on_time = 1e-3 # seconds (=> Duty cycle of 10%)
+   beam = rp.PulsedBeam.from_peak_dose_rate(peak_dose_rate, period, on_time, max_dose)
+   
+   sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
+   sim.set_beam(beam)
+   
+   # Better to adapt simulation settings during ON and OFF time.
+   res = sim.prepare_chunked_run(t_span=[1e-9, 10],
+                                 max_step_size_on=1e-8,  #seconds
+                                 max_step_size_off=0.01, #seconds
+                                 ).run()
+
+   df = res.to_pandas() # pandas.DataFrame
+   
+   # Time integrate species concentrations.
+   s = res.integrate_species() # pandas.Series
    ```
 
-### Configuring Simulation
+## Configuring Simulation
 
-For the moment, the only way to load simulation configuration is via
-[ron](https://github.com/ron-rs/ron) files. The configuration file consists of several
-sections:
+For the moment, the only ways to load simulation configurations is via
+[ron](https://github.com/ron-rs/ron) or [toml](https://toml.io/en/) files.
+TOML files are recommended.
+The TOML configuration file consists of several sections:
 
-#### -> bio_param
+### -> bio_param
 
-Dictionary like structure holding the main biological parameters (pH)
+Contains the main biological parameters (pH)
 
-#### -> fixed_concentrations
+### -> concentrations.fixed
 
-Dictionary like structure holding the concentrations of species supposed to be constant.
+Contains the concentrations of species supposed to be constant.
 => If a species is recorded in this section, its concentration will be forced constant.
+For example:
+```toml
+[concentrations.fixed] # Unit is [mol]/[l]
+H2O = 55
+catalase = 8.0e-8
+```
 
-#### -> initial_concentrations
+### -> concentrations.initial
 
-Dictionary like structure holding the initial concentrations of the species.
+Contains the initial concentrations of the species.
 => If a species is not recorded in this section, its initial concentration will be
 assumed as 0.0 mol/l.
+For example:
+```toml
+[concentrations.initial] # Unit is [mol]/[l]
+O2 = 50e-6
+```
 
-#### -> radiolytic
+### -> reactions.radiolytic
 
-Dictionary like structure holding the G values of the species created by the radiation
+Contains the G values of the species created by the radiation
 source. The unit is [radical/100eV/incident particle].
+For example:
+```toml
+[reactions.radiolytic]
+e_aq = 2.8
+OH_r = 2.8
+```
 
-#### -> acid_base
+### -> reactions.acid_base
 
-List like structure holding all the acid/base reactions involved in the model. Each list
+Contains all the acid/base reactions involved in the model. Each
 entry must defined 3 fields: "acid", "base" & "pKa".
 For example:
 
-```yaml
-(
-   acid: "OH_r",
-   base: "O_r_minus",
-   pKa: 11.9,
-),
+```toml
+[[reactions.acid_base]]
+acid = "OH_r"
+base = "O_r_minus"
+pKa = 11.9
+
 ```
 
-#### -> k_reactions
+### -> reactions.k_reaction
 
-List like structure holding all the simple chemical reactions involved in the model.
+Contains all the simple chemical reactions involved in the model.
 Each list entry must defined 3 fields: "reactants", "products" & "k_value".
 For example:
 
-```yaml
-//O_r_minus + O2_r_minus -> 2 OH_minus + O2
-(
-   reactants: ["O_r_minus", "O2_r_minus"],
-   products: ["OH_minus", "OH_minus", "O2"],
-   k_value: 6.0e8
-),
+```toml
+[[reactions.k_reaction]]  # O_r_minus + O2_r_minus -> 2 OH_minus + O2
+reactants = ["O_r_minus", "O2_r_minus",]
+products = ["OH_minus", "OH_minus"," O2",]
+k_value = 6.0e8
 ```
 
-#### -> enzymatic_reactions
+### -> reactions.enzymatic
 
-List like structure holding all the Enzymatic reactions involved in the model. The
+Contains all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
 entry must defined 5 fields: "enzyme", "substrate", "products", "k_value" & "k_micha".
 For example:
 
-```yaml
-(
-   enzyme: "catalase",
-   substrate: ["H2O2", "H2O2"],
-   products: ["O2", "H2O", "H2O"],
-   k_value: 6.62e7, // [1/s]
-   k_micha: 1.1, // [mol/l]
-),
+```toml
+[[reactions.enzymatic]]
+enzyme =" catalase"
+substrate = ["H2O2", " H2O2",]
+products = ["O2", "H2O", "H2O",]
+k_value = 6.62e7 #  [1/s]
+k_micha = 1.1 #  [mol/l]
+
 ```
 
-### Ways of Running Simulation
+## Ways of Running Simulation
 
 The module currently supports 2 ways of running simulations:
 
@@ -131,13 +164,8 @@ The module currently supports 2 ways of running simulations:
    ```python
    import radiopyo as rp 
 
-   # Beam Definition
-   dose_rate  = 1000 # Gy/s
-   max_dose = 10 # Gy
-   beam = rp.ConstantBeam(dose_rate, max_dose)
-
    # Simulation handler
-   sim = rp.UnitCell.from_ron_file(rp.LABARBE_CONFIG_FILE, beam)
+   sim = rp.UnitCell.from_toml_file(rp.LABARBE_CONFIG_FILE)
    res = sim.run(t_span=[1e-9, 10]) #Run simulation from 1e-9 s to 10 s.
 
    ```
@@ -153,23 +181,20 @@ The module currently supports 2 ways of running simulations:
    period          = 1e-3 # seconds
    on_time         = 5e-6 # seconds
    beam = rp.PulsedBeam.from_peak_dose_rate(peak_dose_rate, period, on_time, max_dose)
-
+   
    # Simulation handler
-   sim = rp.UnitCell.from_ron_file(rp.LABARBE_CONFIG_FILE, beam)
-
-   chunks = sim.beam.make_time_intervals(start=1e-9,stop=500)
-   #chunks[:, 1] contains the max_step variable of ODE solver
-   chunks[np.where(chunks[:,1]>0)[0], 1] = sim.beam.timer.on_time / 1e4
-   chunks[np.where(chunks[:,1]==0)[0], 1] = (sim.beam.timer.period-sim.beam.timer.on_time) / 1e2
-   if chunks[-1,0] > sim.beam.time_at_max_dose:
-      chunks[-2:,1] = 0.01 
-   to_run = sim.prepare_chunked_run(chunks[:,0], max_step=chunks[:,1], use_jac=True,
-   method="LSODA", atol=1e-10)
-   res = ro_tun.run_all()
+   sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
+   sim.set_beam(beam)
+   
+   # Better to adapt simulation settings during ON and OFF time.
+   res = sim.prepare_chunked_run(t_span=[1e-9, 10],
+                                 max_step_size_on=1e-8,  #seconds
+                                 max_step_size_off=0.01, #seconds
+                                 ).run()
 
    ```
 
-### Acknowledgement
+## Acknowledgement
 
 - This module was originally inspired by R. Labarbe
   [validated](https://doi.org/10.1016/j.radonc.2020.06.001) MatLab code.
