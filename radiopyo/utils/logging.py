@@ -54,7 +54,7 @@ def logConfig_from_pyproject(file: str| Path) -> None:
     KeyError
         If logging not found in tool table
     """
-    import tomllib  # type: ignore[import]
+    import tomllib
 
     with open(file, mode="rb") as bf:
         toml_dict = tomllib.load(bf)

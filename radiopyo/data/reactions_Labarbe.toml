@@ -1,30 +1,35 @@
 [bio_param]
 pH = 7
 
-# [beam.pulsed]
+#-------------- Example of pulsed beam defined with average dose rate ------------------
+# [beam.pulsed] 
 # dose_rate_avg  = 1e3      # Mean dose rate [Gy/s]
 # period         = 50       # Time [seconds] (used only for Pulsed beam)
 # on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
 # max_dose       = 10       # Dose [Gy], optionnal
 
+#---------------- Example of pulsed beam defined with peak dose rate -------------------
 # [beam.pulsed]
 # dose_rate_peak = 1e3      # Peak dose rate for pulsed beam [Gy/s]
 # period         = 50       # Time [seconds] (used only for Pulsed beam)
 # on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
 # max_dose       = 10       # Dose [Gy], optionnal
 
+#---------------- Example of pulsed beam defined with dose per pulse -------------------
 # [beam.pulsed]
 # pulse_dose     = 1e3      # Dose per pulse for pulsed beam [Gy]
 # period         = 50       # Time [seconds] (used only for Pulsed beam)
 # on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
 # max_dose       = 10       # Dose [Gy], optionnal
 
+#----------------------- Example of constant beam definition ---------------------------
 [beam.constant]
 dose_rate      = 1e7      # Mean dose rate [Gy/s]
 max_dose       = 10       # Dose [Gy], optionnal
-#LET            = 10.0     # Linear Energy Transfer [keV / µm],
+#LET            = 10.0    # Linear Energy Transfer [keV / µm],
                           # optionnal if G values provided.
 
+#---------------------- Definition of Constants concentrations -------------------------
 [concentrations.fixed] # Unit is [mol]/[l]
 H2O = 55
 catalase = 8.0e-8
@@ -32,7 +37,9 @@ Fe_plus_plus = 8.9e-7
 GSH = 6.5e-3
 RH = 1
 unsat_lipid = 1e-6
-    
+
+#----------------------- Definition of initial concentrations --------------------------
+# Rem: if unspecified, initial cc are assumed 0 (except for constant species)    
 [concentrations.initial] # Unit is [mol]/[l]
 O2 = 50e-6
 

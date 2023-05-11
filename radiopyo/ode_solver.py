@@ -55,7 +55,8 @@ def jacobian(t: float,
                                     NDArray[np.float64],
                                     NDArray[np.int8],
                                     ]] = None,
-             O2_mat: Tuple[NDArray[np.float64], NDArray[np.float64]] = None,
+             O2_mat: Optional[Tuple[NDArray[np.float64],
+                                    NDArray[np.float64]]] = None,
              ) -> NDArray[np.float64]:
     """ Computes the jacobian dy/ds_i where s_i are species[i]
     Returns:
@@ -110,7 +111,8 @@ def derive(t: float,
                                   NDArray[np.float64],
                                   NDArray[np.int8],
                                   ]] = None,
-           O2_mat: Tuple[NDArray[np.float64], NDArray[np.float64]] = None,
+           O2_mat: Optional[Tuple[NDArray[np.float64],
+                                  NDArray[np.float64]]] = None,
            ) -> NDArray[np.float64]:
     """ Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
