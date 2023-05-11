@@ -67,18 +67,18 @@ Currently the main dependencies of this modules are:
    s = res.integrate_species() # pandas.Series
    ```
 
-### Configuring Simulation
+## Configuring Simulation
 
 For the moment, the only ways to load simulation configurations is via
 [ron](https://github.com/ron-rs/ron) or [toml](https://toml.io/en/) files.
 TOML files are recommended.
 The TOML configuration file consists of several sections:
 
-#### -> bio_param
+### -> bio_param
 
 Contains the main biological parameters (pH)
 
-#### -> concentrations.fixed
+### -> concentrations.fixed
 
 Contains the concentrations of species supposed to be constant.
 => If a species is recorded in this section, its concentration will be forced constant.
@@ -89,7 +89,7 @@ H2O = 55
 catalase = 8.0e-8
 ```
 
-#### -> concentrations.initial
+### -> concentrations.initial
 
 Contains the initial concentrations of the species.
 => If a species is not recorded in this section, its initial concentration will be
@@ -100,7 +100,7 @@ For example:
 O2 = 50e-6
 ```
 
-#### -> reactions.radiolytic
+### -> reactions.radiolytic
 
 Contains the G values of the species created by the radiation
 source. The unit is [radical/100eV/incident particle].
@@ -111,7 +111,7 @@ e_aq = 2.8
 OH_r = 2.8
 ```
 
-#### -> reactions.acid_base
+### -> reactions.acid_base
 
 Contains all the acid/base reactions involved in the model. Each
 entry must defined 3 fields: "acid", "base" & "pKa".
@@ -119,26 +119,26 @@ For example:
 
 ```toml
 [[reactions.acid_base]]
-acid: "OH_r"
-base: "O_r_minus"
-pKa: 11.9
+acid = "OH_r"
+base = "O_r_minus"
+pKa = 11.9
 
 ```
 
-#### -> reactions.k_reaction
+### -> reactions.k_reaction
 
 Contains all the simple chemical reactions involved in the model.
 Each list entry must defined 3 fields: "reactants", "products" & "k_value".
 For example:
 
 ```toml
-[[reactions.k_reaction]]  # 25) O_r_minus + O2_r_minus -> 2 OH_minus + O2
+[[reactions.k_reaction]]  # O_r_minus + O2_r_minus -> 2 OH_minus + O2
 reactants = ["O_r_minus", "O2_r_minus",]
 products = ["OH_minus", "OH_minus"," O2",]
 k_value = 6.0e8
 ```
 
-#### -> reactions.enzymatic
+### -> reactions.enzymatic
 
 Contains all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
@@ -155,7 +155,7 @@ k_micha = 1.1 #  [mol/l]
 
 ```
 
-### Ways of Running Simulation
+## Ways of Running Simulation
 
 The module currently supports 2 ways of running simulations:
 
@@ -194,7 +194,7 @@ The module currently supports 2 ways of running simulations:
 
    ```
 
-### Acknowledgement
+## Acknowledgement
 
 - This module was originally inspired by R. Labarbe
   [validated](https://doi.org/10.1016/j.radonc.2020.06.001) MatLab code.
