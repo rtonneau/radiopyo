@@ -455,6 +455,61 @@ class ConstantBeam(ParticleBeam):
                                 or param["dose_rate"],
                             max_dose=param.get("max_dose", None))
 
+class SinglePulseBeam(ConstantBeam):
+    """Class representing a Single Pulse Radiation Source
+    Attributes:
+        dose_rate: float
+            Average dose rate in Gy/s
+        max_dose: float
+            Max dose to deliver in Gy
+    """
+
+    def __init__(self,
+                 dose_rate: float,
+                 max_dose: float,
+                 ) -> None:
+        super().__init__(dose_rate,
+                         max_dose = max_dose,
+                         )
+        
+    def __str__(self) -> str:
+        return (f"SinglePulseBeam(dose_rate={self.dose_rate:.2g}, " 
+                f"max_dose={self.max_dose})")
+
+    @classmethod
+    def from_on_time(cls, dose_rate: float, on_time:float) -> SinglePulseBeam:
+        return cls(dose_rate, max_dose=on_time*dose_rate)
+
+    @classmethod
+    def from_dict(cls, param: Dict[str, float]) -> SinglePulseBeam:
+        """
+        Create a SinglePulseBeam from a Dictionary.
+
+        Args:
+            param: Dict[str, float]
+                Dictionary containing beam parameters
+        
+        Returns:
+            SinglePulseBeam
+
+        Raises:
+            radiopyo.physics.exceptions.ParameterError
+        """
+        if "dose_rate" not in param:
+            raise ParameterError("SinglePulseBeam must be defined with a 'dose_rate' "
+                                 "parameter")
+        
+        if "max_dose" in param:
+            return SinglePulseBeam(dose_rate=param["dose_rate"],
+                                   max_dose=param["max_dose"])
+        if "on_time" in param:
+            return SinglePulseBeam.from_on_time(dose_rate=param["dose_rate"],
+                                                on_time=param["on_time"])
+        
+        raise ParameterError("SinglePulseBeam must be defined with either one of "
+                             "'on_time' or 'max_dose' parameter")
+
+    
 class PulsedBeam(ParticleBeam):
     """ Class representing a Pulsed Radiation Source. Helper functions are also 
     available to easily create specific Pulsed Radiation Sources:
@@ -612,12 +667,6 @@ class PulsedBeam(ParticleBeam):
                               max_dose=param.get("max_dose", None),
                               )
         raise NotImplementedError(f"Unknown Pulsed beam definitions: {param}")
-        
-class MonoPulsedBeam(PulsedBeam):
-    """ 
-    TODO
-    """
-
 
 def beam_from_dict(param: Dict[str, Dict[str, float]],
                    ) -> Tuple[ParticleBeam, Optional[float]]:
@@ -649,6 +698,9 @@ def beam_from_dict(param: Dict[str, Dict[str, float]],
     
     if beam_type.lower() == "pulsed":
         return PulsedBeam.from_dict(config), LET
+    
+    if beam_type.lower() == "singlepulse":
+        return SinglePulseBeam.from_dict(config), LET
     
     raise NotImplementedError(f"Unknown beam type: {beam_type}")
 

@@ -247,6 +247,7 @@ class SimEnv():
         """ 
         Add here all terms related to environment interaction like O2 intake.
         """
+        return None
         Evi = np.zeros(len(self.species), dtype=np.float64)
         Evo = np.zeros(len(self.species), dtype=np.float64)
         sp = self.species.get("O2")
