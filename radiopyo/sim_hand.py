@@ -313,9 +313,8 @@ class UnitCell(object):
             ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
         """
         logger.info(
-            f"""Starting simulation with t_span: {t_span} 
-            (jacobian use: {use_jac})
-            """)
+            f"Starting simulation with t_span: {t_span} "
+            "(jacobian use: {use_jac})")
         sol = self._raw_run(t_span,
                             use_jac,
                             method,
@@ -390,7 +389,8 @@ class UnitCell(object):
                             atol: float = 1e-10,
                             max_step_size_on: float  = np.inf,
                             max_step_size_off: float = np.inf,
-                            max_step_size_final: Optional[float] = None, 
+                            max_step_size_final: Optional[float] = None,
+                            y0: Optional[NDArray[np.float64]] = None,
                             ) -> SimChunksIter:
         """ Method used to prepare a multi step ODE integration
         Args:
@@ -413,6 +413,9 @@ class UnitCell(object):
                 Larger authorized time step for the ODE solver for the very last
                 integration step (can be the larger if long sim time and few pulses).
                 If None, 'max_step_size_off|on' is used instead (default: None).
+            y0: NDArray[np.float64], optional
+                Initial concentration of DynSpecies (default: None). If None, calls 
+                EnvSim.initial_values()
 
         Returns:
             SimChunksIter: Iterable object performing the ODE integration
@@ -437,7 +440,8 @@ class UnitCell(object):
                              chunks=chunk_list,
                              atol=atol,
                              use_jac=use_jac,
-                             method=method,)
+                             method=method,
+                             y0=y0,)
 
 
 class SimChunk(NamedTuple):
@@ -474,7 +478,9 @@ class SimChunksIter():
             Whether jacobian is used with scipy.integrate.solve_ivp
         method: str
             Defines the ODE method used with scipy.integrate.solve_ivp
-
+        y0: NDArray[np.float64], optional
+            Initial concentration of DynSpecies (default: None). If None, calls 
+            EnvSim.initial_values()
     Usage:
         >>> 
     """
@@ -485,12 +491,14 @@ class SimChunksIter():
     atol: float
     use_jac: bool
     method: str
+    y0 : Optional[NDArray[np.float64]]
 
     def __init__(self, sim: UnitCell,
                  chunks: List[SimChunk],
                  atol: float = 1e-10,
                  use_jac: bool = True,
                  method: str = "LSODA",
+                 y0: Optional[NDArray[np.float64]] = None,
                  ):
         self.sim = sim
         self.chunks = chunks
@@ -499,6 +507,7 @@ class SimChunksIter():
         self.use_jac = use_jac
         self.method = method
         self.current = -1
+        self.y0 = y0
 
     def __iter__(self) -> SimChunksIter:
         return self
@@ -515,7 +524,7 @@ class SimChunksIter():
             method=self.method,
             atol=self.atol,
             max_step=chunk.max_step_size,
-            y0=self.sol.y[:, -1] if self.current > 0 else None,
+            y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
         )
         self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
         return self.sol
@@ -616,6 +625,34 @@ class ODEResult(object):
         """Number of simulation run"""
         return len(self.n_points)
 
+    def __add__(self, other:Any) -> ODEResult:
+        """ """
+        # Sanity checks
+        if not isinstance(other, ODEResult):
+            raise TypeError(f"Cannot add type: {type(other)}, to ODEResult")
+        if other.t[0] < self.t[-1]:
+            raise TypeError("Trying to add ODEResult with starting "
+                            "time inferior to previous results")
+        if other.y.shape[0] != self.y.shape[0]:
+            raise TypeError("Trying to add ODEResults with different number of tracked"
+                            "species")
+                            
+        # Combine all together
+        self.t = np.append(self.t, other.t)
+        self.y = np.hstack([self.y, other.y])
+        self.sol = self.sol + other.sol
+        self.t_events += other.t_events
+        self.y_events += other.y_events
+        self.nfev += other.nfev
+        self.njev += other.njev
+        self.nlu += other.nlu
+        self.status += other.status
+        self.message += other.message
+        self.success += other.success
+        self.n_points += other.n_points
+        self.exec_time += other.exec_time
+        return self
+
     @classmethod
     def from_cell(cls,
                   cell: UnitCell,
@@ -658,6 +695,11 @@ class ODEResult(object):
         self.exec_time.append(exec_time)
 
     # --------------------------------- Utils methods -------------------------------- #
+    def final_cc(self) -> NDArray[np.float64]:
+        """
+        """
+        return self.y[:,-1]
+    
     def initial_cc(self) -> NDArray[np.float64]:
         """
         """
