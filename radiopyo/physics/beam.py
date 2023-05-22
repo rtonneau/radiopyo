@@ -44,8 +44,6 @@ __all__ = ["TimeMessage",
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
-
-
 class TimerState(Enum):
     """ Convenient Enum use to define radiation source ON or OFF state."""
     isOff = 0
@@ -111,10 +109,14 @@ class Timer(NamedTuple):
     on_time: float
     start_time: float
 
+    @staticmethod
+    def _default_start_time() -> float:
+        return 0.0
+
     @classmethod
     def new_constant(cls, start_time:Optional[float]=None) -> Timer:
         """ Class method to generate an always ON timer"""
-        return cls(float("inf"), float("inf"), start_time or 0.0)
+        return cls(float("inf"), float("inf"), start_time or cls._default_start_time())
 
     @classmethod
     def new_pulsed(cls,
@@ -128,7 +130,7 @@ class Timer(NamedTuple):
             on_time: float
                 Time during which timer is ON in seconds. on_time should be <= period.
         """
-        return cls(period, on_time, start_time or 0.0)
+        return cls(period, on_time, start_time or cls._default_start_time())
 
     def is_continuous(self) -> bool:
         """ Is timer continuous? 
@@ -190,6 +192,11 @@ class Timer(NamedTuple):
     def time_till_next_period(self, time:float) -> float:
         time = time - self.start_time - self.period * self.period_index(time)
         return self.period - time
+    
+    def copy(self, start_time:Optional[float]=None) -> Timer:
+        return Timer(self.period,
+                     self.on_time,
+                     start_time or Timer._default_start_time())
 
 
 @dataclass
@@ -317,6 +324,13 @@ class ParticleBeam():
                 return self.peak_dose_rate
             return 0.0
         return beam_func
+
+    def reset(self, start:Optional[float]=None, max_dose:Optional[float]=None) -> None:
+        """
+        """
+        self.max_dose = max_dose or 0.0
+        self.timer = self.timer.copy(start_time=start)
+        self.__post_init__()
 
     def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
         """ Method computing the radiation source time structure in the range [start,
