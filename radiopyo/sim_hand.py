@@ -314,7 +314,7 @@ class UnitCell(object):
         """
         logger.info(
             f"Starting simulation with t_span: {t_span} "
-            "(jacobian use: {use_jac})")
+            f"(jacobian use: {use_jac})")
         sol = self._raw_run(t_span,
                             use_jac,
                             method,
@@ -663,7 +663,19 @@ class ODEResult(object):
     @property
     def shape(self) -> Tuple:
         return self.y.shape
-
+    
+    @property
+    def final_cc(self) -> NDArray[np.float64]:
+        """
+        """
+        return self.y[:,-1]
+    
+    @property
+    def initial_cc(self) -> NDArray[np.float64]:
+        """
+        """
+        return self.env.initial_values(all=True)
+    
     def _default_init(self) -> None:
         self.t = np.array([], dtype=np.float64)
         self.y = np.array([], dtype=np.float64)
@@ -695,16 +707,6 @@ class ODEResult(object):
         self.exec_time.append(exec_time)
 
     # --------------------------------- Utils methods -------------------------------- #
-    def final_cc(self) -> NDArray[np.float64]:
-        """
-        """
-        return self.y[:,-1]
-    
-    def initial_cc(self) -> NDArray[np.float64]:
-        """
-        """
-        return self.env.initial_values(all=True)
-
     def to_pandas(self, clip:bool=True) -> pd.DataFrame:
         """
         """

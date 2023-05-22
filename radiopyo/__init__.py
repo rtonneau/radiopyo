@@ -5,7 +5,7 @@ from .utils.logging import logConfig_from_pyproject
 
 logConfig_from_pyproject(Path(__file__).parent.parent / "pyproject.toml")
 
-from .physics.beam import ConstantBeam, PulsedBeam
+from .physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
 from .sim_hand import SimChunksIter, UnitCell
 
 LABARBE_CONFIG_FILE = Path(
