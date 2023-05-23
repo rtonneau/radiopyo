@@ -1,6 +1,6 @@
 # radiopyo: Python Module dedicated to Radiobiology
 
-![version](https://img.shields.io/badge/version-0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.3.0-blue)
 ![License](https://img.shields.io/badge/License-LGPL3-radiopyo.svg)
 ![maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 ![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)
