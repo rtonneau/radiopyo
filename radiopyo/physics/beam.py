@@ -252,7 +252,6 @@ class ParticleBeam():
         if self.timer.period >= float("inf"):
             return self.max_dose / self.peak_dose_rate
 
-
         # From here, radiation source is pulsed with period < inf
         # How many pulses to reach max_dose?
         #   ==> (max dose) / (dose per pulse)
@@ -328,7 +327,7 @@ class ParticleBeam():
     def reset(self, start:Optional[float]=None, max_dose:Optional[float]=None) -> None:
         """
         """
-        self.max_dose = max_dose or 0.0
+        self.max_dose = max_dose or self.max_dose 
         self.timer = self.timer.copy(start_time=start)
         self.__post_init__()
 
