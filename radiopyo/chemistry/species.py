@@ -10,6 +10,7 @@ Author:
 from __future__ import annotations
 
 import copy
+import operator as op
 from contextlib import suppress
 from itertools import chain
 from typing import (
@@ -341,6 +342,26 @@ class ListSpecies():
             self.add_cst_species(label, 0.0)
         return self.__getitem__(label)
 
+    def sorted_iter_cst_species(self) -> Iterable[CstSpecies]:
+        """
+        Get an iterator over all the CstSpecies (ordered).
+
+        Returns:
+            Iterator(CstSpecies) 
+        """
+        return map(op.itemgetter(1),
+                   sorted(self.cst_sp.items(), key=lambda x: x[1].index)) 
+
+    def sorted_iter_dyn_species(self) -> Iterable[DynSpecies]:
+        """
+        Get an iterator over all the DynSpecies (ordered).
+
+        Returns:
+            Iterator(DynSpecies) 
+        """
+        return map(op.itemgetter(1),
+                   sorted(self.dyn_sp.items(), key=lambda x: x[1].index)) 
+    
     def iter_cst_species(self) -> Iterable[CstSpecies]:
         """
         Get an iterator over all the CstSpecies (not ordered).

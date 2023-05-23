@@ -231,7 +231,7 @@ class SimEnv():
             out_cst = np.zeros(
                 self.species.len_cst_species(), dtype=np.float64)
             for cst_species in self.species.iter_cst_species():
-                out_cst[cst_species.index] = cst_species.initial_cc()*1e6
+                out_cst[cst_species.index-len(out_dyn)] = cst_species.initial_cc()*1e6
         return np.append(out_dyn, out_cst)
 
     def species_labels(self) -> List[str]:

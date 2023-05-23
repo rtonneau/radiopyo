@@ -22,6 +22,8 @@ __all__ = [
     "logConfig_from_pyproject",
     "InfoWarning",
     "InfoHandler",
+    "disable_logging",
+    "enable_logging"
 ]
 # ------------------------------------------------------------------------------------ #
 
@@ -37,7 +39,7 @@ class InfoHandler(logging.StreamHandler):
 class InfoWarning(logging.Filter):
     def filter(self, record:logging.LogRecord) -> bool:
         return record.levelno in [logging.INFO, logging.WARNING]
-    
+
 def logConfig_from_pyproject(file: str| Path) -> None:
     """Reads (same way as logging.config.ConfigFile) logging config from pyproject.toml
     file.
@@ -73,3 +75,15 @@ def logConfig_from_pyproject(file: str| Path) -> None:
         raise KeyError("Logging section not found in tool table. See documentation")
 
     logging.config.dictConfig(tool_table_logging)
+
+def set_logging_level(level:str="WARNING") -> None:
+    logger = logging.getLogger("radiopyo")
+    logger.setLevel(level)
+
+def disable_logging() -> None:
+    logger = logging.getLogger("radiopyo")
+    logger.disabled = True
+
+def enable_logging() -> None:
+    logger = logging.getLogger("radiopyo")
+    logger.disabled = False

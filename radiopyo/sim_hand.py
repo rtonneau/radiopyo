@@ -661,6 +661,10 @@ class ODEResult(object):
         return cls(cell.env, cell.beam, sol)
 
     @property
+    def time(self) -> NDArray[np.float64]:
+        return self.t
+    
+    @property
     def shape(self) -> Tuple:
         return self.y.shape
     
@@ -668,7 +672,7 @@ class ODEResult(object):
     def final_cc(self) -> NDArray[np.float64]:
         """
         """
-        return self.y[:,-1]
+        return copy.copy(self.y[:,-1])
     
     @property
     def initial_cc(self) -> NDArray[np.float64]:
