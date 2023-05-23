@@ -834,12 +834,13 @@ class ODEResult(object):
                 out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
         return out
 
-    def integrate_species(self) -> pd.Series:
+    def integrate_species(self, start:float=0, stop:float=float("inf")) -> pd.Series:
         """ 
         """
         labels = [(elt.label, elt.index) for elt in self.env.species.iter_dyn_species()]
         out = pd.Series(index=[elt[0] for elt in sorted(labels, key=lambda x: x[1])],
                         dtype=np.float64)
+        mask = np.where((self.t>=start)&(self.t<stop))
         for idx in range(len(self.y)):
-            out.iloc[idx] = simpson(y=self.y[idx,:].clip(min=0), x=self.t)
+            out.iloc[idx] = simpson(y=self.y[idx,mask].clip(min=0), x=self.t[mask])
         return out
