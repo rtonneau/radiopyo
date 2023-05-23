@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "radiopyo"
-version = "0.1.0"
+version = "0.3.1"
 authors = [
   { name="Romain Tonneau", email="romain.tonneau@unamur.be" },
 ]
