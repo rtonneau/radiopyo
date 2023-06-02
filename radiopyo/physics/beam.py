@@ -260,8 +260,8 @@ class ParticleBeam():
         n = self.max_dose // self.dose_per_pulse
 
         # Fraction of the last pulse needed to reached max_dose
-        last_frac = (self.max_dose % self.dose_per_pulse) / \
-            self.dose_per_pulse
+        last_frac = round( (self.max_dose % self.dose_per_pulse) / \
+            self.dose_per_pulse, 6)
 
         # if n == 0, max dose reached in less than a single pulse:
         if n <= 0.0:
@@ -503,6 +503,12 @@ class ConstantBeam(ParticleBeam):
                           [stop, 0.0],
                           ])
 
+    def as_dict(self) -> Dict[str, float]:
+       """ """
+       return {"dose_rate":self.dose_rate,
+               "max_dose":self.max_dose,
+               "start_time":self.timer.start_time,
+               }
 
     @classmethod
     def from_dict(cls, param: Dict[str, float]) -> ConstantBeam:
@@ -539,6 +545,13 @@ class SinglePulseBeam(ConstantBeam):
                 f"max_dose={self.max_dose}, "
                 f"start_time={self.timer.start_time})")
 
+    def as_dict(self) -> Dict[str, float]:
+       """ """
+       return {"dose_rate":self.dose_rate,
+               "max_dose":self.max_dose,
+               "start_time":self.timer.start_time,
+               }
+    
     @classmethod
     def from_on_time(cls,
                      dose_rate: float,
@@ -610,6 +623,12 @@ class PulsedBeam(ParticleBeam):
                          Timer.new_pulsed(period, on_time, start_time),
                          max_dose or float("inf"),
                          )
+
+    def tot_pulse(self) -> float:
+        """"""
+        fp = self.time_at_max_dose // self.timer.period
+        out = fp + ((self.time_at_max_dose-fp*self.timer.period) / self.timer.on_time)
+        return round(out, 2)
 
     def make_matrix(self,
                     stop: float,
@@ -702,6 +721,16 @@ class PulsedBeam(ParticleBeam):
 
         return out
 
+    def as_dict(self) -> Dict[str, float]:
+       """ """
+       return {"dose_rate":self.dose_rate,
+               "period":self.timer.period,
+               "on_time":self.timer.on_time,
+               "max_dose":self.max_dose,
+               "start_time":self.timer.start_time,
+               }
+              
+    
     @ classmethod
     def from_peak_dose_rate(cls,
                             peak_dr: float,
@@ -801,9 +830,9 @@ class PulsedBeam(ParticleBeam):
                 start_time=param.get("start_time", None),
                 )
         
-        if "dose_rate_avg" in param:
+        if "dose_rate_avg" in param or "dose_rate" in param:
             return PulsedBeam(
-                param["dose_rate_avg"],
+                dose_rate=param.get("dose_rate_avg", 0.0) or param["dose_rate"],
                 period=param["period"],
                 on_time=param["on_time"],
                 max_dose=param.get("max_dose", None),

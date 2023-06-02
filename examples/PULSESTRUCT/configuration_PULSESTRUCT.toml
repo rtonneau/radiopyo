@@ -4,19 +4,19 @@ pH = 7
 #---------------- Example of pulsed beam defined with peak dose rate -------------------
 [beam.pulsed]
 dose_rate_peak = 300      # Peak dose rate for pulsed beam [Gy/s]
-on_time        = 100e-3   # Time [seconds] (used only for Pulsed beam)
-period         = 60       # Period [seconds]
-n_pulse        = 3
-LET = 7.5      # [keV/µm]
+on_time        = 20e-6    # Time [seconds] (used only for Pulsed beam)
+period         = 200e-3   # Period [seconds]
+n_pulse        = 5
+LET            = 7.5      # [keV/µm]
 
 #---------------------- Definition of Constants concentrations -------------------------
 [concentrations.fixed] # Unit is [mol]/[l]
-H2O = 55
-catalase = 8.0e-8
+H2O          = 55
+catalase     = 8.0e-8
 Fe_plus_plus = 8.9e-7
-GSH = 6.5e-3
-RH = 1
-unsat_lipid = 1e-6
+GSH          = 6.5e-3
+RH           = 1
+unsat_lipid  = 1e-6
 
 #----------------------- Definition of initial concentrations --------------------------
 # Rem: if unspecified, initial cc are assumed 0 (except for constant species)    
