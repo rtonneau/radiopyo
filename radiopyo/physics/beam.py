@@ -170,7 +170,7 @@ class Timer(NamedTuple):
             TimerState: Enum being either isOn or isOff
         """
         if ((time>=self.start_time) and 
-            (time-self.start_time % self.period) <= self.on_time):
+            ((time-self.start_time) % self.period) <= self.on_time):
             return TimerState.isOn
         return TimerState.isOff
     
@@ -707,6 +707,7 @@ class PulsedBeam(ParticleBeam):
                             peak_dr: float,
                             period: float,
                             on_time: float,
+                            n_pulse: Optional[float] = None, 
                             max_dose: Optional[float] = None,
                             start_time: Optional[float] = None,
                             ) -> PulsedBeam:
@@ -719,6 +720,8 @@ class PulsedBeam(ParticleBeam):
                 Pulse period, in seconds
             on_time: float
                 Pulse ON time, in seconds
+            n_pulse: float
+                Total number of pulse
             max_dose: float, optional
                 Max dose to deliver, in Gy (default is None -> inf)
 
@@ -726,11 +729,14 @@ class PulsedBeam(ParticleBeam):
             PulsedBeam
         """
         timer = Timer.new_pulsed(period, on_time,)
+        
+        n_pulse = n_pulse or 0
+        max_dose_n_pulse = on_time*n_pulse*peak_dr
         return cls(
             dose_rate=timer.duty_cycle() * peak_dr,
             period=period,
             on_time=on_time,
-            max_dose=max_dose,
+            max_dose=min(max_dose or float("inf"), max_dose_n_pulse),
             start_time=start_time,
             )
 
@@ -739,6 +745,7 @@ class PulsedBeam(ParticleBeam):
                             pulse_dose: float,
                             period: float,
                             on_time: float,
+                            n_pulse: Optional[float] = None, 
                             max_dose: Optional[float] = None,
                             start_time: Optional[float] = None,
                             ) -> PulsedBeam:
@@ -750,6 +757,8 @@ class PulsedBeam(ParticleBeam):
                 Pulse period, in seconds
             on_time: float
                 Pulse ON time, in seconds
+            n_pulse: float
+                Total number of pulse
             max_dose: float, optional
                 Max dose to deliver, in Gy (default is None -> inf)
 
@@ -760,6 +769,7 @@ class PulsedBeam(ParticleBeam):
             peak_dr=pulse_dose / on_time,
             period=period,
             on_time=on_time,
+            n_pulse=n_pulse,
             max_dose=max_dose,
             start_time=start_time,
             )
@@ -777,6 +787,7 @@ class PulsedBeam(ParticleBeam):
                 param["dose_rate_peak"],
                 period=param["period"],
                 on_time=param["on_time"],
+                n_pulse=param.get("n_pulse", None),
                 max_dose=param.get("max_dose", None),
                 start_time=param.get("start_time", None),
                 )
@@ -785,6 +796,7 @@ class PulsedBeam(ParticleBeam):
                 param["pulse_dose"],
                 period=param["period"],
                 on_time=param["on_time"],
+                n_pulse=param.get("n_pulse", None),
                 max_dose=param.get("max_dose", None),
                 start_time=param.get("start_time", None),
                 )
