@@ -427,7 +427,7 @@ class UnitCell(object):
         chunks[np.where(chunks[:,1]>0)[0], 1] = max_step_size_on
         chunks[np.where(chunks[:,1]==0)[0], 1] = max_step_size_off
         if max_step_size_final is not None:
-            chunks[-1, 1] = max_step_size_final
+            chunks[-2, 1] = max_step_size_final
 
         chunk_list: List[SimChunk] = []
         for idx in range(len(chunks[0:-1, :])):

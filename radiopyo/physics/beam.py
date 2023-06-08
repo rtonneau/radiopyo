@@ -116,7 +116,8 @@ class Timer(NamedTuple):
     @classmethod
     def new_constant(cls, start_time:Optional[float]=None) -> Timer:
         """ Class method to generate an always ON timer"""
-        return cls(float("inf"), float("inf"), start_time or cls._default_start_time())
+        stime = start_time if start_time is not None else cls._default_start_time()
+        return cls(float("inf"), float("inf"), stime)
 
     @classmethod
     def new_pulsed(cls,
@@ -130,7 +131,8 @@ class Timer(NamedTuple):
             on_time: float
                 Time during which timer is ON in seconds. on_time should be <= period.
         """
-        return cls(period, on_time, start_time or cls._default_start_time())
+        stime = start_time if start_time is not None else cls._default_start_time()
+        return cls(period, on_time, stime)
 
     def is_continuous(self) -> bool:
         """ Is timer continuous? 
@@ -194,10 +196,10 @@ class Timer(NamedTuple):
         return self.period - time
     
     def copy(self, start_time:Optional[float]=None) -> Timer:
+        stime = start_time if start_time is not None else Timer._default_start_time()
         return Timer(self.period,
                      self.on_time,
-                     start_time or Timer._default_start_time())
-
+                     stime)
 
 @dataclass
 class ParticleBeam():
@@ -327,7 +329,7 @@ class ParticleBeam():
     def reset(self, start:Optional[float]=None, max_dose:Optional[float]=None) -> None:
         """
         """
-        self.max_dose = max_dose or self.max_dose 
+        self.max_dose = max_dose if max_dose is not None else self.max_dose 
         self.timer = self.timer.copy(start_time=start)
         self.__post_init__()
 
@@ -466,7 +468,7 @@ class ConstantBeam(ParticleBeam):
                  ) -> None:
         super().__init__(dose_rate,
                          Timer.new_constant(start_time),
-                         max_dose = max_dose or float("inf"),
+                         max_dose = max_dose if max_dose is not None else float("inf"),
                          )
 
     def __str__(self) -> str:
@@ -512,10 +514,13 @@ class ConstantBeam(ParticleBeam):
 
     @classmethod
     def from_dict(cls, param: Dict[str, float]) -> ConstantBeam:
-        return ConstantBeam(dose_rate=
-                                param.get("dose_rate_avg", False)
-                                or param.get("dose_rate_peak", False)
-                                or param["dose_rate"],
+        dose_rate = 0.0
+        for key in ["dose_rate", "dose_rate_avg", "dose_rate_peak",]:
+            with suppress(KeyError):
+                dose_rate = param[key]
+                break
+
+        return ConstantBeam(dose_rate=dose_rate,
                             max_dose=param.get("max_dose", None),
                             start_time=param.get("start_time", None))
 
@@ -621,7 +626,7 @@ class PulsedBeam(ParticleBeam):
                  ):
         super().__init__(dose_rate,
                          Timer.new_pulsed(period, on_time, start_time),
-                         max_dose or float("inf"),
+                         max_dose if max_dose is not None else float("inf"),
                          )
 
     def tot_pulse(self) -> float:
@@ -665,9 +670,9 @@ class PulsedBeam(ParticleBeam):
                              [out[-1,0]+self.timer.period, self.peak_dose_rate],
                              ])
         
-        while out[-2, 0] >= end:
-            out = out[:-1,:]
+        out = out[:-1, :]
         out[-1, 0] = end
+
         if end < stop:
             out = np.vstack([out, [stop, 0.0]])
         return out
@@ -759,13 +764,14 @@ class PulsedBeam(ParticleBeam):
         """
         timer = Timer.new_pulsed(period, on_time,)
         
-        n_pulse = n_pulse or 0
+        n_pulse = n_pulse if n_pulse is not None else float("inf")
         max_dose_n_pulse = on_time*n_pulse*peak_dr
+        max_dose = max_dose if max_dose is not None else float("inf")
         return cls(
             dose_rate=timer.duty_cycle() * peak_dr,
             period=period,
             on_time=on_time,
-            max_dose=min(max_dose or float("inf"), max_dose_n_pulse),
+            max_dose=min(max_dose, max_dose_n_pulse),
             start_time=start_time,
             )
 
@@ -832,7 +838,7 @@ class PulsedBeam(ParticleBeam):
         
         if "dose_rate_avg" in param or "dose_rate" in param:
             return PulsedBeam(
-                dose_rate=param.get("dose_rate_avg", 0.0) or param["dose_rate"],
+                dose_rate=param.get("dose_rate_avg", param.get("dose_rate", 0.0)),
                 period=param["period"],
                 on_time=param["on_time"],
                 max_dose=param.get("max_dose", None),
@@ -860,7 +866,7 @@ def beam_from_dict(param: Dict[str, Dict[str, float]],
     if len(param) > 1 :
         raise ParameterError(f"Found more than one beam definition ({param})")
     beam_type, config = param.popitem()
-    
+
     LET:Optional[float] = None
     with suppress(KeyError):
         LET = config.pop("LET")
