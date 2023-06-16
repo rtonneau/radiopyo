@@ -37,6 +37,8 @@ __all__ = [
 #                                 FUNCTION DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
 
+global EPSILON 
+EPSILON = 1e-25 # µmol/L
 
 def jacobian(t: float,
              y: NDArray[np.float64],
@@ -68,7 +70,8 @@ def jacobian(t: float,
             .... |    ....        ....   ....      ....
             ds_i | ds_i/ds_0   ds_i/ds_1 ....    ds_i/ds_j
     """
-    y = y.clip(min=0.0,) * 1e-6
+    y = y.clip(min=0.0, ) * 1e-6
+    
     y = np.append(y, cst_sp)
 
     # K Reactions component
@@ -90,9 +93,8 @@ def jacobian(t: float,
     # Take into account Acid/Base
     Jab = AB_mat[0] + AB_mat[2].sum(axis=1)
     res = np.multiply(res, Jab[None, :])
-
+    #res[np.where(res<=EPSILON)] = 0.0
     return res[:-len(cst_sp), :-len(cst_sp)]
-
 
 def derive(t: float,
            y: NDArray[np.float64],
@@ -118,7 +120,8 @@ def derive(t: float,
     See the RPM_extended_doc.pdf file for a more detailed explanation.
     """
     # Force negative cc values to 0 + convert to [mol/l]
-    y = y.clip(min=0.0,) * 1e-6
+    y = y.clip(min=0.0, ) * 1e-6
+
     y = np.append(y, cst_sp)
 
     # Compute the reaction rate of all k_reactions
@@ -152,6 +155,7 @@ def derive(t: float,
         dydt = dydt + (O2_mat[1]-dydt*O2_mat[0])
 
     # select only the DynSpecies and convert to [µmol/l]
+    #dydt[np.where(dydt<=EPSILON)] = 0.0
     return dydt[:-len(cst_sp)] * 1e6
 
 # ------------------------------------------------------------------------------------ #

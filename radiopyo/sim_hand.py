@@ -243,6 +243,7 @@ class UnitCell(object):
                  use_jac: bool,
                  method: str,
                  atol: float,
+                 rtol: float,
                  max_step: float,
                  y0: Optional[NDArray[np.float64]] = None,
                  t_eval: Optional[NDArray[np.float64]] = None,
@@ -273,6 +274,7 @@ class UnitCell(object):
                                         t_eval=t_eval,
                                         jac=jacobian if use_jac else None,
                                         atol=atol,
+                                        rtol=rtol,
                                         method=method,
                                         max_step=max_step,
                                         first_step=first_step,
@@ -287,6 +289,7 @@ class UnitCell(object):
             use_jac: bool = True,
             method: str = "LSODA",
             atol: float = 1e-8,
+            rtol: float = 1e-8,
             max_step: float = np.inf,
             y0: Optional[NDArray[np.float64]] = None,
             ) -> ODEResult:
@@ -319,6 +322,7 @@ class UnitCell(object):
                             use_jac,
                             method,
                             atol,
+                            rtol,
                             max_step,
                             y0,
                             t_eval,
@@ -332,6 +336,7 @@ class UnitCell(object):
                     use_jac: bool = True,
                     method: str = "LSODA",
                     atol: float = 1e-10,
+                    rtol: float = 1e-10,
                     max_step: float | Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
@@ -376,6 +381,7 @@ class UnitCell(object):
                                 use_jac=use_jac,
                                 method=method,
                                 atol=atol,
+                                rtol=rtol,
                                 max_step=step_size,
                                 t_eval=_t_eval,
                                 )
@@ -387,6 +393,7 @@ class UnitCell(object):
                             use_jac: bool = True,
                             method: str = "LSODA",
                             atol: float = 1e-10,
+                            rtol: float = 1e-10,
                             max_step_size_on: float  = np.inf,
                             max_step_size_off: float = np.inf,
                             max_step_size_final: Optional[float] = None,
@@ -439,6 +446,7 @@ class UnitCell(object):
         return SimChunksIter(sim=self,
                              chunks=chunk_list,
                              atol=atol,
+                             rtol=rtol,
                              use_jac=use_jac,
                              method=method,
                              y0=y0,)
@@ -489,6 +497,7 @@ class SimChunksIter():
     sol: ODEResult
     current: int
     atol: float
+    rtol: float
     use_jac: bool
     method: str
     y0 : Optional[NDArray[np.float64]]
@@ -496,6 +505,7 @@ class SimChunksIter():
     def __init__(self, sim: UnitCell,
                  chunks: List[SimChunk],
                  atol: float = 1e-10,
+                 rtol: float = 1e-10,
                  use_jac: bool = True,
                  method: str = "LSODA",
                  y0: Optional[NDArray[np.float64]] = None,
@@ -504,6 +514,7 @@ class SimChunksIter():
         self.chunks = chunks
         self.sol = ODEResult(self.sim.env, self.sim.beam)
         self.atol = atol
+        self.rtol = rtol
         self.use_jac = use_jac
         self.method = method
         self.current = -1
@@ -523,6 +534,7 @@ class SimChunksIter():
             use_jac=self.use_jac,
             method=self.method,
             atol=self.atol,
+            rtol=self.rtol,
             max_step=chunk.max_step_size,
             y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
         )
