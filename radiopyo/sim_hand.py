@@ -18,6 +18,7 @@ from itertools import chain, repeat
 from typing import (
     TYPE_CHECKING,
     Any,
+    Dict,
     Iterable,
     List,
     NamedTuple,
@@ -242,9 +243,9 @@ class UnitCell(object):
                  t_span: Tuple[float, float],
                  use_jac: bool,
                  method: str,
-                 atol: float,
-                 rtol: float,
-                 max_step: float,
+                 atol: Optional[float] = None,
+                 rtol: Optional[float] = None,
+                 max_step: Optional[float] = None,
                  y0: Optional[NDArray[np.float64]] = None,
                  t_eval: Optional[NDArray[np.float64]] = None,
                  ) -> ScipyODEResult:
@@ -252,17 +253,29 @@ class UnitCell(object):
         if self.beam is NoBeam:
             rp_excep.NoBeamDefinedError("Simulation aborted")
         first_step = self.FIRST_STEP
-        # Check if first step is lower than the defined max_step
-        if first_step >= max_step:
-            first_step = max_step / 10
+        
+        # Building kwargs for solve_ivp:
+        kwargs:Dict[str, Any] = {}
+        kwargs["first_step"] = self.FIRST_STEP
+        kwargs["jac"] = jacobian if use_jac else None
+        if rtol is not None: 
+            kwargs["rtol"] = rtol
+        if atol is not None: 
+            kwargs["atol"] = atol
 
+        kwargs["y0"] = y0
         if y0 is None:
-            y0 = self.env.initial_values()
+            kwargs["y0"] = self.env.initial_values()
+            
+        if max_step is not None:
+            kwargs["max_step"] = max_step
+            # Check if first step is lower than the defined max_step
+            if first_step >= max_step:
+                kwargs["first_step"] = max_step / 10
 
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(derive,
                                         t_span,
-                                        y0,
                                         args=(self.beam,
                                               self.mat["cst_sp"],
                                               self.mat["AB_mat"],
@@ -272,12 +285,8 @@ class UnitCell(object):
                                               self.mat["O2_mat"],
                                               ),
                                         t_eval=t_eval,
-                                        jac=jacobian if use_jac else None,
-                                        atol=atol,
-                                        rtol=rtol,
                                         method=method,
-                                        max_step=max_step,
-                                        first_step=first_step,
+                                        **kwargs
                                         )
         t1 = time.time()
         self.last_exec_time = t1 - t0
@@ -288,9 +297,9 @@ class UnitCell(object):
             t_eval: Optional[NDArray[np.float64]] = None,
             use_jac: bool = True,
             method: str = "LSODA",
-            atol: float = 1e-8,
-            rtol: float = 1e-8,
-            max_step: float = np.inf,
+            atol: Optional[float] = None,
+            rtol: Optional[float] = None,
+            max_step: Optional[float] = None,
             y0: Optional[NDArray[np.float64]] = None,
             ) -> ODEResult:
         """ Solve ODE over t_span
@@ -335,8 +344,8 @@ class UnitCell(object):
                     t_eval: Optional[NDArray[np.float64]] = None,
                     use_jac: bool = True,
                     method: str = "LSODA",
-                    atol: float = 1e-10,
-                    rtol: float = 1e-10,
+                    atol: Optional[float] = None,
+                    rtol: Optional[float] = None,
                     max_step: float | Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
@@ -392,10 +401,10 @@ class UnitCell(object):
                             t_span: Tuple[float, float],
                             use_jac: bool = True,
                             method: str = "LSODA",
-                            atol: float = 1e-10,
-                            rtol: float = 1e-10,
-                            max_step_size_on: float  = np.inf,
-                            max_step_size_off: float = np.inf,
+                            atol: Optional[float] = None,
+                            rtol: Optional[float] = None,
+                            max_step_size_on: Optional[float] = None,
+                            max_step_size_off: Optional[float] = None,
                             max_step_size_final: Optional[float] = None,
                             y0: Optional[NDArray[np.float64]] = None,
                             ) -> SimChunksIter:
@@ -496,16 +505,16 @@ class SimChunksIter():
     chunks: List[SimChunk]
     sol: ODEResult
     current: int
-    atol: float
-    rtol: float
+    atol: Optional[float]
+    rtol: Optional[float]
     use_jac: bool
     method: str
     y0 : Optional[NDArray[np.float64]]
 
     def __init__(self, sim: UnitCell,
                  chunks: List[SimChunk],
-                 atol: float = 1e-10,
-                 rtol: float = 1e-10,
+                 atol: Optional[float] = None,
+                 rtol: Optional[float] = None,
                  use_jac: bool = True,
                  method: str = "LSODA",
                  y0: Optional[NDArray[np.float64]] = None,
