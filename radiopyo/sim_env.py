@@ -100,6 +100,22 @@ class SimEnv():
     bio_param: Dict[str, float]
     initial_cc: Dict[str, float]
 
+    @property
+    def acid_base(self) -> List[ABCouple]:
+        return self.reactions.acid_base
+
+    @property
+    def k_reaction(self) -> List[KReaction]:
+        return self.reactions.k_reaction
+    
+    @property
+    def enzymatic(self) -> List[MichaelisMenten]:
+        return self.reactions.enzymatic
+    
+    @property
+    def radiolytic(self) -> List[RadiolyticReaction]:
+        return self.reactions.radiolytic
+
     def iter_ABCouple(self) -> Iterable[ABCouple]:
         """Get iterable over all A/B couples/reactions"""
         return iter(self.reactions.acid_base)

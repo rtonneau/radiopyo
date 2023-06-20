@@ -31,6 +31,8 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 #                                   CLASS DEFINITIONS                                  #
 # ------------------------------------------------------------------------------------ #
+
+
 class KReaction(BaseChemicalReaction):
     """
     Almost all the logic is already included in the BaseChemicalReaction class.
@@ -62,7 +64,7 @@ class KReaction(BaseChemicalReaction):
 
         Returns:
             str
-            
+
         Raises:
             KeyError
                 If index is None.
@@ -71,6 +73,21 @@ class KReaction(BaseChemicalReaction):
             return f"KR_{self.index}"
         raise KeyError(
             "Unknown reaction index. Cannot make a label without index.")
+
+    def as_equation(self) -> str:
+        """
+        """
+        out = []
+        for sp, stoi in self.iter_reactants():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        out[-1] = "->"
+        for sp, stoi in self.iter_products():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        return " ".join(out[:-1])
 
     @classmethod
     def from_dict(cls,
@@ -142,6 +159,7 @@ class KReaction(BaseChemicalReaction):
         out.append(f", index: {self.index}")
         out.append(">")
         return "".join(out)
+
 
 class KReactionDict(TypedDict):
     reactants: List[str]

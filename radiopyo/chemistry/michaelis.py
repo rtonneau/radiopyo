@@ -65,6 +65,24 @@ class MichaelisMenten(BaseChemicalReaction):
         self.k_value = k_value
         self.k_micha = k_micha
 
+    def as_equation(self) -> str:
+        """
+        """
+        out = []
+        for sp, stoi in self.iter_reactants():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        out[-1] = "--"
+        out.append(f"{self.enzyme.label}")
+        out.append(">>")
+
+        for sp, stoi in self.iter_products():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        return " ".join(out[:-1])
+
     @classmethod
     def from_dict(cls,
                   enzyme: str,
@@ -129,7 +147,7 @@ class MichaelisMenten(BaseChemicalReaction):
 
         Returns:
             str
-            
+
         Raises:
             KeyError
                 If index is None.
@@ -170,6 +188,7 @@ class MichaelisMenten(BaseChemicalReaction):
         out.append(f", index: {self.index}")
         out.append(">")
         return "".join(out)
+
 
 class MichaelisMentenDict(TypedDict):
     enzyme: str
