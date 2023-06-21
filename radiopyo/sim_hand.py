@@ -64,6 +64,8 @@ logger = logging.getLogger("radiopyo")
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
+
+
 class SimMatrices(TypedDict):
     """Convenient TypedDict use to leverage type checking and store matrices used in ODE
     solver."""
@@ -105,6 +107,7 @@ class UnitCell(object):
     beam: ParticleBeam
     last_exec_time: float
     g_val: GValuesBoscolo
+    LET: Optional[float]
 
     def __init__(self,
                  env: SimEnv,
@@ -123,10 +126,10 @@ class UnitCell(object):
         self.beam = beam or NoBeam()
         self.last_exec_time = -1
         self.g_val = GValuesBoscolo()
-
+        self.LET = None
 
     @classmethod
-    def from_config_dict(cls, config:ConfigDict) -> UnitCell:
+    def from_config_dict(cls, config: ConfigDict) -> UnitCell:
         """Create a Simulation Environment from a the generic ConfigDict:
 
         Args:
@@ -146,14 +149,14 @@ class UnitCell(object):
             logger.info("No beam configuration detected")
 
         out = UnitCell(env=SimEnv.from_dict(config),
-                        beam=beam)
-        
+                       beam=beam)
+
         if LET is not None:
             out.change_LET(LET)
         return out
-    
+
     @classmethod
-    def from_parser(cls, file: str|Path, Parser:Type[FileParser]) -> UnitCell:
+    def from_parser(cls, file: str | Path, Parser: Type[FileParser]) -> UnitCell:
         """Create a Simulation Environment from a user defined FileParser.
 
         Args:
@@ -171,7 +174,7 @@ class UnitCell(object):
         return UnitCell.from_config_dict(config)
 
     @classmethod
-    def from_toml(cls, file: str|Path) -> UnitCell:
+    def from_toml(cls, file: str | Path) -> UnitCell:
         """Create a Simulation Environment from a TOML file:
 
         Args:
@@ -184,7 +187,7 @@ class UnitCell(object):
         logger.info(f"Loading config from TOML file: {file}")
         config = TOMLFileParser(file).parse()
         logger.info("File is loaded")
-        return UnitCell.from_config_dict(config)       
+        return UnitCell.from_config_dict(config)
 
     @ classmethod
     def from_ron(cls, file: str | Path) -> UnitCell:
@@ -201,7 +204,7 @@ class UnitCell(object):
         config = RonFileParser(file).parse()
         logger.info("File is loaded")
         return UnitCell.from_config_dict(config)
-    
+
     def set_beam(self, beam: ParticleBeam) -> None:
         """Define Radiation Source structure/parameters
 
@@ -225,7 +228,8 @@ class UnitCell(object):
         Returns:
             None
         """
-        logger.info(f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
+        logger.info(
+            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
             if sp.label not in self.g_val or isinstance(sp, CstSpecies):
@@ -234,6 +238,7 @@ class UnitCell(object):
 
         # Recompute the Gi_mat accordingly
         self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
+        self.LET = let
 
         logger.debug("New G values [radical / 100eV / incident particle] are:")
         for reaction in self.env.reactions.radiolytic:
@@ -253,20 +258,20 @@ class UnitCell(object):
         if self.beam is NoBeam:
             rp_excep.NoBeamDefinedError("Simulation aborted")
         first_step = self.FIRST_STEP
-        
+
         # Building kwargs for solve_ivp:
-        kwargs:Dict[str, Any] = {}
+        kwargs: Dict[str, Any] = {}
         kwargs["first_step"] = self.FIRST_STEP
         kwargs["jac"] = jacobian if use_jac else None
-        if rtol is not None: 
+        if rtol is not None:
             kwargs["rtol"] = rtol
-        if atol is not None: 
+        if atol is not None:
             kwargs["atol"] = atol
 
         kwargs["y0"] = y0
         if y0 is None:
             kwargs["y0"] = self.env.initial_values()
-            
+
         if max_step is not None:
             kwargs["max_step"] = max_step
             # Check if first step is lower than the defined max_step
@@ -337,7 +342,7 @@ class UnitCell(object):
                             t_eval,
                             )
         logger.info("Simulation done!")
-        return ODEResult(self.env, self.beam, sol)
+        return ODEResult(self.env, self.beam, self.LET, sol)
 
     def run_chunked(self,
                     t_chunks: NDArray[np.float64],
@@ -349,7 +354,7 @@ class UnitCell(object):
                     max_step: float | Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
-        sol = ODEResult(self.env, self.beam)
+        sol = ODEResult(self.env, self.beam, self.LET)
 
         # Check up max_step
         if isinstance(max_step, float):
@@ -440,8 +445,8 @@ class UnitCell(object):
             logger.error("No beam is defined for the simulation")
             raise rp_excep.NoBeamDefinedError
         chunks = self.beam.make_time_intervals(start=t_span[0], stop=t_span[1])
-        chunks[np.where(chunks[:,1]>0)[0], 1] = max_step_size_on
-        chunks[np.where(chunks[:,1]==0)[0], 1] = max_step_size_off
+        chunks[np.where(chunks[:, 1] > 0)[0], 1] = max_step_size_on
+        chunks[np.where(chunks[:, 1] == 0)[0], 1] = max_step_size_off
         if max_step_size_final is not None:
             chunks[-2, 1] = max_step_size_final
 
@@ -509,7 +514,7 @@ class SimChunksIter():
     rtol: Optional[float]
     use_jac: bool
     method: str
-    y0 : Optional[NDArray[np.float64]]
+    y0: Optional[NDArray[np.float64]]
 
     def __init__(self, sim: UnitCell,
                  chunks: List[SimChunk],
@@ -521,7 +526,7 @@ class SimChunksIter():
                  ):
         self.sim = sim
         self.chunks = chunks
-        self.sol = ODEResult(self.sim.env, self.sim.beam)
+        self.sol = ODEResult(self.sim.env, self.sim.beam, self.sim.LET)
         self.atol = atol
         self.rtol = rtol
         self.use_jac = use_jac
@@ -565,23 +570,23 @@ class SimChunksIter():
         try:
             from tqdm import tqdm  # type: ignore[import]
             with suppress(NameError):
-                gip = get_ipython()  # type: ignore[name-defined] # noqa: F821 
-                if (gip.__class__.__name__ == "ZMQInteractiveShell"): 
+                gip = get_ipython()  # type: ignore[name-defined] # noqa: F821
+                if (gip.__class__.__name__ == "ZMQInteractiveShell"):
                     from tqdm.notebook import tqdm  # type: ignore[import] # noqa: F811
-            #Perform Simulation with TQDM.
-            sim = tqdm(self)            
+            # Perform Simulation with TQDM.
+            sim = tqdm(self)
         except ImportError:
             sim = self
-        
+
         # Efficient way to consume the iterator while returning the last element.
         res = collections.deque(sim, maxlen=1).pop()
         logger.info("Simulation done!")
         return res
 
     def subdivide_last_chunk(self,
-                             n:int,
-                             max_step_size:Optional[float]=None,
-                             scale:str="log",
+                             n: int,
+                             max_step_size: Optional[float] = None,
+                             scale: str = "log",
                              ) -> SimChunksIter:
         last = self.chunks.pop()
         if max_step_size is None or max_step_size < last.max_step_size:
@@ -589,14 +594,14 @@ class SimChunksIter():
 
         if scale == "linear":
             chunks = np.linspace(last.start, last.stop, num=n+1)
-            steps  =  np.linspace(last.max_step_size, max_step_size, num=n)
+            steps = np.linspace(last.max_step_size, max_step_size, num=n)
         elif scale == "log":
             chunks = np.logspace(np.log10(last.start),
                                  np.log10(last.stop),
                                  num=n+1)
-            steps  =  np.logspace(np.log10(last.max_step_size),
-                                  np.log10(max_step_size),
-                                  num=n)
+            steps = np.logspace(np.log10(last.max_step_size),
+                                np.log10(max_step_size),
+                                num=n)
 
         for idx in range(n):
             self.chunks.append(SimChunk(chunks[idx],
@@ -604,6 +609,7 @@ class SimChunksIter():
                                         steps[idx],
                                         ))
         return self
+
 
 class ODEResult(object):
     """
@@ -613,6 +619,7 @@ class ODEResult(object):
     # Keep track of the original sim env
     env: SimEnv
     beam: ParticleBeam
+    LET: Optional[float]
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -634,10 +641,12 @@ class ODEResult(object):
     def __init__(self,
                  env: SimEnv,
                  beam: ParticleBeam,
+                 let: Optional[float],
                  sol: Optional[ScipyODEResult] = None,
                  ) -> None:
         self.env = copy.deepcopy(env)
         self.beam = copy.deepcopy(beam)
+        self.LET = let
         self._default_init()
         if sol is not None:
             self.append_sol(sol)
@@ -646,7 +655,7 @@ class ODEResult(object):
         """Number of simulation run"""
         return len(self.n_points)
 
-    def __add__(self, other:Any) -> ODEResult:
+    def __add__(self, other: Any) -> ODEResult:
         """ """
         # Sanity checks
         if not isinstance(other, ODEResult):
@@ -657,7 +666,7 @@ class ODEResult(object):
         if other.y.shape[0] != self.y.shape[0]:
             raise TypeError("Trying to add ODEResults with different number of tracked"
                             "species")
-                            
+
         # Combine all together
         self.t = np.append(self.t, other.t)
         self.y = np.hstack([self.y, other.y])
@@ -679,28 +688,28 @@ class ODEResult(object):
                   cell: UnitCell,
                   sol: Optional[ScipyODEResult] = None,
                   ) -> ODEResult:
-        return cls(cell.env, cell.beam, sol)
+        return cls(cell.env, cell.beam, cell.LET, sol)
 
     @property
     def time(self) -> NDArray[np.float64]:
         return self.t
-    
+
     @property
     def shape(self) -> Tuple:
         return self.y.shape
-    
+
     @property
     def final_cc(self) -> NDArray[np.float64]:
         """
         """
-        return copy.copy(self.y[:,-1])
-    
+        return copy.copy(self.y[:, -1])
+
     @property
     def initial_cc(self) -> NDArray[np.float64]:
         """
         """
         return self.env.initial_values(all=True)
-    
+
     def _default_init(self) -> None:
         self.t = np.array([], dtype=np.float64)
         self.y = np.array([], dtype=np.float64)
@@ -732,10 +741,11 @@ class ODEResult(object):
         self.exec_time.append(exec_time)
 
     # --------------------------------- Utils methods -------------------------------- #
-    def to_pandas(self, clip:bool=True) -> pd.DataFrame:
+    def to_pandas(self, clip: bool = True) -> pd.DataFrame:
         """
         """
-        labels = [(elt.label, elt.index) for elt in self.env.species.iter_dyn_species()]
+        labels = [(elt.label, elt.index)
+                  for elt in self.env.species.iter_dyn_species()]
         labels = sorted(labels, key=lambda x: x[1])
         return pd.DataFrame(index=self.t,
                             columns=[elt[0] for elt in labels],
@@ -855,13 +865,18 @@ class ODEResult(object):
                 out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
         return out
 
-    def integrate_species(self, start:float=0, stop:float=float("inf")) -> pd.Series:
+    def integrate_species(self,
+                          start: float = 0,
+                          stop: float = float("inf"),
+                          ) -> pd.Series:
         """ 
         """
-        labels = [(elt.label, elt.index) for elt in self.env.species.iter_dyn_species()]
+        labels = [(elt.label, elt.index)
+                  for elt in self.env.species.iter_dyn_species()]
         out = pd.Series(index=[elt[0] for elt in sorted(labels, key=lambda x: x[1])],
                         dtype=np.float64)
-        mask = np.where((self.t>=start)&(self.t<stop))
+        mask = np.where((self.t >= start) & (self.t < stop))
         for idx in range(len(self.y)):
-            out.iloc[idx] = simpson(y=self.y[idx,mask].clip(min=0), x=self.t[mask])
+            out.iloc[idx] = simpson(
+                y=self.y[idx, mask].clip(min=0), x=self.t[mask])
         return out

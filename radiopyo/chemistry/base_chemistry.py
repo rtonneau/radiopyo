@@ -64,6 +64,9 @@ class IsChemicalReaction(Protocol):
     def has_reactant(self, product: SimSpecies | str) -> int:
         """"""
 
+    def make_hash(self, method: str) -> str:
+        """"""
+
 
 class BaseChemicalReaction():
     """
@@ -111,6 +114,11 @@ class BaseChemicalReaction():
         """
         if isinstance(other, (str, RawSpecies)):
             return len([elt for elt in self.iter_species() if elt == other]) > 0
+        raise NotImplementedError
+
+    def make_hash(self, method: str = "sha256") -> str:
+        """
+        """
         raise NotImplementedError
 
     def tot_number_reactants(self) -> int:

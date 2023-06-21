@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import hashlib
 from typing import (
     TYPE_CHECKING,
     List,
@@ -65,23 +66,12 @@ class MichaelisMenten(BaseChemicalReaction):
         self.k_value = k_value
         self.k_micha = k_micha
 
-    def as_equation(self) -> str:
+    def make_hash(self, method: str = "sha256") -> str:
         """
         """
-        out = []
-        for sp, stoi in self.iter_reactants():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_+f"{sp.label}")
-            out.append("+")
-        out[-1] = "--"
-        out.append(f"{self.enzyme.label}")
-        out.append(">>")
-
-        for sp, stoi in self.iter_products():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_+f"{sp.label}")
-            out.append("+")
-        return " ".join(out[:-1])
+        hasher = hashlib.new(method, usedforsecurity=False)
+        hasher.update(repr(self).encode())
+        return hasher.hexdigest()
 
     @classmethod
     def from_dict(cls,
@@ -157,37 +147,23 @@ class MichaelisMenten(BaseChemicalReaction):
         raise KeyError("Unknown reaction index. Cannot make a label.")
 
     def __str__(self) -> str:
-        out = ""
-        for idx, (elt, stoi) in enumerate(self.iter_reactants()):
-            if idx > 0:
-                out += " + "
-            if stoi > 1:
-                out += f"{stoi} {elt.label}"
-            else:
-                out += f"{elt.label}"
-        out += " -> "
-        for idx, (elt, stoi) in enumerate(self.iter_products()):
-            if idx > 0:
-                out += " + "
-            if stoi > 1:
-                out += f"{stoi} {elt.label}"
-            else:
-                out += f"{elt.label}"
-        return out
+        out = []
+        for sp, stoi in self.iter_reactants():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        out[-1] = "--"
+        out.append(f"{self.enzyme.label}")
+        out.append(">>")
+
+        for sp, stoi in self.iter_products():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        return " ".join(out[:-1])
 
     def __repr__(self) -> str:
-        out = ["KReaction<Reactants:["]
-        for (elt, stoi) in self.iter_reactants():
-            out.append(f"{elt.label},"*stoi)
-        out[-1] = out[-1].strip(",")
-        out.append("], Products:[")
-        for (elt, stoi) in self.iter_products():
-            out.append(f"{elt.label},"*stoi)
-        out[-1] = out[-1].strip(",")
-        out.append(f"], kValue: {self.k_value:.2e}")
-        out.append(f", index: {self.index}")
-        out.append(">")
-        return "".join(out)
+        return "MichaelisMenten('"+self.__str__()+"')"
 
 
 class MichaelisMentenDict(TypedDict):

@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import hashlib
 from typing import (
     TYPE_CHECKING,
     List,
@@ -55,6 +56,13 @@ class KReaction(BaseChemicalReaction):
         super().__init__()
         self.k_value = k_value
 
+    def make_hash(self, method: str = "sha256") -> str:
+        """
+        """
+        hasher = hashlib.new(method, usedforsecurity=False)
+        hasher.update(repr(self).encode())
+        return hasher.hexdigest()
+
     def as_label(self) -> str:
         """
         This method is used for the data mining. It should be implemented by child
@@ -73,21 +81,6 @@ class KReaction(BaseChemicalReaction):
             return f"KR_{self.index}"
         raise KeyError(
             "Unknown reaction index. Cannot make a label without index.")
-
-    def as_equation(self) -> str:
-        """
-        """
-        out = []
-        for sp, stoi in self.iter_reactants():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_+f"{sp.label}")
-            out.append("+")
-        out[-1] = "->"
-        for sp, stoi in self.iter_products():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_+f"{sp.label}")
-            out.append("+")
-        return " ".join(out[:-1])
 
     @classmethod
     def from_dict(cls,
@@ -128,37 +121,20 @@ class KReaction(BaseChemicalReaction):
         return new
 
     def __str__(self) -> str:
-        out = ""
-        for idx, (elt, stoi) in enumerate(self.iter_reactants()):
-            if idx > 0:
-                out += " + "
-            if stoi > 1:
-                out += f"{stoi} {elt.label}"
-            else:
-                out += f"{elt.label}"
-        out += " -> "
-        for idx, (elt, stoi) in enumerate(self.iter_products()):
-            if idx > 0:
-                out += " + "
-            if stoi > 1:
-                out += f"{stoi} {elt.label}"
-            else:
-                out += f"{elt.label}"
-        return out
+        out = []
+        for sp, stoi in self.iter_reactants():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        out[-1] = "->"
+        for sp, stoi in self.iter_products():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_+f"{sp.label}")
+            out.append("+")
+        return " ".join(out[:-1])
 
     def __repr__(self) -> str:
-        out = ["KReaction<Reactants:["]
-        for (elt, stoi) in self.iter_reactants():
-            out.append(f"{elt.label},"*stoi)
-        out[-1] = out[-1].strip(",")
-        out.append("], Products:[")
-        for (elt, stoi) in self.iter_products():
-            out.append(f"{elt.label},"*stoi)
-        out[-1] = out[-1].strip(",")
-        out.append(f"], kValue: {self.k_value:.2e}")
-        out.append(f", index: {self.index}")
-        out.append(">")
-        return "".join(out)
+        return "KReaction('"+self.__str__()+"')"
 
 
 class KReactionDict(TypedDict):

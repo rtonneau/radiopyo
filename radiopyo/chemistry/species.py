@@ -82,7 +82,7 @@ class DynSpecies(RawSpecies):
         self.cc_init = cc_init
 
     def __str__(self) -> str:
-        return f"SimSpecies<{self.label}, index={self.index}>"
+        return f"DynSpecies('{self.label}')"
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -108,10 +108,7 @@ class CstSpecies(RawSpecies):
         self.cc_value = cc
 
     def __str__(self) -> str:
-        return (f"CstSpecies<{self.label}, "
-                f"cc={self.cc_value:.1g}, "
-                f"index= {self.index}"
-                f">")
+        return (f"CstSpecies('{self.label}', cc='{self.cc_value}')")
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -350,7 +347,7 @@ class ListSpecies():
             Iterator(CstSpecies) 
         """
         return map(op.itemgetter(1),
-                   sorted(self.cst_sp.items(), key=lambda x: x[1].index)) 
+                   sorted(self.cst_sp.items(), key=lambda x: x[1].index))
 
     def sorted_iter_dyn_species(self) -> Iterable[DynSpecies]:
         """
@@ -360,8 +357,8 @@ class ListSpecies():
             Iterator(DynSpecies) 
         """
         return map(op.itemgetter(1),
-                   sorted(self.dyn_sp.items(), key=lambda x: x[1].index)) 
-    
+                   sorted(self.dyn_sp.items(), key=lambda x: x[1].index))
+
     def iter_cst_species(self) -> Iterable[CstSpecies]:
         """
         Get an iterator over all the CstSpecies (not ordered).

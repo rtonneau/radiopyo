@@ -10,6 +10,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import hashlib
 import logging
 from contextlib import suppress
 from dataclasses import dataclass
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
     from .chemistry.michaelis import MichaelisMentenDict
     from .chemistry.radiolytic import RadiolyticReactionDict
     from .sim_types import ConfigDict
-    
+
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",
            ]
@@ -55,6 +56,8 @@ logger = logging.getLogger("radiopyo")
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
+
+
 @dataclass
 class ReactionsList:
     """Collection class to store all reactions and apply some changes on its 
@@ -78,6 +81,12 @@ class ReactionsList:
                                     self.radiolytic,
                                     self.enzymatic])
 
+    def iter_all(self) -> Iterable[IsChemicalReaction | ABCouple]:
+        return chain.from_iterable([self.k_reaction,
+                                    self.radiolytic,
+                                    self.enzymatic,
+                                    self.acid_base])
+
 
 @ dataclass
 class SimEnv():
@@ -93,12 +102,23 @@ class SimEnv():
             Dictionary with some biological parameter like pH
         initial_cc: Dict[str, float]
             Dictionary with the initial concentration of some species
-
     """
     reactions: ReactionsList
     species: ListSpecies
     bio_param: Dict[str, float]
     initial_cc: Dict[str, float]
+
+    def make_hash(self, method: str = "sha256") -> str:
+        """
+        """
+        hasher = hashlib.new(method, usedforsecurity=False)
+        hasher.update(repr(frozenset(self.bio_param.items())).encode())
+        hasher.update(repr(frozenset(self.initial_cc.items())).encode())
+        for species in self.species:
+            hasher.update(repr(species).encode())
+        for reaction in self.reactions.iter_all():
+            hasher.update(repr(reaction).encode())
+        return hasher.hexdigest()
 
     @property
     def acid_base(self) -> List[ABCouple]:
@@ -107,11 +127,11 @@ class SimEnv():
     @property
     def k_reaction(self) -> List[KReaction]:
         return self.reactions.k_reaction
-    
+
     @property
     def enzymatic(self) -> List[MichaelisMenten]:
         return self.reactions.enzymatic
-    
+
     @property
     def radiolytic(self) -> List[RadiolyticReaction]:
         return self.reactions.radiolytic
@@ -148,8 +168,8 @@ class SimEnv():
             logger.warn("CONFIG::No concentration section found in config. It means, no"
                         " species with constant concentration and all initial"
                         " set to 0.")
-            config["concentrations"] = {"fixed":{}, "initial":{}}
-        
+            config["concentrations"] = {"fixed": {}, "initial": {}}
+
         # Sanity check
         if len(config["concentrations"]) > 2:
             extra = [elt for elt in config["concentrations"]
@@ -158,17 +178,18 @@ class SimEnv():
                         f"section: {extra}. These will not be used.")
 
         # Read Constant species
-        list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
+        list_sp = constant_species_from_dict(
+            config["concentrations"].get("fixed", {}))
 
         # Read bio param
         bio_param = config.get("bio_param", {})
         if "pH" not in bio_param:
             logger.warning(
                 "CONFIG::pH is not defined in bio_param! Assuming pH=7",
-                )
+            )
             bio_param["pH"] = 7
-                
-        #Copy initial cc and strip species name on the fly.
+
+        # Copy initial cc and strip species name on the fly.
         initial_cc = {}
         for key, cc in config["concentrations"].get("initial", {}).items():
             initial_cc[key.strip()] = cc
@@ -184,7 +205,7 @@ class SimEnv():
                            "configuration")
             config["reactions"] = {"acid_base": [], "k_reaction": [],
                                    "enzymatic": [], "radiolytic": {}}
-        
+
         # Read Acid/Base Reactions
         ab, list_sp = acid_base_from_dict(config["reactions"].get("acid_base", []),
                                           list_sp)
@@ -219,8 +240,10 @@ class SimEnv():
         # Sort species so that all constant species are at the end.
         list_sp.sort(inplace=True)
 
-        logger.info(f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
-        logger.info(f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
+        logger.info(
+            f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
+        logger.info(
+            f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
         logger.info("CONFIG::Simulation Configuration done!")
         return cls(reactions=ReactionsList(ab, kr, enz, rad),
                    species=list_sp,
@@ -247,7 +270,8 @@ class SimEnv():
             out_cst = np.zeros(
                 self.species.len_cst_species(), dtype=np.float64)
             for cst_species in self.species.iter_cst_species():
-                out_cst[cst_species.index-len(out_dyn)] = cst_species.initial_cc()*1e6
+                out_cst[cst_species.index -
+                        len(out_dyn)] = cst_species.initial_cc()*1e6
         return np.append(out_dyn, out_cst)
 
     def species_labels(self) -> List[str]:
@@ -257,9 +281,9 @@ class SimEnv():
             List[str]
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
-    
+
     def make_O2_intake_matrix(self) -> Optional[Tuple[NDArray[np.float64],
-                                             NDArray[np.float64],]]:
+                                                      NDArray[np.float64],]]:
         """ 
         Add here all terms related to environment interaction like O2 intake.
         """
@@ -271,11 +295,11 @@ class SimEnv():
             return None
 
         print("O2 intake enabled")
-        cell_memb_th = 10e-9 # Cell membrane thickness
-        cell_rad = 20e-6 # cell radius in µm
+        cell_memb_th = 10e-9  # Cell membrane thickness
+        cell_rad = 20e-6  # cell radius in µm
         cell_surf = 4 * np.pi * cell_rad * cell_rad
         cell_vol = cell_surf * cell_rad / 3
-        O2_diff = 1.7e-5*1e-4 # m²/s
+        O2_diff = 1.7e-5*1e-4  # m²/s
         x = O2_diff / cell_memb_th * cell_surf * Avogadro * 1e3 / cell_vol
         x = O2_diff / cell_vol / cell_memb_th
 
@@ -502,9 +526,11 @@ class SimEnv():
 # ------------------------------------------------------------------------------------ #
 #                                 FUNCTION DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
+
+
 def acid_base_from_dict(reactions: List[ABDict],
                         sim_sp: Optional[ListSpecies] = None,
-                        )-> Tuple[List[ABCouple], ListSpecies]:
+                        ) -> Tuple[List[ABCouple], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
@@ -512,9 +538,10 @@ def acid_base_from_dict(reactions: List[ABDict],
             for reaction in reactions],
             sim_sp)
 
+
 def kreaction_from_dict(reactions: List[KReactionDict],
                         sim_sp: Optional[ListSpecies] = None,
-                        )-> Tuple[List[KReaction], ListSpecies]:
+                        ) -> Tuple[List[KReaction], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
@@ -522,9 +549,10 @@ def kreaction_from_dict(reactions: List[KReactionDict],
             for reaction in reactions],
             sim_sp)
 
+
 def michaelis_from_dict(reactions: List[MichaelisMentenDict],
                         sim_sp: Optional[ListSpecies] = None,
-                        )-> Tuple[List[MichaelisMenten], ListSpecies]:
+                        ) -> Tuple[List[MichaelisMenten], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
@@ -532,9 +560,10 @@ def michaelis_from_dict(reactions: List[MichaelisMentenDict],
             for reaction in reactions],
             sim_sp)
 
+
 def radiolytic_from_dict(reactions: RadiolyticReactionDict,
-                        sim_sp: Optional[ListSpecies] = None,
-                        )-> Tuple[List[RadiolyticReaction], ListSpecies]:
+                         sim_sp: Optional[ListSpecies] = None,
+                         ) -> Tuple[List[RadiolyticReaction], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
@@ -542,7 +571,8 @@ def radiolytic_from_dict(reactions: RadiolyticReactionDict,
             for product, ge in reactions.items()],
             sim_sp)
 
-def constant_species_from_dict(species:Dict[str,float],
+
+def constant_species_from_dict(species: Dict[str, float],
                                sim_sp: Optional[ListSpecies] = None,
                                ) -> ListSpecies:
     if sim_sp is None:
@@ -550,4 +580,3 @@ def constant_species_from_dict(species:Dict[str,float],
     for sp, cc in species.items():
         sim_sp.add_cst_species(sp.strip(), cc)
     return sim_sp
-

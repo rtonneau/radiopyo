@@ -14,6 +14,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import hashlib
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -78,6 +79,17 @@ class RadiolyticReaction(BaseChemicalReaction):
         super().__init__()
         self._reaction_cst = reaction_cst  # [mol/l/Gy]
 
+    def make_hash(self, method: str = "sha256") -> str:
+        """
+        The G value is not included in the hash. The aim is to have a single hash for
+        two radiolytic reactions of the same species even for different Gvalue. The LET
+        or actual Gvalue should be given sideway.
+        (Therefore it limits the number of entries in the database)
+        """
+        hasher = hashlib.new(method, usedforsecurity=False)
+        hasher.update(repr(self).encode())
+        return hasher.hexdigest()
+
     def species(self) -> SimSpecies:
         return self.products[self.label()]
 
@@ -95,10 +107,10 @@ class RadiolyticReaction(BaseChemicalReaction):
 
     @classmethod
     def from_dict(cls,
-                      product: str,
-                      ge: float,
-                      list_sp: ListSpecies,
-                      ) -> RadiolyticReaction:
+                  product: str,
+                  ge: float,
+                  list_sp: ListSpecies,
+                  ) -> RadiolyticReaction:
         """Create a RadiolyticReaction from a dictionary (via destructuring)
 
         Args:
@@ -141,13 +153,10 @@ class RadiolyticReaction(BaseChemicalReaction):
         raise KeyError("Unknown reaction index. Cannot make a label.")
 
     def __str__(self) -> str:
-        return (f"Radiolytic<"
-                f"{self.label()}, "
-                f"Ge:{self.ge():.2f}, "
-                f"index:{self.index}"
-                ">")
+        return (f"RadiolyticReaction('{self.label()}')")
 
     def __repr__(self) -> str:
         return self.__str__()
+
 
 RadiolyticReactionDict = Dict[str, float]

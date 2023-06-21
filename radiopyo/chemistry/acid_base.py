@@ -8,6 +8,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING, NamedTuple, TypedDict
 
 # --------------------------------- Internal imports --------------------------------- #
@@ -100,6 +101,13 @@ class ABCouple():
         self.acid = acid
         self.base = base
 
+    def make_hash(self, method: str = "sha256") -> str:
+        """
+        """
+        hasher = hashlib.new(method, usedforsecurity=False)
+        hasher.update(repr(self).encode())
+        return hasher.hexdigest()
+
     @classmethod
     def from_dict(cls,
                   acid: str,
@@ -152,12 +160,13 @@ class ABCouple():
         )
 
     def __str__(self) -> str:
-        return f"{self.acid.label}/{self.base.label}"
+        return f"ABCouple('{self.acid}', '{self.base}', pKa={self.pKa})"
 
     def __repr__(self) -> str:
-        return f"AcidBase<{self.acid}, {self.base}, pKa: {self.pKa}>"
+        return self.__str__()
+
 
 class ABDict(TypedDict):
-    acid:str
-    base:str
-    pKa:float
+    acid: str
+    base: str
+    pKa: float
