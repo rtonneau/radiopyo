@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import collections
 import copy
+import datetime
 import logging
 import time
 from contextlib import suppress
@@ -620,6 +621,7 @@ class ODEResult(object):
     env: SimEnv
     beam: ParticleBeam
     LET: Optional[float]
+    start_time: datetime.datetime
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -644,6 +646,7 @@ class ODEResult(object):
                  let: Optional[float],
                  sol: Optional[ScipyODEResult] = None,
                  ) -> None:
+        self.start_time = datetime.datetime.now()
         self.env = copy.deepcopy(env)
         self.beam = copy.deepcopy(beam)
         self.LET = let
