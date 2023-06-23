@@ -51,7 +51,7 @@ k_value = 1.1e10
 [[reactions.k_reaction]] # 3) e_aq + H_r -> H2 + OH_minus   
 reactants = ["e_aq", "H_r"]
 products = ["H2", "OH_minus"]
-k_value = 1.1e10
+k_value = 2.5e10
     
 [[reactions.k_reaction]] # 4) e_aq + OH_r -> OH_minus
 reactants = ["e_aq", "OH_r",]
@@ -138,7 +138,7 @@ k_value = 4.2e7
 [[reactions.k_reaction]]  # 20) OH_r + OH_Minus -> O_r_minus + H2O
 reactants = ["OH_r", "OH_minus",]
 products = ["O_r_minus", "H2O",]
-k_value = 4.2e7
+k_value = 1.3e7
 
 [[reactions.k_reaction]]  # 21) OH_r + HO2_minus -> OH_minus + HO2_r
 reactants = ["OH_r", "HO2_minus",]
@@ -165,3 +165,8 @@ k_value = 3.6e9
 reactants = ["O_r_minus", "O2_r_minus",]
 products = ["OH_minus", "OH_minus"," O2",]
 k_value = 6.0e8
+
+[[reactions.k_reaction]]  
+reactants = ["O2_r_minus", "O2_r_minus",]
+products = ["H2O2", "O2",]
+k_value = 2e5

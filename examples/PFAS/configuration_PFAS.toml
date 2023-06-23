@@ -1,13 +1,11 @@
 [includes]
 toml = ["radiopyo/basic_water_radiolysis.toml"]
 
-[bio_param]
-pH = 7
-
 #---------------- Example of pulsed beam defined with peak dose rate -------------------
 [beam.constant]
-dose_rate      = 300       # Peak dose rate for pulsed beam [Gy/s]
-LET = 7.5      # [keV/µm]
+dose_rate  = 20e3     # Peak dose rate for pulsed beam [Gy/s]
+max_dose   = 2000e3   # Max Dose in [Gy]
+LET        = 7.5      # [keV/µm]
 
 #---------------------- Definition of Constants concentrations -------------------------
 [concentrations.fixed] # Unit is [mol]/[l]
@@ -16,13 +14,7 @@ H2O = 55
 #----------------------- Definition of initial concentrations --------------------------
 # Rem: if unspecified, initial cc are assumed 0 (except for constant species)    
 [concentrations.initial] # Unit is [mol]/[l]
-O2 = 50e-6
-
-#  --------------------------- Biological Reactions --------------------------------
-[[reactions.k_reaction]]  # 27) Same but Spontaneous reaction (no SOD involved)
-reactants = ["O2_r_minus", "O2_r_minus",]
-products = ["H2O2", "O2",]
-k_value = 2e5
+O2 = 250e-6
 
 # ----------------------------- PFAS related reactions ----------------------------- 
 [[reactions.k_reaction]] 
