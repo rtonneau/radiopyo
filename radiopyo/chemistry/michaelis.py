@@ -10,18 +10,15 @@ Author:
 from __future__ import annotations
 
 import hashlib
-from typing import (
-    TYPE_CHECKING,
-    List,
-    TypedDict,
-)
+import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
 from .base_chemistry import BaseChemicalReaction
+from .species import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
-    from .species import ListSpecies, SimSpecies
+if tp.TYPE_CHECKING:
+    from .species import SimSpecies
 
 # ------------------------------------------------------------------------------------ #
 
@@ -76,11 +73,11 @@ class MichaelisMenten(BaseChemicalReaction):
     @classmethod
     def from_dict(cls,
                   enzyme: str,
-                  substrate: List[str] | str,
-                  products: List[str],
+                  substrate: tp.List[str] | str,
+                  products: tp.List[str],
                   k_value: float,
                   k_micha: float,
-                  list_sp: ListSpecies,
+                  list_sp: tp.Optional[ListSpecies] = None,
                   ) -> MichaelisMenten:
         """Create a MichaelisMenten from a dictionary (via destructuring)
 
@@ -109,6 +106,9 @@ class MichaelisMenten(BaseChemicalReaction):
                 if more than one substrate "kind" if defined.
         """
         new = cls(k_value, k_micha)
+        # Allow shallow creation (outside of a simulation env)
+        if list_sp is None:
+            list_sp = ListSpecies()
 
         new.enzyme = list_sp.get_or_create_cst_species(enzyme.strip())
         if isinstance(substrate, str):
@@ -168,9 +168,9 @@ class MichaelisMenten(BaseChemicalReaction):
                 f"k_micha={round(self.k_micha, 5)}")
 
 
-class MichaelisMentenDict(TypedDict):
+class MichaelisMentenDict(tp.TypedDict):
     enzyme: str
-    substrate: List[str] | str
-    products: List[str]
+    substrate: tp.List[str] | str
+    products: tp.List[str]
     k_value: float
     k_micha: float

@@ -161,9 +161,7 @@ class UnitCell(object):
             UnitCell
         """
         logger.info(f"Loading config from file: {file}")
-        config = Parser(file).parse()
-        include = resolve_includes(config["includes"])
-        config = include | config  # Merging the two dictionaries
+        config = resolve_includes(Parser(file).parse())
         logger.info("File is loaded")
         return UnitCell.from_config_dict(config)
 

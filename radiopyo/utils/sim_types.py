@@ -12,6 +12,10 @@ from __future__ import annotations
 
 import typing as tp
 
+from radiopyo.chemistry.acid_base import ABCouple
+from radiopyo.chemistry.k_reactions import KReaction
+from radiopyo.chemistry.michaelis import MichaelisMenten
+
 # --------------------------------- Internal imports --------------------------------- #
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
@@ -83,8 +87,57 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     root["concentrations"]["initial"] |= other["concentrations"]["initial"]
 
     # Update reactions
+    #  => Radiolytic
     root["reactions"]["radiolytic"] |= other["reactions"]["radiolytic"]
+
+    # => Acid Base
+    r_root = {}
+    for idx, _ in enumerate(root["reactions"]["acid_base"]):
+        _ = ABCouple.from_dict(**_)
+        r_root[str(_)] = (_, idx)
+    to_add = []
+    for _ in other["reactions"]["acid_base"]:
+        ar = ABCouple.from_dict(**_)
+        if str(ar) in r_root:
+            if r_root[str(ar)][0].pKa != ar.pKa:
+                idx = r_root[str(ar)][1]
+                root["reactions"]["acid_base"][idx]["pKa"] = ar.pKa
+            continue
+        to_add.append(_.copy())
+    root["reactions"]["acid_base"] += to_add
+
+    # => k_reactions
+    r_root = {}
+    for idx, _ in enumerate(root["reactions"]["k_reaction"]):
+        _ = KReaction.from_dict(**_)
+        r_root[str(_)] = (_, idx)
+    to_add = []
     for _ in other["reactions"]["k_reaction"]:
-        pass
+        kr = KReaction.from_dict(**_)
+        if str(kr) in r_root:
+            if r_root[str(kr)][0].k_value != kr.k_value:
+                idx = r_root[str(kr)][1]
+                root["reactions"]["k_reaction"][idx]["k_value"] = kr.k_value
+            continue
+        to_add.append(_.copy())
+    root["reactions"]["k_reaction"] += to_add
+
+    # => Enzymatic
+    r_root = {}
+    for idx, _ in enumerate(root["reactions"]["enzymatic"]):
+        _ = MichaelisMenten.from_dict(**_)
+        r_root[str(_)] = (_, idx)
+    to_add = []
+    for _ in other["reactions"]["enzymatic"]:
+        er = MichaelisMenten.from_dict(**_)
+        if str(er) in r_root:
+            if r_root[str(er)][0].k_value != er.k_value and \
+               r_root[str(er)][0].k_micha != er.k_micha:
+                idx = r_root[str(er)][1]
+                root["reactions"]["enzymatic"][idx]["k_value"] = er.k_value
+                root["reactions"]["enzymatic"][idx]["k_micha"] = er.k_micha
+            continue
+        to_add.append(_.copy())
+    root["reactions"]["enzymatic"] += to_add
 
     return root

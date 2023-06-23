@@ -9,17 +9,19 @@ Author:
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING, NamedTuple, TypedDict
+import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.chemistry.species import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
-    from radiopyo.chemistry.species import ListSpecies, SimSpecies
+if tp.TYPE_CHECKING:
+    from radiopyo.chemistry.species import SimSpecies
 
 __all__ = [
     "ABPartition",
     "ABCouple",
+    "ABDict",
 ]
 
 # ------------------------------------------------------------------------------------ #
@@ -27,7 +29,7 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 
 
-class ABPartition(NamedTuple):
+class ABPartition(tp.NamedTuple):
     """
     Acid-Base equilibrium results are stored in a NamedTuple. It is computed
     from the total concentration of the Acid-Base couple. The class provides several
@@ -93,13 +95,15 @@ class ABCouple():
     acid: SimSpecies
     base: SimSpecies
     pKa: float
-    ka: float
 
     def __init__(self, acid: SimSpecies, base: SimSpecies, pKa: float):
         self.pKa = pKa
-        self.ka = 10**(-self.pKa)
         self.acid = acid
         self.base = base
+
+    @property
+    def ka(self) -> float:
+        return 10**(-self.pKa)
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -113,7 +117,7 @@ class ABCouple():
                   acid: str,
                   base: str,
                   pKa: float,
-                  list_sp: ListSpecies,
+                  list_sp: tp.Optional[ListSpecies] = None,
                   ) -> ABCouple:
         """Class method to conveniently create a new Acid/Base couple from dictionary
         destructuring (from input file parsing). The method also require an argument 
@@ -134,6 +138,9 @@ class ABCouple():
         Returns:
             ABCouple
         """
+        # Allow shallow creation (outside of a simulation env)
+        if list_sp is None:
+            list_sp = ListSpecies()
         return cls(acid=list_sp.get_or_create_dyn_species(acid.strip()),
                    base=list_sp.get_or_create_dyn_species(base.strip()),
                    pKa=pKa,
@@ -160,13 +167,13 @@ class ABCouple():
         )
 
     def __str__(self) -> str:
-        return f"ABCouple('{self.acid}', '{self.base}', pKa={round(self.pKa, 5)})"
+        return f"{self.acid}/{self.base})"
 
     def __repr__(self) -> str:
-        return self.__str__()
+        return f"ABCouple('{self.__str__()}', pKa={round(self.pKa, 5)})"
 
 
-class ABDict(TypedDict):
+class ABDict(tp.TypedDict):
     acid: str
     base: str
     pKa: float

@@ -9,16 +9,14 @@ from __future__ import annotations
 
 import logging
 import os
+import pathlib
 import typing as tp
 
-from .sim_types import default_ConfigDict
-
 # --------------------------------- Internal imports --------------------------------- #
+from .sim_types import combine_config
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    import pathlib
-
     from .sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -44,22 +42,32 @@ def list_available_parsers() -> tp.Dict[str, tp.Type[FileParser]]:
     return {cls.ext: cls for cls in FileParser.__subclasses__()}
 
 
-def resolve_includes(includes: tp.Dict[str, tp.List[str]]) -> ConfigDict:
+def resolve_includes(config: ConfigDict) -> ConfigDict:
     """ """
-    out = default_ConfigDict()
-    if len(includes) == 0:
-        return out
+    if len(config["includes"]) == 0:
+        return config  # Do nothing
     available_parsers = list_available_parsers()
+    includes = config["includes"].copy()
+    config["includes"] = {}
     for ext, f_list in includes.items():
         if ("."+ext) not in available_parsers:
             logger.warning(f"Unable to include .{ext} file. "
                            "No parser available")
             continue
         for f in f_list:
-            logger.info(f"Resolving include: {f}")
-            _ = available_parsers["."+ext](f).parse()
-            out = _.update(out)
-    return out
+            if f.startswith("radiopyo"):
+                path = pathlib.Path(__file__).parent.parent
+                path /= rf"data/{f.split('/')[-1].strip()}"
+            else:
+                path = pathlib.Path(f)
+            path = path.absolute()
+            if not path.exists():
+                raise FileNotFoundError(path)
+            logger.info(f"Resolving include: {path}")
+            _ = resolve_includes(available_parsers["."+ext](path).parse())
+            config = combine_config(_, config)
+
+    return config
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #

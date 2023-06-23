@@ -15,19 +15,18 @@ Author:
 from __future__ import annotations
 
 import hashlib
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-)
+import typing as tp
 
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.chemistry.species import ListSpecies
+
 from .base_chemistry import BaseChemicalReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
-    from radiopyo.chemistry.species import ListSpecies, SimSpecies
+if tp.TYPE_CHECKING:
+    from radiopyo.chemistry.species import SimSpecies
 
 # ------------------------------------------------------------------------------------ #
 
@@ -109,7 +108,7 @@ class RadiolyticReaction(BaseChemicalReaction):
     def from_dict(cls,
                   product: str,
                   ge: float,
-                  list_sp: ListSpecies,
+                  list_sp: tp.Optional[ListSpecies] = None,
                   ) -> RadiolyticReaction:
         """Create a RadiolyticReaction from a dictionary (via destructuring)
 
@@ -125,6 +124,9 @@ class RadiolyticReaction(BaseChemicalReaction):
             RadiolyticReaction
         """
         new = cls(ge_to_kr(ge))
+        # Allow shallow creation (outside of a simulation env)
+        if list_sp is None:
+            list_sp = ListSpecies()
         new.add_as_product(list_sp.get_or_create_dyn_species(product.strip()))
         return new
 
@@ -159,4 +161,4 @@ class RadiolyticReaction(BaseChemicalReaction):
         return self.__str__()
 
 
-RadiolyticReactionDict = Dict[str, float]
+RadiolyticReactionDict = tp.Dict[str, float]
