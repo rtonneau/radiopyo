@@ -56,7 +56,9 @@ class TOMLFileParser(FileParser):
             config["reactions"] = {"acid_base": [], "k_reaction": [],
                                    "enzymatic": [], "radiolytic": {}}
 
-        return {"bio_param": config.get("bio_param", {}),
+        return {"includes": config.get("includes", {}),
+
+                "bio_param": config.get("bio_param", {}),
 
                 "concentrations": {
                     "fixed": config["concentrations"].get("fixed", {}),

@@ -160,7 +160,7 @@ class ABCouple():
         )
 
     def __str__(self) -> str:
-        return f"ABCouple('{self.acid}', '{self.base}', pKa={self.pKa})"
+        return f"ABCouple('{self.acid}', '{self.base}', pKa={round(self.pKa, 5)})"
 
     def __repr__(self) -> str:
         return self.__str__()

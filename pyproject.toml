@@ -91,7 +91,7 @@ extend-select = [
     "TID",
     "YTT",
 ]
-ignore = ["E402", "B905", "N818", "S101", "N815", "N803", "N806", "N802", "E731"]
+ignore = ["E402", "B905", "N818", "S101", "N815", "N803", "N806", "N802", "E731", "TCH005"]
 show-fixes = true
 target-version = "py39"
 

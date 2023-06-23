@@ -10,23 +10,21 @@ Author:
 from __future__ import annotations
 
 import hashlib
-from typing import (
-    TYPE_CHECKING,
-    List,
-    TypedDict,
-)
+import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
 from .base_chemistry import BaseChemicalReaction
+from .species import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
-    from .species import ListSpecies
+if tp.TYPE_CHECKING:
+    pass
 
 # ------------------------------------------------------------------------------------ #
 
 __all__ = [
     "KReaction",
+    "KReactionDict",
 ]
 
 # ------------------------------------------------------------------------------------ #
@@ -84,10 +82,10 @@ class KReaction(BaseChemicalReaction):
 
     @classmethod
     def from_dict(cls,
-                  reactants: List[str],
-                  products: List[str],
+                  reactants: tp.List[str],
+                  products: tp.List[str],
                   k_value: float,
-                  list_sp: ListSpecies,
+                  list_sp: tp.Optional[ListSpecies] = None,
                   ) -> KReaction:
         """Create a KReaction from a dictionary (via destructuring)
 
@@ -106,6 +104,10 @@ class KReaction(BaseChemicalReaction):
             KReaction
         """
         new = cls(k_value)
+        # Allow shallow creation (outside of a simulation env)
+        if list_sp is None:
+            list_sp = ListSpecies()
+
         for sp in reactants:
             sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
             new.add_as_reactant(sim_sp)
@@ -134,10 +136,11 @@ class KReaction(BaseChemicalReaction):
         return " ".join(out[:-1])
 
     def __repr__(self) -> str:
-        return "KReaction('"+self.__str__()+"')"
+        return (f"KReaction('{self.__str__()}', "
+                f"k_value={round(self.k_value,5)})")
 
 
-class KReactionDict(TypedDict):
-    reactants: List[str]
-    products: List[str]
+class KReactionDict(tp.TypedDict):
+    reactants: tp.List[str]
+    products: tp.List[str]
     k_value: float

@@ -30,6 +30,7 @@ from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
 from .physics.beam import NoBeam, beam_from_dict
 from .sim_env import SimEnv
+from .utils.parser_def import FileParser, resolve_includes
 from .utils.ron_parser import RonFileParser
 from .utils.toml_parser import TOMLFileParser
 
@@ -40,7 +41,6 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from .physics.beam import ParticleBeam
-    from .utils.parser_def import FileParser
     from .utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -162,6 +162,8 @@ class UnitCell(object):
         """
         logger.info(f"Loading config from file: {file}")
         config = Parser(file).parse()
+        include = resolve_includes(config["includes"])
+        config = include | config  # Merging the two dictionaries
         logger.info("File is loaded")
         return UnitCell.from_config_dict(config)
 
@@ -176,10 +178,7 @@ class UnitCell(object):
         Returns:
             UnitCell
         """
-        logger.info(f"Loading config from TOML file: {file}")
-        config = TOMLFileParser(file).parse()
-        logger.info("File is loaded")
-        return UnitCell.from_config_dict(config)
+        return cls.from_parser(file, TOMLFileParser)
 
     @ classmethod
     def from_ron(cls, file: str | Path) -> UnitCell:
@@ -192,10 +191,7 @@ class UnitCell(object):
         Returns:
             UnitCell
         """
-        logger.info(f"Loading config from RON file: {file}")
-        config = RonFileParser(file).parse()
-        logger.info("File is loaded")
-        return UnitCell.from_config_dict(config)
+        return cls.from_parser(file, RonFileParser)
 
     def set_beam(self, beam: ParticleBeam) -> None:
         """Define Radiation Source structure/parameters

@@ -26,6 +26,7 @@ __all__ = [
     "ConfigDict",
     "ReactionsDict",
     "ConcentrationDict",
+    "default_ConfigDict",
 ]
 # ------------------------------------------------------------------------------------ #
 
@@ -47,7 +48,43 @@ class ReactionsDict(tp.TypedDict):
 
 
 class ConfigDict(tp.TypedDict):
+    includes: tp.Dict[str, tp.List[str]]
     bio_param: tp.Dict[str, float]
     concentrations: ConcentrationDict
     reactions: ReactionsDict
     beam: tp.Dict[str, tp.Dict[str, float]]
+
+
+def default_ConfigDict() -> ConfigDict:
+    """ """
+    return {"includes": {},
+            "bio_param": {},
+            "concentrations": {
+                "fixed": {},
+                "initial": {},
+    },
+        "beam": {},
+        "reactions": {
+            "acid_base": [],
+            "k_reaction": [],
+            "enzymatic": [],
+            "radiolytic": {},
+    },
+    }
+
+
+def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
+    """" Keep root, erase entries from root when other has it and add entries from other
+    not included in root"""
+    # Easy part
+    root["bio_param"] |= other["bio_param"]
+    root["beam"] |= other["beam"]
+    root["concentrations"]["fixed"] |= other["concentrations"]["fixed"]
+    root["concentrations"]["initial"] |= other["concentrations"]["initial"]
+
+    # Update reactions
+    root["reactions"]["radiolytic"] |= other["reactions"]["radiolytic"]
+    for _ in other["reactions"]["k_reaction"]:
+        pass
+
+    return root

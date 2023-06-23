@@ -376,7 +376,8 @@ class RonFileParser(FileParser):
         """
         self.parse_file()
 
-        return {"bio_param": self.build_bio_parameters(),
+        return {"includes": self.items.get("includes", {}),
+                "bio_param": self.build_bio_parameters(),
 
                 "concentrations": {
                     "fixed": self.build_cst_species(),

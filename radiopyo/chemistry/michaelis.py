@@ -163,7 +163,9 @@ class MichaelisMenten(BaseChemicalReaction):
         return " ".join(out[:-1])
 
     def __repr__(self) -> str:
-        return "MichaelisMenten('"+self.__str__()+"')"
+        return (f"MichaelisMenten('{self.__str__()}', "
+                f"k_value={round(self.k_value, 5)}, "
+                f"k_micha={round(self.k_micha, 5)}")
 
 
 class MichaelisMentenDict(TypedDict):
