@@ -13,28 +13,19 @@ from __future__ import annotations
 
 import enum
 import re
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    List,
-    Match,
-    NamedTuple,
-    Optional,
-    Pattern,
-    Tuple,
-    Union,
-)
+import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.sim_types import ConfigDict, FileParser
+from radiopyo.utils.parser_def import FileParser
 
 # ------------------------------------------------------------------------------------ #
 #                               TYPE CHECKING ONLY IMPORT                              #
 # ------------------------------------------------------------------------------------ #
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from radiopyo.chemistry.acid_base import ABDict
     from radiopyo.chemistry.k_reactions import KReactionDict
     from radiopyo.chemistry.michaelis import MichaelisMentenDict
+    from radiopyo.utils.sim_types import ConfigDict
 
 # ------------------------------------------------------------------------------------ #
 #                                      DECORATORS                                      #
@@ -50,11 +41,11 @@ class RonTokens():
     RonTokens => an entry. Either in a list or in a dict like structure.
     """
 
-    OPEN_TOKENS = ["[", "(", "{"]
-    CLOSE_TOKENS = ["]", ")", "}"]
-    SEP = ","
+    OPEN_TOKENS: tp.ClassVar[tp.List[str]] = ["[", "(", "{"]
+    CLOSE_TOKENS: tp.ClassVar[tp.List[str]] = ["]", ")", "}"]
+    SEP: str = ","
 
-    REGEX: Dict[str, Pattern] = {
+    REGEX: tp.ClassVar[tp.Dict[str, tp.Pattern]] = {
         "map":   re.compile(r"^\s*(?P<key>\w+)\s*: \s *\"?"
                             r"(?P<value>[\w\d\'\.]+)\"?\s*,?$"
                             ),
@@ -92,7 +83,7 @@ class RonUnit(enum.Enum):
         raise KeyError(f"Unknown delimiter for RON files: {sep}")
 
     @staticmethod
-    def is_named(txt: str) -> Optional[Match]:
+    def is_named(txt: str) -> tp.Optional[tp.Match]:
         return RonTokens.REGEX["name"].match(txt)
 
     @staticmethod
@@ -136,7 +127,7 @@ class RonUnit(enum.Enum):
         return len(RonUnit.list_inner_units(txt))
 
     @staticmethod
-    def list_inner_units(txt: str) -> List[RonUnit]:
+    def list_inner_units(txt: str) -> tp.List[RonUnit]:
         out = []
         level = 0
         for elt in RonTokens.REGEX["unit"].findall(txt):
@@ -151,7 +142,7 @@ class RonUnit(enum.Enum):
         return out
 
 
-class DelimiterStruct(NamedTuple):
+class DelimiterStruct(tp.NamedTuple):
 
     start: str
     end: str
@@ -169,7 +160,7 @@ class RonBlock():
     tokens: list
     txt: str
     name: str
-    content: Optional[Union[list, dict]]
+    content: tp.Optional[tp.Union[tp.List, tp.Dict]]
 
     def __init__(self, name: str, block: str):
         self.index = -1
@@ -181,7 +172,7 @@ class RonBlock():
         self._delim = RonBlock.struct_delimiters(self.tokens[0])
         self._checkup()
 
-    def recursive_walk2(self, txt: str) -> Union[Dict, List]:
+    def recursive_walk2(self, txt: str) -> tp.Union[tp.Dict, tp.List]:
         """Perform the recursive parsing of txt.
 
         Args:
@@ -193,7 +184,7 @@ class RonBlock():
         Returns:
             Union[Dict, List]: A dict or list of items found in the text to parse.
         """
-        out: Union[Dict, List]
+        out: tp.Union[tp.Dict, tp.List]
         delim = RonBlock.struct_delimiters(txt[0])
         if delim.unit is RonUnit.isList:
             out = []
@@ -234,7 +225,7 @@ class RonBlock():
         return out
 
     @staticmethod
-    def _grab_next_item(txt: str) -> Tuple[RonUnit, str, str]:
+    def _grab_next_item(txt: str) -> tp.Tuple[RonUnit, str, str]:
         """Extract next RON item (i.e. until the next comma) from txt.
         If the next item is another block, then _grab_next_block is called.
 
@@ -270,7 +261,7 @@ class RonBlock():
         return (RonUnit.isItem, out[0], out[1].strip(","))
 
     @staticmethod
-    def _grab_next_block(txt: str) -> Tuple[str, str]:
+    def _grab_next_block(txt: str) -> tp.Tuple[str, str]:
         """Extract next RON block from txt.
 
         Args:
@@ -328,7 +319,7 @@ class RonBlock():
         raise KeyError(f"Unknown delimiter for RON files: {sep}")
 
     @staticmethod
-    def read_next_named_block(txt: str) -> Tuple[str, str,  str]:
+    def read_next_named_block(txt: str) -> tp.Tuple[str, str,  str]:
         _ = txt.strip(",").split(":", 1)
         name, txt = _[0], _[1].strip()
         res, txt = RonBlock._grab_next_block(txt)
@@ -339,6 +330,7 @@ class RonFileParser(FileParser):
     """
     Class parsing RON files.
     """
+    ext = ".ron"
     items: dict
 
     def parse_file(self) -> None:
@@ -385,24 +377,24 @@ class RonFileParser(FileParser):
         self.parse_file()
 
         return {"bio_param": self.build_bio_parameters(),
-                
+
                 "concentrations": {
                     "fixed": self.build_cst_species(),
                     "initial": self.build_initial_concentrations()
-                    },
+        },
 
-                "reactions": {
+            "reactions": {
                     "acid_base": self.build_acid_base(),
                     "k_reaction": self.build_k_reactions(),
                     "radiolytic": self.build_radiolytics(),
                     "enzymatic": self.build_enzymatic(),
-                    },
+        },
 
-                "beam": {},
+            "beam": {},
 
-                }
+        }
 
-    def build_bio_parameters(self) -> Dict[str, float]:
+    def build_bio_parameters(self) -> tp.Dict[str, float]:
         """build_bio_parameters
 
         Returns:
@@ -413,7 +405,7 @@ class RonFileParser(FileParser):
         except KeyError:
             return {}
 
-    def build_initial_concentrations(self) -> Dict[str, float]:
+    def build_initial_concentrations(self) -> tp.Dict[str, float]:
         """Parse initial conditions (species's concentration)
 
         Returns:
@@ -424,7 +416,7 @@ class RonFileParser(FileParser):
         except KeyError:
             return {}
 
-    def build_radiolytics(self) -> Dict[str, float]:
+    def build_radiolytics(self) -> tp.Dict[str, float]:
         """build_radiolytics _summary_
 
         Returns:
@@ -435,7 +427,7 @@ class RonFileParser(FileParser):
         except KeyError:
             return {}
 
-    def build_cst_species(self) -> Dict[str, float]:
+    def build_cst_species(self) -> tp.Dict[str, float]:
         """build_cst_species _summary_
 
         Returns:
@@ -448,7 +440,7 @@ class RonFileParser(FileParser):
         except KeyError:
             return {}
 
-    def build_acid_base(self) -> List[ABDict]:
+    def build_acid_base(self) -> tp.List[ABDict]:
         """build_acid_base _summary_
 
         Returns:
@@ -459,7 +451,7 @@ class RonFileParser(FileParser):
         except KeyError:
             return []
 
-    def build_k_reactions(self) -> List[KReactionDict]:
+    def build_k_reactions(self) -> tp.List[KReactionDict]:
         """build_k_reactions
 
         Raises:
@@ -473,7 +465,7 @@ class RonFileParser(FileParser):
         except KeyError:
             return []
 
-    def build_enzymatic(self,) -> List[MichaelisMentenDict]:
+    def build_enzymatic(self,) -> tp.List[MichaelisMentenDict]:
         """build_enzymatic
 
         Raises:

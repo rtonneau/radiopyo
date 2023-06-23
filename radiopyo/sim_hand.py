@@ -50,7 +50,8 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from .physics.beam import ParticleBeam
-    from .sim_types import ConfigDict, FileParser
+    from .utils.parser_def import FileParser
+    from .utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [

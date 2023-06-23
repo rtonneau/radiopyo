@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from .chemistry.k_reactions import KReactionDict
     from .chemistry.michaelis import MichaelisMentenDict
     from .chemistry.radiolytic import RadiolyticReactionDict
-    from .sim_types import ConfigDict
+    from .utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",

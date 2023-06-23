@@ -9,13 +9,16 @@ Author:
 from __future__ import annotations
 
 import logging
+import typing as tp
 
 import tomllib
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.sim_types import ConfigDict, FileParser
+from radiopyo.utils.parser_def import FileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
+if tp.TYPE_CHECKING:
+    from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["TOMLFileParser"]
@@ -26,43 +29,46 @@ logger = logging.getLogger("radiopyo")
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
+
+
 class TOMLFileParser(FileParser):
     """
     Class parsing TOML files.
     """
+    ext = ".toml"
 
     def parse(self) -> ConfigDict:
         """ 
         """
         with open(self.path, mode="rb") as fb:
             config = tomllib.load(fb)
-        
+
         # Sanity checks
         if "concentrations" not in config:
             logger.warn("CONFIG::No concentration section found in config. It means, no"
                         " species with constant concentration and all initial"
                         " set to 0.")
-            config["concentrations"] = {"fixed":{}, "initial":{}}
+            config["concentrations"] = {"fixed": {}, "initial": {}}
 
         if "reactions" not in config:
             logger.warning("CONFIG::No 'reactions' section in the provided "
                            "configuration")
             config["reactions"] = {"acid_base": [], "k_reaction": [],
                                    "enzymatic": [], "radiolytic": {}}
-            
+
         return {"bio_param": config.get("bio_param", {}),
-                
+
                 "concentrations": {
                     "fixed": config["concentrations"].get("fixed", {}),
                     "initial": config["concentrations"].get("initial", {}),
-                    },
+        },
 
-                "reactions": {
+            "reactions": {
                     "acid_base": config["reactions"].get("acid_base", []),
                     "k_reaction": config["reactions"].get("k_reaction", []),
                     "radiolytic": config["reactions"].get("radiolytic", {}),
                     "enzymatic": config["reactions"].get("enzymatic", []),
-                    },
+        },
 
-                "beam": config.get("beam", {}),
-                }
+            "beam": config.get("beam", {}),
+        }
