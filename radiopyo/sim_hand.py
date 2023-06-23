@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 The sim_hand submodule contains class(es) to easily handle simulation. This one should
 be the entry point for lambda user.
@@ -14,20 +15,9 @@ import copy
 import datetime
 import logging
 import time
+import typing as tp
 from contextlib import suppress
 from itertools import chain, repeat
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterable,
-    List,
-    NamedTuple,
-    Optional,
-    Tuple,
-    Type,
-    TypedDict,
-)
 
 import numpy as np
 import pandas as pd
@@ -44,7 +34,7 @@ from .utils.ron_parser import RonFileParser
 from .utils.toml_parser import TOMLFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from pathlib import Path
 
     from numpy.typing import NDArray
@@ -68,17 +58,17 @@ logger = logging.getLogger("radiopyo")
 # ------------------------------------------------------------------------------------ #
 
 
-class SimMatrices(TypedDict):
+class SimMatrices(tp.TypedDict):
     """Convenient TypedDict use to leverage type checking and store matrices used in ODE
     solver."""
-    AB_mat: Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]]
-    Ki_mat: Tuple[NDArray[np.float64], NDArray[np.int8],
-                  NDArray[np.float32], NDArray[np.float32]]
+    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]]
+    Ki_mat: tp.Tuple[NDArray[np.float64], NDArray[np.int8],
+                     NDArray[np.float32], NDArray[np.float32]]
     Gi_mat: NDArray[np.float64]
-    Ez_mat: Optional[Tuple[NDArray[np.float32], NDArray[np.float32],
-                           NDArray[np.float64], NDArray[np.int8],]]
+    Ez_mat: tp.Optional[tp.Tuple[NDArray[np.float32], NDArray[np.float32],
+                                 NDArray[np.float64], NDArray[np.int8],]]
     cst_sp: NDArray[np.float64]
-    O2_mat: Optional[Tuple[NDArray[np.float64], NDArray[np.float64]]]
+    O2_mat: tp.Optional[tp.Tuple[NDArray[np.float64], NDArray[np.float64]]]
 
 
 class UnitCell(object):
@@ -109,11 +99,11 @@ class UnitCell(object):
     beam: ParticleBeam
     last_exec_time: float
     g_val: GValuesBoscolo
-    LET: Optional[float]
+    LET: tp.Optional[float]
 
     def __init__(self,
                  env: SimEnv,
-                 beam: Optional[ParticleBeam] = None,
+                 beam: tp.Optional[ParticleBeam] = None,
                  ) -> None:
         self.env = env
         self.mat = SimMatrices(
@@ -141,7 +131,7 @@ class UnitCell(object):
         Returns:
             UnitCell 
         """
-        beam: Optional[ParticleBeam] = None
+        beam: tp.Optional[ParticleBeam] = None
 
         if len(config["beam"]) > 0:
             logger.info("Beam configuration detected in config file")
@@ -158,7 +148,7 @@ class UnitCell(object):
         return out
 
     @classmethod
-    def from_parser(cls, file: str | Path, Parser: Type[FileParser]) -> UnitCell:
+    def from_parser(cls, file: str | Path, Parser: tp.Type[FileParser]) -> UnitCell:
         """Create a Simulation Environment from a user defined FileParser.
 
         Args:
@@ -247,14 +237,14 @@ class UnitCell(object):
             logger.debug(f"-> {reaction.label()}: {reaction.ge():.3f}")
 
     def _raw_run(self,
-                 t_span: Tuple[float, float],
+                 t_span: tp.Tuple[float, float],
                  use_jac: bool,
                  method: str,
-                 atol: Optional[float] = None,
-                 rtol: Optional[float] = None,
-                 max_step: Optional[float] = None,
-                 y0: Optional[NDArray[np.float64]] = None,
-                 t_eval: Optional[NDArray[np.float64]] = None,
+                 atol: tp.Optional[float] = None,
+                 rtol: tp.Optional[float] = None,
+                 max_step: tp.Optional[float] = None,
+                 y0: tp.Optional[NDArray[np.float64]] = None,
+                 t_eval: tp.Optional[NDArray[np.float64]] = None,
                  ) -> ScipyODEResult:
 
         if self.beam is NoBeam:
@@ -262,7 +252,7 @@ class UnitCell(object):
         first_step = self.FIRST_STEP
 
         # Building kwargs for solve_ivp:
-        kwargs: Dict[str, Any] = {}
+        kwargs: tp.Dict[str, tp.Any] = {}
         kwargs["first_step"] = self.FIRST_STEP
         kwargs["jac"] = jacobian if use_jac else None
         if rtol is not None:
@@ -300,14 +290,14 @@ class UnitCell(object):
         return sol
 
     def run(self,
-            t_span: Tuple[float, float],
-            t_eval: Optional[NDArray[np.float64]] = None,
+            t_span: tp.Tuple[float, float],
+            t_eval: tp.Optional[NDArray[np.float64]] = None,
             use_jac: bool = True,
             method: str = "LSODA",
-            atol: Optional[float] = None,
-            rtol: Optional[float] = None,
-            max_step: Optional[float] = None,
-            y0: Optional[NDArray[np.float64]] = None,
+            atol: tp.Optional[float] = None,
+            rtol: tp.Optional[float] = None,
+            max_step: tp.Optional[float] = None,
+            y0: tp.Optional[NDArray[np.float64]] = None,
             ) -> ODEResult:
         """ Solve ODE over t_span
         Args:
@@ -348,12 +338,12 @@ class UnitCell(object):
 
     def run_chunked(self,
                     t_chunks: NDArray[np.float64],
-                    t_eval: Optional[NDArray[np.float64]] = None,
+                    t_eval: tp.Optional[NDArray[np.float64]] = None,
                     use_jac: bool = True,
                     method: str = "LSODA",
-                    atol: Optional[float] = None,
-                    rtol: Optional[float] = None,
-                    max_step: float | Iterable[float] = np.inf,
+                    atol: tp.Optional[float] = None,
+                    rtol: tp.Optional[float] = None,
+                    max_step: float | tp.Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
         sol = ODEResult(self.env, self.beam, self.LET)
@@ -367,7 +357,7 @@ class UnitCell(object):
                              f"length if max_step is a list or and array")
 
         # Checkup t_eval
-        iter_t_eval: Iterable | List
+        iter_t_eval: tp.Iterable | tp.List
         if t_eval is None:
             iter_t_eval = repeat(None, len(t_chunks)-1)
         else:
@@ -405,15 +395,15 @@ class UnitCell(object):
         return sol
 
     def prepare_chunked_run(self,
-                            t_span: Tuple[float, float],
+                            t_span: tp.Tuple[float, float],
                             use_jac: bool = True,
                             method: str = "LSODA",
-                            atol: Optional[float] = None,
-                            rtol: Optional[float] = None,
-                            max_step_size_on: Optional[float] = None,
-                            max_step_size_off: Optional[float] = None,
-                            max_step_size_final: Optional[float] = None,
-                            y0: Optional[NDArray[np.float64]] = None,
+                            atol: tp.Optional[float] = None,
+                            rtol: tp.Optional[float] = None,
+                            max_step_size_on: tp.Optional[float] = None,
+                            max_step_size_off: tp.Optional[float] = None,
+                            max_step_size_final: tp.Optional[float] = None,
+                            y0: tp.Optional[NDArray[np.float64]] = None,
                             ) -> SimChunksIter:
         """ Method used to prepare a multi step ODE integration
         Args:
@@ -452,7 +442,7 @@ class UnitCell(object):
         if max_step_size_final is not None:
             chunks[-2, 1] = max_step_size_final
 
-        chunk_list: List[SimChunk] = []
+        chunk_list: tp.List[SimChunk] = []
         for idx in range(len(chunks[0:-1, :])):
             chunk = SimChunk(start=chunks[idx, 0],
                              stop=chunks[idx+1, 0],
@@ -468,7 +458,7 @@ class UnitCell(object):
                              y0=y0,)
 
 
-class SimChunk(NamedTuple):
+class SimChunk(tp.NamedTuple):
     """Convenient (immutable) container defining a chunk/ step of ODE integration.
 
     Attributes:
@@ -509,22 +499,22 @@ class SimChunksIter():
         >>> 
     """
     sim: UnitCell
-    chunks: List[SimChunk]
+    chunks: tp.List[SimChunk]
     sol: ODEResult
     current: int
-    atol: Optional[float]
-    rtol: Optional[float]
+    atol: tp.Optional[float]
+    rtol: tp.Optional[float]
     use_jac: bool
     method: str
-    y0: Optional[NDArray[np.float64]]
+    y0: tp.Optional[NDArray[np.float64]]
 
     def __init__(self, sim: UnitCell,
-                 chunks: List[SimChunk],
-                 atol: Optional[float] = None,
-                 rtol: Optional[float] = None,
+                 chunks: tp.List[SimChunk],
+                 atol: tp.Optional[float] = None,
+                 rtol: tp.Optional[float] = None,
                  use_jac: bool = True,
                  method: str = "LSODA",
-                 y0: Optional[NDArray[np.float64]] = None,
+                 y0: tp.Optional[NDArray[np.float64]] = None,
                  ):
         self.sim = sim
         self.chunks = chunks
@@ -587,7 +577,7 @@ class SimChunksIter():
 
     def subdivide_last_chunk(self,
                              n: int,
-                             max_step_size: Optional[float] = None,
+                             max_step_size: tp.Optional[float] = None,
                              scale: str = "log",
                              ) -> SimChunksIter:
         last = self.chunks.pop()
@@ -621,31 +611,31 @@ class ODEResult(object):
     # Keep track of the original sim env
     env: SimEnv
     beam: ParticleBeam
-    LET: Optional[float]
+    LET: tp.Optional[float]
     date: datetime.datetime
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
     y: NDArray[np.float64]
-    sol: List[Any]
-    t_events: List[Optional[List[NDArray[np.float64]]]]
-    y_events: List[Optional[List[NDArray[np.float64]]]]
-    nfev: List[int]
-    njev: List[int]
-    nlu: List[int]
-    status: List[int]
-    message: List[str]
-    success: List[bool]
+    sol: tp.List[tp.Any]
+    t_events: tp.List[tp.Optional[tp.List[NDArray[np.float64]]]]
+    y_events: tp.List[tp.Optional[tp.List[NDArray[np.float64]]]]
+    nfev: tp.List[int]
+    njev: tp.List[int]
+    nlu: tp.List[int]
+    status: tp.List[int]
+    message: tp.List[str]
+    success: tp.List[bool]
 
     # Add new useful properties
-    n_points: List[int]
-    exec_time: List[Optional[float]]
+    n_points: tp.List[int]
+    exec_time: tp.List[tp.Optional[float]]
 
     def __init__(self,
                  env: SimEnv,
                  beam: ParticleBeam,
-                 let: Optional[float],
-                 sol: Optional[ScipyODEResult] = None,
+                 let: tp.Optional[float],
+                 sol: tp.Optional[ScipyODEResult] = None,
                  ) -> None:
         self.date = datetime.datetime.now()
         self.env = copy.deepcopy(env)
@@ -659,7 +649,7 @@ class ODEResult(object):
         """Number of simulation run"""
         return len(self.n_points)
 
-    def __add__(self, other: Any) -> ODEResult:
+    def __add__(self, other: tp.Any) -> ODEResult:
         """ """
         # Sanity checks
         if not isinstance(other, ODEResult):
@@ -690,7 +680,7 @@ class ODEResult(object):
     @classmethod
     def from_cell(cls,
                   cell: UnitCell,
-                  sol: Optional[ScipyODEResult] = None,
+                  sol: tp.Optional[ScipyODEResult] = None,
                   ) -> ODEResult:
         return cls(cell.env, cell.beam, cell.LET, sol)
 
@@ -699,7 +689,7 @@ class ODEResult(object):
         return self.t
 
     @property
-    def shape(self) -> Tuple:
+    def shape(self) -> tp.Tuple:
         return self.y.shape
 
     @property
@@ -725,7 +715,7 @@ class ODEResult(object):
 
     def append_sol(self,
                    sol: ScipyODEResult,
-                   exec_time: Optional[float] = None,
+                   exec_time: tp.Optional[float] = None,
                    ) -> None:
         self.t = np.append(self.t, sol.t)
         if len(self.y) == 0:
