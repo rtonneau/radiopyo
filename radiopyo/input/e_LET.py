@@ -46,7 +46,7 @@ class EnergyLET():
                         header=None,
                         skiprows=8,
                         delimiter=" ")
-        _.iloc[:, 1] *= 0.1  # conversion to keV/µm
+        _.iloc[:, 1] *= 0.1  # 1 MeV cm²/g = 0.1 keV/µm (for pure water)
         self.df = pd.Series(index=_.iloc[:, 0],
                             data=_.iloc[:, 1].values)
         self.interpol = interp1d(x=self.df.index,
