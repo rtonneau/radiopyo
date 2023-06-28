@@ -1,0 +1,85 @@
+#---------------- Example of pulsed beam defined with peak dose rate -------------------
+[beam.constant]
+dose_rate  = 1.58e3   # Peak dose rate for pulsed beam [Gy/s]
+max_dose   = 2000e3   # Max Dose in [Gy]
+LET        = 0.13      # [keV/µm] (1MeV electrons in water)
+
+[bio_param]
+pH = 7
+
+# ----------------------------------------------------------------------------------
+#                             DEFINE RADIOLYTIC REACTIONS                            
+# ----------------------------------------------------------------------------------
+[reactions.radiolytic] # Unit is [radical / 100eV / incident particle]
+e_aq = 2.8
+OH_r = 2.8
+H_r = 0.62
+H2 = 0.47
+H2O2 = 0.73
+# ----------------------------------------------------------------------------------
+#                             DEFINE ACID-BASE REACTIONS                            
+# ----------------------------------------------------------------------------------
+
+
+#---------------------- Definition of Constants concentrations -------------------------
+[concentrations.fixed] # Unit is [mol]/[l]
+H2O = 55
+O2 = 250e-6
+#----------------------- Definition of initial concentrations --------------------------
+# Rem: if unspecified, initial cc are assumed 0 (except for constant species)    
+[concentrations.initial] # Unit is [mol]/[l]
+C7F15COO_minus = 2.42e-5
+C8F17SO3_minus = 2.00e-5
+
+# ----------------------------- PFAS related reactions ----------------------------- 
+[[reactions.k_reaction]] 
+reactants = ["e_aq", "C7F15COO_minus",]
+products = ["C7F15COO_r_minus_minus",]
+k_value = 5.1e7 #4.35e7
+
+[[reactions.k_reaction]] 
+reactants = ["e_aq", "C8F17SO3_minus",]
+products = ["C8F17SO3_r_minus_minus",]
+k_value = 5.1e7 #3.78e7
+
+
+# ------------------ List of all reactions with e_aq as reactants ------------------ 
+[[reactions.k_reaction]] #e_aq + e_aq -> H2 + 2 OH_minus
+reactants = ["e_aq", "e_aq"]
+products = ["H2", "OH_minus", "OH_r"]
+k_value = 1.0e10
+
+[[reactions.k_reaction]] #e_aq + OH_r -> OH_minus
+reactants = ["e_aq", "OH_r",]
+products = ["OH_minus",]
+k_value = 3.0e10
+
+[[reactions.k_reaction]]  #e_aq +  H_plus -> H_r
+reactants = ["e_aq", "H_plus",]
+products = ["H_r",]
+k_value = 2.3e10
+
+[[reactions.k_reaction]] #e_aq + H_r -> H2 + OH_minus   
+reactants = ["e_aq", "H_r"]
+products = ["H2", "OH_minus"]
+k_value = 2.5e10
+
+[[reactions.k_reaction]]  #OH_r + OH_Minus -> O_r_minus + H2O
+reactants = ["OH_r", "OH_minus",]
+products = ["O_r_minus", "H2O",]
+k_value = 1.3e10
+
+[[reactions.k_reaction]]  #O_r_minus + O2 -> O3_minus
+reactants = ["O_r_minus", "O2",]
+products = ["O3_minus",]
+k_value = 3.6e9
+
+[[reactions.k_reaction]]  #H_r + OH_minus -> e_aq (+ H2O)
+reactants = ["H_r", "OH_minus",]
+products = ["e_aq",]
+k_value = 2.2e7
+
+[[reactions.k_reaction]]  #e_aq + O2 -> O2_r_minus
+reactants = ["e_aq", "O2",]
+products = ["O2_r_minus",]
+k_value = 1.9e10

@@ -399,3 +399,10 @@ class ListSpecies():
         out.next_index = idx + 1
         out.sorted = True
         return out if not inplace else None
+
+    def is_dyn_species(self, key: str | SimSpecies) -> bool:
+        """ """
+        # If CstSpecies from another sim, should still be tested for this one.
+        if isinstance(key, (CstSpecies, DynSpecies)):
+            key = key.label
+        return key in self.dyn_sp

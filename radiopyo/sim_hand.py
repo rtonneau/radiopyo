@@ -41,7 +41,7 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from .physics.beam import ParticleBeam
-    from .utils.sim_types import ConfigDict
+    from .utils.sim_types import ConfigDict, KwargsRun
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
@@ -283,6 +283,15 @@ class UnitCell(object):
         self.last_exec_time = t1 - t0
         return sol
 
+    def run_till_max_dose(self,
+                          time_start: float = 1e-9,
+                          **kwargs: tp.Dict[str, tp.Any]) -> ODEResult:
+        """ """
+        if self.beam.time_at_max_dose >= np.inf:
+            raise ValueError("Unable to use 'run_till_max_dose', time at max dose "
+                             f"is inf (-> {self.beam.time_at_max_dose})")
+        return self.run(t_span=(time_start, self.beam.time_at_max_dose), **kwargs)
+
     def run(self,
             t_span: tp.Tuple[float, float],
             t_eval: tp.Optional[NDArray[np.float64]] = None,
@@ -327,7 +336,7 @@ class UnitCell(object):
                             y0,
                             t_eval,
                             )
-        logger.info("Simulation done!")
+        logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
         return ODEResult(self.env, self.beam, self.LET, sol)
 
     def run_chunked(self,
@@ -642,6 +651,13 @@ class ODEResult(object):
     def __len__(self) -> int:
         """Number of simulation run"""
         return len(self.n_points)
+
+    def __getitem__(self, key: str) -> pd.Series:
+        """ """
+        if not self.env.species.is_dyn_species(key):
+            raise KeyError(f"'{key}' is not a valid DynSpecies label")
+        idx = self.env.species.dyn_sp[key].index
+        return pd.Series(data=self.y[idx, :], index=self.t)
 
     def __add__(self, other: tp.Any) -> ODEResult:
         """ """

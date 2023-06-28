@@ -20,6 +20,9 @@ from radiopyo.chemistry.michaelis import MichaelisMenten
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
+
     from radiopyo.chemistry.acid_base import ABDict
     from radiopyo.chemistry.k_reactions import KReactionDict
     from radiopyo.chemistry.michaelis import MichaelisMentenDict
@@ -27,6 +30,7 @@ if tp.TYPE_CHECKING:
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
+    "KwargsRun",
     "ConfigDict",
     "ReactionsDict",
     "ConcentrationDict",
@@ -37,6 +41,17 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
+
+
+class KwargsRun(tp.TypedDict):
+    t_span: tp.Tuple[float, float]
+    t_eval: tp.Optional[NDArray[np.float64]]
+    use_jac: bool
+    method: str
+    atol: tp.Optional[float]
+    rtol: tp.Optional[float]
+    max_step: tp.Optional[float]
+    y0: tp.Optional[NDArray[np.float64]]
 
 
 class ConcentrationDict(tp.TypedDict):
