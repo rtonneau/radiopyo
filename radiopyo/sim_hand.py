@@ -191,6 +191,16 @@ class UnitCell(object):
         """
         return cls.from_parser(file, RonFileParser)
 
+    def use_acid_base(self, enable: bool = True) -> None:
+        """ """
+        if enable:
+            self.mat["AB_mat"] = self.env.make_acidBase_matrix()
+        else:
+            ABi = np.zeros([len(self.env.species), len(self.env.reactions.acid_base)],
+                           dtype=np.int8)
+            ABy = np.ones(len(self.env.species), dtype=np.int8)
+            self.mat["AB_mat"] = (ABy, ABi, self.mat["AB_mat"][2])
+
     def set_beam(self, beam: ParticleBeam) -> None:
         """Define Radiation Source structure/parameters
 
@@ -337,7 +347,7 @@ class UnitCell(object):
                             t_eval,
                             )
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
-        return ODEResult(self.env, self.beam, self.LET, sol)
+        return ODEResult(self.env, self.beam, self.mat, self.LET, sol)
 
     def run_chunked(self,
                     t_chunks: NDArray[np.float64],
@@ -349,7 +359,7 @@ class UnitCell(object):
                     max_step: float | tp.Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
-        sol = ODEResult(self.env, self.beam, self.LET)
+        sol = ODEResult(self.env, self.beam, self.mat, self.LET)
 
         # Check up max_step
         if isinstance(max_step, float):
@@ -521,7 +531,10 @@ class SimChunksIter():
                  ):
         self.sim = sim
         self.chunks = chunks
-        self.sol = ODEResult(self.sim.env, self.sim.beam, self.sim.LET)
+        self.sol = ODEResult(self.sim.env,
+                             self.sim.beam,
+                             self.sim.mat,
+                             self.sim.LET)
         self.atol = atol
         self.rtol = rtol
         self.use_jac = use_jac
@@ -614,6 +627,7 @@ class ODEResult(object):
     # Keep track of the original sim env
     env: SimEnv
     beam: ParticleBeam
+    mat: SimMatrices
     LET: tp.Optional[float]
     date: datetime.datetime
 
@@ -637,12 +651,14 @@ class ODEResult(object):
     def __init__(self,
                  env: SimEnv,
                  beam: ParticleBeam,
+                 mat: SimMatrices,
                  let: tp.Optional[float],
                  sol: tp.Optional[ScipyODEResult] = None,
                  ) -> None:
         self.date = datetime.datetime.now()
         self.env = copy.deepcopy(env)
         self.beam = copy.deepcopy(beam)
+        self.mat = copy.deepcopy(mat)
         self.LET = let
         self._default_init()
         if sol is not None:
@@ -692,7 +708,7 @@ class ODEResult(object):
                   cell: UnitCell,
                   sol: tp.Optional[ScipyODEResult] = None,
                   ) -> ODEResult:
-        return cls(cell.env, cell.beam, cell.LET, sol)
+        return cls(cell.env, cell.beam, cell.mat, cell.LET, sol)
 
     @property
     def time(self) -> NDArray[np.float64]:
@@ -761,15 +777,6 @@ class ODEResult(object):
         if self.beam is None:
             raise TypeError("Beam is None, unable to compute jacobian")
 
-        # (Re)Build used matrices
-        mat = SimMatrices(
-            AB_mat=self.env.make_acidBase_matrix(),
-            Ki_mat=self.env.make_kreaction_matrix(),
-            Gi_mat=self.env.make_radiolytic_vector(),
-            Ez_mat=self.env.make_enzymatic_matrix(),
-            cst_sp=self.env.make_cst_species_vector(),
-            O2_mat=self.env.make_O2_intake_matrix(),
-        )
         sp_label = [elt.label for elt in self.env.iter_DynSpecies()]
         dsp_label = ["".join(["d", elt]) for elt in sp_label]
 
@@ -781,7 +788,7 @@ class ODEResult(object):
         for (idx, t_val) in enumerate(self.t):
             jac = jacobian(t_val, self.y[:, idx],
                            self.beam,
-                           **mat,
+                           **self.mat,
                            )
             out.iloc[idx, :] = jac.flatten()
         return out
@@ -791,16 +798,6 @@ class ODEResult(object):
         Rem: to integrate df
             >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
         """
-        # (Re)Build used matrices
-        mat = SimMatrices(
-            AB_mat=self.env.make_acidBase_matrix(),
-            Ki_mat=self.env.make_kreaction_matrix(),
-            Gi_mat=self.env.make_radiolytic_vector(),
-            Ez_mat=self.env.make_enzymatic_matrix(),
-            cst_sp=self.env.make_cst_species_vector(),
-            O2_mat=self.env.make_O2_intake_matrix(),
-        )
-
         # Compute column names and Pre compute slices to ease access in the dataframe
         # columns
         cols_kr = [kr.as_label() for kr in self.env.reactions.k_reaction]
@@ -809,7 +806,7 @@ class ODEResult(object):
         cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
         idx_gi = slice(idx_kr.stop, idx_kr.stop+len(cols_gi))
 
-        if mat["Ez_mat"] is not None:
+        if self.mat["Ez_mat"] is not None:
             cols_ez = [er.as_label() for er in self.env.reactions.enzymatic]
             idx_ez = slice(idx_gi.stop, idx_gi.stop+len(cols_ez))
         else:
@@ -828,12 +825,12 @@ class ODEResult(object):
 
         for ((idx, t_val), y) in zip(enumerate(self.t), self.y.T):
             y = y.clip(min=0.0,) * 1e-6
-            y = np.append(y, mat["cst_sp"])
+            y = np.append(y, self.mat["cst_sp"])
 
             # K Reactions
             Rki = np.nan_to_num(
-                np.einsum("j, jik -> ik ", y, mat["Ki_mat"][2]), nan=1)
-            Rki = np.prod(Rki, axis=1) * mat["Ki_mat"][0]
+                np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1)
+            Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
             out.iloc[idx, idx_kr] = Rki
 
             # Radiolytic Reactions
@@ -843,11 +840,11 @@ class ODEResult(object):
             out.iloc[idx, idx_gi] *= dr
 
             # Enzimatic reactions
-            if mat["Ez_mat"] is not None:
-                E = np.matmul(y, mat["Ez_mat"][1])
-                S = np.matmul(y, mat["Ez_mat"][0])
-                MM = mat["Ez_mat"][2][1, :] * E * \
-                    S / (mat["Ez_mat"][2][0, :] + S)
+            if self.mat["Ez_mat"] is not None:
+                E = np.matmul(y, self.mat["Ez_mat"][1])
+                S = np.matmul(y, self.mat["Ez_mat"][0])
+                MM = self.mat["Ez_mat"][2][1, :] * E * \
+                    S / (self.mat["Ez_mat"][2][0, :] + S)
                 out.iloc[idx, idx_ez] = MM
         return out
 
