@@ -27,3 +27,8 @@ k_value = 5.1e7 #4.35e7
 reactants = ["e_aq", "C8F17SO3_minus",]
 products = ["C8F17SO3_r_minus_minus",]
 k_value = 5.1e7 #3.78e7
+
+[[reactions.k_reaction]]  # 7) e_aq + H2O2 -> OH_minus + OH_r
+reactants = ["e_aq", "H2O2",]
+products = ["OH_minus", "OH_r",]
+k_value = 1.1e10
