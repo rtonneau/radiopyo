@@ -1,3 +1,15 @@
 {
-    "python.defaultInterpreterPath": "C:\\Users\\Romain\\anaconda3\\envs\\radiobio"
+  "python.defaultInterpreterPath": "C:\\Users\\Romain\\anaconda3\\envs\\radiobio",
+  "cSpell.words": [
+    "Boscolo",
+    "excep",
+    "kreaction",
+    "logspace",
+    "LSODA",
+    "nfev",
+    "njev",
+    "radiolytic",
+    "stoi",
+    "tqdm"
+  ]
 }
