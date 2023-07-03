@@ -93,9 +93,9 @@ class Molecule(object):
                  charge: int = 0):
         match atoms:
             case ((_, _), *_):
-                self.atoms = atoms  # type: ignore[assignment]
+                self.atoms = atoms  # type: ignore [assignment]
             case (_, _):
-                self.atoms = [atoms,]  # type: ignore[list-item]
+                self.atoms = [atoms,]  # type: ignore [list-item]
 
         self.multiple = multiple
         self.radical = radical
