@@ -21,7 +21,7 @@ dependencies = [
   "pandas-stubs~=1.5.3",
   "numpy~=1.24.3",
   "scipy~=1.10.1",
-  "mypy~=0.981",
+  "mypy",
 ]
 
 [project.urls]

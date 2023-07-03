@@ -295,7 +295,8 @@ class UnitCell(object):
 
     def run_till_max_dose(self,
                           time_start: float = 1e-9,
-                          **kwargs: tp.Dict[str, tp.Any]) -> ODEResult:
+                          **kwargs: tp.Unpack[KwargsRun],  # type: ignore[misc]
+                          ) -> ODEResult:
         """ """
         if self.beam.time_at_max_dose >= np.inf:
             raise ValueError("Unable to use 'run_till_max_dose', time at max dose "

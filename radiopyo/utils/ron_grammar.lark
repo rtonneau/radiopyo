@@ -1,0 +1,36 @@
+start : "(" (key ":" value ","*)* ")"
+
+?value: dict
+          | list
+          | tuple
+          | list_dict
+          | string
+          | key
+          | SIGNED_NUMBER      -> number
+          | "true"             -> true
+          | "false"            -> false
+          | "null"             -> null
+
+list : "[" [(value) ("," (value))*] ","* "]"
+tuple: "(" [(value) ("," (value))*] ","* ")"
+
+dict : "{" [pair ("," pair)*] ","* "}"
+list_dict : ("("|"[") pair ("," pair)* ","* (")"|"]")
+
+pair : (string | key) ":" value
+
+//kstring : CNAME
+?string : "\"" key "\""
+key: ESCAPED_STRING | CNAME
+
+COMMENTS: "//" /.*/ NEWLINE
+%import common.ESCAPED_STRING
+%import common.SIGNED_NUMBER
+%import common.WS
+%import common.NEWLINE
+%import common.CNAME
+
+%ignore COMMENTS
+%ignore WS
+%ignore NEWLINE
+

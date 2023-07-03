@@ -1,0 +1,295 @@
+(
+    bio_param: (
+        pH: 7,
+    ),
+    fixed_concentrations:{ // Unit is [mol]/[l]
+        "H2O": 55,
+        "catalase": 0.08e-6,
+        "Fe_plus_plus": 8.9e-7,
+        "GSH": 6.5e-3,
+        "RH": 1,
+        "unsat_lipid": 1e-6,
+    },
+    initial_concentrations:{ // Unit is [mol]/[l]
+        "O2": 50e-6, 
+    },
+    radiolytic: { // Unit is [radical / 100eV / incident particle]
+        "e_aq": 2.8,
+        "OH_r": 2.8,
+        "H_r"  : 0.62,
+        "H2"  : 0.47,
+        "H2O2": 0.73,
+        "R_r": 0.59, 
+    },
+    acid_base: [
+        (
+            acid: "OH_r",
+            base: "O_r_minus",
+            pKa: 11.9,
+        ),
+        (
+            acid: "H2O2",
+            base: "HO2_minus",
+            pKa: 11.7,
+        ),
+        (
+            acid: "HO2_r",
+            base: "O2_r_minus",
+            pKa: 4.9,
+        ),
+    ],
+
+    //List of all reactions with e_aq as reactants
+    //For [X].[X] -> ... reactions, 2k value is given
+    k_reactions: [
+        //1) e_aq + H2O -> H_r + OH_minus
+        (
+            reactants: ["e_aq", "H2O"],
+            products: ["H_r", "OH_minus"],
+            k_value: 1.9e1
+        ),
+        //2) e_aq + e_aq -> H2 + 2 OH_minus
+        (
+            reactants: ["e_aq", "e_aq"],
+            products: ["H2", "OH_minus", "OH_minus"],
+            k_value: 1.1e10
+        ),
+        //3) e_aq + H_r -> H2 + OH_minus
+        (
+            reactants: ["e_aq", "H_r"],
+            products: ["H2", "OH_minus"],
+            k_value: 1.1e10
+        ),
+        //4) e_aq + OH_r -> OH_minus
+        (
+            reactants: ["e_aq", "OH_r"],
+            products: ["OH_minus"],
+            k_value: 3.0e10
+        ),
+        //5) e_aq + O_r_minus -> 2 OH_minus
+        (
+            reactants: ["e_aq", "O_r_minus"],
+            products: ["OH_minus", "OH_minus"],
+            k_value: 2.2e10
+        ),
+        //6) e_aq +  H_plus -> H_r
+        (
+            reactants: ["e_aq", "H_plus"],
+            products: ["H_r"],
+            k_value: 2.3e10
+        ),
+        //7) e_aq + H2O2 -> OH_minus + OH_r
+        (
+            reactants: ["e_aq", "H2O2"],
+            products: ["OH_minus", "OH_r"],
+            k_value: 1.1e10
+        ),
+        //8) e_aq + HO2_minus -> 2 OH_minus + OH_r
+        (
+            reactants: ["e_aq", "HO2_minus"],
+            products: ["OH_minus", "OH_minus", "OH_r"],
+            k_value: 3.5e9
+        ),
+        //9) e_aq + O2 -> O2_r_minus
+        (
+            reactants: ["e_aq", "O2"],
+            products: ["O2_r_minus"],
+            k_value: 1.9e10
+        ),
+        //10) e_aq + O2_r_minus -> O2_minus_minus
+        (
+            reactants: ["e_aq", "O2_r_minus"],
+            products: ["O2_minus_minus"],
+            k_value: 1.3e10
+        ),
+
+    // Reactions involving H_r as reactant:
+        //11) H_r + H2O -> H2 + OH_r
+        (
+            reactants: ["H_r", "H2O"],
+            products: ["H2", "OH_r"],
+            k_value: 1.0e1
+        ),
+        //12) H_r + H_r -> H2
+        (
+            reactants: ["H_r", "H_r"],
+            products: ["H2"],
+            k_value: 1.55e10
+        ),
+        //13) H_r + OH_r -> H2O
+        (
+            reactants: ["H_r", "OH_r"],
+            products: ["H2O"],
+            k_value: 7e9
+        ),
+        //14) H_r + OH_minus -> e_aq (+ H2O)
+        (
+            reactants: ["H_r", "OH_minus"],
+            products: ["e_aq"],
+            k_value: 2.2e7
+        ),
+        //15) H_r + H2O2 -> OH_r + H2O
+        (
+            reactants: ["H_r", "H2O2"],
+            products: ["OH_r", "H2O"],
+            k_value: 9.0e7
+        ),
+        //16) H_r + O2 -> HO2_r
+        (
+            reactants: ["H_r", "O2"],
+            products: ["HO2_r"],
+            k_value: 2.1e10
+        ),
+        //17) H_r + HO2_r -> H2O2
+        (
+            reactants: ["H_r", "HO2_r"],
+            products: ["H2O2"],
+            k_value: 1.0e10
+        ),
+
+    //Reactions involving OH_r as reactant:
+        //18) OH_r + OH_r -> H2O2
+        (
+            reactants: ["OH_r", "OH_r"],
+            products: ["H2O2"],
+            k_value: 1.1e10
+        ),
+        //19) OH_r + H2 -> H_r + H2O
+        (
+            reactants: ["OH_r", "H2"],
+            products: ["H_r", "H2O"],
+            k_value: 4.2e7
+        ),
+        //20) OH_r + OH_Minus -> O_r_minus + H2O
+        (
+            reactants: ["OH_r", "OH_minus"],
+            products: ["O_r_minus", "H2O"],
+            k_value: 4.2e7
+        ),
+        //21) OH_r + HO2_minus -> OH_minus + HO2_r
+        (
+            reactants: ["OH_r", "HO2_minus"],
+            products: ["OH_minus", "HO2_r"],
+            k_value: 7.5e9
+        ),
+        //22) OH_r + O2_r_minus -> OH_minus + O2
+        (
+            reactants: ["OH_r", "O2_r_minus"],
+            products: ["OH_minus", "O2"],
+            k_value: 8.0e9
+        ),
+
+    //Reactions involving O_r_minus as reactant:
+        //23) O_r_minus + H2O -> OH_minus + OH_r
+        (
+            reactants: ["O_r_minus", "H2O"],
+            products: ["OH_minus", "OH_r"],
+            k_value: 1.8e6
+        ),
+        //24) O_r_minus + O2 -> O3_minus
+        (
+            reactants: ["O_r_minus", "O2"],
+            products: ["O3_minus"],
+            k_value: 3.6e9
+        ),
+        //25) O_r_minus + O2_r_minus -> 2 OH_minus + O2
+        (
+            reactants: ["O_r_minus", "O2_r_minus"],
+            products: ["OH_minus", "OH_minus", "O2"],
+            k_value: 6.0e8
+        ),
+
+    // --------------------------- Biological Reactions --------------------------------
+        //26) Super Oxide Dismutase action on  O2_r_minus (H_plus?)
+        (
+            reactants: ["O2_r_minus", "O2_r_minus"],
+            products: ["H2O2", "O2"],
+            k_value: 2e9
+        ),
+        //27) Same but Spontaneous reaction (no SOD involved)
+        (
+            reactants: ["O2_r_minus", "O2_r_minus"],
+            products: ["H2O2", "O2"],
+            k_value: 2e5
+        ),
+        //------------------------------------------------------------------------------
+        //28) Fenton Reactions
+        (
+            reactants: ["Fe_plus_plus", "H2O2"],
+            products: ["Fe_plus_plus_plus", "OH_minus", "OH_r"],
+            k_value: 1e3
+        ),
+        //------------------------------------------------------------------------------
+        //29) Reaction of H_r with biological molecules (RdH in R.Labarbe)
+        (
+            reactants: ["RH", "H_r"],
+            products: ["RH_r"],
+            k_value: 1e8
+        ),
+        //30) Reaction of e_aq with biological molecules (Rde in R.Labarbe)
+        (
+            reactants: ["RH", "e_aq"],
+            products: ["RH_r"],
+            k_value: 1.4e8
+        ),
+        //31) Reaction of HO^. with thiols (RdOH in R.Labarbe)
+        (
+            reactants: ["OH_r", "GSH"],
+            products: ["RH_r"],
+            k_value: 1e10
+        ),
+        //32) Hydrogen abstraction by OH_r (Rb2 in R.Labarbe)
+        (
+            reactants: ["OH_r", "RH"],
+            products: ["R_r"],
+            k_value: 1e9
+        ),
+        //33) Reaction of Alkyl, R_r with O2 to form alkylperoxyl radicals ROO_r (Rb3 in R.Labarbe)
+        (
+            reactants: ["R_r", "O2"],
+            products: ["ROO_r"],
+            k_value: 5e7
+        ),
+        //34) decay of alkyl radiacl by other routes than oxygen (Rbr in R.Labarbe)
+        (
+            reactants: ["R_r"],
+            products: ["trash"],
+            k_value: 300
+        ),
+        //35) R^. + R^. --> R-R   1e5 < k < 1e9 M^-1s^-1 (Rbr2 in R.Labarbe)
+        (
+            reactants: ["R_r", "R_r"],
+            products: ["trash"],
+            k_value: 5e7
+        ),
+        //36) self reaction of ROO_r (Rb6 in R.Labarbe)
+        (
+            reactants: ["ROO_r", "ROO_r"],
+            products: ["O2", "ROH", "RO"],
+            k_value: 1e4
+        ),
+        //37) Life time of ROO_r ~ 17 s (k~ln(2)/17) (Rb8 in R.Labarbe)-
+        (
+            reactants: ["ROO_r"],
+            products: ["trash"],
+            k_value: 0.0408
+        ),
+        //38) ROO_r react with unsaturated lipids RH to initiate nex radical chain  (Rb11 in R.Labarbe)
+        (
+            reactants: ["ROO_r", "unsat_lipid"],
+            products: ["ROOH", "R_r"],
+            k_value: 20
+        ),
+  ],
+  // These reactions are implemented via the Michaelis Menten kinetic
+  enzymatic_reactions: [
+        // (Rb10 in R.Labarbe)
+        (
+            enzyme: "catalase",
+            substrate: ["H2O2", "H2O2"],
+            products: ["O2", "H2O", "H2O"],
+            k_value: 6.62e7, // [1/s]
+            k_micha: 1.1, // [mol/l]
+        ),
+  ],
+)
