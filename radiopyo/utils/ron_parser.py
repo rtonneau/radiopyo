@@ -11,7 +11,6 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-import re
 import typing as tp
 from functools import reduce
 
@@ -25,9 +24,6 @@ from radiopyo.utils.parser_def import FileParser
 #                               TYPE CHECKING ONLY IMPORT                              #
 # ------------------------------------------------------------------------------------ #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.acid_base import ABDict
-    from radiopyo.chemistry.k_reactions import KReactionDict
-    from radiopyo.chemistry.michaelis import MichaelisMentenDict
     from radiopyo.utils.sim_types import ConfigDict
 
 # ------------------------------------------------------------------------------------ #
