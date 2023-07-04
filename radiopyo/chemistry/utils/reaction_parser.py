@@ -12,6 +12,7 @@ from __future__ import annotations
 import typing as tp
 
 import lark
+import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
 
@@ -37,6 +38,14 @@ __all__: tp.List = []
 # ------------------------------------------------------------------------------------ #
 
 
+class KwargsAtom(tp.TypedDict):
+    name: str
+    multiple: int
+    charge: int
+    radical: bool
+    mass: float
+
+
 class Atom(object):
     """
     """
@@ -51,7 +60,8 @@ class Atom(object):
                  multiple: int = 1,
                  charge: int = 0,
                  radical: bool = False,
-                 mass: float = 0) -> None:
+                 mass: float = 0
+                 ) -> None:
         self.name = name
         self.multiple = multiple
         self.charge = charge
@@ -59,7 +69,8 @@ class Atom(object):
         self.mass = mass
 
     def __str__(self) -> str:
-        out = [self.name,]
+        out = [f"{self.multiple}",
+               self.name] if self.multiple > 1 else [self.name]
         if self.radical:
             out.append("_r")
         if self.charge > 0:
@@ -68,14 +79,24 @@ class Atom(object):
             out += ["_minus"]*self.charge
         return "".join(out)
 
+    def __repr__(self) -> str:
+        return self.__str__()
 
-class HydratedElectron(Atom):
 
-    def __init__(self) -> None:
-        super().__init__("e_aq", charge=-1, mass=0)
+class ChemicalElement(Atom):
+    def __init__(self, name: str, multiple: int = 1) -> None:
+        super().__init__(name, multiple=multiple, charge=0, mass=0)
 
     def __str__(self) -> str:
-        return self.name
+        if self.multiple == 1:
+            return self.name
+        return f"{self.multiple}{self.name}"
+
+
+class HydratedElectron(ChemicalElement):
+
+    def __init__(self, multiple: int = 1) -> None:
+        Atom.__init__(self, name="e_aq", multiple=multiple, charge=-1, mass=0)
 
 
 class Molecule(object):
@@ -83,34 +104,57 @@ class Molecule(object):
     """
     atoms: tp.List[tp.Tuple[Atom, int]]
     multiple: int
-    radical: bool
-    charge: int
 
     def __init__(self,
-                 atoms: tp.List[tp.Tuple[Atom, int]] | tp.Tuple[Atom, int],
+                 atoms: tp.List[tp.Tuple[Atom, int]],
                  multiple: int = 1,
-                 radical: bool = False,
-                 charge: int = 0):
-        match atoms:
-            case ((_, _), *_):
-                self.atoms = atoms  # type: ignore [assignment]
-            case (_, _):
-                self.atoms = [atoms,]  # type: ignore [list-item]
+                 charge: int = 0,
+                 radical: bool = False
+                 ):
+        if len(atoms) == 2 and isinstance(atoms[0], Atom):
+            self.atoms = [atoms,]
+        else:
+            self.atoms = atoms
 
         self.multiple = multiple
         self.radical = radical
         self.charge = charge
 
+    @classmethod
+    def from_atom_dict(cls,
+                       atoms: tp.List[tp.Tuple[KwargsAtom, int]],
+                       multiple: int = 1,
+                       charge: int = 0,
+                       radical: bool = False,
+                       ) -> Molecule:
+        return cls([(Atom(**elt), stoi) for elt, stoi in atoms],
+                   multiple,
+                   charge,
+                   radical)
+
     def __str__(self) -> str:
         out = []
         if self.multiple > 1:
             out.append(str(self.multiple))
-        out += [str(elt) for elt in self.atoms]
+        for elt, stoi in self.atoms:
+            out.append(f"{elt}")
+            if stoi > 1:
+                out[-1] += f"{stoi}"
+        if self.radical:
+            out.append("_r")
+        if self.charge > 0:
+            out += ["_plus"]*self.charge
+        elif self.charge < 0:
+            out += ["_minus"]*np.abs(self.charge)
         return "".join(out)
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 class TreeToReaction(lark.Transformer):
     """ """
+    
     species_list = list
 
     def start(self, items: tp.List) -> tp.Dict:
@@ -128,11 +172,22 @@ class TreeToReaction(lark.Transformer):
     def products(self, items: tp.List) -> tp.Dict:
         return {"products": items[0]}
 
-    def species(self, items: tp.List) -> tp.Dict:
+    def species(self, items: tp.List) -> Molecule | Atom:
         if len(items) > 1:
             items[1]["multiple"] = items[0]
-            return items[1]
-        return items[0]
+            kwargs = items[1]
+        else:
+            kwargs = items[0]
+
+        if isinstance(kwargs, str):
+            return ChemicalElement(kwargs)
+        if "name" in kwargs:
+            if kwargs["name"] == "e_aq":
+                return HydratedElectron(kwargs["multiple"])
+            return Atom(**kwargs)
+        if "atoms" in kwargs:  # It is a Molecule
+            return Molecule.from_atom_dict(**kwargs)
+        raise ValueError(f"Unknown species: {kwargs}")
 
     def enzyme(self, items: tp.List) -> tp.Dict:
         return {"enzyme": items[0]}
@@ -155,12 +210,11 @@ class TreeToReaction(lark.Transformer):
         return items[0]
 
     def atom(self, items: tp.List) -> tp.Dict:
-        return {"name": items[0], "stoi": 1, "radical": False, "charge": 0}
+        return {"name": items[0], "radical": False, "charge": 0}
 
-    def sub_mol(self, items: tp.List) -> tp.Dict:
+    def sub_mol(self, items: tp.List) -> tp.Tuple[tp.Dict, int]:
         stoi, = items[1:2] or [1]
-        items[0]["stoi"] = stoi
-        return items[0]
+        return (items[0], stoi)
 
     def molecule(self, items: tp.List) -> tp.Dict:
         return {"atoms": items, "radical": False, "charge": 0, "multiple": 1}
