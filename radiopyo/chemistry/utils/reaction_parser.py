@@ -44,8 +44,8 @@ __all__: tp.List = []
 class GenericReaction(tp.TypedDict):
     products: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
     reactants: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
-    constants: tp.Optional[tp.Dict[str, float]]
-    enzyme: tp.Optional[BasicSpecies | Atom | Molecule]
+    constants: tp.Dict[str, float]
+    enzyme: BasicSpecies | Atom | Molecule | None
 
 
 class KwargsAtom(tp.TypedDict):
@@ -199,13 +199,13 @@ class TreeToReaction(lark.Transformer):
         return GenericReaction(reactants={items[0][0].label(): items[0]},
                                products=items[2],
                                enzyme=items[1],
-                               constants=None,
+                               constants={},
                                )
 
     def kreaction(self, items: tp.List) -> GenericReaction:
         return GenericReaction(reactants=items[0],
                                products=items[1],
-                               constants=None,
+                               constants={},
                                enzyme=None)
 
     def reactants(self, items: tp.List) -> tp.List:
@@ -311,7 +311,8 @@ class ReactionParser(object):
         """"""
         r = self._parse(reaction)
         if not isinstance(r, dict):
-            raise TypeError(f"Unable to parse: '{reaction}' as a chemical reaction")
+            raise TypeError(
+                f"Unable to parse: '{reaction}' as a chemical reaction")
         for _, (species, _) in r["reactants"].items():
             if isinstance(species, (Atom, Molecule)):
                 self._set_mass(species)

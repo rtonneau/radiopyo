@@ -23,11 +23,6 @@ if tp.TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
 
-    from radiopyo.chemistry.acid_base import ABDict
-    from radiopyo.chemistry.k_reactions import KReactionDict
-    from radiopyo.chemistry.michaelis import MichaelisMentenDict
-    from radiopyo.chemistry.radiolytic import RadiolyticReactionDict
-
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
     "KwargsRun",
@@ -60,10 +55,10 @@ class ConcentrationDict(tp.TypedDict):
 
 
 class ReactionsDict(tp.TypedDict):
-    radiolytic: RadiolyticReactionDict
-    acid_base: tp.List[ABDict]
-    k_reaction: tp.List[KReactionDict]
-    enzymatic: tp.List[MichaelisMentenDict]
+    radiolytic: tp.Dict
+    acid_base: tp.List[tp.Dict]
+    k_reaction: tp.List[tp.Dict]
+    enzymatic: tp.List[tp.Dict]
 
 
 class ConfigDict(tp.TypedDict):

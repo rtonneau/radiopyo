@@ -132,7 +132,7 @@ class RadiolyticReaction(BaseChemicalReaction):
 
     # ------------------------------------------------------------------------ #
 
-    def add_as_reactant(self, sp: SimSpecies) -> None:
+    def add_as_reactant(self, sp: SimSpecies, multiple: int = 1) -> None:
         """No reactant should be involved"""
         NotImplementedError("Not implemented for Radiolytic Reactions")
 

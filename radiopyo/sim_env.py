@@ -12,31 +12,24 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import typing as tp
 from contextlib import suppress
 from dataclasses import dataclass
 from itertools import chain
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-)
 
 import numpy as np
 from scipy.constants import Avogadro  # type: ignore[import]
 
+# --------------------------------- Internal imports --------------------------------- #
 from .chemistry.acid_base import ABCouple
 from .chemistry.k_reactions import KReaction
 from .chemistry.michaelis import MichaelisMenten
 from .chemistry.radiolytic import RadiolyticReaction
-
-# --------------------------------- Internal imports --------------------------------- #
 from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
+from .chemistry.utils.reaction_parser import ReactionParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from .chemistry.acid_base import ABDict
@@ -44,6 +37,7 @@ if TYPE_CHECKING:
     from .chemistry.k_reactions import KReactionDict
     from .chemistry.michaelis import MichaelisMentenDict
     from .chemistry.radiolytic import RadiolyticReactionDict
+    from .chemistry.utils.reaction_parser import GenericReaction
     from .utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -63,10 +57,10 @@ class ReactionsList:
     """Collection class to store all reactions and apply some changes on its 
     e.g. indexing. Also expose methods to ease iteration.
     """
-    acid_base: List[ABCouple]
-    k_reaction: List[KReaction]
-    enzymatic: List[MichaelisMenten]
-    radiolytic: List[RadiolyticReaction]
+    acid_base: tp.List[ABCouple]
+    k_reaction: tp.List[KReaction]
+    enzymatic: tp.List[MichaelisMenten]
+    radiolytic: tp.List[RadiolyticReaction]
 
     def __post_init__(self) -> None:
         for idx, k_reaction in enumerate(self.k_reaction):
@@ -76,12 +70,12 @@ class ReactionsList:
         for idx, e_reaction in enumerate(self.enzymatic):
             e_reaction.set_index(idx)
 
-    def iter_isChemicalReaction(self) -> Iterable[IsChemicalReaction]:
+    def iter_isChemicalReaction(self) -> tp.Iterable[IsChemicalReaction]:
         return chain.from_iterable([self.k_reaction,
                                     self.radiolytic,
                                     self.enzymatic])
 
-    def iter_all(self) -> Iterable[IsChemicalReaction | ABCouple]:
+    def iter_all(self) -> tp.Iterable[IsChemicalReaction | ABCouple]:
         return chain.from_iterable([self.k_reaction,
                                     self.radiolytic,
                                     self.enzymatic,
@@ -105,8 +99,8 @@ class SimEnv():
     """
     reactions: ReactionsList
     species: ListSpecies
-    bio_param: Dict[str, float]
-    initial_cc: Dict[str, float]
+    bio_param: tp.Dict[str, float]
+    initial_cc: tp.Dict[str, float]
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -121,34 +115,34 @@ class SimEnv():
         return hasher.hexdigest()
 
     @property
-    def acid_base(self) -> List[ABCouple]:
+    def acid_base(self) -> tp.List[ABCouple]:
         return self.reactions.acid_base
 
     @property
-    def k_reaction(self) -> List[KReaction]:
+    def k_reaction(self) -> tp.List[KReaction]:
         return self.reactions.k_reaction
 
     @property
-    def enzymatic(self) -> List[MichaelisMenten]:
+    def enzymatic(self) -> tp.List[MichaelisMenten]:
         return self.reactions.enzymatic
 
     @property
-    def radiolytic(self) -> List[RadiolyticReaction]:
+    def radiolytic(self) -> tp.List[RadiolyticReaction]:
         return self.reactions.radiolytic
 
-    def iter_ABCouple(self) -> Iterable[ABCouple]:
+    def iter_ABCouple(self) -> tp.Iterable[ABCouple]:
         """Get iterable over all A/B couples/reactions"""
         return iter(self.reactions.acid_base)
 
-    def iter_DynSpecies(self) -> Iterable[DynSpecies]:
+    def iter_DynSpecies(self) -> tp.Iterable[DynSpecies]:
         """Get iterable over all the Dynamic Species"""
         return self.species.iter_dyn_species()
 
-    def iter_CstSpecies(self) -> Iterable[CstSpecies]:
+    def iter_CstSpecies(self) -> tp.Iterable[CstSpecies]:
         """Get iterable over all the Cst Species"""
         return self.species.iter_cst_species()
 
-    def iter_species(self) -> Iterable[SimSpecies]:
+    def iter_species(self) -> tp.Iterable[SimSpecies]:
         """Get (sorted) iterable over all the Species"""
         return sorted(self.species, key=lambda x: x.index)
 
@@ -274,7 +268,7 @@ class SimEnv():
                         len(out_dyn)] = cst_species.initial_cc()*1e6
         return np.append(out_dyn, out_cst)
 
-    def species_labels(self) -> List[str]:
+    def species_labels(self) -> tp.List[str]:
         """Get (index ordered) list of species name
 
         Returns:
@@ -282,8 +276,8 @@ class SimEnv():
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
 
-    def make_O2_intake_matrix(self) -> Optional[Tuple[NDArray[np.float64],
-                                                      NDArray[np.float64],]]:
+    def make_O2_intake_matrix(self) -> tp.Optional[tp.Tuple[NDArray[np.float64],
+                                                            NDArray[np.float64],]]:
         """ 
         Add here all terms related to environment interaction like O2 intake.
         """
@@ -307,10 +301,10 @@ class SimEnv():
         Evo[sp.index] = x*sp.initial_cc()*1e6
         return Evi, Evo
 
-    def make_kreaction_matrix(self) -> Tuple[NDArray[np.float64],
-                                             NDArray[np.int8],
-                                             NDArray[np.float32],
-                                             NDArray[np.float32],]:
+    def make_kreaction_matrix(self) -> tp.Tuple[NDArray[np.float64],
+                                                NDArray[np.int8],
+                                                NDArray[np.float32],
+                                                NDArray[np.float32],]:
         """ Construct all matrices necessary to compute the variation of the species
         concentrations due to all k reactions.
         """
@@ -396,11 +390,11 @@ class SimEnv():
                 Gi[sp.index, col] = radiolytic.kr()
         return Gi.sum(axis=1)
 
-    def make_enzymatic_matrix(self) -> Optional[Tuple[NDArray[np.float32],
-                                                      NDArray[np.float32],
-                                                      NDArray[np.float64],
-                                                      NDArray[np.int8],
-                                                      ]]:
+    def make_enzymatic_matrix(self) -> tp.Optional[tp.Tuple[NDArray[np.float32],
+                                                            NDArray[np.float32],
+                                                            NDArray[np.float64],
+                                                            NDArray[np.int8],
+                                                            ]]:
         """ Construct all matrices necessary to compute the variation of the species
         concentrations due enzymatic reactions.
         Tricks to keep in mind: 
@@ -442,9 +436,9 @@ class SimEnv():
                 Ez_iy[sp.index, col] = stoi
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
 
-    def make_acidBase_matrix(self) -> Tuple[NDArray[np.int8],
-                                            NDArray[np.int8],
-                                            NDArray[np.float64]]:
+    def make_acidBase_matrix(self) -> tp.Tuple[NDArray[np.int8],
+                                               NDArray[np.int8],
+                                               NDArray[np.float64]]:
         """ Construct matrix necessary to compute to account for Acid/Base equilibrium 
         during the computation of the cc values variations.
         """
@@ -483,23 +477,23 @@ class SimEnv():
 
     def kreactions_involving(self,
                              species: str | SimSpecies,
-                             ) -> List[KReaction]:
+                             ) -> tp.List[KReaction]:
         return [r for r in self.reactions.k_reaction if species in r]
 
     def kreactions_involving_reactant(self,
                                       species: str | SimSpecies,
-                                      ) -> List[KReaction]:
+                                      ) -> tp.List[KReaction]:
         return [r for r in self.reactions.k_reaction if r.has_reactant(species)]
 
     def kreactions_involving_product(self,
                                      species: str | SimSpecies,
-                                     ) -> List[KReaction]:
+                                     ) -> tp.List[KReaction]:
         return [r for r in self.reactions.k_reaction if r.has_product(species)]
 
     def reactions_involving(self,
                             species: str | SimSpecies,
-                            ) -> List[IsChemicalReaction]:
-        out: List[IsChemicalReaction] = []
+                            ) -> tp.List[IsChemicalReaction]:
+        out: tp.List[IsChemicalReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
             if species in reaction:
                 out.append(reaction)
@@ -507,8 +501,8 @@ class SimEnv():
 
     def reactions_involving_reactant(self,
                                      species: str | SimSpecies,
-                                     ) -> List[IsChemicalReaction]:
-        out: List[IsChemicalReaction] = []
+                                     ) -> tp.List[IsChemicalReaction]:
+        out: tp.List[IsChemicalReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
             if reaction.has_reactant(species):
                 out.append(reaction)
@@ -516,8 +510,8 @@ class SimEnv():
 
     def reactions_involving_product(self,
                                     species: str | SimSpecies,
-                                    ) -> List[IsChemicalReaction]:
-        out: List[IsChemicalReaction] = []
+                                    ) -> tp.List[IsChemicalReaction]:
+        out: tp.List[IsChemicalReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
             if reaction.has_product(species):
                 out.append(reaction)
@@ -528,9 +522,9 @@ class SimEnv():
 # ------------------------------------------------------------------------------------ #
 
 
-def acid_base_from_dict(reactions: List[ABDict],
-                        sim_sp: Optional[ListSpecies] = None,
-                        ) -> Tuple[List[ABCouple], ListSpecies]:
+def acid_base_from_dict(reactions: tp.List[tp.Dict],
+                        sim_sp: tp.Optional[ListSpecies] = None,
+                        ) -> tp.Tuple[tp.List[ABCouple], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
@@ -539,31 +533,58 @@ def acid_base_from_dict(reactions: List[ABDict],
             sim_sp)
 
 
-def kreaction_from_dict(reactions: List[KReactionDict],
-                        sim_sp: Optional[ListSpecies] = None,
-                        ) -> Tuple[List[KReaction], ListSpecies]:
+def kreaction_from_dict(reactions: tp.List[tp.Dict],
+                        sim_sp: tp.Optional[ListSpecies] = None,
+                        ) -> tp.Tuple[tp.List[KReaction], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
-    return ([KReaction.from_dict(list_sp=sim_sp, **reaction)
-            for reaction in reactions],
-            sim_sp)
+    if len(reactions) == 0:
+        return ([], sim_sp)
+
+    out = []
+    parser = ReactionParser()
+    for reaction in reactions:
+        match reaction:
+            case {"reactants": _, "products": _, "k_value": _}\
+                    if len(reaction) == 3:
+                out.append(KReaction.from_dict(list_sp=sim_sp, **reaction))
+            case {"reaction": r, "k_value": k} if len(reaction) == 2:
+                gen = parser.parse_reaction(r)
+                out.append(KReaction.from_generic(gen, k, list_sp=sim_sp))
+            case _:
+                raise ValueError(f"Wrong KReaction syntax {reaction}")
+    return (out, sim_sp)
 
 
-def michaelis_from_dict(reactions: List[MichaelisMentenDict],
-                        sim_sp: Optional[ListSpecies] = None,
-                        ) -> Tuple[List[MichaelisMenten], ListSpecies]:
+def michaelis_from_dict(reactions: tp.List[tp.Dict],
+                        sim_sp: tp.Optional[ListSpecies] = None,
+                        ) -> tp.Tuple[tp.List[MichaelisMenten], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
-    return ([MichaelisMenten.from_dict(list_sp=sim_sp, **reaction)
-            for reaction in reactions],
-            sim_sp)
+    out = []
+    parser = ReactionParser()
+    for reaction in reactions:
+        match reaction:
+            case {"enzyme": _, "substrate": _, "products": _, "k_value": _,
+                  "k_micha": _} if len(reaction) == 5:
+                out.append(MichaelisMenten.from_dict(
+                    list_sp=sim_sp, **reaction))
+            case {"reaction": r, "k_value": k_value, "k_micha": k_micha}\
+                    if len(reaction) == 3:
+                gen = parser.parse_reaction(r)
+                out.append(MichaelisMenten.from_generic(generic=gen,
+                                                        k_value=k_value,
+                                                        k_micha=k_micha,
+                                                        list_sp=sim_sp))
+
+    return (out, sim_sp)
 
 
-def radiolytic_from_dict(reactions: RadiolyticReactionDict,
-                         sim_sp: Optional[ListSpecies] = None,
-                         ) -> Tuple[List[RadiolyticReaction], ListSpecies]:
+def radiolytic_from_dict(reactions: tp.Dict,
+                         sim_sp: tp.Optional[ListSpecies] = None,
+                         ) -> tp.Tuple[tp.List[RadiolyticReaction], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
@@ -572,8 +593,8 @@ def radiolytic_from_dict(reactions: RadiolyticReactionDict,
             sim_sp)
 
 
-def constant_species_from_dict(species: Dict[str, float],
-                               sim_sp: Optional[ListSpecies] = None,
+def constant_species_from_dict(species: tp.Dict[str, float],
+                               sim_sp: tp.Optional[ListSpecies] = None,
                                ) -> ListSpecies:
     if sim_sp is None:
         sim_sp = ListSpecies()

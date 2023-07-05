@@ -15,6 +15,7 @@ import typing as tp
 # --------------------------------- Internal imports --------------------------------- #
 from .base_chemistry import BaseChemicalReaction
 from .species import ListSpecies
+from .utils.reaction_parser import GenericReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -81,6 +82,22 @@ class KReaction(BaseChemicalReaction):
             "Unknown reaction index. Cannot make a label without index.")
 
     @classmethod
+    def from_generic(cls,
+                     generic: GenericReaction,
+                     k_value: float,
+                     list_sp: tp.Optional[ListSpecies] = None,) -> KReaction:
+        """ """
+
+        reactants: tp.List[str] = []
+        products: tp.List[str] = []
+
+        for sp, (_, stoi) in generic["reactants"].items():
+            reactants += [sp]*stoi
+        for sp, (_, stoi) in generic["products"].items():
+            products += [sp]*stoi
+        return KReaction.from_dict(reactants, products, k_value, list_sp)
+
+    @classmethod
     def from_dict(cls,
                   reactants: tp.List[str],
                   products: tp.List[str],
@@ -140,7 +157,10 @@ class KReaction(BaseChemicalReaction):
                 f"k_value={round(self.k_value,5)})")
 
 
-class KReactionDict(tp.TypedDict):
-    reactants: tp.List[str]
-    products: tp.List[str]
+class KReactionDict(tp.TypedDict, total=False):
+    """ """
+    reactants: tp.Optional[tp.List[str]]
+    products: tp.Optional[tp.List[str]]
+    reaction: tp.Optional[str]
+    constants: tp.Optional[tp.Dict[str, float]]
     k_value: float

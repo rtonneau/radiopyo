@@ -213,7 +213,7 @@ class BaseChemicalReaction():
             return self.stoi_reactants.get(reactant, 0) > 0
         return self.stoi_reactants.get(reactant.label, 0) > 0
 
-    def add_as_product(self, sp: SimSpecies) -> None:
+    def add_as_product(self, sp: SimSpecies, multiple: int = 1) -> None:
         """
         Method to conveniently add a new product to the reaction by keeping the
         stoichiometry relevant:
@@ -228,12 +228,12 @@ class BaseChemicalReaction():
             None
         """
         if sp.label in self.products:
-            self.stoi_products[sp.label] += 1
+            self.stoi_products[sp.label] += multiple
         else:
             self.products[sp.label] = sp
-            self.stoi_products[sp.label] = 1
+            self.stoi_products[sp.label] = multiple
 
-    def add_as_reactant(self, sp: SimSpecies) -> None:
+    def add_as_reactant(self, sp: SimSpecies, multiple: int = 1) -> None:
         """
         Method to conveniently add a new reactant to the reaction by keeping the
         stoichiometry relevant:
@@ -248,10 +248,10 @@ class BaseChemicalReaction():
             None
         """
         if sp.label in self.reactants:
-            self.stoi_reactants[sp.label] += 1
+            self.stoi_reactants[sp.label] += multiple
         else:
             self.reactants[sp.label] = sp
-            self.stoi_reactants[sp.label] = 1
+            self.stoi_reactants[sp.label] = multiple
 
     def as_label(self) -> str:
         """ 

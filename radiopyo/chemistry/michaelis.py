@@ -19,7 +19,7 @@ from .species import ListSpecies
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
     from .species import SimSpecies
-
+    from .utils.reaction_parser import GenericReaction
 # ------------------------------------------------------------------------------------ #
 
 __all__ = [
@@ -69,6 +69,31 @@ class MichaelisMenten(BaseChemicalReaction):
         hasher = hashlib.new(method, usedforsecurity=False)
         hasher.update(repr(self).encode())
         return hasher.hexdigest()
+
+    @classmethod
+    def from_generic(cls,
+                     generic: GenericReaction,
+                     k_value: float,
+                     k_micha: float,
+                     list_sp: tp.Optional[ListSpecies] = None,) -> MichaelisMenten:
+        """ """
+        if generic["enzyme"] is None:
+            raise ValueError(
+                f"No enzyme found for enzymatic reaction: {generic}")
+        enzyme: str = generic["enzyme"].label()
+        substrate: tp.List[str] = []
+        products: tp.List[str] = []
+
+        for sp, (_, stoi) in generic["reactants"].items():
+            substrate += [sp]*stoi
+        for sp, (_, stoi) in generic["products"].items():
+            products += [sp]*stoi
+        return MichaelisMenten.from_dict(enzyme=enzyme,
+                                         substrate=substrate,
+                                         products=products,
+                                         k_value=k_value,
+                                         k_micha=k_micha,
+                                         list_sp=list_sp)
 
     @classmethod
     def from_dict(cls,
