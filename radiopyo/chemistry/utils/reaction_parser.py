@@ -10,15 +10,18 @@ Author:
 from __future__ import annotations
 
 import typing as tp
+from functools import reduce
+from pathlib import Path
 
 import lark
 import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.chemistry.utils.atomic_weights import Atomix
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    from collections.abc import Iterator
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__: tp.List = []
@@ -38,108 +41,59 @@ __all__: tp.List = []
 # ------------------------------------------------------------------------------------ #
 
 
+class GenericReaction(tp.TypedDict):
+    products: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
+    reactants: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
+    constants: tp.Optional[tp.Dict[str, float]]
+    enzyme: tp.Optional[BasicSpecies | Atom | Molecule]
+
+
 class KwargsAtom(tp.TypedDict):
     name: str
-    multiple: int
     charge: int
     radical: bool
     mass: float
 
 
-class Atom(object):
-    """
-    """
+class BasicSpecies(object):
+    """"""
     name: str
-    multiple: int
-    charge: int
-    radical: bool
-    mass: float
 
     def __init__(self,
                  name: str,
-                 multiple: int = 1,
-                 charge: int = 0,
-                 radical: bool = False,
-                 mass: float = 0
                  ) -> None:
         self.name = name
-        self.multiple = multiple
-        self.charge = charge
-        self.radical = radical
-        self.mass = mass
 
     def __str__(self) -> str:
-        out = [f"{self.multiple}",
-               self.name] if self.multiple > 1 else [self.name]
-        if self.radical:
-            out.append("_r")
-        if self.charge > 0:
-            out += ["_plus"]*self.charge
-        elif self.charge < 0:
-            out += ["_minus"]*self.charge
-        return "".join(out)
+        return self.name
 
     def __repr__(self) -> str:
         return self.__str__()
 
-
-class ChemicalElement(Atom):
-    def __init__(self, name: str, multiple: int = 1) -> None:
-        super().__init__(name, multiple=multiple, charge=0, mass=0)
-
-    def __str__(self) -> str:
-        if self.multiple == 1:
-            return self.name
-        return f"{self.multiple}{self.name}"
+    def label(self) -> str:
+        return self.__str__()
 
 
-class HydratedElectron(ChemicalElement):
-
-    def __init__(self, multiple: int = 1) -> None:
-        Atom.__init__(self, name="e_aq", multiple=multiple, charge=-1, mass=0)
-
-
-class Molecule(object):
+class ChemicalSpecies(BasicSpecies):
     """
     """
-    atoms: tp.List[tp.Tuple[Atom, int]]
-    multiple: int
+    charge: int
+    radical: bool
+    _mass: float
 
     def __init__(self,
-                 atoms: tp.List[tp.Tuple[Atom, int]],
-                 multiple: int = 1,
+                 name: str,
                  charge: int = 0,
-                 radical: bool = False
-                 ):
-        if len(atoms) == 2 and isinstance(atoms[0], Atom):
-            self.atoms = [atoms,]
-        else:
-            self.atoms = atoms
-
-        self.multiple = multiple
-        self.radical = radical
+                 radical: bool = False,
+                 mass: float = 0
+                 ) -> None:
+        super().__init__(name)
         self.charge = charge
-
-    @classmethod
-    def from_atom_dict(cls,
-                       atoms: tp.List[tp.Tuple[KwargsAtom, int]],
-                       multiple: int = 1,
-                       charge: int = 0,
-                       radical: bool = False,
-                       ) -> Molecule:
-        return cls([(Atom(**elt), stoi) for elt, stoi in atoms],
-                   multiple,
-                   charge,
-                   radical)
+        self.radical = radical
+        self._mass = mass
 
     def __str__(self) -> str:
-        out = []
-        if self.multiple > 1:
-            out.append(str(self.multiple))
-        for elt, stoi in self.atoms:
-            out.append(f"{elt}")
-            if stoi > 1:
-                out[-1] += f"{stoi}"
+        out = [super().__str__(),]
         if self.radical:
             out.append("_r")
         if self.charge > 0:
@@ -148,49 +102,147 @@ class Molecule(object):
             out += ["_minus"]*np.abs(self.charge)
         return "".join(out)
 
-    def __repr__(self) -> str:
-        return self.__str__()
+    @property
+    def mass(self) -> float:
+        return self._mass
+
+    @mass.setter
+    def mass(self, value: float) -> None:
+        self._mass = value
+
+
+class HydratedElectron(ChemicalSpecies):
+
+    def __init__(self) -> None:
+        super().__init__(name="e_aq",
+                         charge=-1,
+                         radical=False,
+                         mass=0)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Atom (ChemicalSpecies):
+    """ """
+
+    def raw_label(self) -> str:
+        return self.name
+
+
+class Molecule(ChemicalSpecies):
+    """
+    """
+    atoms: tp.List[tp.Tuple[Atom, int]]
+
+    def __init__(self,
+                 atoms: tp.List[tp.Tuple[Atom, int]],
+                 charge: int = 0,
+                 radical: bool = False
+                 ):
+        super().__init__("", charge, radical)
+        if len(atoms) == 2 and isinstance(atoms[0], Atom):
+            self.atoms = [atoms,]
+        else:
+            self.atoms = atoms
+
+        # Let's do some checks
+        for atom, _ in self.atoms:
+            if atom.charge != 0:
+                raise ValueError(f"{atom} must be neutral (and not {atom.charge}) "
+                                 "to compose a molecule")
+            if atom.radical is not False:
+                raise ValueError(f"{atom} must not be a radical "
+                                 "to compose a molecule")
+
+    def __iter__(self) -> Iterator[tp.Tuple[Atom, int]]:
+        return iter(self.atoms)
+
+    def __str__(self) -> str:
+        out = []
+        for atom, stoi in self.atoms:
+            out.append(f"{atom.label()}{stoi if stoi>1 else ''}")
+        if self.radical:
+            out.append("_r")
+        if self.charge > 0:
+            out += ["_plus"]*self.charge
+        elif self.charge < 0:
+            out += ["_minus"]*np.abs(self.charge)
+        return "".join(out)
+
+    @classmethod
+    def from_atom_dict(cls,
+                       atoms: tp.List[tp.Tuple[KwargsAtom, int]],
+                       charge: int = 0,
+                       radical: bool = False,
+                       ) -> Molecule:
+        return cls([(Atom(**elt), stoi) for elt, stoi in atoms],
+                   charge,
+                   radical)
+
+    @property
+    def mass(self) -> float:
+        return reduce(lambda tot, atom: tot+atom[1]*atom[0].mass, self.atoms, 0.0)
+
+    @mass.setter
+    def mass(self, value: float) -> None:
+        raise NotImplementedError("Cannot manually set the mass of a molecule")
 
 
 class TreeToReaction(lark.Transformer):
     """ """
-    
-    species_list = list
 
-    def start(self, items: tp.List) -> tp.Dict:
+    def start(self, items: tp.List) -> GenericReaction | Atom | Molecule:
         return items[0]
 
-    def ereaction(self, items: tp.List) -> tp.Dict:
-        return {"substrate": items[0]} | items[1] | items[2]
+    def ereaction(self, items: tp.List) -> GenericReaction:
+        return GenericReaction(reactants={items[0][0].label(): items[0]},
+                               products=items[2],
+                               enzyme=items[1],
+                               constants=None,
+                               )
 
-    def kreaction(self, items: tp.List) -> tp.Dict:
-        return items[0] | items[1]
+    def kreaction(self, items: tp.List) -> GenericReaction:
+        return GenericReaction(reactants=items[0],
+                               products=items[1],
+                               constants=None,
+                               enzyme=None)
 
-    def reactants(self, items: tp.List) -> tp.Dict:
-        return {"reactants": items[0]}
+    def reactants(self, items: tp.List) -> tp.List:
+        return items[0]
 
-    def products(self, items: tp.List) -> tp.Dict:
-        return {"products": items[0]}
+    def products(self, items: tp.List) -> tp.List:
+        return items[0]
 
-    def species(self, items: tp.List) -> Molecule | Atom:
+    def species_list(self, items: tp.List[tp.Tuple[ChemicalSpecies, int]]) -> tp.Dict:
+        """"""
+        out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
+        for species, stoi in items:
+            label = species.label()
+            out[label] = (species, out.get(label, (0, 0))[1]+stoi)
+        return out
+
+    def species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int]:
+
         if len(items) > 1:
-            items[1]["multiple"] = items[0]
+            multiple = items[0]
             kwargs = items[1]
         else:
+            multiple = 1
             kwargs = items[0]
 
         if isinstance(kwargs, str):
-            return ChemicalElement(kwargs)
+            return (BasicSpecies(kwargs), multiple)
         if "name" in kwargs:
             if kwargs["name"] == "e_aq":
-                return HydratedElectron(kwargs["multiple"])
-            return Atom(**kwargs)
+                return (HydratedElectron(), multiple)
+            return (Atom(**kwargs), multiple)
         if "atoms" in kwargs:  # It is a Molecule
-            return Molecule.from_atom_dict(**kwargs)
+            return (Molecule.from_atom_dict(**kwargs), multiple)
         raise ValueError(f"Unknown species: {kwargs}")
 
-    def enzyme(self, items: tp.List) -> tp.Dict:
-        return {"enzyme": items[0]}
+    def enzyme(self, items: tp.List) -> str:
+        return items[0]
 
     def ion(self, items: tp.List) -> tp.Dict:
         return items[0]
@@ -217,7 +269,7 @@ class TreeToReaction(lark.Transformer):
         return (items[0], stoi)
 
     def molecule(self, items: tp.List) -> tp.Dict:
-        return {"atoms": items, "radical": False, "charge": 0, "multiple": 1}
+        return {"atoms": items, "radical": False, "charge": 0}
 
     def multiple(self, items: tp.List) -> int:
         return int(items[0])
@@ -236,3 +288,55 @@ class TreeToReaction(lark.Transformer):
 
     def WORD(self, items: tp.List) -> str:
         return str(items)
+
+
+class ReactionParser(object):
+    """ """
+    GRAMMAR: Path = Path(__file__).parent/"reaction_grammar.lark"
+
+    parser: lark.Lark
+    atomix: Atomix
+
+    def __init__(self) -> None:
+        with open(self.GRAMMAR, "r") as f:
+            self.parser = lark.Lark(f.read())
+        self.atomix = Atomix()
+
+    def _parse(self, value: str) -> GenericReaction | Atom | Molecule:
+        """ """
+        tree = self.parser.parse(value.strip())
+        return TreeToReaction().transform(tree)
+
+    def parse_reaction(self, reaction: str) -> GenericReaction:
+        """"""
+        r = self._parse(reaction)
+        if not isinstance(r, dict):
+            raise TypeError(f"Unable to parse: '{reaction}' as a chemical reaction")
+        for _, (species, _) in r["reactants"].items():
+            if isinstance(species, (Atom, Molecule)):
+                self._set_mass(species)
+        for _, (species, _) in r["products"].items():
+            if isinstance(species, (Atom, Molecule)):
+                self._set_mass(species)
+        if isinstance(r["enzyme"], (Atom, Molecule)):
+            self._set_mass(r["enzyme"])
+        return r
+
+    def parse_species(self, species: str) -> BasicSpecies | Atom | Molecule:
+        """ """
+        _ = self._parse(species)
+        if isinstance(_, (Atom, Molecule)):
+            self._set_mass(_)
+            return _
+        if isinstance(_, BasicSpecies):
+            return _
+        raise TypeError(f"Unable to parse: '{species}' as a chemical species")
+
+    def _set_mass(self, species: Atom | Molecule) -> None:
+        if isinstance(species, Atom):
+            species.mass = self.atomix.get(species.raw_label())
+            return
+        for atom, _ in species:
+            atom.mass = self.atomix.get(atom.raw_label())
+
+        return

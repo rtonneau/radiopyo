@@ -43,7 +43,7 @@ class Entry(tp.NamedTuple):
 
 
 class Atomix(object):
-    DATA_FILE = Path("_data_atomic_weights.txt")
+    DATA_FILE = Path(__file__).parent/"_data_atomic_weights.txt"
     _data: tp.Dict[str, Entry]
 
     def __init__(self) -> None:
@@ -64,11 +64,23 @@ class Atomix(object):
                                                  atomic_weight=_[3],
                                                  )
 
-    def get(self, key: str) -> float | None:
+    def get(self, key: str) -> float:
         """ """
+        out: tp.Optional[float] = -1.0
+
         with suppress(KeyError):
-            return self._data[key].atomic_weight
-        for k, v in self._data.items():
-            if v.name == key:
-                return self._data[k].atomic_weight
+            out = self._data[key].atomic_weight
+            if out is not None:
+                return out
+
+        if out is not None:
+            for k, v in self._data.items():
+                if v.name == key:
+                    out = self._data[k].atomic_weight
+                    break
+        if out is None:
+            raise KeyError(f"No mass data available for {key}")
+        if out >= 0.0:
+            return out
+
         raise KeyError(f"Unknown species: {key}")
