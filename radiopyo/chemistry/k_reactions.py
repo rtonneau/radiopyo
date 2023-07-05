@@ -15,11 +15,10 @@ import typing as tp
 # --------------------------------- Internal imports --------------------------------- #
 from .base_chemistry import BaseChemicalReaction
 from .species import ListSpecies
-from .utils.reaction_parser import GenericReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    from .utils.reaction_parser import GenericReaction
 
 # ------------------------------------------------------------------------------------ #
 

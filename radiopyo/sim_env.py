@@ -32,12 +32,7 @@ from .chemistry.utils.reaction_parser import ReactionParser
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from .chemistry.acid_base import ABDict
     from .chemistry.base_chemistry import IsChemicalReaction
-    from .chemistry.k_reactions import KReactionDict
-    from .chemistry.michaelis import MichaelisMentenDict
-    from .chemistry.radiolytic import RadiolyticReactionDict
-    from .chemistry.utils.reaction_parser import GenericReaction
     from .utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
