@@ -8,9 +8,12 @@
     "kreaction",
     "logspace",
     "LSODA",
+    "Menten",
+    "Michaelis",
     "nfev",
     "njev",
     "radiolytic",
+    "RPARSER",
     "stoi",
     "tqdm"
   ]

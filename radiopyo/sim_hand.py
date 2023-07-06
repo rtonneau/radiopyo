@@ -132,6 +132,7 @@ class UnitCell(object):
             UnitCell 
         """
         beam: tp.Optional[ParticleBeam] = None
+        LET: tp.Optional[float] = None
 
         if len(config["beam"]) > 0:
             logger.info("Beam configuration detected in config file")

@@ -49,17 +49,27 @@ def resolve_includes(config: ConfigDict) -> ConfigDict:
     available_parsers = list_available_parsers()
     includes = config["includes"].copy()
     config["includes"] = {}
+
+    # Loop ovr all files in 'includes' section (sorted by extension)
     for ext, f_list in includes.items():
+        # Check that it is a known extension
         if ("."+ext) not in available_parsers:
             logger.warning(f"Unable to include .{ext} file. "
                            "No parser available")
             continue
+
+        if not isinstance(f_list, (list, tuple)):
+            f_list = [f_list, ]
+
+        # Loop over all file with the same extension ('ext')
         for f in f_list:
+            # If ask to include "built-in" configuration
             if f.startswith("radiopyo"):
                 path = pathlib.Path(__file__).parent.parent
                 path /= rf"data/{f.split('/')[-1].strip()}"
             else:
                 path = pathlib.Path(f)
+
             path = path.absolute()
             if not path.exists():
                 raise FileNotFoundError(path)
