@@ -283,7 +283,7 @@ class SimEnv():
         if sp is None or isinstance(sp, CstSpecies):
             return None
 
-        print("O2 intake enabled")
+        print("O2 intake enabled")  # noqa: T201
         cell_memb_th = 10e-9  # Cell membrane thickness
         cell_rad = 20e-6  # cell radius in µm
         cell_surf = 4 * np.pi * cell_rad * cell_rad
