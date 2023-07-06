@@ -26,7 +26,6 @@ from .chemistry.k_reactions import KReaction
 from .chemistry.michaelis import MichaelisMenten
 from .chemistry.radiolytic import RadiolyticReaction
 from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
-from .chemistry.utils.reaction_parser import ReactionParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -184,9 +183,8 @@ class SimEnv():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        if "H2O" in list_sp or "H2O" in initial_cc:
-            list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
-            list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
+        list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
+        list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
 
         # Sanity check
         if "reactions" not in config:
@@ -528,7 +526,7 @@ def acid_base_from_dict(reactions: tp.List[tp.Dict],
             sim_sp)
 
 
-def kreaction_from_dict(reactions: tp.List[tp.Dict],
+def kreaction_from_dict(reactions: tp.List[tp.Dict] | tp.Dict,
                         sim_sp: tp.Optional[ListSpecies] = None,
                         ) -> tp.Tuple[tp.List[KReaction], ListSpecies]:
     if sim_sp is None:
@@ -537,44 +535,26 @@ def kreaction_from_dict(reactions: tp.List[tp.Dict],
     if len(reactions) == 0:
         return ([], sim_sp)
 
-    out = []
-    parser = ReactionParser()
-    for reaction in reactions:
-        match reaction:
-            case {"reactants": _, "products": _, "k_value": _}\
-                    if len(reaction) == 3:
-                out.append(KReaction.from_dict(list_sp=sim_sp, **reaction))
-            case {"reaction": r, "k_value": k} if len(reaction) == 2:
-                gen = parser.parse_reaction(r)
-                out.append(KReaction.from_generic(gen, k, list_sp=sim_sp))
-            case _:
-                raise ValueError(f"Wrong KReaction syntax {reaction}")
-    return (out, sim_sp)
+    if isinstance(reactions, dict):
+        reactions = [reactions, ]
+
+    return ([KReaction.from_kwargs(list_sp=sim_sp, **reaction)
+             for reaction in reactions],
+            sim_sp)
 
 
-def michaelis_from_dict(reactions: tp.List[tp.Dict],
+def michaelis_from_dict(reactions: tp.List[tp.Dict] | tp.Dict,
                         sim_sp: tp.Optional[ListSpecies] = None,
                         ) -> tp.Tuple[tp.List[MichaelisMenten], ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
-    out = []
-    parser = ReactionParser()
-    for reaction in reactions:
-        match reaction:
-            case {"enzyme": _, "substrate": _, "products": _, "k_value": _,
-                  "k_micha": _} if len(reaction) == 5:
-                out.append(MichaelisMenten.from_dict(
-                    list_sp=sim_sp, **reaction))
-            case {"reaction": r, "k_value": k_value, "k_micha": k_micha}\
-                    if len(reaction) == 3:
-                gen = parser.parse_reaction(r)
-                out.append(MichaelisMenten.from_generic(generic=gen,
-                                                        k_value=k_value,
-                                                        k_micha=k_micha,
-                                                        list_sp=sim_sp))
+    if isinstance(reactions, dict):
+        reactions = [reactions, ]
 
-    return (out, sim_sp)
+    return ([MichaelisMenten.from_kwargs(list_sp=sim_sp, **reaction)
+             for reaction in reactions],
+            sim_sp)
 
 
 def radiolytic_from_dict(reactions: tp.Dict,

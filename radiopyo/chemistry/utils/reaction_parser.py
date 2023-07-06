@@ -284,10 +284,7 @@ class TreeToReaction(lark.Transformer):
         return str(items[0])
 
     def element(self, items: tp.List) -> str:
-        return items[0]
-
-    def WORD(self, items: tp.List) -> str:
-        return str(items)
+        return str(items[0])
 
 
 class ReactionParser(object):
@@ -335,9 +332,21 @@ class ReactionParser(object):
 
     def _set_mass(self, species: Atom | Molecule) -> None:
         if isinstance(species, Atom):
-            species.mass = self.atomix.get(species.raw_label())
-            return
-        for atom, _ in species:
-            atom.mass = self.atomix.get(atom.raw_label())
+            try:
+                species.mass = self.atomix.get(species.raw_label())
+                return
+            except KeyError as e:
+                if "R" not in species.raw_label():
+                    raise e
+                species.mass = np.inf
+                return
 
+        for atom, _ in species:
+            try:
+                atom.mass = self.atomix.get(atom.raw_label())
+            except KeyError as e:
+                if "R" not in atom.raw_label():
+                    raise e
+                atom.mass = np.inf
+                return
         return

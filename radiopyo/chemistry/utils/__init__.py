@@ -6,10 +6,12 @@ Author:
 """
 # --------------------------------- External imports --------------------------------- #
 # --------------------------------- Internal imports --------------------------------- #
+from .reaction_parser import ReactionParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
-__all__: list = []
+__all__: list = ["RPARSER"]
 
-# -------------------------------------- Logging ------------------------------------- #
+
+RPARSER = ReactionParser()

@@ -1,0 +1,12 @@
+[includes]
+toml = [
+    "radiopyo/basic_water_radiolysis.toml",
+    "radiopyo/reactions_biology.toml",
+    ]
+
+#----------------------- Example of constant beam definition ---------------------------
+[beam.constant]
+dose_rate      = 1e7      # Mean dose rate [Gy/s]
+max_dose       = 10       # Dose [Gy], optionnal
+#LET            = 10.0    # Linear Energy Transfer [keV / µm],
+                          # optionnal if G values provided.

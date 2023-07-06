@@ -13,6 +13,8 @@ import hashlib
 import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.chemistry.utils import RPARSER
+
 from .base_chemistry import BaseChemicalReaction
 from .species import ListSpecies
 
@@ -63,6 +65,13 @@ class MichaelisMenten(BaseChemicalReaction):
         self.k_value = k_value
         self.k_micha = k_micha
 
+    def raw_k_value(self) -> float:
+        # Case of n*A -> B, then n*k is measured/given
+        if len(self.reactants) == 1:
+            sp = list(self.reactants.keys())[0]
+            return self.k_value * self.stoi_reactants[sp]
+        return self.k_value
+
     def make_hash(self, method: str = "sha256") -> str:
         """
         """
@@ -94,6 +103,34 @@ class MichaelisMenten(BaseChemicalReaction):
                                          k_value=k_value,
                                          k_micha=k_micha,
                                          list_sp=list_sp)
+
+    @classmethod
+    def from_kwargs(cls,
+                    list_sp: tp.Optional[ListSpecies],
+                    **kwargs: str | tp.List[str] | float,
+                    ) -> MichaelisMenten:
+        """ """
+        # Allow shallow creation (outside of a simulation env)
+        if list_sp is None:
+            list_sp = ListSpecies()
+
+        match kwargs:
+            case {"enzyme": _, "substrate": _, "products": _, "k_value": _,
+                  "k_micha": _} if len(kwargs) == 5:
+                return MichaelisMenten.from_dict(
+                    list_sp=list_sp,
+                    **kwargs,  # type:ignore[arg-type]
+                )
+            case {"reaction": r, "k_value": k_value, "k_micha": k_micha}\
+                    if len(kwargs) == 3:
+                gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
+                return MichaelisMenten.from_generic(
+                    generic=gen,
+                    k_value=k_value,  # type:ignore[arg-type]
+                    k_micha=k_micha,  # type:ignore[arg-type]
+                    list_sp=list_sp,  # type:ignore[arg-type]
+                )
+        raise ValueError(f"Wrong KReaction syntax {kwargs}")
 
     @classmethod
     def from_dict(cls,

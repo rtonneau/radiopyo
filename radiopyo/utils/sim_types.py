@@ -13,8 +13,7 @@ from __future__ import annotations
 import typing as tp
 
 from radiopyo.chemistry.acid_base import ABCouple
-from radiopyo.chemistry.k_reactions import KReaction
-from radiopyo.chemistry.michaelis import MichaelisMenten
+from radiopyo.sim_env import kreaction_from_dict, michaelis_from_dict
 
 # --------------------------------- Internal imports --------------------------------- #
 
@@ -118,32 +117,47 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # => k_reactions
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["k_reaction"]):
-        _ = KReaction.from_dict(**_)
+        _ = kreaction_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
     to_add = []
     for _ in other["reactions"]["k_reaction"]:
-        kr = KReaction.from_dict(**_)
+        kr = kreaction_from_dict(_, sim_sp=None)[0][0]
         if str(kr) in r_root:
             idx = r_root[str(kr)][1]
-            root["reactions"]["k_reaction"][idx]["k_value"] = kr.k_value
+            root["reactions"]["k_reaction"][idx]["k_value"] = kr.raw_k_value()
             continue
-        to_add.append(_.copy())
+    to_add.append(_.copy())
     root["reactions"]["k_reaction"] += to_add
 
     # => Enzymatic
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["enzymatic"]):
-        _ = MichaelisMenten.from_dict(**_)
+        _ = michaelis_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
     to_add = []
     for _ in other["reactions"]["enzymatic"]:
-        er = MichaelisMenten.from_dict(**_)
+        er = michaelis_from_dict(_, sim_sp=None)[0][0]
         if str(er) in r_root:
             idx = r_root[str(er)][1]
-            root["reactions"]["enzymatic"][idx]["k_value"] = er.k_value
+            root["reactions"]["enzymatic"][idx]["k_value"] = er.raw_k_value()
             root["reactions"]["enzymatic"][idx]["k_micha"] = er.k_micha
             continue
         to_add.append(_.copy())
     root["reactions"]["enzymatic"] += to_add
 
     return root
+
+
+def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Tuple[tp.Set, tp.Set, tp.Dict, tp.Set]:
+    """ 
+    From:
+    https://stackoverflow.com/questions/4527942
+    """
+    d1_keys = set(d1.keys())
+    d2_keys = set(d2.keys())
+    shared_keys = d1_keys.intersection(d2_keys)
+    removed = d1_keys - d2_keys
+    added = d2_keys - d1_keys
+    modified = {o: (d1[o], d2[o]) for o in shared_keys if d1[o] != d2[o]}
+    same = {o for o in shared_keys if d1[o] == d2[o]}
+    return added, removed, modified, same

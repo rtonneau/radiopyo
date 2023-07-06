@@ -14,7 +14,7 @@ species_list: species ("+"~1 species)*
 // Species definitions
 species: multiple? (atom | molecule | radical | ion) | element
 enzyme: multiple? (atom | molecule) | element
-element: WORD+ // Some species like 'catalase' doesn't have a formula
+element: /\w+/ // Some species like 'catalase' doesn't have a formula
 
 //Charged species
 ion: cation | anion
@@ -41,7 +41,10 @@ PLUS: "+" | "_plus"
 MINUS: "-" | "_minus"
 RADICAL: "_r"
 
-%import common.WORD -> WORD
-%import common.WS -> WS
+%import common.WORD 
+%import common.WS 
 %import common.INT
+%import common.DIGIT
+%import common.LETTER
+
 %ignore WS
