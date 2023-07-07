@@ -89,7 +89,12 @@ class MichaelisMenten(BaseChemicalReaction):
         if generic["enzyme"] is None:
             raise ValueError(
                 f"No enzyme found for enzymatic reaction: {generic}")
-        enzyme: str = generic["enzyme"].label()
+        
+        if isinstance(generic["enzyme"], str):
+            enzyme: str = generic["enzyme"]
+        else:
+            enzyme = generic["enzyme"].label()
+
         substrate: tp.List[str] = []
         products: tp.List[str] = []
 

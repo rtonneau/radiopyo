@@ -91,9 +91,16 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     not included in root"""
     # Easy part
     root["bio_param"] |= other["bio_param"]
-    root["beam"] |= other["beam"]
     root["concentrations"]["fixed"] |= other["concentrations"]["fixed"]
     root["concentrations"]["initial"] |= other["concentrations"]["initial"]
+
+    # Update beam definition
+    # Make sure to keep only the latest beam definition if multiple beam types
+    cmp = dict_compare(root["beam"], other["beam"])
+    if len(cmp["removed"]) > 0 and len(cmp["same"]) == 0:
+        root["beam"] = other["beam"]
+    else:
+        root["beam"] |= other["beam"]
 
     # Update reactions
     #  => Radiolytic
@@ -115,18 +122,28 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     root["reactions"]["acid_base"] += to_add
 
     # => k_reactions
+    # First, let's make a set of the kreaction presents in root. Each one should have a
+    # unique ID ==> Make kReaction and then use the str version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["k_reaction"]):
         _ = kreaction_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
+
+    # Loop over all KReaction in other and check whether it is also in root or not.
     to_add = []
     for _ in other["reactions"]["k_reaction"]:
         kr = kreaction_from_dict(_, sim_sp=None)[0][0]
+        # Same reaction in root => just make sur the kvalue comes from 'other'
         if str(kr) in r_root:
             idx = r_root[str(kr)][1]
+            # raw_k_value is necessary to avoid multiple divide for reactions like
+            # xA -> B + C (in this case, xk should be provided)
             root["reactions"]["k_reaction"][idx]["k_value"] = kr.raw_k_value()
             continue
-    to_add.append(_.copy())
+        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
+        to_add.append(_.copy())
+    # All shared reactions are updated at this point. Now just add all new reactions
+    # from 'other' --> stored in 'to_add'
     root["reactions"]["k_reaction"] += to_add
 
     # => Enzymatic
@@ -148,7 +165,7 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     return root
 
 
-def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Tuple[tp.Set, tp.Set, tp.Dict, tp.Set]:
+def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Dict:
     """ 
     From:
     https://stackoverflow.com/questions/4527942
@@ -160,4 +177,7 @@ def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Tuple[tp.Set, tp.Set, tp.Dict, 
     added = d2_keys - d1_keys
     modified = {o: (d1[o], d2[o]) for o in shared_keys if d1[o] != d2[o]}
     same = {o for o in shared_keys if d1[o] == d2[o]}
-    return added, removed, modified, same
+    return {"added": added,
+            "removed": removed,
+            "modified": modified,
+            "same": same}

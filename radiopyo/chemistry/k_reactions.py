@@ -124,9 +124,9 @@ class KReaction(BaseChemicalReaction):
             case {"reaction": r, "k_value": k} if len(kwargs) == 2:
                 gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
                 return KReaction.from_generic(
-                    gen,  # type:ignore[arg-type]
+                    gen,
                     k,  # type:ignore[arg-type]
-                    list_sp=list_sp,  # type:ignore[arg-type]
+                    list_sp=list_sp,
                 )
 
         raise ValueError(f"Wrong KReaction syntax {kwargs}")

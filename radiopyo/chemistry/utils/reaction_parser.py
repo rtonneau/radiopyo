@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import logging
 import typing as tp
 from functools import reduce
 from pathlib import Path
@@ -27,6 +28,7 @@ if tp.TYPE_CHECKING:
 __all__: tp.List = []
 
 # -------------------------------------- Logging ------------------------------------- #
+logger = logging.getLogger("radiopyo")
 
 # ------------------------------------------------------------------------------------ #
 #                                DECORATOR DEFINITIONS                                 #
@@ -79,13 +81,13 @@ class ChemicalSpecies(BasicSpecies):
     """
     charge: int
     radical: bool
-    _mass: float
+    _mass: tp.Optional[float]
 
     def __init__(self,
                  name: str,
                  charge: int = 0,
                  radical: bool = False,
-                 mass: float = 0
+                 mass: tp.Optional[float] = None
                  ) -> None:
         super().__init__(name)
         self.charge = charge
@@ -104,6 +106,8 @@ class ChemicalSpecies(BasicSpecies):
 
     @property
     def mass(self) -> float:
+        if self._mass is None:
+            raise ValueError(f"No mass defined for {self.__str__()}")
         return self._mass
 
     @mass.setter
@@ -182,11 +186,13 @@ class Molecule(ChemicalSpecies):
 
     @property
     def mass(self) -> float:
+        if self._mass is not None:
+            return self._mass
         return reduce(lambda tot, atom: tot+atom[1]*atom[0].mass, self.atoms, 0.0)
 
     @mass.setter
     def mass(self, value: float) -> None:
-        raise NotImplementedError("Cannot manually set the mass of a molecule")
+        self._mass = value
 
 
 class TreeToReaction(lark.Transformer):
@@ -312,12 +318,27 @@ class ReactionParser(object):
                 f"Unable to parse: '{reaction}' as a chemical reaction")
         for _, (species, _) in r["reactants"].items():
             if isinstance(species, (Atom, Molecule)):
-                self._set_mass(species)
+                try:
+                    self._set_mass(species)
+                except KeyError:
+                    logger.warning(f"Unable to compute mass of {species}. "
+                                   "Setting it to default mass, i.e. 0")
+                    species.mass = 0
         for _, (species, _) in r["products"].items():
             if isinstance(species, (Atom, Molecule)):
-                self._set_mass(species)
+                try:
+                    self._set_mass(species)
+                except KeyError:
+                    logger.warning(f"Unable to compute mass of {species}. "
+                                   "Setting it to default mass, i.e. 0")
+                    species.mass = 0
         if isinstance(r["enzyme"], (Atom, Molecule)):
-            self._set_mass(r["enzyme"])
+            try:
+                self._set_mass(r["enzyme"])
+            except KeyError:
+                logger.warning(f"Unable to compute mass of {species}. "
+                               "Setting it to default mass, i.e. 0")
+                species.mass = 0
         return r
 
     def parse_species(self, species: str) -> BasicSpecies | Atom | Molecule:
@@ -331,14 +352,19 @@ class ReactionParser(object):
         raise TypeError(f"Unable to parse: '{species}' as a chemical species")
 
     def _set_mass(self, species: Atom | Molecule) -> None:
+        """ 
+        Raises
+            KeyError: if unknown species.
+        """
         if isinstance(species, Atom):
             try:
                 species.mass = self.atomix.get(species.raw_label())
                 return
             except KeyError as e:
                 if "R" not in species.raw_label():
-                    raise e
-                species.mass = np.inf
+                    msg = f"Unable to compute mass of: {species}"
+                    raise KeyError(msg) from e
+                species.mass = 0
                 return
 
         for atom, _ in species:
@@ -346,7 +372,8 @@ class ReactionParser(object):
                 atom.mass = self.atomix.get(atom.raw_label())
             except KeyError as e:
                 if "R" not in atom.raw_label():
-                    raise e
+                    msg = f"Unable to compute mass of: {atom} for molecule: {species}"
+                    raise KeyError(msg) from e
                 atom.mass = np.inf
                 return
         return
