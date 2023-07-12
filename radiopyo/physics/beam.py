@@ -203,6 +203,10 @@ class Timer(NamedTuple):
                      self.on_time,
                      stime)
 
+    def off_time(self) -> float:
+        """ """
+        return self.period - self.on_time
+
 
 @dataclass
 class ParticleBeam():
