@@ -7,8 +7,8 @@ Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
 """
 # --------------------------------- External imports --------------------------------- #
+import typing as tp
 from pathlib import Path
-from typing import Dict, Iterable
 
 import pandas as pd
 from scipy.interpolate import interp1d  # type: ignore[import]
@@ -37,6 +37,9 @@ class GValuesBoscolo():
         >>> species = "e_aq"
         >>> LET = 12.5  # keV/µm
         >>> g_e_aq = g_values.values_at(species, LET)
+        >>> 
+        >>> # This also works
+        >>> g_values[(1, 5, 10, 12.5)] # ==> returns a dataframe 
 
     Attributes:
         df: pandas.DataFrame
@@ -47,7 +50,7 @@ class GValuesBoscolo():
                 value -> Interpolation of GValues to handle any LET within valid range.
     """
     df: pd.DataFrame
-    interpol: Dict[str, interp1d]
+    interpol: tp.Dict[str, interp1d]
 
     DATA = Path("gvalues_from_Boscolo_2020.csv")
 
@@ -64,7 +67,16 @@ class GValuesBoscolo():
     def __contains__(self, key: str) -> bool:
         return key in self.interpol
 
-    def values_at(self, species: str, let: float) -> float:
+    def __getitem__(self, key: float | tp.Iterable) -> pd.DataFrame:
+        out = {}
+        if not hasattr(key, "__iter__"):
+            key = [key,]
+
+        for species in self.species():
+            out[species] = self.values_at(species, key)
+        return pd.DataFrame.from_dict(out, )
+
+    def values_at(self, species: str, let: float | tp.Iterable) -> float:
         """ 
         Method retrieving the G value from interpolated data.
 
@@ -79,7 +91,7 @@ class GValuesBoscolo():
         """
         return self.interpol[species](let)
 
-    def species(self) -> Iterable[str]:
+    def species(self) -> tp.Iterable[str]:
         """Get all species whose GValues are available. 
 
         Returns:

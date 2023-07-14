@@ -89,7 +89,7 @@ class MichaelisMenten(BaseChemicalReaction):
         if generic["enzyme"] is None:
             raise ValueError(
                 f"No enzyme found for enzymatic reaction: {generic}")
-        
+
         if isinstance(generic["enzyme"], str):
             enzyme: str = generic["enzyme"]
         else:
@@ -133,7 +133,7 @@ class MichaelisMenten(BaseChemicalReaction):
                     generic=gen,
                     k_value=k_value,  # type:ignore[arg-type]
                     k_micha=k_micha,  # type:ignore[arg-type]
-                    list_sp=list_sp,  # type:ignore[arg-type]
+                    list_sp=list_sp,
                 )
         raise ValueError(f"Wrong KReaction syntax {kwargs}")
 
