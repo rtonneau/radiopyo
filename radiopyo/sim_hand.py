@@ -28,7 +28,7 @@ from . import exceptions as rp_excep
 from .chemistry.species import CstSpecies
 from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
-from .physics.beam import NoBeam, beam_from_dict
+from .physics.beam import BeamCollection, beam_from_dict
 from .sim_env import SimEnv
 from .utils.parser_def import FileParser, resolve_includes
 from .utils.ron_parser import RonFileParser
@@ -96,7 +96,7 @@ class UnitCell(object):
 
     env: SimEnv
     mat: SimMatrices
-    beam: ParticleBeam
+    beam_list: BeamCollection
     last_exec_time: float
     g_val: GValuesBoscolo
     LET: tp.Optional[float]
@@ -115,7 +115,9 @@ class UnitCell(object):
             O2_mat=self.env.make_O2_intake_matrix(),
         )
 
-        self.beam = beam or NoBeam()
+        self.beam_list = BeamCollection()
+        if beam is not None:
+            self.beam_list.add_beam(beam, beam.nickname)
         self.last_exec_time = -1
         self.g_val = GValuesBoscolo()
         self.LET = None
@@ -202,7 +204,7 @@ class UnitCell(object):
             ABy = np.ones(len(self.env.species), dtype=np.int8)
             self.mat["AB_mat"] = (ABy, ABi, self.mat["AB_mat"][2])
 
-    def set_beam(self, beam: ParticleBeam) -> None:
+    def set_beam(self, beam: ParticleBeam | str) -> None:
         """Define Radiation Source structure/parameters
 
         Args:
@@ -211,8 +213,12 @@ class UnitCell(object):
         Returns:
             None
         """
-        self.beam = beam
-        logger.info(f"Setting new beam definition: {beam}, done!")
+        if isinstance(beam, str):
+            self.beam_list.use_beam(beam)
+        else:
+            self.beam_list.add_beam(beam, beam.nickname, use=True)
+        logger.info(f"Setting new beam definition ({self.beam_list._current}): "
+                    f"{self.beam_list.current}, done!")
 
     def change_LET(self, let: float) -> None:
         """Update the radiolytic yields from the simulation env according to literature
@@ -252,7 +258,7 @@ class UnitCell(object):
                  t_eval: tp.Optional[NDArray[np.float64]] = None,
                  ) -> ScipyODEResult:
 
-        if self.beam is NoBeam:
+        if len(self.beam_list) <= 0:
             rp_excep.NoBeamDefinedError("Simulation aborted")
         first_step = self.FIRST_STEP
 
@@ -278,7 +284,7 @@ class UnitCell(object):
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(derive,
                                         t_span,
-                                        args=(self.beam,
+                                        args=(self.beam_list.current,
                                               self.mat["cst_sp"],
                                               self.mat["AB_mat"],
                                               self.mat["Ki_mat"],
@@ -300,10 +306,11 @@ class UnitCell(object):
             **kwargs: tp.Unpack[KwargsRun],  # type: ignore [misc]
     ) -> ODEResult:
         """ """
-        if self.beam.time_at_max_dose >= np.inf:
+        if self.beam_list.current.time_at_max_dose >= np.inf:
             raise ValueError("Unable to use 'run_till_max_dose', time at max dose "
-                             f"is inf (-> {self.beam.time_at_max_dose})")
-        return self.run(t_span=(time_start, self.beam.time_at_max_dose), **kwargs)
+                             f"is inf (-> {self.beam_list.current.time_at_max_dose})")
+        return self.run(t_span=(time_start, self.beam_list.current.time_at_max_dose),
+                        **kwargs)
 
     def run(self,
             t_span: tp.Tuple[float, float],
@@ -350,7 +357,7 @@ class UnitCell(object):
                             t_eval,
                             )
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
-        return ODEResult(self.env, self.beam, self.mat, self.LET, sol)
+        return ODEResult(self.env, self.beam_list.current, self.mat, self.LET, sol)
 
     def run_chunked(self,
                     t_chunks: NDArray[np.float64],
@@ -362,7 +369,7 @@ class UnitCell(object):
                     max_step: float | tp.Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
-        sol = ODEResult(self.env, self.beam, self.mat, self.LET)
+        sol = ODEResult(self.env, self.beam_list.current, self.mat, self.LET)
 
         # Check up max_step
         if isinstance(max_step, float):
@@ -449,10 +456,11 @@ class UnitCell(object):
         Returns:
             SimChunksIter: Iterable object performing the ODE integration
         """
-        if self.beam is NoBeam:
+        if len(self.beam_list) <= 0:
             logger.error("No beam is defined for the simulation")
             raise rp_excep.NoBeamDefinedError
-        chunks = self.beam.make_time_intervals(start=t_span[0], stop=t_span[1])
+        chunks = self.beam_list.current.make_time_intervals(start=t_span[0],
+                                                            stop=t_span[1])
         chunks[np.where(chunks[:, 1] > 0)[0], 1] = max_step_size_on
         chunks[np.where(chunks[:, 1] == 0)[0], 1] = max_step_size_off
         if max_step_size_final is not None:
@@ -535,7 +543,7 @@ class SimChunksIter():
         self.sim = sim
         self.chunks = chunks
         self.sol = ODEResult(self.sim.env,
-                             self.sim.beam,
+                             self.sim.beam_list.current,
                              self.sim.mat,
                              self.sim.LET)
         self.atol = atol
@@ -711,7 +719,7 @@ class ODEResult(object):
                   cell: UnitCell,
                   sol: tp.Optional[ScipyODEResult] = None,
                   ) -> ODEResult:
-        return cls(cell.env, cell.beam, cell.mat, cell.LET, sol)
+        return cls(cell.env, cell.beam_list.current, cell.mat, cell.LET, sol)
 
     @property
     def time(self) -> NDArray[np.float64]:

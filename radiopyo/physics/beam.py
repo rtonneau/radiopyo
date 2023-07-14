@@ -9,18 +9,11 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import typing as tp
 from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from math import isinf, isnan
-from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Dict,
-    NamedTuple,
-    Optional,
-    Tuple,
-)
 
 import numpy as np
 
@@ -28,7 +21,7 @@ import numpy as np
 from .exceptions import ParameterError
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -39,6 +32,7 @@ __all__ = ["TimeMessage",
            "ConstantBeam",
            "PulsedBeam",
            "NoBeam",
+           "BeamCollection"
            ]
 
 # ------------------------------------------------------------------------------------ #
@@ -52,7 +46,7 @@ class TimerState(Enum):
     isOn = 1
 
 
-class TimeMessage(NamedTuple):
+class TimeMessage(tp.NamedTuple):
     """ NamedTuple containing the dose rate for a given time.
     Attributes:
         time: float
@@ -73,7 +67,7 @@ class TimeMessage(NamedTuple):
         return self.current_dose_rate
 
 
-class Timer(NamedTuple):
+class Timer(tp.NamedTuple):
     """NamedTuple use as a binary timer for radiation source. Currently only two states
     are possible for a radiation source, either ON or OFF i.e. 0.0% or 100%
     This class holds the time structure of the radiation source, defined as pulses.
@@ -116,7 +110,7 @@ class Timer(NamedTuple):
         return 0.0
 
     @classmethod
-    def new_constant(cls, start_time: Optional[float] = None) -> Timer:
+    def new_constant(cls, start_time: tp.Optional[float] = None) -> Timer:
         """ Class method to generate an always ON timer"""
         stime = start_time if start_time is not None else cls._default_start_time()
         return cls(float("inf"), float("inf"), stime)
@@ -125,7 +119,7 @@ class Timer(NamedTuple):
     def new_pulsed(cls,
                    period: float,
                    on_time: float,
-                   start_time: Optional[float] = None) -> Timer:
+                   start_time: tp.Optional[float] = None) -> Timer:
         """ Class method to generate a pulsed timer
         Args:
             period: float
@@ -197,7 +191,7 @@ class Timer(NamedTuple):
         time = time - self.start_time - self.period * self.period_index(time)
         return self.period - time
 
-    def copy(self, start_time: Optional[float] = None) -> Timer:
+    def copy(self, start_time: tp.Optional[float] = None) -> Timer:
         stime = start_time if start_time is not None else Timer._default_start_time()
         return Timer(self.period,
                      self.on_time,
@@ -332,7 +326,7 @@ class ParticleBeam():
             current_dose_rate=dr,
         )
 
-    def make_beam_func(self) -> Callable[[float], float]:
+    def make_beam_func(self) -> tp.Callable[[float], float]:
         """
         USELESS FOR NOW
         => TODO ? or to clean?
@@ -346,8 +340,8 @@ class ParticleBeam():
         return beam_func
 
     def reset(self,
-              start: Optional[float] = None,
-              max_dose: Optional[float] = None,
+              start: tp.Optional[float] = None,
+              max_dose: tp.Optional[float] = None,
               ) -> None:
         """
         """
@@ -488,8 +482,8 @@ class ConstantBeam(ParticleBeam):
 
     def __init__(self,
                  dose_rate: float,
-                 max_dose: Optional[float] = None,
-                 start_time: Optional[float] = None,
+                 max_dose: tp.Optional[float] = None,
+                 start_time: tp.Optional[float] = None,
                  ) -> None:
         super().__init__(dose_rate,
                          Timer.new_constant(start_time),
@@ -533,7 +527,7 @@ class ConstantBeam(ParticleBeam):
                           [stop, 0.0],
                           ])
 
-    def as_dict(self) -> Dict[str, float]:
+    def as_dict(self) -> tp.Dict[str, float]:
         """ """
         return {"dose_rate": self.dose_rate,
                 "max_dose": self.max_dose,
@@ -541,7 +535,7 @@ class ConstantBeam(ParticleBeam):
                 }
 
     @classmethod
-    def from_dict(cls, param: Dict[str, float]) -> ConstantBeam:
+    def from_dict(cls, param: tp.Dict[str, float]) -> ConstantBeam:
         dose_rate = 0.0
         for key in ["dose_rate", "dose_rate_avg", "dose_rate_peak",]:
             with suppress(KeyError):
@@ -567,7 +561,7 @@ class SinglePulseBeam(ConstantBeam):
     def __init__(self,
                  dose_rate: float,
                  max_dose: float,
-                 start_time: Optional[float] = None,
+                 start_time: tp.Optional[float] = None,
                  ) -> None:
         super().__init__(dose_rate,
                          max_dose=max_dose,
@@ -582,7 +576,7 @@ class SinglePulseBeam(ConstantBeam):
     def beam_type(self) -> str:
         return "SinglePulseBeam"
 
-    def as_dict(self) -> Dict[str, float]:
+    def as_dict(self) -> tp.Dict[str, float]:
         """ """
         return {"dose_rate": self.dose_rate,
                 "max_dose": self.max_dose,
@@ -593,12 +587,12 @@ class SinglePulseBeam(ConstantBeam):
     def from_on_time(cls,
                      dose_rate: float,
                      on_time: float,
-                     start_time: Optional[float] = None,
+                     start_time: tp.Optional[float] = None,
                      ) -> SinglePulseBeam:
         return cls(dose_rate, max_dose=on_time*dose_rate, start_time=start_time)
 
     @classmethod
-    def from_dict(cls, param: Dict[str, float]) -> SinglePulseBeam:
+    def from_dict(cls, param: tp.Dict[str, float]) -> SinglePulseBeam:
         """
         Create a SinglePulseBeam from a Dictionary.
 
@@ -654,8 +648,8 @@ class PulsedBeam(ParticleBeam):
                  dose_rate: float,
                  period: float,
                  on_time: float,
-                 max_dose: Optional[float] = None,
-                 start_time: Optional[float] = None,
+                 max_dose: tp.Optional[float] = None,
+                 start_time: tp.Optional[float] = None,
                  ):
         super().__init__(dose_rate,
                          Timer.new_pulsed(period, on_time, start_time),
@@ -764,7 +758,7 @@ class PulsedBeam(ParticleBeam):
 
         return out
 
-    def as_dict(self) -> Dict[str, float]:
+    def as_dict(self) -> tp.Dict[str, float]:
         """ """
         return {"dose_rate": self.dose_rate,
                 "period": self.timer.period,
@@ -778,9 +772,9 @@ class PulsedBeam(ParticleBeam):
                             peak_dr: float,
                             period: float,
                             on_time: float,
-                            n_pulse: Optional[float] = None,
-                            max_dose: Optional[float] = None,
-                            start_time: Optional[float] = None,
+                            n_pulse: tp.Optional[float] = None,
+                            max_dose: tp.Optional[float] = None,
+                            start_time: tp.Optional[float] = None,
                             ) -> PulsedBeam:
         """ Class method building a PulsedBeam based on peak dose rate => dose rate
         during ON time.
@@ -817,9 +811,9 @@ class PulsedBeam(ParticleBeam):
                             pulse_dose: float,
                             period: float,
                             on_time: float,
-                            n_pulse: Optional[float] = None,
-                            max_dose: Optional[float] = None,
-                            start_time: Optional[float] = None,
+                            n_pulse: tp.Optional[float] = None,
+                            max_dose: tp.Optional[float] = None,
+                            start_time: tp.Optional[float] = None,
                             ) -> PulsedBeam:
         """ Class method building a PulsedBeam based on a dose per pulse
         Args:
@@ -847,7 +841,7 @@ class PulsedBeam(ParticleBeam):
         )
 
     @classmethod
-    def from_dict(cls, param: Dict[str, float]) -> PulsedBeam:
+    def from_dict(cls, param: tp.Dict[str, float]) -> PulsedBeam:
         """ """
         if "period" not in param:
             raise ParameterError(
@@ -886,8 +880,64 @@ class PulsedBeam(ParticleBeam):
         raise NotImplementedError(f"Unknown Pulsed beam definitions: {param}")
 
 
-def beam_from_dict(param: Dict[str, Dict[str, float]],
-                   ) -> Tuple[ParticleBeam, Optional[float]]:
+class BeamCollection(object):
+    _beam: tp.Dict[str, ParticleBeam]
+    _current: str
+    _let: tp.Dict[str, float]
+
+    def __init__(self) -> None:
+        self._beam = {}
+        self._current = ""
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._beam
+
+    def __iter__(self) -> tp.Iterator[tp.Tuple[str, ParticleBeam]]:
+        return iter(self._beam.items())
+
+    def __len__(self) -> int:
+        return len(self._beam)
+
+    @property
+    def current(self) -> ParticleBeam:
+        return self._beam[self._current]
+
+    @property
+    def current_LET(self) -> float:
+        return self._let[self._current]
+
+    def update_let(self, let: float, key: tp.Optional[str]) -> None:
+        if key is None:
+            key = self._current
+        elif key not in self:
+            raise KeyError(f"No beam definition named: {key}")
+        self._let[key] = let
+
+    def add_beam(self,
+                 beam: ParticleBeam,
+                 key: tp.Optional[str] = None,
+                 let: tp.Optional[float] = None,
+                 use: bool = False) -> None:
+        if key is None or len(key) == 0:
+            key = "default"
+        if let is not None:
+            self._let[key] = let
+        elif key in self._beam and key in self._let:
+            del self._let[key]
+        self._beam[key] = beam
+        if len(self._current) == 0 or use:
+            self._current = key
+
+    def use_beam(self, key: str) -> ParticleBeam:
+        if key not in self._beam:
+            raise KeyError(f"No beam definition named: {key}")
+        self._current = key
+        return self.current
+
+
+def beam_from_dict(param: tp.Dict[str, tp.Dict[str, float] |
+                                  tp.List[tp.Dict[str, float]]],
+                   ) -> tp.Tuple[ParticleBeam, tp.Optional[float]]:
     """ 
     Construct beam from a dictionary.
 
@@ -907,7 +957,7 @@ def beam_from_dict(param: Dict[str, Dict[str, float]],
         raise ParameterError(f"Found more than one beam definition ({param})")
     beam_type, config = param.popitem()
 
-    LET: Optional[float] = None
+    LET: tp.Optional[float] = None
     with suppress(KeyError):
         LET = config.pop("LET")
 

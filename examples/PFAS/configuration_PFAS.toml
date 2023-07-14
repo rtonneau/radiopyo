@@ -2,7 +2,7 @@
 toml = ["radiopyo/basic_water_radiolysis.toml"]
 
 #---------------- Example of pulsed beam defined with peak dose rate -------------------
-[beam.constant]
+[[beam.constant]]
 dose_rate  = 1.58e3   # Peak dose rate for pulsed beam [Gy/s]
 max_dose   = 2000e3   # Max Dose in [Gy]
 LET        = 0.17   # [keV/µm] (6MeV electrons in water)

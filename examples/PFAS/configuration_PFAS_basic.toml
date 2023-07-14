@@ -1,5 +1,5 @@
 #---------------- Example of pulsed beam defined with peak dose rate -------------------
-[beam.constant]
+[[beam.constant]]
 dose_rate  = 1.58e3   # Peak dose rate for pulsed beam [Gy/s]
 max_dose   = 2000e3   # Max Dose in [Gy]
 LET        = 0.13      # [keV/µm] (1MeV electrons in water)
