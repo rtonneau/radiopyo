@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import logging
 import typing as tp
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -23,6 +24,9 @@ from .exceptions import ParameterError
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
+
+# -------------------------------------- Logging ------------------------------------- #
+logger = logging.getLogger("radiopyo")
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["TimeMessage",
@@ -227,7 +231,6 @@ class ParticleBeam():
     dose_rate: float = field(init=True)
     timer: Timer = field(init=True)
     max_dose: float = field(default=float("inf"))
-    nickname: str = field(init=False, default="")
     time_at_max_dose: float = field(init=False)
     dose_per_pulse: float = field(init=False)
     peak_dose_rate: float = field(init=False)
@@ -883,10 +886,11 @@ class PulsedBeam(ParticleBeam):
 class BeamCollection(object):
     _beam: tp.Dict[str, ParticleBeam]
     _current: str
-    _let: tp.Dict[str, float]
+    _let: tp.Dict[str, float | None]
 
     def __init__(self) -> None:
         self._beam = {}
+        self._let = {}
         self._current = ""
 
     def __contains__(self, key: str) -> bool:
@@ -904,7 +908,15 @@ class BeamCollection(object):
 
     @property
     def current_LET(self) -> float:
-        return self._let[self._current]
+        if self._let[self._current] is not None:
+            return self._let[self._current]  # type: ignore [return-value]
+        raise ValueError(f"No LET defined for beam: {self._current}")
+
+    def remove_beam(self, key: str) -> None:
+        if key not in self:
+            raise KeyError(f"No beam definition named: {key}")
+        del self._let[key]
+        del self._beam[key]
 
     def update_let(self, let: float, key: tp.Optional[str]) -> None:
         if key is None:
@@ -920,12 +932,11 @@ class BeamCollection(object):
                  use: bool = False) -> None:
         if key is None or len(key) == 0:
             key = "default"
-        if let is not None:
-            self._let[key] = let
-        elif key in self._beam and key in self._let:
-            del self._let[key]
+        if key in self:
+            self.remove_beam(key)
         self._beam[key] = beam
-        if len(self._current) == 0 or use:
+        self._let[key] = let
+        if use or len(self._current) == 0:
             self._current = key
 
     def use_beam(self, key: str) -> ParticleBeam:
@@ -934,9 +945,51 @@ class BeamCollection(object):
         self._current = key
         return self.current
 
+    @classmethod
+    def from_config_dict(cls, param: tp.Dict[str, tp.Dict[str, float] |
+                                             tp.List[tp.Dict[str, float]]],
+                         ) -> BeamCollection:
+        beams = cls()
 
-def beam_from_dict(param: tp.Dict[str, tp.Dict[str, float] |
-                                  tp.List[tp.Dict[str, float]]],
+        for beam_type, beam_config in param.items():
+            if isinstance(beam_config, dict):
+                beam_config = [beam_config, ]
+            for config in beam_config:
+                LET: tp.Optional[float] = None
+                with suppress(KeyError):
+                    LET = config.pop("LET")
+
+                nickname: str
+                if "nickname" not in config:
+                    msg = ("BEAM:: Assigning 'default' name to beam definition "
+                           f"{beam_type} -> {config}")
+                    logger.info(msg)
+                    nickname = "default"
+                else:
+                    nickname = str(config["nickname"])
+                    msg = (f"BEAM:: Found beam '{nickname}' as {beam_type} -> {config}")
+                    logger.info(msg)
+
+                beam: ParticleBeam
+                if beam_type.lower() == "constant":
+                    beam = ConstantBeam.from_dict(config)
+                elif beam_type.lower() == "pulsed":
+                    beam = PulsedBeam.from_dict(config)
+                elif beam_type.lower() == "singlepulse":
+                    beam = SinglePulseBeam.from_dict(config)
+                else:
+                    raise NotImplementedError(f"Unknown beam type: {beam_type}")
+
+                if nickname in beams:
+                    msg = (f"BEAM:: Beam definition: {nickname} already defined. "
+                           "Erasing previous definition")
+                    logger.info(msg)
+
+                beams.add_beam(beam=beam, key=nickname, let=LET)
+        return beams
+
+
+def beam_from_dict(param: tp.Dict[str, tp.Dict[str, float]],
                    ) -> tp.Tuple[ParticleBeam, tp.Optional[float]]:
     """ 
     Construct beam from a dictionary.

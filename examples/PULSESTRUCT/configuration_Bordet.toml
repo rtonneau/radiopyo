@@ -4,9 +4,17 @@ toml = "radiopyo/config_Labarbe.toml"
 
 #---------------- Example of pulsed beam defined with peak dose rate -------------------
 [[beam.pulsed]]
+nickname       = "conv"
 dose_rate_peak = 5e5       # Peak dose rate for pulsed beam [Gy/s]
 on_time        = 2e-6      # Time [seconds] (used only for Pulsed beam)
 period         = 0.0111    # Period [seconds] -> 90 Hz
 max_dose       = 1
 LET            = 0.2116    # [keV/µm] -> 9MeV electrons
 
+[[beam.pulsed]]
+nickname       = "UHDR"
+dose_rate_peak = 5e5       # Peak dose rate for pulsed beam [Gy/s]
+on_time        = 2e-6      # Time [seconds] (used only for Pulsed beam)
+period         = 0.0111    # Period [seconds] -> 90 Hz
+max_dose       = 1
+LET            = 0.2116    # [keV/µm] -> 9MeV electrons
