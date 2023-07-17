@@ -98,7 +98,6 @@ class UnitCell(object):
     beam_list: BeamCollection
     last_exec_time: float
     g_val: GValuesBoscolo
-    LET: tp.Optional[float]
 
     def __init__(self,
                  env: SimEnv,
@@ -114,13 +113,16 @@ class UnitCell(object):
             O2_mat=self.env.make_O2_intake_matrix(),
         )
 
-        self.beam_list = beam if isinstance(beam, BeamCollection) else BeamCollection()
+        if isinstance(beam, BeamCollection):
+            self.beam_list = beam
+            self.set_beam(self.beam_list.current_name)
+        else:
+            self.beam_list = BeamCollection()
+            if isinstance(beam, ParticleBeam):
+                self.beam_list.add_beam(beam, beam.nickname)
 
-        if isinstance(beam, ParticleBeam):
-            self.beam_list.add_beam(beam, beam.nickname)
         self.last_exec_time = -1
         self.g_val = GValuesBoscolo()
-        self.LET = None
 
     @classmethod
     def from_config_dict(cls, config: ConfigDict) -> UnitCell:
@@ -144,12 +146,8 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
-        out = UnitCell(env=SimEnv.from_dict(config),
-                       beam=beam_list)
-
-        with suppress(ValueError):
-            out.change_LET(out.beam_list.current_LET)
-        return out
+        return UnitCell(env=SimEnv.from_dict(config),
+                        beam=beam_list)
 
     @classmethod
     def from_parser(cls, file: str | Path, Parser: tp.Type[FileParser]) -> UnitCell:
@@ -205,7 +203,10 @@ class UnitCell(object):
             ABy = np.ones(len(self.env.species), dtype=np.int8)
             self.mat["AB_mat"] = (ABy, ABi, self.mat["AB_mat"][2])
 
-    def set_beam(self, beam: ParticleBeam | str) -> None:
+    def set_beam(self,
+                 beam: ParticleBeam | str,
+                 LET: tp.Optional[float] = None,
+                 ) -> None:
         """Define Radiation Source structure/parameters
 
         Args:
@@ -217,9 +218,11 @@ class UnitCell(object):
         if isinstance(beam, str):
             self.beam_list.use_beam(beam)
         else:
-            self.beam_list.add_beam(beam, beam.nickname, use=True)
+            self.beam_list.add_beam(beam, beam.nickname, let=LET, use=True)
         logger.info(f"Setting new beam definition ({self.beam_list._current}): "
                     f"{self.beam_list.current}, done!")
+        with suppress(ValueError):
+            self.change_LET(LET or self.beam_list.current_LET)
 
     def change_LET(self, let: float) -> None:
         """Update the radiolytic yields from the simulation env according to literature
@@ -232,6 +235,7 @@ class UnitCell(object):
         Returns:
             None
         """
+        self.beam_list.update_let(let)
         logger.info(
             f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
         for reaction in self.env.reactions.radiolytic:
@@ -242,7 +246,6 @@ class UnitCell(object):
 
         # Recompute the Gi_mat accordingly
         self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
-        self.LET = let
 
         logger.debug("New G values [radical / 100eV / incident particle] are:")
         for reaction in self.env.reactions.radiolytic:
@@ -358,7 +361,11 @@ class UnitCell(object):
                             t_eval,
                             )
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
-        return ODEResult(self.env, self.beam_list.current, self.mat, self.LET, sol)
+        return ODEResult(self.env,
+                         self.beam_list.current,
+                         self.mat,
+                         self.beam_list.current_LET,
+                         sol)
 
     def run_chunked(self,
                     t_chunks: NDArray[np.float64],
@@ -370,7 +377,11 @@ class UnitCell(object):
                     max_step: float | tp.Iterable[float] = np.inf,
                     ) -> ODEResult:
         """TODO: Clean and remove"""
-        sol = ODEResult(self.env, self.beam_list.current, self.mat, self.LET)
+        sol = ODEResult(self.env,
+                        self.beam_list.current,
+                        self.mat,
+                        self.beam_list.current_LET,
+                        )
 
         # Check up max_step
         if isinstance(max_step, float):
@@ -546,7 +557,7 @@ class SimChunksIter():
         self.sol = ODEResult(self.sim.env,
                              self.sim.beam_list.current,
                              self.sim.mat,
-                             self.sim.LET)
+                             self.sim.beam_list.current_LET)
         self.atol = atol
         self.rtol = rtol
         self.use_jac = use_jac
@@ -720,7 +731,11 @@ class ODEResult(object):
                   cell: UnitCell,
                   sol: tp.Optional[ScipyODEResult] = None,
                   ) -> ODEResult:
-        return cls(cell.env, cell.beam_list.current, cell.mat, cell.LET, sol)
+        return cls(cell.env,
+                   cell.beam_list.current,
+                   cell.mat,
+                   cell.beam_list.current_LET,
+                   sol)
 
     @property
     def time(self) -> NDArray[np.float64]:

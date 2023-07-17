@@ -96,13 +96,9 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
 
     # Update beam definition
     # Make sure to keep only the latest beam definition if multiple beam type
-    print("comparing beam defs")
     root_beams = BeamCollection.from_config_dict(root["beam"], verbose=False)
     other_beams = BeamCollection.from_config_dict(other["beam"], verbose=False)
-    print("root: ", root_beams._beam)
-    print("other: ", other_beams._beam)
     root["beam"] = root_beams.merge(other_beams, verbose=False).as_dict()
-    print("After merge: ", root["beam"])
 
     # Update reactions
     #  => Radiolytic

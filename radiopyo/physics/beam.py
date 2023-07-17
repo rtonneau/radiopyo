@@ -909,6 +909,10 @@ class BeamCollection(object):
         return self._beam[self._current]
 
     @property
+    def current_name(self) -> str:
+        return self._current
+
+    @property
     def current_LET(self) -> float:
         if self._let[self._current] is not None:
             return self._let[self._current]  # type: ignore [return-value]
@@ -920,7 +924,7 @@ class BeamCollection(object):
         del self._let[key]
         del self._beam[key]
 
-    def update_let(self, let: float, key: tp.Optional[str]) -> None:
+    def update_let(self, let: float, key: tp.Optional[str] = None) -> None:
         if key is None:
             key = self._current
         elif key not in self:
