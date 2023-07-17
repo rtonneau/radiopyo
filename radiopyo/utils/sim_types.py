@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import typing as tp
 
-from radiopyo.chemistry.acid_base import ABCouple
-from radiopyo.sim_env import kreaction_from_dict, michaelis_from_dict
-
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.chemistry.acid_base import ABCouple
+from radiopyo.physics.beam import BeamCollection
+from radiopyo.sim_env import kreaction_from_dict, michaelis_from_dict
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -65,7 +65,7 @@ class ConfigDict(tp.TypedDict):
     bio_param: tp.Dict[str, float]
     concentrations: ConcentrationDict
     reactions: ReactionsDict
-    beam: tp.Dict[str, tp.Dict[str, float]]
+    beam: tp.Dict[str, tp.List[tp.Dict]]
 
 
 def default_ConfigDict() -> ConfigDict:
@@ -95,12 +95,14 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     root["concentrations"]["initial"] |= other["concentrations"]["initial"]
 
     # Update beam definition
-    # Make sure to keep only the latest beam definition if multiple beam types
-    cmp = dict_compare(root["beam"], other["beam"])
-    if len(cmp["removed"]) > 0 and len(cmp["same"]) == 0:
-        root["beam"] = other["beam"]
-    else:
-        root["beam"] |= other["beam"]
+    # Make sure to keep only the latest beam definition if multiple beam type
+    print("comparing beam defs")
+    root_beams = BeamCollection.from_config_dict(root["beam"], verbose=False)
+    other_beams = BeamCollection.from_config_dict(other["beam"], verbose=False)
+    print("root: ", root_beams._beam)
+    print("other: ", other_beams._beam)
+    root["beam"] = root_beams.merge(other_beams, verbose=False).as_dict()
+    print("After merge: ", root["beam"])
 
     # Update reactions
     #  => Radiolytic

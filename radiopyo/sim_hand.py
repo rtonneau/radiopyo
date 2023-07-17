@@ -28,7 +28,7 @@ from . import exceptions as rp_excep
 from .chemistry.species import CstSpecies
 from .input.g_values import GValuesBoscolo
 from .ode_solver import ScipyODEResult, derive, jacobian
-from .physics.beam import BeamCollection, beam_from_dict
+from .physics.beam import BeamCollection, ParticleBeam
 from .sim_env import SimEnv
 from .utils.parser_def import FileParser, resolve_includes
 from .utils.ron_parser import RonFileParser
@@ -40,7 +40,6 @@ if tp.TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from .physics.beam import ParticleBeam
     from .utils.sim_types import ConfigDict, KwargsRun
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -103,7 +102,7 @@ class UnitCell(object):
 
     def __init__(self,
                  env: SimEnv,
-                 beam: tp.Optional[ParticleBeam] = None,
+                 beam: tp.Optional[ParticleBeam | BeamCollection] = None,
                  ) -> None:
         self.env = env
         self.mat = SimMatrices(
@@ -115,8 +114,9 @@ class UnitCell(object):
             O2_mat=self.env.make_O2_intake_matrix(),
         )
 
-        self.beam_list = BeamCollection()
-        if beam is not None:
+        self.beam_list = beam if isinstance(beam, BeamCollection) else BeamCollection()
+
+        if isinstance(beam, ParticleBeam):
             self.beam_list.add_beam(beam, beam.nickname)
         self.last_exec_time = -1
         self.g_val = GValuesBoscolo()
@@ -133,21 +133,22 @@ class UnitCell(object):
         Returns:
             UnitCell 
         """
-        beam: tp.Optional[ParticleBeam] = None
-        LET: tp.Optional[float] = None
+        beam_list: tp.Optional[BeamCollection] = None
 
+        logger.info(f"BEAM::from config reader -> len: {len(config['beam'])}")
+        logger.info(f"{config['beam']}")
         if len(config["beam"]) > 0:
             logger.info("Beam configuration detected in config file")
-            beam, LET = beam_from_dict(config["beam"])
-            logger.info(f"Beam {beam} is setup")
+            beam_list = BeamCollection.from_config_dict(config["beam"])
+            logger.info(f"Beam {beam_list} is setup")
         else:
             logger.info("No beam configuration detected")
 
         out = UnitCell(env=SimEnv.from_dict(config),
-                       beam=beam)
+                       beam=beam_list)
 
-        if LET is not None:
-            out.change_LET(LET)
+        with suppress(ValueError):
+            out.change_LET(out.beam_list.current_LET)
         return out
 
     @classmethod

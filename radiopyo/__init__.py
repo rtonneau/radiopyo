@@ -1,9 +1,9 @@
 # Load logging configuration
 from pathlib import Path
 
-from .physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
-from .sim_hand import SimChunksIter, UnitCell
-from .utils.logging import (
+from radiopyo.physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
+from radiopyo.sim_hand import SimChunksIter, UnitCell
+from radiopyo.utils.logging import (
     disable_logging,
     enable_logging,
     logConfig_from_pyproject,

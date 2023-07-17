@@ -111,6 +111,6 @@ class RonFileParser(FileParser):
                     "enzymatic": items.get("enzymatic_reactions", []),
         },
 
-            "beam": items.get("beam", []),
+            "beam": items.get("beam", {}),
 
         }
