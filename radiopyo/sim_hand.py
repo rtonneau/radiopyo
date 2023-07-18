@@ -113,6 +113,8 @@ class UnitCell(object):
             O2_mat=self.env.make_O2_intake_matrix(),
         )
 
+        self.g_val = GValuesBoscolo()  # To do before set_beam
+
         if isinstance(beam, BeamCollection):
             self.beam_list = beam
             self.set_beam(self.beam_list.current_name)
@@ -122,7 +124,6 @@ class UnitCell(object):
                 self.beam_list.add_beam(beam, beam.nickname)
 
         self.last_exec_time = -1
-        self.g_val = GValuesBoscolo()
 
     @classmethod
     def from_config_dict(cls, config: ConfigDict) -> UnitCell:
@@ -137,12 +138,9 @@ class UnitCell(object):
         """
         beam_list: tp.Optional[BeamCollection] = None
 
-        logger.info(f"BEAM::from config reader -> len: {len(config['beam'])}")
-        logger.info(f"{config['beam']}")
         if len(config["beam"]) > 0:
             logger.info("Beam configuration detected in config file")
             beam_list = BeamCollection.from_config_dict(config["beam"])
-            logger.info(f"Beam {beam_list} is setup")
         else:
             logger.info("No beam configuration detected")
 

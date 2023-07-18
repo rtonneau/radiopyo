@@ -98,6 +98,9 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # Make sure to keep only the latest beam definition if multiple beam type
     root_beams = BeamCollection.from_config_dict(root["beam"], verbose=False)
     other_beams = BeamCollection.from_config_dict(other["beam"], verbose=False)
+    if "default" in root_beams and len(other_beams) > 0:
+        root_beams.remove_beam("default")
+
     root["beam"] = root_beams.merge(other_beams, verbose=False).as_dict()
 
     # Update reactions

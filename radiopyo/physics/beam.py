@@ -844,12 +844,15 @@ class PulsedBeam(ParticleBeam):
     @classmethod
     def from_dict(cls, param: tp.Dict[str, float]) -> PulsedBeam:
         """ """
-        if "period" not in param:
+        if "period" not in param and "frequency" not in param:
             raise ParameterError(
-                "PulsedBeam must be defined with a 'period' parameter")
+                "PulsedBeam must be defined with a 'period' or 'frequency' parameter")
         if "on_time" not in param:
             raise ParameterError("PulsedBeam must be defined with an "
                                  "'on_time' parameter")
+        if "period" not in param:
+            param["period"] = 1 / param["frequency"]
+
         if "dose_rate_peak" in param:
             return PulsedBeam.from_peak_dose_rate(
                 param["dose_rate_peak"],
@@ -904,6 +907,12 @@ class BeamCollection(object):
     def __getitem__(self, key: str) -> tp.Tuple[ParticleBeam, float | None]:
         return self._beam[key], self._let[key]
 
+    def __str__(self) -> str:
+        out = ["BeamCollection:\n"]
+        for name, beam, let in self:
+            out.append(f"Beam {name} [{let}keV/µm] -> {beam}\n")
+        return "".join(out)
+
     @property
     def current(self) -> ParticleBeam:
         return self._beam[self._current]
@@ -957,6 +966,11 @@ class BeamCollection(object):
                            LET: tp.Optional[float] = None,
                            verbose: bool = True
                            ) -> None:
+        if LET is None and "LET" in config:
+            LET = config["LET"]
+        if LET is not None and "LET" not in config:
+            config["LET"] = LET  # So that LET is displayed in the bottom log
+
         nickname: str
         if "nickname" not in config:
             msg = ("BEAM:: Assigning 'default' name to beam definition "
@@ -985,8 +999,6 @@ class BeamCollection(object):
                    "Erasing previous definition")
             logger.info(msg)
 
-        if LET is None and "LET" in config:
-            LET = config["LET"]
         self.add_beam(beam=beam, key=nickname, let=LET)
 
     @classmethod
