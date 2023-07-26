@@ -196,6 +196,9 @@ class UnitCell(object):
         Returns:
             None
         """
+        if LET is None:
+            LET = self.beam_list.current_LET
+
         if isinstance(beam, str):
             self.beam_list.use_beam(beam)
         else:
@@ -203,7 +206,7 @@ class UnitCell(object):
         logger.info(f"Setting new beam definition ({self.beam_list._current}): "
                     f"{self.beam_list.current}, done!")
         with suppress(ValueError):
-            self.change_LET(LET or self.beam_list.current_LET)
+            self.change_LET(LET)
 
     def change_LET(self, let: float) -> None:
         """Update the radiolytic yields from the simulation env according to literature
