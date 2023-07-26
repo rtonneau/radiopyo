@@ -256,11 +256,11 @@ class TreeToReaction(lark.Transformer):
     def anion(self, items: tp.List) -> tp.Dict:
         if isinstance(items[0], lark.Token) and items[0].type == "ELECTRON":
             return {"name": "e_aq", "charge": -1, "radical": False, "stoi": 1}
-        items[0]["charge"] -= 1
+        items[0]["charge"] -= (len(items)-1)
         return items[0]
 
     def cation(self, items: tp.List) -> tp.Dict:
-        items[0]["charge"] += 1
+        items[0]["charge"] += (len(items)-1)
         return items[0]
 
     def radical(self, items: tp.List) -> tp.Dict:
