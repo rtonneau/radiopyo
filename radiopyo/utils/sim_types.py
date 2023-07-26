@@ -15,7 +15,10 @@ import typing as tp
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.acid_base import ABCouple
 from radiopyo.physics.beam import BeamCollection
-from radiopyo.sim_env import kreaction_from_dict, michaelis_from_dict
+from radiopyo.simulation.environment_build import (
+    kreaction_from_dict,
+    michaelis_from_dict,
+)
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -29,6 +32,7 @@ __all__ = [
     "ReactionsDict",
     "ConcentrationDict",
     "default_ConfigDict",
+    "SimMatrices",
 ]
 # ------------------------------------------------------------------------------------ #
 
@@ -66,6 +70,19 @@ class ConfigDict(tp.TypedDict):
     concentrations: ConcentrationDict
     reactions: ReactionsDict
     beam: tp.Dict[str, tp.List[tp.Dict]]
+
+
+class SimMatrices(tp.TypedDict):
+    """Convenient TypedDict use to leverage type checking and store matrices used in ODE
+    solver."""
+    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]]
+    Ki_mat: tp.Tuple[NDArray[np.float64], NDArray[np.int8],
+                     NDArray[np.float32], NDArray[np.float32]]
+    Gi_mat: NDArray[np.float64]
+    Ez_mat: tp.Optional[tp.Tuple[NDArray[np.float32], NDArray[np.float32],
+                                 NDArray[np.float64], NDArray[np.int8],]]
+    cst_sp: NDArray[np.float64]
+    O2_mat: tp.Optional[tp.Tuple[NDArray[np.float64], NDArray[np.float64]]]
 
 
 def default_ConfigDict() -> ConfigDict:

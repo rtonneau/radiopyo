@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from radiopyo.physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
-from radiopyo.sim_hand import SimChunksIter, UnitCell
+from radiopyo.simulation.unit_cell import SimChunksIter, UnitCell
 from radiopyo.utils.logging import (
     disable_logging,
     enable_logging,

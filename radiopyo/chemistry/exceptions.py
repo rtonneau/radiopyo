@@ -7,7 +7,7 @@ Author:
 """
 # --------------------------------- External imports --------------------------------- #
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.exceptions import RadioPyoError
+from radiopyo.simulation.exceptions import RadioPyoError
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 # ------------------------------------------------------------------------------------ #

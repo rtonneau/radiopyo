@@ -21,18 +21,18 @@ import numpy as np
 from scipy.constants import Avogadro  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
-from .chemistry.acid_base import ABCouple
-from .chemistry.k_reactions import KReaction
-from .chemistry.michaelis import MichaelisMenten
-from .chemistry.radiolytic import RadiolyticReaction
-from .chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
+from radiopyo.chemistry.acid_base import ABCouple
+from radiopyo.chemistry.k_reactions import KReaction
+from radiopyo.chemistry.michaelis import MichaelisMenten
+from radiopyo.chemistry.radiolytic import RadiolyticReaction
+from radiopyo.chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from .chemistry.base_chemistry import IsChemicalReaction
-    from .utils.sim_types import ConfigDict
+    from radiopyo.chemistry.base_chemistry import IsChemicalReaction
+    from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = ["SimEnv",
