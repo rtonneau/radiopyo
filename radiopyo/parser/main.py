@@ -13,11 +13,11 @@ import pathlib
 import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
-from .sim_types import combine_config
+from radiopyo.parser.utils import combine_config
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from .sim_types import ConfigDict
+    from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [

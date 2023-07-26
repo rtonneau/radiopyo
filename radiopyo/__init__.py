@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from radiopyo.physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
-from radiopyo.simulation.unit_cell import SimChunksIter, UnitCell
+from radiopyo.simulation.unit_cell import UnitCell
 from radiopyo.utils.logging import (
     disable_logging,
     enable_logging,
@@ -20,7 +20,6 @@ LABARBE_CONFIG_FILE = Path(
 __all__ = ["ConstantBeam",
            "PulsedBeam",
            "SinglePulseBeam",
-           "SimChunksIter",
            "UnitCell",
            "disable_logging",
            "enable_logging",

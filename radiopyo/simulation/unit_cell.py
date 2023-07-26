@@ -21,16 +21,16 @@ from scipy.integrate import solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.species import CstSpecies
+from radiopyo.parser import FileParser, resolve_includes
+from radiopyo.parser.ron import RonFileParser
+from radiopyo.parser.toml import TOMLFileParser
 from radiopyo.physics.beam import BeamCollection, ParticleBeam
 from radiopyo.simulation import exceptions as rp_excep
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import ScipyODEResult, derive, jacobian
 from radiopyo.simulation.ode_result import ODEResult
 from radiopyo.utils.g_values import GValuesBoscolo
-from radiopyo.utils.parser_def import FileParser, resolve_includes
-from radiopyo.utils.ron_parser import RonFileParser
 from radiopyo.utils.sim_types import SimMatrices
-from radiopyo.utils.toml_parser import TOMLFileParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:

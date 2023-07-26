@@ -18,7 +18,7 @@ import itertools_recipes as it  # type: ignore[import]
 import lark
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.utils.parser_def import FileParser
+from radiopyo.parser import FileParser
 
 # ------------------------------------------------------------------------------------ #
 #                               TYPE CHECKING ONLY IMPORT                              #
