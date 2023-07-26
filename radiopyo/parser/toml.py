@@ -15,7 +15,7 @@ from contextlib import suppress
 import tomllib
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.parser.main import FileParser
+from radiopyo.parser.file_parser import FileParser
 from radiopyo.utils.sim_types import ConfigDict, default_ConfigDict
 
 # ----------------------------- Type checking ONLY imports---------------------------- #

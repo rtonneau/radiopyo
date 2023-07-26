@@ -20,7 +20,7 @@ from .species import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from .utils.reaction_parser import GenericReaction
+    from ..parser.reaction_parser import GenericReaction
 
 # ------------------------------------------------------------------------------------ #
 

@@ -295,7 +295,7 @@ class TreeToReaction(lark.Transformer):
 
 class ReactionParser(object):
     """ """
-    GRAMMAR: Path = Path(__file__).parent/"reaction_grammar.lark"
+    GRAMMAR: Path = Path(__file__).parent/r"grammar//reaction_grammar.lark"
 
     parser: lark.Lark
     atomix: Atomix

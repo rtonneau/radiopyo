@@ -21,7 +21,7 @@ from scipy.integrate import solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.species import CstSpecies
-from radiopyo.parser import FileParser, resolve_includes
+from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.ron import RonFileParser
 from radiopyo.parser.toml import TOMLFileParser
 from radiopyo.physics.beam import BeamCollection, ParticleBeam

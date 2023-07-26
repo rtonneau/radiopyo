@@ -6,7 +6,7 @@ Author:
 """
 # --------------------------------- External imports --------------------------------- #
 # --------------------------------- Internal imports --------------------------------- #
-from .reaction_parser import ReactionParser
+from radiopyo.parser.reaction_parser import ReactionParser
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 

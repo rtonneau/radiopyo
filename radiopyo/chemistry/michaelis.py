@@ -12,16 +12,16 @@ from __future__ import annotations
 import hashlib
 import typing as tp
 
+from radiopyo.chemistry.base_chemistry import BaseChemicalReaction
+from radiopyo.chemistry.species import ListSpecies
+
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.utils import RPARSER
 
-from .base_chemistry import BaseChemicalReaction
-from .species import ListSpecies
-
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from .species import SimSpecies
-    from .utils.reaction_parser import GenericReaction
+    from radiopyo.chemistry.species import SimSpecies
+    from radiopyo.parser.reaction_parser import GenericReaction
 # ------------------------------------------------------------------------------------ #
 
 __all__ = [

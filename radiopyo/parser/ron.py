@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import typing as tp
 from functools import reduce
+from pathlib import Path
 
 import itertools_recipes as it  # type: ignore[import]
 import lark
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.parser import FileParser
+from radiopyo.parser.file_parser import FileParser
 
 # ------------------------------------------------------------------------------------ #
 #                               TYPE CHECKING ONLY IMPORT                              #
@@ -90,7 +91,7 @@ class RonFileParser(FileParser):
     def parse(self) -> ConfigDict:
         """ 
         """
-        with open("ron_grammar.lark", "r") as file:
+        with open(Path(__file__).parent/r"grammar//ron_grammar.lark", "r") as file:
             parser = lark.Lark(file.read())
 
         with open(self.path, "r") as file:

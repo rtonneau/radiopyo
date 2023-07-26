@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import typing as tp
 from contextlib import suppress
-from pathlib import Path
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.utils import PACKAGE_DATA_PATH
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -43,7 +43,7 @@ class Entry(tp.NamedTuple):
 
 
 class Atomix(object):
-    DATA_FILE = Path(__file__).parent/"_data_atomic_weights.txt"
+    DATA_FILE = PACKAGE_DATA_PATH/r"masses//_data_atomic_weights.txt"
     _data: tp.Dict[str, Entry]
 
     def __init__(self) -> None:
