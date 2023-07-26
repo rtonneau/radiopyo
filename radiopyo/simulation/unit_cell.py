@@ -104,7 +104,7 @@ class UnitCell(object):
         else:
             self.beam_list = BeamCollection()
             if isinstance(beam, ParticleBeam):
-                self.beam_list.add_beam(beam, beam.nickname)
+                self.beam_list.add_beam(beam, beam.label)
 
         self.last_exec_time = -1
 
@@ -199,7 +199,7 @@ class UnitCell(object):
         if isinstance(beam, str):
             self.beam_list.use_beam(beam)
         else:
-            self.beam_list.add_beam(beam, beam.nickname, let=LET, use=True)
+            self.beam_list.add_beam(beam, beam.label, let=LET, use=True)
         logger.info(f"Setting new beam definition ({self.beam_list._current}): "
                     f"{self.beam_list.current}, done!")
         with suppress(ValueError):

@@ -1,10 +1,9 @@
 [includes]
 toml = "radiopyo/config_Labarbe.toml"
 
-
 #----------------------- Beams defined in N. Blond Master Thesis -----------------------
 [[beam.pulsed]]
-nickname       = "conv"
+label          = "conv"
 dose_rate_peak = 4e3       # Peak dose rate for pulsed beam [Gy/s]
 on_time        = 1.2e-6    # Time [seconds] (used only for Pulsed beam)
 frequency      = 30        # Frequency [Hz]
@@ -12,7 +11,7 @@ max_dose       = 10
 LET            = 0.2116    # [keV/µm] -> 9MeV electrons
 
 [[beam.pulsed]]
-nickname       = "UHDR"
+label          = "UHDR"
 dose_rate_peak = 5.7e5     # Peak dose rate for pulsed beam [Gy/s]
 on_time        = 2e-6      # Time [seconds] (used only for Pulsed beam)
 frequency      = 90        # [Hz]
@@ -20,7 +19,7 @@ max_dose       = 10        # [Gy]
 LET            = 0.2116    # [keV/µm] -> 9MeV electrons
 
 [[beam.pulsed]]
-nickname       = "UHDR1"
+label          = "UHDR1"
 dose_rate_peak = 5.7e5     # Peak dose rate for pulsed beam [Gy/s]
 on_time        = 2e-6      # Time [seconds] (used only for Pulsed beam)
 frequency      = 90        # [Hz]
@@ -28,7 +27,7 @@ n_pulse        = 9
 LET            = 0.2116    # [keV/µm] -> 9MeV electrons
 
 [[beam.pulsed]]
-nickname       = "UHDR2"
+label          = "UHDR2"
 dose_rate_peak = 4.4e5     # Peak dose rate for pulsed beam [Gy/s]
 on_time        = 4e-6      # Time [seconds] (used only for Pulsed beam)
 frequency      = 60        # [Hz]
@@ -36,7 +35,7 @@ n_pulse        = 6
 LET            = 0.2116    # [keV/µm] -> 9MeV electrons
 
 [[beam.pulsed]]
-nickname       = "UHDR3"
+label          = "UHDR3"
 dose_rate_peak = 6.6e5     # Peak dose rate for pulsed beam [Gy/s]
 on_time        = 1.2e-6    # Time [seconds] (used only for Pulsed beam)
 frequency      = 120       # [Hz]
