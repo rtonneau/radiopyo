@@ -254,6 +254,14 @@ class ParticleBeam():
         """
         raise NotImplementedError
 
+    def update_beam_param(self, **kwargs: float) -> None:
+        """ """
+        for key, value in kwargs.items():
+            if key not in ["dose_rate", "max_dose", "label"]:
+                raise AttributeError(f"ParticleBeam has not attribute: {key}")
+            setattr(self, key, value)
+        self.__post_init__()
+
     def _compute_time_at_max_dose(self) -> float:
         """Helper method to compute the time at which max dose rate will be reached with
         the average dose rate and Timer defined.
@@ -503,6 +511,12 @@ class ConstantBeam(ParticleBeam):
     def __str__(self) -> str:
         return f"ConstantBeam(dose_rate={self.dose_rate:.2g}, max_dose={self.max_dose})"
 
+    def update_beam_param(self, **kwargs: float) -> None:
+        """ """
+        if "start_time" in kwargs:
+            self.timer = Timer.new_constant(kwargs.pop("start_time"))
+        super().update_beam_param(**kwargs)
+
     def beam_type(self) -> str:
         return "ConstantBeam"
 
@@ -657,6 +671,38 @@ class PulsedBeam(ParticleBeam):
                          Timer.new_pulsed(period, on_time, start_time),
                          max_dose if max_dose is not None else float("inf"),
                          )
+
+    def update_beam_param(self, **kwargs: float) -> None:
+        """ """
+        if "peak_dose_rate" in kwargs:
+            self = PulsedBeam.from_peak_dose_rate(
+                peak_dr=kwargs["peak_dose_rate"],
+                period=self.timer.period,
+                on_time=self.timer.on_time,
+                n_pulse=kwargs.pop("n_pulse", self.tot_pulse()),
+                max_dose=kwargs.pop("max_dose", self.max_dose),
+                start_time=self.timer.start_time,
+            )
+            return
+
+        if "dose_per_pulse" in kwargs:
+            self = PulsedBeam.from_dose_per_pulse(
+                pulse_dose=kwargs["dose_per_pulse"],
+                period=self.timer.period,
+                on_time=self.timer.on_time,
+                n_pulse=kwargs.pop("n_pulse", self.tot_pulse()),
+                max_dose=kwargs.pop("max_dose", self.max_dose),
+                start_time=self.timer.start_time,
+            )
+            return
+
+        if "start_time" in kwargs or "on_time" in kwargs or "period" in kwargs:
+            start_time = kwargs.pop("start_time", self.timer.start_time)
+            on_time = kwargs.pop("on_time", self.timer.on_time)
+            period = kwargs.pop("period", self.timer.period)
+            self.timer = Timer.new_pulsed(period, on_time, start_time)
+
+        super().update_beam_param(**kwargs)
 
     def beam_type(self) -> str:
         return "PulsedBeam"

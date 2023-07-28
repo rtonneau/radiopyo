@@ -26,4 +26,4 @@ __all__: tp.List = [
 
 # ------------------------------------------------------------------------------------ #
 PACKAGE_DATA_PATH = Path(f"{Path(__file__).parent.parent}//data").absolute()
-LABARBE_CONFIG_FILE = PACKAGE_DATA_PATH / "reactions_Labarbe.toml"
+LABARBE_CONFIG_FILE = PACKAGE_DATA_PATH / "config_Labarbe.toml"

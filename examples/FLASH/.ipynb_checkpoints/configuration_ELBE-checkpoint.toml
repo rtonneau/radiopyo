@@ -1,0 +1,9 @@
+[includes]
+toml = "radiopyo/config_Labarbe.toml"
+
+#----------------------- Beams defined in N. Blond Master Thesis -----------------------
+[[beam.constant]]
+dose_rate = 0.13
+max_dose  = 32
+LET       = 0.27      # [keV/µm] -> 9MeV electrons
+

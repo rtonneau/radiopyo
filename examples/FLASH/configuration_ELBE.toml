@@ -1,0 +1,27 @@
+[includes]
+toml = "radiopyo/config_Labarbe.toml"
+
+#----------------------- Beams defined in N. Blond Master Thesis -----------------------
+[[beam.constant]]
+dose_rate = 0.13
+max_dose = 32
+LET = 0.27       # [keV/µm] -> 9MeV electrons
+
+[[beam.pulsed]]
+label = "O2_depletion"
+dose_rate_peak = 4.9e6
+period = 120
+on_time = 0.1
+n_pulse = 8
+LET = 0.27             # [keV/µm] -> 9MeV electrons
+
+[concentrations.fixed] # Unit is [mol]/[l]
+H2O = 55
+catalase = 8.0e-8
+Fe_plus_plus = 8.9e-7
+GSH = 6.5e-3
+RH = 1
+unsat_lipid = 1e-6
+
+[concentrations.initial] # Unit is [mol]/[l]
+O2 = 52e-6
