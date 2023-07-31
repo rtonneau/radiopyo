@@ -12,7 +12,8 @@ label = "O2_depletion"
 dose_rate_peak = 4.9e6
 period = 120
 on_time = 0.1
-n_pulse = 8
+n_pulse = 1
+start_time = 30
 LET = 0.27             # [keV/µm] -> 9MeV electrons
 
 [concentrations.fixed] # Unit is [mol]/[l]
