@@ -183,8 +183,12 @@ class SimEnv():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
-        list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
+        list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))  # noqa: ERA001
+        list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))  # noqa: ERA001
+        # list_sp.add_dyn_species("H_plus") # noqa: ERA001
+        # initial_cc["H_plus"] = 10**(-bio_param["pH"]) # noqa: ERA001
+        # list_sp.add_dyn_species("OH_minus") # noqa: ERA001
+        # initial_cc["OH_minus"] = 10**(-14+bio_param["pH"]) # noqa: ERA001
 
         # Sanity check
         if "reactions" not in config:
@@ -439,7 +443,11 @@ class SimEnv():
                        dtype=np.int8)
         ABo = np.zeros_like(ABi, dtype=np.float64)
         ABy = np.zeros(len(self.species), dtype=np.int8)
-        cc_H_plus = self.species.cst_sp["H_plus"].cc_value  # mol/l
+        try:
+            cc_H_plus = self.species.cst_sp["H_plus"].cc_value  # mol/l
+        except KeyError:  # H_plus not a cst species
+            cc_H_plus = self.initial_cc["H_plus"]
+
         for col, reaction in enumerate(self.reactions.acid_base):
             ABi[reaction.acid.index, col] = 1
             ABi[reaction.base.index, col] = 1

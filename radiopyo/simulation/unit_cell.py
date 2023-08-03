@@ -108,6 +108,10 @@ class UnitCell(object):
 
         self.last_exec_time = -1
 
+    @property
+    def beam(self) -> ParticleBeam:
+        return self.beam_list.current
+
     @classmethod
     def from_config_dict(cls, config: ConfigDict) -> UnitCell:
         """Create a Simulation Environment from a the generic ConfigDict:

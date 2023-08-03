@@ -677,22 +677,22 @@ class PulsedBeam(ParticleBeam):
         if "peak_dose_rate" in kwargs:
             self = PulsedBeam.from_peak_dose_rate(
                 peak_dr=kwargs["peak_dose_rate"],
-                period=self.timer.period,
-                on_time=self.timer.on_time,
+                period=kwargs.pop("period", self.timer.period),
+                on_time=kwargs.pop("on_time", self.timer.on_time),
                 n_pulse=kwargs.pop("n_pulse", self.tot_pulse()),
                 max_dose=kwargs.pop("max_dose", self.max_dose),
-                start_time=self.timer.start_time,
+                start_time=kwargs.pop("start_time", self.timer.start_time),
             )
             return
 
         if "dose_per_pulse" in kwargs:
             self = PulsedBeam.from_dose_per_pulse(
                 pulse_dose=kwargs["dose_per_pulse"],
-                period=self.timer.period,
-                on_time=self.timer.on_time,
+                period=kwargs.pop("period", self.timer.period),
+                on_time=kwargs.pop("on_time", self.timer.on_time),
                 n_pulse=kwargs.pop("n_pulse", self.tot_pulse()),
                 max_dose=kwargs.pop("max_dose", self.max_dose),
-                start_time=self.timer.start_time,
+                start_time=kwargs.pop("start_time", self.timer.start_time),
             )
             return
 
@@ -894,11 +894,17 @@ class PulsedBeam(ParticleBeam):
         if "period" not in param and "frequency" not in param:
             raise ParameterError(
                 "PulsedBeam must be defined with a 'period' or 'frequency' parameter")
-        if "on_time" not in param:
-            raise ParameterError("PulsedBeam must be defined with an "
-                                 "'on_time' parameter")
-        if "period" not in param:
+
+        if "frequency" in param:
             param["period"] = 1 / param["frequency"]
+
+        if "on_time" not in param:
+            if "dose_rate_peak" in param and "dose_rate" in param:
+                param["on_time"] = param["dose_rate"] * param["period"]
+                param["on_time"] /= param["dose_rate_peak"]
+            else:
+                raise ParameterError("PulsedBeam must be defined with an "
+                                     "'on_time' parameter")
 
         if "dose_rate_peak" in param:
             return PulsedBeam.from_peak_dose_rate(
@@ -1076,7 +1082,7 @@ class BeamCollection(object):
                 x["label"] = name
             if LET is not None:
                 x["LET"] = self._let[name]
-            beam_type = beam.beam_type().lower().strip("beam")
+            beam_type = beam.beam_type().lower().split("beam")[0]
             if beam_type not in out:
                 out[beam_type] = [x, ]
             else:
@@ -1092,7 +1098,7 @@ class BeamCollection(object):
             if let is not None:
                 d["LET"] = let
             d["label"] = name
-            s[name] = (d, _beam.beam_type().lower().strip("beam"))
+            s[name] = (d, _beam.beam_type().lower().split("beam")[0])
 
         for beam_type, beams in other.as_dict().items():
             for beam in beams:

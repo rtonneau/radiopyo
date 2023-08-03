@@ -1,6 +1,5 @@
 [bio_param]
 pH = 7
-
 # ----------------------------------------------------------------------------------
 #                             DEFINE RADIOLYTIC REACTIONS                            
 # ----------------------------------------------------------------------------------
@@ -10,8 +9,6 @@ OH_r = 2.8
 H_r = 0.62
 H2 = 0.47
 H2O2 = 0.73
-
-
 # ----------------------------------------------------------------------------------
 #                             DEFINE ACID-BASE REACTIONS                            
 # ----------------------------------------------------------------------------------
@@ -19,7 +16,7 @@ H2O2 = 0.73
 acid = "OH_r"
 base = "O_r_minus"
 pKa = 11.9
-    
+
 [[reactions.acid_base]]
 acid = "H2O2"
 base = "HO2_minus"
@@ -29,7 +26,6 @@ pKa = 11.7
 acid = "HO2_r"
 base = "O2_r_minus"
 pKa = 4.9
-
 # ----------------------------------------------------------------------------------
 #                                 DEFINE K-REACTIONS                             
 # ----------------------------------------------------------------------------------
@@ -40,15 +36,15 @@ pKa = 4.9
 [[reactions.k_reaction]]
 reaction = "e_aq + H2O -> H_r + OH_minus"
 k_value = 1.9e1
-        
-[[reactions.k_reaction]] 
+
+[[reactions.k_reaction]]
 reaction = "e_aq + e_aq -> H2 + 2 OH_minus"
 k_value = 1.1e10
-        
-[[reactions.k_reaction]] 
+
+[[reactions.k_reaction]]
 reaction = "e_aq + H_r -> H2 + OH_minus"
 k_value = 2.5e10
-    
+
 [[reactions.k_reaction]]
 reaction = "e_aq + OH_r -> OH_minus"
 k_value = 3.0e10
@@ -136,10 +132,10 @@ k_value = 1.8e6
 reaction = "O_r_minus + O2 -> O3_minus"
 k_value = 3.6e9
 
-[[reactions.k_reaction]] 
+[[reactions.k_reaction]]
 reaction = "O_r_minus + O2_r_minus -> 2 OH_minus + O2"
 k_value = 6.0e8
 
-[[reactions.k_reaction]]  
+[[reactions.k_reaction]]
 reaction = "2 O2_r_minus -> H2O2 + O2"
-k_value = 2e5
+k_value = 2e9                          # 2e5

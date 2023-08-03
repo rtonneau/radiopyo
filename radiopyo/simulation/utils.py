@@ -50,6 +50,9 @@ class ResCollection(object):
     def __len__(self) -> int:
         return len(self._order)
 
+    def keys(self) -> tp.List[tp.Any]:
+        return self._order.copy()
+
     def iter_pandas(self) -> tp.Iterator[tp.Tuple[tp.Any, DataFrame]]:
         for key in self._order:
             yield key, self._results[key].to_pandas()

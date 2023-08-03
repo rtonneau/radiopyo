@@ -1,0 +1,48 @@
+[includes]
+toml = "radiopyo/config_Labarbe.toml"
+
+#----------------------- Beams defined in N. Blond Master Thesis -----------------------
+[[beam.pulsed]]
+#From Irradiation at Ultra-High (FLASH) Dose Rates Reduces Acute Normal Tissue Toxicity in the Mouse Gastrointestinal System - 2021
+# doi: 10.1016/j.ijrobp.2021.08.004
+label = "conv"
+frequency = 25 # Pulse repetition frequency [Hz]
+dose_rate = 0.25
+dose_rate_peak = 3e3 # Peak dose rate [Gy/s]
+max_dose = 7.5
+LET = 0.201       # [keV/µm] -> 6MeV electrons
+
+[[beam.constant]]
+#From Irradiation at Ultra-High (FLASH) Dose Rates Reduces Acute Normal Tissue Toxicity in the Mouse Gastrointestinal System - 2021
+# doi: 10.1016/j.ijrobp.2021.08.004
+label = "conv-constant"
+dose_rate = 0.25
+max_dose = 7.5
+LET = 0.201       # [keV/µm] -> 6MeV electrons
+
+[[beam.singlepulse]]
+label = "flash"
+dose_rate = 2.2e6
+on_time = 3.4e-6
+LET = 0.201             # [keV/µm] -> 6MeV electrons
+
+[concentrations.fixed] # Unit is [mol]/[l]
+H2O = 55
+
+[concentrations.initial] # Unit is [mol]/[l]
+O2 = 52e-6
+
+# ----------------------------------------------------------------------------------
+#                                ADAPTING K-REACTIONS                             
+# ----------------------------------------------------------------------------------
+#[[reactions.k_reaction]]
+#reaction = "O_r_minus + O2 -> O3_minus"
+#"k_value = 7.2e9                         #3.6e9
+
+#[[reactions.k_reaction]]
+#reaction = "H_r + O2 -> HO2_r"
+#k_value = 4.2e10               #2.1e10
+
+#[[reactions.k_reaction]]
+#reaction = "e_aq + O2 -> O2_r_minus"
+#k_value = 0.48e10                    #1.9e10
