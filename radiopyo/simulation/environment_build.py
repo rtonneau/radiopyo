@@ -183,12 +183,12 @@ class SimEnv():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))  # noqa: ERA001
-        list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))  # noqa: ERA001
-        # list_sp.add_dyn_species("H_plus") # noqa: ERA001
-        # initial_cc["H_plus"] = 10**(-bio_param["pH"]) # noqa: ERA001
-        # list_sp.add_dyn_species("OH_minus") # noqa: ERA001
-        # initial_cc["OH_minus"] = 10**(-14+bio_param["pH"]) # noqa: ERA001
+        list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
+        list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
+        # list_sp.add_dyn_species("H_plus")  # noqa: ERA001
+        # initial_cc["H_plus"] = 10**(-bio_param["pH"])  # noqa: ERA001
+        # list_sp.add_dyn_species("OH_minus")  # noqa: ERA001
+        # initial_cc["OH_minus"] = 10**(-14+bio_param["pH"])  # noqa: ERA001
 
         # Sanity check
         if "reactions" not in config:

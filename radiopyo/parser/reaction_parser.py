@@ -114,6 +114,22 @@ class ChemicalSpecies(BasicSpecies):
     def mass(self, value: float) -> None:
         self._mass = value
 
+    def _latex_radical_charge(self) -> str:
+        out = ["^{"]
+        if self.radical:
+            out.append(r"\bullet")
+        charge = f"{self.charge}" if abs(self.charge) > 1 else ""
+        if self.charge > 0:
+            out += [f"{charge}+"]
+        elif self.charge < 0:
+            out += [f"{charge}-"]
+        out.append("}")
+        return "".join(out) if len(out) > 2 else ""
+
+    def to_latex(self) -> str:
+        out = ["$", self.name, self._latex_radical_charge(), "$"]
+        return "".join(out)
+
 
 class HydratedElectron(ChemicalSpecies):
 
@@ -125,6 +141,9 @@ class HydratedElectron(ChemicalSpecies):
 
     def __str__(self) -> str:
         return self.name
+
+    def to_latex(self) -> str:
+        return "$e_{aq}$"
 
 
 class Atom (ChemicalSpecies):
@@ -172,6 +191,14 @@ class Molecule(ChemicalSpecies):
             out += ["_plus"]*self.charge
         elif self.charge < 0:
             out += ["_minus"]*np.abs(self.charge)
+        return "".join(out)
+
+    def to_latex(self) -> str:
+        out = ["$"]
+        for (atom, stoi) in self.atoms:
+            out.append(f"{atom.to_latex().strip('$')}{f'_{stoi}' if stoi>1 else ''}")
+        out.append(self._latex_radical_charge())
+        out.append("$")
         return "".join(out)
 
     @classmethod
