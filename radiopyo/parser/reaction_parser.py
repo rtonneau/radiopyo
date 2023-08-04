@@ -268,7 +268,7 @@ class TreeToReaction(lark.Transformer):
         return items[0]
 
     def atom(self, items: tp.List) -> tp.Dict:
-        return {"name": items[0], "radical": False, "charge": 0}
+        return {"name": "".join(items), "radical": False, "charge": 0}
 
     def sub_mol(self, items: tp.List) -> tp.Tuple[tp.Dict, int]:
         stoi, = items[1:2] or [1]
