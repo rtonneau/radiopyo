@@ -50,6 +50,9 @@ class ResCollection(object):
     def __len__(self) -> int:
         return len(self._order)
 
+    def __getitem__(self, key: tp.Any) -> ODEResult:
+        return self._results[key]
+
     def keys(self) -> tp.List[tp.Any]:
         return self._order.copy()
 
