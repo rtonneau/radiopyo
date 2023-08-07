@@ -42,6 +42,8 @@ __all__ = ["ge_to_kr",
 # Ge units => radical / 100eV / incident particle
 # Kr units => mol/l/Gy
 
+# Define some functions for unit conversion:
+
 
 def umol_per_joule_to_ge(value: float) -> float:
     return value * 1e-6 * Avogadro / elementary_charge * 100
@@ -83,7 +85,7 @@ class RadiolyticReaction(BaseChemicalReaction):
         The G value is not included in the hash. The aim is to have a single hash for
         two radiolytic reactions of the same species even for different Gvalue. The LET
         or actual Gvalue should be given sideway.
-        (Therefore it limits the number of entries in the database)
+        (Therefore it limits the number of entries in a database)
         """
         hasher = hashlib.new(method, usedforsecurity=False)
         hasher.update(repr(self).encode())

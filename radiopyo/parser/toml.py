@@ -40,11 +40,13 @@ class TOMLFileParser(FileParser):
     ext = ".toml"
 
     def parse(self) -> ConfigDict:
-        """ 
+        """
+        No Need for Lark grammar, "tomllib" works just fine =) 
         """
         with open(self.path, mode="rb") as fb:
             config = tomllib.load(fb)
 
+        # Produces a bare dict with all fields initiated
         out = default_ConfigDict()
         out["includes"] = config.get("includes", {})
         out["bio_param"] = config.get("bio_param", {})

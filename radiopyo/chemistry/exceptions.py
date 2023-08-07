@@ -42,5 +42,7 @@ class NotReactionReactant(ChemistryError):
 
 class NotReactionProduct(ChemistryError):
     """"""
+
+
 class UnknownSpeciesError(ChemistryError):
     """"""

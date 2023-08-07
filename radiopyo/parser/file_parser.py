@@ -100,17 +100,17 @@ class FileParser(object):
         """ 
         Method parsing the file (self.path) and returning a ConfigDict.
 
-        Returns
+        Returns:
             ConfigDict: TypedDictionary use to build the simulation Environment.
         """
         raise NotImplementedError
 
     def file_type(self) -> str:
         """
-        raises
+        raises:
             AttributeError: if ext class attribute is not defined by the user.
 
-        returns
+        returns:
             str: file extension
         """
         try:

@@ -174,6 +174,9 @@ class ABCouple():
 
 
 class ABDict(tp.TypedDict):
+    """
+    Typed-Dict used to parse config files like a breeze.
+    """
     acid: str
     base: str
     pKa: float

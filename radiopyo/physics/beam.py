@@ -35,7 +35,6 @@ __all__ = ["TimeMessage",
            "ParticleBeam",
            "ConstantBeam",
            "PulsedBeam",
-           "NoBeam",
            "BeamCollection"
            ]
 
@@ -45,7 +44,7 @@ __all__ = ["TimeMessage",
 
 
 class TimerState(Enum):
-    """ Convenient Enum use to define radiation source ON or OFF state."""
+    """ Convenient Enum use to define radiation source states, ON or OFF."""
     isOff = 0
     isOn = 1
 
@@ -177,32 +176,46 @@ class Timer(tp.NamedTuple):
         return TimerState.isOff
 
     def period_index(self, time: float) -> int:
+        """
+        Get the 'position' of the period containing 'time'.
+        For example, for 3s period & start_time=0, t=8s then period_index = 2
+        """
         time = time - self.start_time
         return int(time // self.period)
 
     def time_till_next_ON(self, time: float) -> float:
+        """
+        Computes time remaining before next pulse.
+        """
         if self.state_at(time) is TimerState.isOn:
             return 0.0
         return self.time_till_next_period(time)
 
     def time_till_next_OFF(self, time: float) -> float:
+        """
+        Computes time remaining before beam is off. Returns 0 if beam already off.
+        """
         if self.state_at(time) is TimerState.isOff:
             return 0.0
         time = time - self.start_time - self.period * self.period_index(time)
         return self.on_time - time
 
     def time_till_next_period(self, time: float) -> float:
+        """
+        Computes how much time is remaining before next period starts.
+        """
         time = time - self.start_time - self.period * self.period_index(time)
         return self.period - time
 
     def copy(self, start_time: tp.Optional[float] = None) -> Timer:
+        """Make a simple copy of the Timer"""
         stime = start_time if start_time is not None else Timer._default_start_time()
         return Timer(self.period,
                      self.on_time,
                      stime)
 
     def off_time(self) -> float:
-        """ """
+        """Computes the OFF time"""
         return self.period - self.on_time
 
 
@@ -245,17 +258,31 @@ class ParticleBeam():
         self.time_at_max_dose = self.timer.start_time + self._compute_time_at_max_dose()
 
     def set_name(self, name: str) -> None:
-        """
-        """
+        """Gives the beam a name"""
         self.label = name
 
     def beam_type(self) -> str:
-        """ 
+        """
+        Returns beam type as a string.
+        Returns:
+            str
+                Beam type
         """
         raise NotImplementedError
 
     def update_beam_param(self, **kwargs: float) -> None:
-        """ """
+        """
+        Modify some beam parameter and recomputes what needs to be changed.
+        This method should be overridden for new ParticleBeam inherited class.
+        This one takes care of dose_rate, max_dose and label(name).
+
+        Args:
+            kwargs: float
+                key words argument containing float value (except for 'label').
+        Raises:
+            AttributeError
+                if kwargs contains unknown key values.
+        """
         for key, value in kwargs.items():
             if key not in ["dose_rate", "max_dose", "label"]:
                 raise AttributeError(f"ParticleBeam has not attribute: {key}")
@@ -351,16 +378,6 @@ class ParticleBeam():
             return 0.0
         return beam_func
 
-    def reset(self,
-              start: tp.Optional[float] = None,
-              max_dose: tp.Optional[float] = None,
-              ) -> None:
-        """
-        """
-        self.max_dose = max_dose if max_dose is not None else self.max_dose
-        self.timer = self.timer.copy(start_time=start)
-        self.__post_init__()
-
     def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
         """ Method computing the radiation source time structure in the range [start,
         stop] i.e. computes 2 columns matrix whose columns are:
@@ -408,8 +425,8 @@ class ParticleBeam():
         Create a 2D matrix similar to the one produced by the make_matrix(stop, start)
         method. The major differences are:
             - takes into account max_dose in order to trim the matrix if needed.
-            - increases the the on_time so that it is possible to define a refined ODE
-              integration time step for beam OFF-ON & ON-OFF transitions.
+            - Symmetrically expand the 'on_time' so that it is possible to define a 
+              refined ODE integration time step for beam OFF-ON & ON-OFF transitions.
             - The first column is still time but the second is:
                 * 0 for beam OFF
                 * 1 for beam ON
@@ -430,7 +447,7 @@ class ParticleBeam():
             return out
 
         # if 2 lines ==> line 0 is for ON, line 1 is for OFF AND End time.
-        # ==> only ON, no need to grow anything.
+        # ==> only ON, no need to expand anything.
         if out.shape[0] == 2:
             return out
 
@@ -447,7 +464,7 @@ class ParticleBeam():
         # 1) Shift the pulse start to "pulse start"  - (delta/2)
         # -------------------------------------------------------
         # select indices of the lines to modify (where dr > 0.0)
-        # indexes mist be a tuple of len 2 as matrix of 2 cols.
+        # indexes must be a tuple of len 2 as matrix of 2 cols.
         # Want to modify time -> col 0
         indexes = np.where(out[:, 1] > 0.0)[0], [0]
 
@@ -479,15 +496,6 @@ class ParticleBeam():
         raise NotImplementedError
 
 
-class NoBeam(ParticleBeam):
-    """
-    Class used when no beam is defined.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(0, Timer.new_constant(), 0)
-
-
 class ConstantBeam(ParticleBeam):
     """ Class representing a Constant Radiation Source
     Attributes:
@@ -512,7 +520,9 @@ class ConstantBeam(ParticleBeam):
         return f"ConstantBeam(dose_rate={self.dose_rate:.2g}, max_dose={self.max_dose})"
 
     def update_beam_param(self, **kwargs: float) -> None:
-        """ """
+        """
+        Add start_time as possible keyword.
+        """
         if "start_time" in kwargs:
             self.timer = Timer.new_constant(kwargs.pop("start_time"))
         super().update_beam_param(**kwargs)
@@ -559,8 +569,9 @@ class ConstantBeam(ParticleBeam):
 
     @classmethod
     def from_dict(cls, param: tp.Dict[str, float]) -> ConstantBeam:
+        """Build a ConstantBeam out of a dictionary"""
         dose_rate = 0.0
-        for key in ["dose_rate", "dose_rate_avg", "dose_rate_peak",]:
+        for key in ["dose_rate_peak", "dose_rate_avg", "dose_rate"]:
             with suppress(KeyError):
                 dose_rate = param[key]
                 break
@@ -579,6 +590,9 @@ class SinglePulseBeam(ConstantBeam):
             Max dose to deliver in Gy
         start_time: float, optional
             Time to start beam ON (default: 0.0)
+
+    TODO: remove this class as it just mimic ConstantBeam? /!\ useful constructor from 
+          'on_time' though
     """
 
     def __init__(self,
@@ -672,8 +686,9 @@ class PulsedBeam(ParticleBeam):
                          max_dose if max_dose is not None else float("inf"),
                          )
 
+    # @override waiting for this baby to show up (Python3.12 fall 2023!)
+    # => https://peps.python.org/pep-0698/
     def update_beam_param(self, **kwargs: float) -> None:
-        """ """
         if "peak_dose_rate" in kwargs:
             self = PulsedBeam.from_peak_dose_rate(
                 peak_dr=kwargs["peak_dose_rate"],
@@ -708,7 +723,11 @@ class PulsedBeam(ParticleBeam):
         return "PulsedBeam"
 
     def tot_pulse(self) -> float:
-        """"""
+        """Computes the total number of pulses.
+        Returns:
+            float
+                Number of pulses (.2 digits precision)
+        """
         fp = self.time_at_max_dose // self.timer.period
         out = fp + ((self.time_at_max_dose-fp *
                     self.timer.period) / self.timer.on_time)
@@ -755,55 +774,6 @@ class PulsedBeam(ParticleBeam):
 
         if end < stop:
             out = np.vstack([out, [stop, 0.0]])
-        return out
-
-    def make_matrix_from_zero(self,
-                              stop: float,
-                              start: float = 0.0,
-                              ) -> NDArray[np.float64]:
-        # If sim starts after beam off:
-        if start >= self.time_at_max_dose:
-            return np.array([[start, 0.0], [stop, 0.0]], dtype=np.float64)
-
-        # If sim ends in less than one on_time:
-        if stop < self.timer.on_time:
-            return np.array([[start, self.peak_dose_rate],
-                             [stop, 0.0]],
-                            dtype=np.float64)
-
-        # If total dose is delivered in less than one pulse:
-        if self.time_at_max_dose < self.timer.on_time:
-            return np.array([[start, self.peak_dose_rate],
-                             [self.time_at_max_dose, 0.0],
-                             [stop, 0.0]],
-                            dtype=np.float64)
-
-        # Else ...
-        start_period: int = int(start//self.timer.period)
-        stop_period: int
-        if stop > self.time_at_max_dose:
-            stop_period = int(self.time_at_max_dose//self.timer.period)+1
-        else:
-            stop_period = int(stop//self.timer.period)+1
-        times = np.empty([stop_period-start_period, 2],
-                         dtype=np.float64)
-        times[:, 0] = np.arange(start_period, stop_period) * self.timer.period
-        times[:, 1] = times[:, 0] + self.timer.on_time
-
-        dr = np.zeros_like(times)
-        indexes = (np.where(times[:, 0] < self.time_at_max_dose)[0], [0])
-        dr[indexes] = self.peak_dose_rate
-
-        out = np.empty([dr.shape[0]*2, 2])
-        out[:, 0] = times.flatten()
-        out[:, 1] = dr.flatten()
-
-        # Trim based on start/stop times:
-        if out[1, 0] > start:
-            out[0, 0] = start
-        if out[-1, 0] < stop:
-            return np.vstack([out, [stop, 0.0]])
-
         return out
 
     def as_dict(self) -> tp.Dict[str, float]:
@@ -934,12 +904,19 @@ class PulsedBeam(ParticleBeam):
                 max_dose=param.get("max_dose", None),
                 start_time=param.get("start_time", None),
             )
-        raise NotImplementedError(f"Unknown Pulsed beam definitions: {param}")
+        raise NotImplementedError(f"Unknown Pulsed beam definition: {param}")
 
 
 class BeamCollection(object):
+    """
+    Container class for efficient beam storage so that multiple beams can be define
+    (even though only one at a time can be use). 
+    """
+    # Beam definitions are stored in this dict
     _beam: tp.Dict[str, ParticleBeam]
+    # Keyword to access the currently used beam from _beam
     _current: str
+    # LET to use with the corresponding beams
     _let: tp.Dict[str, float | None]
 
     def __init__(self) -> None:
@@ -981,12 +958,30 @@ class BeamCollection(object):
         raise ValueError(f"No LET defined for beam: {self._current}")
 
     def remove_beam(self, key: str) -> None:
+        """Remove a beam entry.
+        Args:
+            key: str
+                name of the beam to delete
+        Raises:
+            KeyError
+                No beam with name: 'key'
+        """
         if key not in self:
             raise KeyError(f"No beam definition named: {key}")
         del self._let[key]
         del self._beam[key]
 
     def update_let(self, let: float, key: tp.Optional[str] = None) -> None:
+        """Modifies the LET of a beam
+        Args:
+            let: float
+                LET value
+            key: str, optional (default=None)
+                name of the beam to update. Default is the current one.
+        Raises:
+            KeyError
+                Beam with name 'key' not found
+        """
         if key is None:
             key = self._current
         elif key not in self:
@@ -995,11 +990,24 @@ class BeamCollection(object):
 
     def add_beam(self,
                  beam: ParticleBeam,
-                 key: tp.Optional[str] = None,
+                 key: str = "default",
                  let: tp.Optional[float] = None,
                  use: bool = False) -> None:
+        """
+        Pushes a new beam into the container.
+        Args:
+            beam: ParticleBeam
+                beam to push in
+            key: str, optional (default="default")
+                Name of the beam
+            let: float, optional (default=None)
+                LET of the beam 
+            use: bool, optional (default=False)
+                Defines the newly pushed beam as the current one
+        """
         if key is None or len(key) == 0:
             key = "default"
+        # First remove any previous definition with the same 'key'
         if key in self:
             self.remove_beam(key)
         self._beam[key] = beam
@@ -1007,11 +1015,24 @@ class BeamCollection(object):
         if use or len(self._current) == 0:
             self._current = key
 
-    def use_beam(self, key: str) -> ParticleBeam:
+    def use_beam(self, key: str) -> tp.Tuple[ParticleBeam, float]:
+        """
+        Defines which beam to use
+        Args:
+            key: str
+                Beam name
+        Raises:
+            KeyError
+                Beam with name 'key' not found
+        Returns:
+            ParticleBeam
+            float
+                The beam LET
+        """
         if key not in self._beam:
             raise KeyError(f"No beam definition named: {key}")
         self._current = key
-        return self.current
+        return self.current, self.current_LET
 
     def add_beam_from_dict(self,
                            beam_type: str,
@@ -1019,8 +1040,26 @@ class BeamCollection(object):
                            LET: tp.Optional[float] = None,
                            verbose: bool = True
                            ) -> None:
+        """
+        Add new beam defined in a dictionary.
+        Args:
+            beam_type: str
+                type of the beam to add
+            config: dict
+                Dictionary containing values defining the beam
+            LET: float, optional
+                LET of the beam
+            verbose: bool, optional (default=True)
+                Enable or disable logging
+
+        Raises:
+            NotImplementedError
+                beam_type not recognized
+        """
+        # if LET not provided, check if present in config.
         if LET is None and "LET" in config:
             LET = config["LET"]
+
         if LET is not None and "LET" not in config:
             config["LET"] = LET  # So that LET is displayed in the bottom log
 
@@ -1059,9 +1098,19 @@ class BeamCollection(object):
                          param: tp.Dict[str, tp.List[tp.Dict]],
                          verbose: bool = True,
                          ) -> BeamCollection:
+        """
+        Create a BeamCollection out of a Dict containing multiple beam definitions.
+        param dictionary keywords should be valid beam type names. Values can be either
+        be a single Dict-like beam or a list of it.
+        Args:
+            param: Dict
+                Dict structure whose keywords are valid beam type names.
+            verbose: bool, optional (default=True)
+        """
         beams = cls()
 
         for beam_type, beam_config in param.items():
+            # If only one beam, not in a list, put it in a list!
             if isinstance(beam_config, dict):
                 beam_config = [beam_config, ]
             for config in beam_config:
@@ -1074,6 +1123,8 @@ class BeamCollection(object):
 
     def as_dict(self) -> tp.Dict[str, tp.List[tp.Dict]]:
         """
+        Extract all the beam in a dictionary whose structure comply with the method
+        'from_config_dict'
         """
         out: tp.Dict[str, tp.List[tp.Dict]] = {}
         for name, beam, LET in self:
@@ -1091,6 +1142,17 @@ class BeamCollection(object):
 
     def merge(self, other: BeamCollection, verbose: bool = True) -> BeamCollection:
         """
+        Merge two BeamCollection. Do not modify the current definition but return a new
+        one.
+
+        Args:
+            other: BeamCollection
+                collection to merge with
+            verbose: bool, optional (default=True)
+                Flag for logging
+
+        Returns:
+            BeamCollection
         """
         s: tp.Dict[str, tp.Tuple[tp.Dict, str]] = {}
         for name, _beam, let in self:
@@ -1098,6 +1160,7 @@ class BeamCollection(object):
             if let is not None:
                 d["LET"] = let
             d["label"] = name
+            # Bug Fix: important to use plit('beam') and not strip('beam')
             s[name] = (d, _beam.beam_type().lower().split("beam")[0])
 
         for beam_type, beams in other.as_dict().items():

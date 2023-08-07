@@ -40,15 +40,20 @@ __all__: tp.List = []
 
 
 def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
-    """" Keep root, erase entries from root when other has it and add entries from other
-    not included in root"""
+    """" 
+    Function for config files assembly. It allows to define the environment in several
+    independent config file. Convenient for reuse. 
+    General behavior:
+        Keep 'root', erase entries from 'root' when 'other' has it and add entries from
+        'other' not included in 'root'
+    """
     # Easy part
     root["bio_param"] |= other["bio_param"]
     root["concentrations"]["fixed"] |= other["concentrations"]["fixed"]
     root["concentrations"]["initial"] |= other["concentrations"]["initial"]
 
     # Update beam definition
-    # Make sure to keep only the latest beam definition if multiple beam type
+    # Make sure to keep only the latest beam definition if multiple beam types
     root_beams = BeamCollection.from_config_dict(root["beam"], verbose=False)
     other_beams = BeamCollection.from_config_dict(other["beam"], verbose=False)
     if "default" in root_beams and len(other_beams) > 0:
@@ -60,12 +65,18 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     #  => Radiolytic
     root["reactions"]["radiolytic"] |= other["reactions"]["radiolytic"]
 
-    # => Acid Base
+    # For the following, Reactions are built from Dict and then their unique identifier
+    # (string version) are used to compare them. First, all reaction from 'root' are
+    # read and stored in a Dict whose keys are the strings. Then each entries of 'other'
+    # are parsed to extract their string. if it exists in the dict, their constants are
+    # compared and updated accordingly.
+
+    ## => Acid Base ##
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["acid_base"]):
         _ = ABCouple.from_dict(**_)
         r_root[str(_)] = (_, idx)
-    to_add = []
+    to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["acid_base"]:
         ar = ABCouple.from_dict(**_)
         if str(ar) in r_root:
@@ -75,7 +86,7 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
         to_add.append(_.copy())
     root["reactions"]["acid_base"] += to_add
 
-    # => k_reactions
+    ## => k_reactions ##
     # First, let's make a set of the kreaction presents in root. Each one should have a
     # unique ID ==> Make kReaction and then use the str version of it!
     r_root = {}
@@ -84,7 +95,7 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
         r_root[str(_)] = (_, idx)
 
     # Loop over all KReaction in other and check whether it is also in root or not.
-    to_add = []
+    to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["k_reaction"]:
         kr = kreaction_from_dict(_, sim_sp=None)[0][0]
         # Same reaction in root => just make sur the kvalue comes from 'other'
@@ -100,12 +111,12 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # from 'other' --> stored in 'to_add'
     root["reactions"]["k_reaction"] += to_add
 
-    # => Enzymatic
+    ## => Enzymatic ##
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["enzymatic"]):
         _ = michaelis_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
-    to_add = []
+    to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["enzymatic"]:
         er = michaelis_from_dict(_, sim_sp=None)[0][0]
         if str(er) in r_root:
@@ -121,6 +132,7 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
 
 def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Dict:
     """ 
+    Dictionary comparison, insightful.
     From:
     https://stackoverflow.com/questions/4527942
     """

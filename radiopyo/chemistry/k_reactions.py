@@ -20,7 +20,7 @@ from .species import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from ..parser.reaction_parser import GenericReaction
+    from radiopyo.parser.reaction_parser import GenericReaction
 
 # ------------------------------------------------------------------------------------ #
 
@@ -57,6 +57,9 @@ class KReaction(BaseChemicalReaction):
         self.k_value = k_value
 
     def raw_k_value(self) -> float:
+        """
+        Produce the k_value as provided by config files.
+        """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
             sp = list(self.reactants.keys())[0]
@@ -94,7 +97,11 @@ class KReaction(BaseChemicalReaction):
                      generic: GenericReaction,
                      k_value: float,
                      list_sp: tp.Optional[ListSpecies] = None,) -> KReaction:
-        """ """
+        """
+        Create a KReaction from a 'GenericReaction', Typed-Dict structure produced by
+        radiopyo module parser.
+        TODO: k_value should probably be contained in the GenericReaction instance.
+        """
 
         reactants: tp.List[str] = []
         products: tp.List[str] = []
@@ -109,7 +116,11 @@ class KReaction(BaseChemicalReaction):
     def from_kwargs(cls,
                     list_sp: tp.Optional[ListSpecies] = None,
                     **kwargs: str | tp.List[str] | float, ) -> KReaction:
-        """ """
+        """ 
+        This method combines the two possible definitions of a KReaction in a config
+        file.
+        TODO: remove the dict approach to keep only the single string reaction.
+        """
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
             list_sp = ListSpecies()

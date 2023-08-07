@@ -5,16 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "radiopyo"
 version = "0.3.1"
-authors = [
-  { name="Romain Tonneau", email="romain.tonneau@unamur.be" },
-]
+authors = [{ name = "Romain Tonneau", email = "romain.tonneau@unamur.be" }]
 description = "A small module to perform FLASH simulations with resolution of ODE's"
 readme = "README.md"
 requires-python = ">=3.9"
-license="LGPL-3.0-only"
+license = "LGPL-3.0-only"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
 ]
 dependencies = [
   "pandas~=1.5.3",
@@ -22,6 +20,7 @@ dependencies = [
   "numpy~=1.24.3",
   "scipy~=1.10.1",
   "mypy",
+  "lark~=1.1.2",
 ]
 
 [project.urls]
@@ -38,20 +37,13 @@ clean_env = 'conda env remove -n radiobio'
 # dependencies = ["hatch-mypyc"]
 
 [tool.hatch.build]
-exclude = [
-  ".env",
-  ".vscode",
-  "tests",
-  "doc",
-]
+exclude = [".env", ".vscode", "tests", "doc"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["radiopyo"]
 
 [tool.pytest.ini_options]
-addopts = [
-    "--import-mode=importlib",
-]
+addopts = ["--import-mode=importlib"]
 
 
 [tool.mypy]
@@ -67,36 +59,47 @@ exclude = "tests"
 [tool.ruff]
 extend-exclude = ["tests/"]
 extend-select = [
-    "B",
-    "BLE",
-    "C4",
-    "ERA",
-    "I",
-    "ICN",
-    "INP",
-    "ISC",
-    "N",
-    "NPY",
-    "PGH",
-    "PIE",
-    # "PTH",
-    "Q",
-    "RET",
-    "RSE",
-    "RUF",
-    "S",
-    "SIM",
-    "T20",
-    "TCH",
-    "TID",
-    "YTT",
+  "B",
+  "BLE",
+  "C4",
+  "ERA",
+  "I",
+  "ICN",
+  "INP",
+  "ISC",
+  "N",
+  "NPY",
+  "PGH",
+  "PIE",
+  # "PTH",
+  "Q",
+  "RET",
+  "RSE",
+  "RUF",
+  "S",
+  "SIM",
+  "T20",
+  "TCH",
+  "TID",
+  "YTT",
 ]
-ignore = ["E402", "B905", "N818", "S101", "N815", "N803", "N806", "N802", "E731", "TCH005"]
+ignore = [
+  "E402",
+  "B905",
+  "N818",
+  "S101",
+  "N815",
+  "N803",
+  "N806",
+  "N802",
+  "E731",
+  "TCH005",
+]
 show-fixes = true
 target-version = "py39"
 
 [tool.logging]
-version=1
+version = 1
 disable_existing_loggers = true
 
 [tool.logging.filters]
@@ -114,7 +117,7 @@ stream = "ext://sys.stdout"
 level = "INFO"
 
 [tool.logging.handlers.err_console]
-class = "logging.StreamHandler" 
+class = "logging.StreamHandler"
 formatter = "formatter"
 stream = "ext://sys.stderr"
 level = "ERROR"
@@ -122,6 +125,3 @@ level = "ERROR"
 [tool.logging.loggers.radiopyo]
 level = "DEBUG"
 handlers = ["info_handler", "err_console"]
-
-
-

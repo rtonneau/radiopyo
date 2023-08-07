@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Small parser to be able to parse reaction like:
+Small parser to be able to parse reaction def from strings like:
 xA + yB -> iC + kD
 xA + yB --enzyme>> iC + kD
 Author:
@@ -58,7 +58,7 @@ class KwargsAtom(tp.TypedDict):
 
 
 class BasicSpecies(object):
-    """"""
+    """ The most simple building block. Basically just a named thing."""
     name: str
 
     def __init__(self,
@@ -78,6 +78,7 @@ class BasicSpecies(object):
 
 class ChemicalSpecies(BasicSpecies):
     """
+    More complex entity. Contains charge, radical and mass.
     """
     charge: int
     radical: bool
@@ -115,6 +116,9 @@ class ChemicalSpecies(BasicSpecies):
         self._mass = value
 
     def _latex_radical_charge(self) -> str:
+        """ For LateX rendering of radical and charge only.
+        -> Shared by Atoms and Molecules.
+        """
         out = ["^{"]
         if self.radical:
             out.append(r"\bullet")
@@ -127,11 +131,15 @@ class ChemicalSpecies(BasicSpecies):
         return "".join(out) if len(out) > 2 else ""
 
     def to_latex(self) -> str:
+        """Produces string formatted for LateX rendering (e.g. by MatplotLib)"""
         out = ["$", self.name, self._latex_radical_charge(), "$"]
         return "".join(out)
 
 
 class HydratedElectron(ChemicalSpecies):
+    """
+    Hydrated electrons have their own class definition. No mass for them.
+    """
 
     def __init__(self) -> None:
         super().__init__(name="e_aq",
@@ -147,15 +155,17 @@ class HydratedElectron(ChemicalSpecies):
 
 
 class Atom (ChemicalSpecies):
-    """ """
+    """ Atom definition """
 
     def raw_label(self) -> str:
+        """Just a getter for the name (does not include charge or radical)"""
         return self.name
 
 
 class Molecule(ChemicalSpecies):
-    """
-    """
+    """ Molecule definition -> Collection of Atoms.
+     To create a Molecule out of atoms, they cannot be ions nor radical. It is the
+     molecule which can be charged or radical"""
     atoms: tp.List[tp.Tuple[Atom, int]]
 
     def __init__(self,
@@ -179,6 +189,7 @@ class Molecule(ChemicalSpecies):
                                  "to compose a molecule")
 
     def __iter__(self) -> Iterator[tp.Tuple[Atom, int]]:
+        """Let's easily iterate of (atoms, stoichiometry)"""
         return iter(self.atoms)
 
     def __str__(self) -> str:
@@ -223,7 +234,10 @@ class Molecule(ChemicalSpecies):
 
 
 class TreeToReaction(lark.Transformer):
-    """ """
+    """Lark Class handling the conversion.
+    See: https://lark-parser.readthedocs.io/en/latest/visitors.html
+    For some doc and examples.
+    """
 
     def start(self, items: tp.List) -> GenericReaction | Atom | Molecule:
         return items[0]
@@ -321,7 +335,9 @@ class TreeToReaction(lark.Transformer):
 
 
 class ReactionParser(object):
-    """ """
+    """
+    Actual Parser using the Lark grammar/Transformer.
+    """
     GRAMMAR: Path = Path(__file__).parent/r"grammar//reaction_grammar.lark"
 
     parser: lark.Lark
@@ -334,11 +350,26 @@ class ReactionParser(object):
 
     def _parse(self, value: str) -> GenericReaction | Atom | Molecule:
         """ """
+        # Parse and then transform the output.
         tree = self.parser.parse(value.strip())
         return TreeToReaction().transform(tree)
 
     def parse_reaction(self, reaction: str) -> GenericReaction:
-        """"""
+        """
+        Parse Reaction String.
+        - K Reactions syntax: aA + bB -> cC + dD
+        - Enzymatic reactions syntax: aA --ENZYME>> cC + dD 
+
+        Rem: Capital letters stand for Species, lower letters for stoichiometry.
+
+        Raises:
+            TypeError
+                If cannot parse to a dict.
+
+        Returns:
+            GenericReaction
+                TypedDict structure holding the reaction metadata.
+        """
         r = self._parse(reaction)
         if not isinstance(r, dict):
             raise TypeError(
@@ -369,7 +400,12 @@ class ReactionParser(object):
         return r
 
     def parse_species(self, species: str) -> BasicSpecies | Atom | Molecule:
-        """ """
+        """
+        Method to Parse a single species Name.
+
+        Returns:
+            BasicSpecies | Atom | Molecule        
+        """
         _ = self._parse(species)
         if isinstance(_, (Atom, Molecule)):
             self._set_mass(_)
@@ -380,14 +416,18 @@ class ReactionParser(object):
 
     def _set_mass(self, species: Atom | Molecule) -> None:
         """ 
-        Raises
-            KeyError: if unknown species.
+        Try to get the mass of all Atoms.
+
+        Raises:
+            KeyError
+                if unknown species (i.e. not in 'data/_data_atomic_weights.txt')
         """
         if isinstance(species, Atom):
             try:
                 species.mass = self.atomix.get(species.raw_label())
                 return
             except KeyError as e:
+                # Let's add an exception for Carbon Centered molecules named R, ROOH,...
                 if "R" not in species.raw_label():
                     msg = f"Unable to compute mass of: {species}"
                     raise KeyError(msg) from e
@@ -398,6 +438,7 @@ class ReactionParser(object):
             try:
                 atom.mass = self.atomix.get(atom.raw_label())
             except KeyError as e:
+                # Let's add an exception for Carbon Centered molecules named R, ROOH,...
                 if "R" not in atom.raw_label():
                     msg = f"Unable to compute mass of: {atom} for molecule: {species}"
                     raise KeyError(msg) from e

@@ -2,7 +2,7 @@
 
 ## To-Do List for next devs
 
-- [ ] Implemente computation of biological end points
+- [ ] Implement computation of biological end points
 - [ ] write jupyterlab examples
 - [ ] Write good tests
 - [x] Remove calls to 'as_str()' for species and directly access 'label' attribute

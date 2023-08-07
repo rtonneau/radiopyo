@@ -66,6 +66,9 @@ class MichaelisMenten(BaseChemicalReaction):
         self.k_micha = k_micha
 
     def raw_k_value(self) -> float:
+        """
+        Produce the k_value as provided by config files.
+        """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
             sp = list(self.reactants.keys())[0]
@@ -74,6 +77,7 @@ class MichaelisMenten(BaseChemicalReaction):
 
     def make_hash(self, method: str = "sha256") -> str:
         """
+        Produce a unique identifier (content based) for easy comparison.
         """
         hasher = hashlib.new(method, usedforsecurity=False)
         hasher.update(repr(self).encode())
@@ -85,7 +89,12 @@ class MichaelisMenten(BaseChemicalReaction):
                      k_value: float,
                      k_micha: float,
                      list_sp: tp.Optional[ListSpecies] = None,) -> MichaelisMenten:
-        """ """
+        """
+        Create a KReaction from a 'GenericReaction', Typed-Dict structure produced by
+        radiopyo module parser.
+        TODO: k_value & k_micha should probably be contained in the GenericReaction 
+        instance.
+        """
         if generic["enzyme"] is None:
             raise ValueError(
                 f"No enzyme found for enzymatic reaction: {generic}")
@@ -114,7 +123,11 @@ class MichaelisMenten(BaseChemicalReaction):
                     list_sp: tp.Optional[ListSpecies],
                     **kwargs: str | tp.List[str] | float,
                     ) -> MichaelisMenten:
-        """ """
+        """ 
+        This method combines the two possible definitions of a MichaelisMenten reaction
+        in a config file.
+        TODO: remove the dict approach to keep only the single string reaction.
+        """
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
             list_sp = ListSpecies()

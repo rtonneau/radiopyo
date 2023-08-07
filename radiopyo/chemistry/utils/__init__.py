@@ -13,5 +13,5 @@ from radiopyo.parser.reaction_parser import ReactionParser
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__: list = ["RPARSER"]
 
-
+# Expose a instance (sharable) of ReactionParser (avoid unnecessary csv parsing)
 RPARSER = ReactionParser()

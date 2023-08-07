@@ -91,12 +91,15 @@ class RonFileParser(FileParser):
     def parse(self) -> ConfigDict:
         """ 
         """
+        # Read the grammar
         with open(Path(__file__).parent/r"grammar//ron_grammar.lark", "r") as file:
             parser = lark.Lark(file.read())
 
+        # Parses the config file
         with open(self.path, "r") as file:
             items = TreeToRon().transform(parser.parse(file.read()))
 
+        # Output a ConfigDict
         return {"includes": items.get("includes", {}),
                 "bio_param": items.get("bio_param", {}),
 
