@@ -278,6 +278,7 @@ The 'label' keyword is not mandatory. If not specify, the 'default' label will b
 However, be aware that any attempt to create another unlabelled (or labelled 'default')
 beam will erase previous definition. Additionally, be aware that the "default" beam is
 never included/imported from files specified in the [includes] section.
+
 LET values will redefine the G-values of the following species:
 
 - e_aq
@@ -289,8 +290,6 @@ LET values will redefine the G-values of the following species:
 G-values are extrapolated according to the work of [D.
 Boscolo](https://doi.org/10.3390/ijms21020424)  
 Therefore, LET values must be in the range: [0.13, 150] keV/µm
-
-
 
 ## Ways of Running Simulation
 
