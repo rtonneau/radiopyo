@@ -40,7 +40,7 @@ Currently the main dependencies of this modules are:
 For JupyterLab user, think to also install (to have nice progressbar):
 
 - tqdm
-- jupyterlab-widets
+- jupyterlab-widgets
 - ipywidgets
 
 ## Installation
@@ -206,6 +206,7 @@ k_value = 6.0e8
 Charges must be specified either by '_minus' or '_plus'. For multiple charge, just
 multiply the specifier e.g. $Fe^{2+}$ -> Fe_plus_plus.
 Reactants and products must only be separated by '->' characters.
+
 Blanks/spaces for separation are allowed but not mandatory.
 
 ps: note the double "[[" and "]]", mandatory for each entry!
