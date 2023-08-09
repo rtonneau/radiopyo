@@ -15,8 +15,8 @@ import typing as tp
 from functools import reduce
 from pathlib import Path
 
-import itertools_recipes as it  # type: ignore[import]
 import lark
+from more_itertools import grouper
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.parser.file_parser import FileParser
@@ -51,7 +51,7 @@ class TreeToRon(lark.Transformer):
         return False
 
     def start(self, items: tp.List) -> tp.Dict:
-        return {k: v for (k, v) in it.grouper(items, n=2)}
+        return {k: v for (k, v) in grouper(items, n=2)}
 
     def CNAME(self, items: lark.Token) -> str:
         return str(items)
