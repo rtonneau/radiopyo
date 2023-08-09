@@ -106,11 +106,11 @@ toml = [
 package. Of course, each entry can be an absolute path towards a valid configuration
 file. Files defined at the package level are the following:
 
-- basic_water_radiolysis.toml
+- basic_water_radiolysis.toml  
    Contains all reactions related to the radiolysis of pure water.
-- reactions_biology.toml
+- reactions_biology.toml  
    Includes 'basic_water_radiolysis.toml' and add biological reactions.
-- config_Labarbe.toml
+- config_Labarbe.toml  
    Includes both 'basic_water_radiolysis.toml' and 'reactions_biology.toml' and add a
    constant beam matching the one used in the excellent paper of R. Labarbe. 
 
@@ -187,6 +187,8 @@ multiply the specifier e.g. $Fe^{2+}$ -> Fe_plus_plus.
 Reactants and products must only be separated by '->' characters.
 Blanks/spaces for separation are allowed but not mandatory.
 
+ps: note the double "[[" and "]]", mandatory for each entry!
+
 ### [[reactions.enzymatic]]
 
 Contains all the Enzymatic reactions involved in the model. The
@@ -205,6 +207,7 @@ k_micha = 1.1 #  [mol/l]
 The same grammar as for "k_reactions" applies. For enzymatic reactions, the enzyme name
 must be specified in the operator arrow (-- 'enzyme name' >>).
 
+ps: note the double "[[" and "]]", mandatory for each entry!
 
 ### Possible beam definitions
 
@@ -257,6 +260,10 @@ on_time = 3.4e-6       # Time duration for beam ON [s]
 LET = 0.201            # [keV/µm]
 ```
 
+The 'label' keyword is not mandatory. If not specify, the 'default' label will be given.
+However, be aware that any attempt to create another unlabelled (or labelled 'default')
+beam will erase previous definition. Additionally, be aware that the "default" beam is
+never included/imported from files specified in the [includes] section.
 LET values will redefine the G-values of the following species:
 
 - e_aq
@@ -268,6 +275,8 @@ LET values will redefine the G-values of the following species:
 G-values are extrapolated according to the work of [D.
 Boscolo](https://doi.org/10.3390/ijms21020424)  
 Therefore, LET values must be in the range: [0.13, 150] keV/µm
+
+ps: note the double "[[" and "]]", mandatory for each entry!
 
 ## Ways of Running Simulation
 
