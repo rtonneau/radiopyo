@@ -88,6 +88,32 @@ For the moment, the only ways to load simulation configurations is via
 TOML files are recommended.
 The TOML configuration file consists of several sections:
 
+### [includes]
+
+This section enable the user to reference other config file to read.
+All included files will have a lower precedence i.e. will be erased by new definitions.
+It is then, for example, possible to modify a rate constant of a given reaction defined
+in an included file.
+
+```toml
+toml = [
+    "radiopyo/basic_water_radiolysis.toml",
+    "radiopyo/reactions_biology.toml",
+]
+```
+
+"radiopyo/" is referring to internal data (radiopyo/radiopyo/data) i.e. provided in the
+package. Of course, each entry can be an absolute path towards a valid configuration
+file. Files defined at the package level are the following:
+
+- basic_water_radiolysis.toml
+   Contains all reactions related to the radiolysis of pure water.
+- reactions_biology.toml
+   Includes 'basic_water_radiolysis.toml' and add biological reactions.
+- config_Labarbe.toml
+   Includes both 'basic_water_radiolysis.toml' and 'reactions_biology.toml' and add a
+   constant beam matching the one used in the excellent paper of R. Labarbe. 
+
 ### [bio_param]
 
 Contains the main biological parameters (only pH for now)
@@ -128,7 +154,7 @@ e_aq = 2.8
 OH_r = 2.8
 ```
 
-### [reactions.acid_base]
+### [[reactions.acid_base]]
 
 Contains all the acid/base reactions involved in the model. Each
 entry must defined 3 fields: "acid", "base" & "pKa".
@@ -144,7 +170,7 @@ pKa = 11.9
 
 ps: note the double "[[" and "]]", mandatory for each entry!
 
-### [reactions.k_reaction]
+### [[reactions.k_reaction]]
 
 Contains all the simple chemical reactions involved in the model.
 Each list entry must defined 2 fields: "reaction" & "k_value".
@@ -161,7 +187,7 @@ multiply the specifier e.g. $Fe^{2+}$ -> Fe_plus_plus.
 Reactants and products must only be separated by '->' characters.
 Blanks/spaces for separation are allowed but not mandatory.
 
-### [reactions.enzymatic]
+### [[reactions.enzymatic]]
 
 Contains all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
@@ -178,6 +204,70 @@ k_micha = 1.1 #  [mol/l]
 
 The same grammar as for "k_reactions" applies. For enzymatic reactions, the enzyme name
 must be specified in the operator arrow (-- 'enzyme name' >>).
+
+
+### Possible beam definitions
+
+All of the following are valid beam definitions:
+
+```toml
+[[beam.constant]]
+label          = "constant beam example"
+dose_rate      = 0.25  # Average dose rate [Gy/s]
+max_dose       = 7.5   # Max dose to deliver [Gy], after that, beam is OFF.
+LET            = 0.201 # [keV/µm]
+```
+
+```toml
+[[beam.pulsed]]
+label          = "pulse beam example 1"
+dose_rate_peak = 319   # Dose rate during beam ON [Gy/s]
+period         = 121   # Beam period repetition [s]
+on_time        = 0.1   # Time duration for beam ON [s]
+n_pulse        = 8     # Number of pulses
+start_time     = 30    # Time of first pulse [s]
+LET            = 0.201 # [keV/µm] 
+```
+
+```toml
+[[beam.pulsed]]
+label          = "pulse beam example 2"
+dose_rate_peak = 125   # Dose rate during beam ON [Gy/s]
+on_time        = 8e-3  # Time duration for beam ON [s]
+period         = 20e-3 # Beam period repetition [s]
+max_dose       = 1     # Max dose to deliver [Gy]
+LET            = 7.5   # [keV/µm]
+```
+
+```toml
+[[beam.pulsed]]
+label          = "pulse beam example 3"
+dose_rate_peak = 5.7e5 # Peak dose rate for pulsed beam [Gy/s]
+on_time        = 2e-6  # Time [seconds] (used only for Pulsed beam)
+frequency      = 90    # Beam frequency [Hz]
+max_dose       = 10    # Max dose to deliver [Gy] (can also be 'n_pulse')
+LET            = 3.2   # [keV/µm]
+```
+
+```toml
+[[beam.singlepulse]]
+label = "singlepulse example"
+dose_rate = 2.2e6      # Average dose rate (for singlepulse beam, same as peak) [Gy/s]    
+on_time = 3.4e-6       # Time duration for beam ON [s]
+LET = 0.201            # [keV/µm]
+```
+
+LET values will redefine the G-values of the following species:
+
+- e_aq
+- OH_r
+- H_r
+- H2
+- H2O2
+
+G-values are extrapolated according to the work of [D.
+Boscolo](https://doi.org/10.3390/ijms21020424)  
+Therefore, LET values must be in the range: [0.13, 150] keV/µm
 
 ## Ways of Running Simulation
 
