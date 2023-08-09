@@ -8,6 +8,19 @@
 This python3 module allows you to perform radiobiology related simulations. The embedded
 science (all Physics, Chemistry & Biology) has the purpose to solve systems of Ordinary
 Differential Equations (a.k.a. ODE) based on equations provided via an input file.
+The default solver is the LSODA solver from the good
+[scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html)
+module.
+
+## Remarks for developer
+
+If you intend to join this dev. adventure, first of all, thanks you for your time and
+support. Second, please be aware that this code base uses the fast
+[RUFF](https://github.com/astral-sh/ruff) linter and comply with the
+[Mypy](https://mypy.readthedocs.io/en/stable/index.html) static type checker.
+
+ps: Needless to say that Python2 is forbidden...
+pps: There is currently no code coverage (tests)... a big problem to solve.
 
 ## Getting Started
 
@@ -254,11 +267,12 @@ LET            = 3.2   # [keV/µm]
 
 ```toml
 [[beam.singlepulse]]
-label = "singlepulse example"
-dose_rate = 2.2e6      # Average dose rate (for singlepulse beam, same as peak) [Gy/s]    
-on_time = 3.4e-6       # Time duration for beam ON [s]
-LET = 0.201            # [keV/µm]
+label          = "singlepulse example"
+dose_rate      = 2.2e6 # Average dose rate (for singlepulse beam, same as peak) [Gy/s]    
+on_time        = 3e-6  # Time duration for beam ON [s]
+LET            = 0.201 # [keV/µm]
 ```
+ps: note the double "[[" and "]]", mandatory for each entry!
 
 The 'label' keyword is not mandatory. If not specify, the 'default' label will be given.
 However, be aware that any attempt to create another unlabelled (or labelled 'default')
@@ -276,7 +290,7 @@ G-values are extrapolated according to the work of [D.
 Boscolo](https://doi.org/10.3390/ijms21020424)  
 Therefore, LET values must be in the range: [0.13, 150] keV/µm
 
-ps: note the double "[[" and "]]", mandatory for each entry!
+
 
 ## Ways of Running Simulation
 
