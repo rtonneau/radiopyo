@@ -34,6 +34,14 @@ Currently the main dependencies of this modules are:
 - numpy
 - pandas
 - pandas-stubs
+- lark
+- more-itertools
+
+For JupyterLab user, think to also install (to have nice progressbar):
+
+- tqdm
+- jupyterlab-widets
+- ipywidgets
 
 ## Installation
 
