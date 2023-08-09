@@ -14,12 +14,12 @@ module.
 
 ## Remarks for developer
 
-If you intend to join this dev. adventure, first of all, thanks you for your time and
+If you intend to join this dev. adventure, first of all, thank you for your time and
 support. Second, please be aware that this code base uses the fast
 [RUFF](https://github.com/astral-sh/ruff) linter and comply with the
 [Mypy](https://mypy.readthedocs.io/en/stable/index.html) static type checker.
 
-ps: Needless to say that Python2 is forbidden...
+ps: Needless to say that Python2 is forbidden...  
 pps: There is currently no code coverage (tests)... a big problem to solve.
 
 ## Getting Started
