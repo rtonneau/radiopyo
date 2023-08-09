@@ -125,7 +125,7 @@ file. Files defined at the package level are the following:
    Includes 'basic_water_radiolysis.toml' and add biological reactions.
 - config_Labarbe.toml  
    Includes both 'basic_water_radiolysis.toml' and 'reactions_biology.toml' and add a
-   constant beam matching the one used in the excellent paper of R. Labarbe. 
+   constant beam matching the one used in the excellent paper of R. Labarbe.
 
 ### [bio_param]
 
@@ -272,6 +272,7 @@ dose_rate      = 2.2e6 # Average dose rate (for singlepulse beam, same as peak) 
 on_time        = 3e-6  # Time duration for beam ON [s]
 LET            = 0.201 # [keV/µm]
 ```
+
 ps: note the double "[[" and "]]", mandatory for each entry!
 
 The 'label' keyword is not mandatory. If not specify, the 'default' label will be given.
