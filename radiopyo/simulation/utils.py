@@ -30,9 +30,14 @@ __all__: tp.List = [
 
 
 class ResCollection(object):
-    """ """
+    """
+    Container class storing ODEResult instances.
+    """
+    # Dictionary storing ODEResult
     _results: tp.Dict[tp.Any, ODEResult]
+    # General label (variable) of the collection e.g. "dose_rate [Gy]" -> ideal for plot
     _key_label: str
+    # Enable sorting and thus iteration over a specific order
     _order: tp.List[tp.Any]
 
     def __init__(self, key_label: str) -> None:
@@ -64,14 +69,35 @@ class ResCollection(object):
         return self._key_label
 
     def push(self, label: tp.Any, sim: ODEResult) -> None:
-        """ """
+        """ 
+        Args:
+            label: Any
+                Label of the ODEResult to push in.
+            sim: ODEResult
+                Simulation result to store.
+
+        Raises:
+            KeyError
+                if label already in the collection.
+        """
         if label in self._results:
             raise KeyError(f"Simulation label: {label}, already exists. cannot push.")
         self._order.append(label)
         self._results[label] = sim
 
     def update(self, label: tp.Any, sim: ODEResult) -> None:
-        """ """
+        """
+        Update an existing entry.
+        Args:
+            label: Any
+                Label of the ODEResult to push in.
+            sim: ODEResult
+                Simulation result to store.
+
+        Raises:
+            KeyError
+                if label not in the collection.
+        """
         if label not in self._results:
             raise KeyError(f"Simulation label: {label}, not existing. Cannot update.")
         self._results[label] = sim
