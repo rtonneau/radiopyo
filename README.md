@@ -24,13 +24,24 @@ Currently the main dependencies of this modules are:
 
 ## Installation
 
-1. Run:
+1. Via pip + git
+   1. Run:
 
-   ```bash
-   pip install git+https://gitlab.unamur.be/rtonneau/radiopyo.git
-   ```
+      ```bash
+      pip install git+https://gitlab.unamur.be/rtonneau/radiopyo.git
+      ```
 
-2. You are good to go.
+   2. You are good to go.
+
+2. Install as an editable package for development
+   1. Clone this repo
+   2. In the package folder, run the following:
+
+      ```bash
+      pip install -e ./
+      ```
+
+   3. You are good to go/
 
 ## Usage
 
@@ -57,9 +68,12 @@ Currently the main dependencies of this modules are:
    
    # Better to adapt simulation settings during ON and OFF time.
    res = sim.prepare_chunked_run(t_span=[1e-9, 10],
+                                 atol=1e-4, #Absolute tolerance of the ODE Solver
+                                 rtol=1e-6, #Relative tolerance of the ODE Solver
                                  max_step_size_on=1e-8,  #seconds
                                  max_step_size_off=0.01, #seconds
                                  ).run()
+   # /!\ For atol and rtol, the base unit for the ODE solver is [µmol/l]
 
    df = res.to_pandas() # pandas.DataFrame
    
@@ -76,13 +90,14 @@ The TOML configuration file consists of several sections:
 
 ### -> bio_param
 
-Contains the main biological parameters (pH)
+Contains the main biological parameters (only pH for now)
 
 ### -> concentrations.fixed
 
 Contains the concentrations of species supposed to be constant.
 => If a species is recorded in this section, its concentration will be forced constant.
 For example:
+
 ```toml
 [concentrations.fixed] # Unit is [mol]/[l]
 H2O = 55
@@ -95,6 +110,7 @@ Contains the initial concentrations of the species.
 => If a species is not recorded in this section, its initial concentration will be
 assumed as 0.0 mol/l.
 For example:
+
 ```toml
 [concentrations.initial] # Unit is [mol]/[l]
 O2 = 50e-6
@@ -102,9 +118,10 @@ O2 = 50e-6
 
 ### -> reactions.radiolytic
 
-Contains the G values of the species created by the radiation
+Contains the G-values of the species created by the radiation
 source. The unit is [radical/100eV/incident particle].
 For example:
+
 ```toml
 [reactions.radiolytic]
 e_aq = 2.8
@@ -125,35 +142,42 @@ pKa = 11.9
 
 ```
 
+ps: note the double "[[" and "]]", mandatory for each entry!
+
 ### -> reactions.k_reaction
 
 Contains all the simple chemical reactions involved in the model.
-Each list entry must defined 3 fields: "reactants", "products" & "k_value".
+Each list entry must defined 2 fields: "reaction" & "k_value".
 For example:
 
 ```toml
 [[reactions.k_reaction]]  # O_r_minus + O2_r_minus -> 2 OH_minus + O2
-reactants = ["O_r_minus", "O2_r_minus",]
-products = ["OH_minus", "OH_minus"," O2",]
+reaction = "O_r_minus + O2_r_minus -> 2 OH_minus + O2"
 k_value = 6.0e8
 ```
+
+Charges must be specified either by '_minus' or '_plus'. For multiple charge, just
+multiply the specifier e.g. $Fe^{2+}$ -> Fe_plus_plus.
+Reactants and products must only be separated by '->' characters.
+Blanks/spaces for separation are allowed but not mandatory.
 
 ### -> reactions.enzymatic
 
 Contains all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
-entry must defined 5 fields: "enzyme", "substrate", "products", "k_value" & "k_micha".
+entry must defined 3 fields: "reaction", "k_value" & "k_micha".
 For example:
 
 ```toml
 [[reactions.enzymatic]]
-enzyme =" catalase"
-substrate = ["H2O2", " H2O2",]
-products = ["O2", "H2O", "H2O",]
+reaction =" 2H2O2 -- catalase >> O2 + 2 H2O"
 k_value = 6.62e7 #  [1/s]
 k_micha = 1.1 #  [mol/l]
 
 ```
+
+The same grammar as for "k_reactions" applies. For enzymatic reactions, the enzyme name
+must be specified in the operator arrow (-- 'enzyme name' >>).
 
 ## Ways of Running Simulation
 
