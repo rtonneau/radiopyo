@@ -41,7 +41,7 @@ Currently the main dependencies of this modules are:
       pip install -e ./
       ```
 
-   3. You are good to go/
+   3. You are good to go.
 
 ## Usage
 
@@ -88,11 +88,11 @@ For the moment, the only ways to load simulation configurations is via
 TOML files are recommended.
 The TOML configuration file consists of several sections:
 
-### -> bio_param
+### [bio_param]
 
 Contains the main biological parameters (only pH for now)
 
-### -> concentrations.fixed
+### [concentrations.fixed]
 
 Contains the concentrations of species supposed to be constant.
 => If a species is recorded in this section, its concentration will be forced constant.
@@ -104,7 +104,7 @@ H2O = 55
 catalase = 8.0e-8
 ```
 
-### -> concentrations.initial
+### [concentrations.initial]
 
 Contains the initial concentrations of the species.
 => If a species is not recorded in this section, its initial concentration will be
@@ -116,7 +116,7 @@ For example:
 O2 = 50e-6
 ```
 
-### -> reactions.radiolytic
+### [reactions.radiolytic]
 
 Contains the G-values of the species created by the radiation
 source. The unit is [radical/100eV/incident particle].
@@ -128,7 +128,7 @@ e_aq = 2.8
 OH_r = 2.8
 ```
 
-### -> reactions.acid_base
+### [reactions.acid_base]
 
 Contains all the acid/base reactions involved in the model. Each
 entry must defined 3 fields: "acid", "base" & "pKa".
@@ -144,7 +144,7 @@ pKa = 11.9
 
 ps: note the double "[[" and "]]", mandatory for each entry!
 
-### -> reactions.k_reaction
+### [reactions.k_reaction]
 
 Contains all the simple chemical reactions involved in the model.
 Each list entry must defined 2 fields: "reaction" & "k_value".
@@ -161,7 +161,7 @@ multiply the specifier e.g. $Fe^{2+}$ -> Fe_plus_plus.
 Reactants and products must only be separated by '->' characters.
 Blanks/spaces for separation are allowed but not mandatory.
 
-### -> reactions.enzymatic
+### [reactions.enzymatic]
 
 Contains all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
