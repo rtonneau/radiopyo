@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "radiopyo"
+name = "radiopyo-WIP"
 version = "0.4.0"
 authors = [{ name = "Romain Tonneau", email = "romain.tonneau@unamur.be" }]
 description = "A small module to perform FLASH simulations with resolution of ODE's"
