@@ -307,7 +307,7 @@ class UnitCell(object):
     def run(self,
             t_span: tp.Tuple[float, float],
             t_eval: tp.Optional[NDArray[np.float64]] = None,
-            use_jac: bool = True,
+            use_jac: bool = False,
             method: str = "LSODA",
             atol: tp.Optional[float] = None,
             rtol: tp.Optional[float] = None,
@@ -357,7 +357,7 @@ class UnitCell(object):
 
     def prepare_chunked_run(self,
                             t_span: tp.Tuple[float, float],
-                            use_jac: bool = True,
+                            use_jac: bool = False,
                             method: str = "LSODA",
                             atol: tp.Optional[float] = None,
                             rtol: tp.Optional[float] = None,
@@ -477,7 +477,7 @@ class SimChunksIter():
                  chunks: tp.List[SimChunk],
                  atol: tp.Optional[float] = None,
                  rtol: tp.Optional[float] = None,
-                 use_jac: bool = True,
+                 use_jac: bool = False,
                  method: str = "LSODA",
                  y0: tp.Optional[NDArray[np.float64]] = None,
                  ):

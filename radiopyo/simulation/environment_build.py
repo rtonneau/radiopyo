@@ -138,6 +138,7 @@ class SimEnv():
 
     def iter_species(self) -> tp.Iterable[SimSpecies]:
         """Get (sorted) iterable over all the Species"""
+
         return sorted(self.species, key=lambda x: x.index)
 
     def number_dyn_species(self) -> int:
