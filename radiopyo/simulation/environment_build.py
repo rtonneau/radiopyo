@@ -22,10 +22,11 @@ from scipy.constants import Avogadro  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.acid_base import ABCouple
+from radiopyo.chemistry.collections import ListSpecies
 from radiopyo.chemistry.k_reactions import KReaction
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
-from radiopyo.chemistry.species import CstSpecies, DynSpecies, ListSpecies, SimSpecies
+from radiopyo.chemistry.species import ChemSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -128,15 +129,15 @@ class SimEnv():
         """Get iterable over all A/B couples/reactions"""
         return iter(self.reactions.acid_base)
 
-    def iter_DynSpecies(self) -> tp.Iterable[DynSpecies]:
+    def iter_DynSpecies(self) -> tp.Iterable[ChemSpecies]:
         """Get iterable over all the Dynamic Species"""
         return self.species.iter_dyn_species()
 
-    def iter_CstSpecies(self) -> tp.Iterable[CstSpecies]:
+    def iter_CstSpecies(self) -> tp.Iterable[ChemSpecies]:
         """Get iterable over all the Cst Species"""
         return self.species.iter_cst_species()
 
-    def iter_species(self) -> tp.Iterable[SimSpecies]:
+    def iter_species(self) -> tp.Iterable[ChemSpecies]:
         """Get (sorted) iterable over all the Species"""
         return sorted(self.species, key=lambda x: x.index)
 
@@ -221,7 +222,7 @@ class SimEnv():
         for label, value in initial_cc.items():
             with suppress(KeyError):
                 sp = list_sp[label]
-                if isinstance(sp, DynSpecies):
+                if isinstance(sp, ChemSpecies):
                     sp.set_initial_cc(value)
 
         # Convert the "trash" species, if presents, to Cst.
@@ -282,7 +283,7 @@ class SimEnv():
         Evi = np.zeros(len(self.species), dtype=np.float64)
         Evo = np.zeros(len(self.species), dtype=np.float64)
         sp = self.species.get("O2")
-        if sp is None or isinstance(sp, CstSpecies):
+        if sp is None or isinstance(sp, ChemSpecies):
             return None
 
         print("O2 intake enabled")  # noqa: T201
@@ -335,7 +336,7 @@ class SimEnv():
             idx_reactant = 0
             for sp, stoi in reaction.iter_reactants():
                 # If declared as cst, keep it 0
-                if not isinstance(sp, CstSpecies):
+                if not isinstance(sp, ChemSpecies):
                     Riy[sp.index, idx_r] -= stoi
                 for _ in range(stoi):
                     Rki[:, idx_r, idx_reactant] = 0
@@ -345,14 +346,14 @@ class SimEnv():
             # Loop over all reaction's products
             for sp, stoi in reaction.iter_products():
                 # If declared as cst, keep it 0
-                if isinstance(sp, CstSpecies):
+                if isinstance(sp, ChemSpecies):
                     continue
                 Riy[sp.index, idx_r] += stoi
 
             # Jacobian related loops:
             for sp in self.iter_species():
                 # sp not involved in reaction => derivative = 0
-                if not reaction.has_reactant(sp) or isinstance(sp, CstSpecies):
+                if not reaction.has_reactant(sp) or isinstance(sp, ChemSpecies):
                     JRki[:, idx_r, :, sp.index] = 0
                     continue
 
@@ -424,11 +425,11 @@ class SimEnv():
             Ez_kmki[0, col] = enzymatic.k_micha
             Ez_kmki[1, col] = enzymatic.k_value
             for sp, stoi in enzymatic.iter_reactants():
-                if isinstance(sp, CstSpecies):
+                if isinstance(sp, ChemSpecies):
                     continue
                 Ez_iy[sp.index, col] = -stoi
             for sp, stoi in enzymatic.iter_products():
-                if isinstance(sp, CstSpecies):
+                if isinstance(sp, ChemSpecies):
                     continue
                 Ez_iy[sp.index, col] = stoi
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
@@ -477,22 +478,22 @@ class SimEnv():
         return out
 
     def kreactions_involving(self,
-                             species: str | SimSpecies,
+                             species: str | ChemSpecies,
                              ) -> tp.List[KReaction]:
         return [r for r in self.reactions.k_reaction if species in r]
 
     def kreactions_involving_reactant(self,
-                                      species: str | SimSpecies,
+                                      species: str | ChemSpecies,
                                       ) -> tp.List[KReaction]:
         return [r for r in self.reactions.k_reaction if r.has_reactant(species)]
 
     def kreactions_involving_product(self,
-                                     species: str | SimSpecies,
+                                     species: str | ChemSpecies,
                                      ) -> tp.List[KReaction]:
         return [r for r in self.reactions.k_reaction if r.has_product(species)]
 
     def reactions_involving(self,
-                            species: str | SimSpecies,
+                            species: str | ChemSpecies,
                             ) -> tp.List[IsChemicalReaction]:
         out: tp.List[IsChemicalReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
@@ -501,7 +502,7 @@ class SimEnv():
         return out
 
     def reactions_involving_reactant(self,
-                                     species: str | SimSpecies,
+                                     species: str | ChemSpecies,
                                      ) -> tp.List[IsChemicalReaction]:
         out: tp.List[IsChemicalReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
@@ -510,7 +511,7 @@ class SimEnv():
         return out
 
     def reactions_involving_product(self,
-                                    species: str | SimSpecies,
+                                    species: str | ChemSpecies,
                                     ) -> tp.List[IsChemicalReaction]:
         out: tp.List[IsChemicalReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():

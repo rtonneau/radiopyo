@@ -49,20 +49,23 @@ class RawSpecies():
 
 
 class ChemSpecies(RawSpecies):
-    """Class used for species whose cc can vary during the simulation."""
+    """Class used for species with cc (cst or dyn)."""
     cc_init: float  # Store initial value
     index: int
+    is_cst: bool
 
-    def __init__(self, label: str, index: int, cc_init: float = 0) -> None:
+    def __init__(self,
+                 label: str,
+                 index: int = -1,
+                 cc_init: float = -1,
+                 is_cst: bool = False) -> None:
         super().__init__(label)
         self.index = index
         self.cc_init = cc_init
-
-    def __str__(self) -> str:
-        return f"DynSpecies('{self.label}')"
+        self.is_cst = is_cst
 
     def __repr__(self) -> str:
-        return self.__str__()
+        return f"ChemSpecies('{self.label}', {self.index}, {self.cc_init})"
 
     def __copy__(self) -> ChemSpecies:
         return ChemSpecies(self.label, self.index, self.cc_init)
@@ -72,3 +75,9 @@ class ChemSpecies(RawSpecies):
 
     def set_initial_cc(self, value: float) -> None:
         self.cc_init = float(value)
+
+    def is_constant(self) -> bool:
+        return self.is_cst
+
+    def is_dynamical(self) -> bool:
+        return not self.is_cst

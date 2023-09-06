@@ -79,13 +79,15 @@ class ABCouple(ChemSpecies):
                  acid: RawSpecies | str,
                  base: RawSpecies | str,
                  pKa: float,
-                 index: int):
+                 index: int = -1,
+                 is_cst: bool = False):
         self.pKa = pKa
         self.acid = RawSpecies(acid) if isinstance(acid, str) else acid
         self.base = RawSpecies(base) if isinstance(base, str) else base
         super().__init__(self.__str__(),
                          index=index,
-                         cc_init=0)
+                         cc_init=0,
+                         is_cst=is_cst)
 
     def __contains__(self, key: str) -> bool:
         return self.acid == key or self.base == key
@@ -115,13 +117,18 @@ class ABCouple(ChemSpecies):
         )
 
     def __str__(self) -> str:
-        return f"{self.acid}/{self.base})"
+        """
+        rem: pKa should not be included in order to easily find similar AB couples.
+        """
+        return f"{self.acid}/{self.base}"
 
     def __repr__(self) -> str:
-        return ("ABDyn("
+        return ("ABCouple("
                 f"acid='{self.base}', "
                 f"acid='{self.base}', "
-                f"pKa={round(self.pKa, 5)})")
+                f"pKa={round(self.pKa, 5)}, "
+                f"index={self.index}, "
+                f"is_cst={self.is_cst})")
 
 
 # class OLDABCouple():

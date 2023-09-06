@@ -20,13 +20,13 @@ import typing as tp
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry.species import ListSpecies
+from radiopyo.chemistry.collections import ListSpecies
 
 from .base_chemistry import BaseChemicalReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.species import SimSpecies
+    from radiopyo.chemistry.species import ChemSpecies
 
 # ------------------------------------------------------------------------------------ #
 
@@ -91,11 +91,11 @@ class RadiolyticReaction(BaseChemicalReaction):
         hasher.update(repr(self).encode())
         return hasher.hexdigest()
 
-    def species(self) -> SimSpecies:
+    def species(self) -> ChemSpecies:
         return self.products[self.label()]
 
     def label(self) -> str:
-        return list(self.products.keys())[0]
+        return next(iter(self.products.keys()))
 
     def kr(self) -> float:
         return self._reaction_cst
@@ -134,7 +134,7 @@ class RadiolyticReaction(BaseChemicalReaction):
 
     # ------------------------------------------------------------------------ #
 
-    def add_as_reactant(self, sp: SimSpecies, multiple: int = 1) -> None:
+    def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """No reactant should be involved"""
         NotImplementedError("Not implemented for Radiolytic Reactions")
 

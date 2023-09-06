@@ -74,11 +74,11 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     ## => Acid Base ##
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["acid_base"]):
-        _ = ABCouple.from_dict(**_)
+        _ = ABCouple(_["acid"], _["base"], _["pKa"])
         r_root[str(_)] = (_, idx)
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["acid_base"]:
-        ar = ABCouple.from_dict(**_)
+        ar = ABCouple(_["acid"], _["base"], _["pKa"])
         if str(ar) in r_root:
             idx = r_root[str(ar)][1]
             root["reactions"]["acid_base"][idx]["pKa"] = ar.pKa
