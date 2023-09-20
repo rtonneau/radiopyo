@@ -52,7 +52,6 @@ class ReactionsList:
     """Collection class to store all reactions and apply some changes on its 
     e.g. indexing. Also expose methods to ease iteration.
     """
-    acid_base: tp.List[ABCouple]
     k_reaction: tp.List[KReaction]
     enzymatic: tp.List[MichaelisMenten]
     radiolytic: tp.List[RadiolyticReaction]
@@ -73,8 +72,7 @@ class ReactionsList:
     def iter_all(self) -> tp.Iterable[IsChemicalReaction | ABCouple]:
         return chain.from_iterable([self.k_reaction,
                                     self.radiolytic,
-                                    self.enzymatic,
-                                    self.acid_base])
+                                    self.enzymatic])
 
 
 @ dataclass
@@ -111,7 +109,7 @@ class SimEnv():
 
     @property
     def acid_base(self) -> tp.List[ABCouple]:
-        return self.reactions.acid_base
+        return list(self.species.iter_AB())
 
     @property
     def k_reaction(self) -> tp.List[KReaction]:
@@ -127,7 +125,7 @@ class SimEnv():
 
     def iter_ABCouple(self) -> tp.Iterable[ABCouple]:
         """Get iterable over all A/B couples/reactions"""
-        return iter(self.reactions.acid_base)
+        return self.species.iter_AB()
 
     def iter_DynSpecies(self) -> tp.Iterable[ChemSpecies]:
         """Get iterable over all the Dynamic Species"""
@@ -166,7 +164,7 @@ class SimEnv():
             logger.warn(f"CONFIG::Found unknown, extra, key(s) in 'concentrations'"
                         f"section: {extra}. These will not be used.")
 
-        # Read Constant species
+        # Read Constant species and create the species collection
         list_sp = constant_species_from_dict(
             config["concentrations"].get("fixed", {}))
 
@@ -191,6 +189,7 @@ class SimEnv():
         # list_sp.add_dyn_species("OH_minus")  # noqa: ERA001
         # initial_cc["OH_minus"] = 10**(-14+bio_param["pH"])  # noqa: ERA001
 
+        list_sp.sort(inplace=True)
         # Sanity check
         if "reactions" not in config:
             logger.warning("CONFIG::No 'reactions' section in the provided "
@@ -199,9 +198,9 @@ class SimEnv():
                                    "enzymatic": [], "radiolytic": {}}
 
         # Read Acid/Base Reactions
-        ab, list_sp = acid_base_from_dict(config["reactions"].get("acid_base", []),
-                                          list_sp)
-        logger.info(f"CONFIG::{len(ab)} Acid/Base reactions added")
+        list_sp = acid_base_from_dict(config["reactions"].get("acid_base", []),
+                                      list_sp)
+        logger.info(f"CONFIG::{list_sp.len_AB()} Acid/Base reactions added")
 
         # Read K-Reactions
         kr, list_sp = kreaction_from_dict(config["reactions"].get("k_reaction", []),
@@ -237,7 +236,7 @@ class SimEnv():
         logger.info(
             f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
         logger.info("CONFIG::Simulation Configuration done!")
-        return cls(reactions=ReactionsList(ab, kr, enz, rad),
+        return cls(reactions=ReactionsList(kr, enz, rad),
                    species=list_sp,
                    bio_param=bio_param,
                    initial_cc=initial_cc,
@@ -526,13 +525,13 @@ class SimEnv():
 
 def acid_base_from_dict(reactions: tp.List[tp.Dict],
                         sim_sp: tp.Optional[ListSpecies] = None,
-                        ) -> tp.Tuple[tp.List[ABCouple], ListSpecies]:
+                        ) -> ListSpecies:
     if sim_sp is None:
         sim_sp = ListSpecies()
 
-    return ([ABCouple.from_dict(list_sp=sim_sp, **reaction)
-            for reaction in reactions],
-            sim_sp)
+    for reaction in reactions:
+        sim_sp.add_acid_base(reaction["acid"], reaction["base"], reaction["pKa"])
+    return sim_sp
 
 
 def kreaction_from_dict(reactions: tp.List[tp.Dict] | tp.Dict,

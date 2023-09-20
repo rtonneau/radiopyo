@@ -79,15 +79,13 @@ class ABCouple(ChemSpecies):
                  acid: RawSpecies | str,
                  base: RawSpecies | str,
                  pKa: float,
-                 index: int = -1,
-                 is_cst: bool = False):
+                 index: int = -1):
         self.pKa = pKa
         self.acid = RawSpecies(acid) if isinstance(acid, str) else acid
         self.base = RawSpecies(base) if isinstance(base, str) else base
         super().__init__(self.__str__(),
                          index=index,
-                         cc_init=0,
-                         is_cst=is_cst)
+                         cc_init=0)
 
     def __contains__(self, key: str) -> bool:
         return self.acid == key or self.base == key

@@ -57,12 +57,10 @@ class ChemSpecies(RawSpecies):
     def __init__(self,
                  label: str,
                  index: int = -1,
-                 cc_init: float = -1,
-                 is_cst: bool = False) -> None:
+                 cc_init: float = -1) -> None:
         super().__init__(label)
         self.index = index
         self.cc_init = cc_init
-        self.is_cst = is_cst
 
     def __repr__(self) -> str:
         return f"ChemSpecies('{self.label}', {self.index}, {self.cc_init})"
@@ -75,9 +73,3 @@ class ChemSpecies(RawSpecies):
 
     def set_initial_cc(self, value: float) -> None:
         self.cc_init = float(value)
-
-    def is_constant(self) -> bool:
-        return self.is_cst
-
-    def is_dynamical(self) -> bool:
-        return not self.is_cst
