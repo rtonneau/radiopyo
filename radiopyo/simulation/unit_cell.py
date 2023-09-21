@@ -92,7 +92,6 @@ class UnitCell(object):
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
-            O2_mat=self.env.make_O2_intake_matrix(),
         )
 
         self.g_val = GValuesBoscolo()  # To do before set_beam
@@ -266,12 +265,12 @@ class UnitCell(object):
         sol: ScipyODEResult = solve_ivp(derive,
                                         t_span,
                                         args=(self.beam_list.current,
+                                              self.env.species["H_plus"].index,
                                               self.mat["cst_sp"],
                                               self.mat["AB_mat"],
                                               self.mat["Ki_mat"],
                                               self.mat["Gi_mat"],
                                               self.mat["Ez_mat"],
-                                              self.mat["O2_mat"],
                                               ),
                                         t_eval=t_eval,
                                         method=method,

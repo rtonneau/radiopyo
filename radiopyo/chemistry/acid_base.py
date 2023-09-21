@@ -8,11 +8,10 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-import hashlib
 import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry.species import ChemSpecies, RawSpecies
+from radiopyo.chemistry.species import ChemSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -71,28 +70,35 @@ class ABPartition(tp.NamedTuple):
 
 class ABCouple(ChemSpecies):
     """ Class """
-    acid: RawSpecies
-    base: RawSpecies
+    LENGTH_INDEX: int = 2
+
+    acid: ChemSpecies
+    base: ChemSpecies
     pKa: float
-    index_acid: int
-    index_base: int
 
     def __init__(self,
-                 acid: RawSpecies | str,
-                 base: RawSpecies | str,
+                 acid: ChemSpecies | str,
+                 base: ChemSpecies | str,
                  pKa: float,
                  index: int = -1):
         self.pKa = pKa
-        self.acid = RawSpecies(acid) if isinstance(acid, str) else acid
-        self.base = RawSpecies(base) if isinstance(base, str) else base
-        self.index_acid = index
-        self.index_base = index + 1
+        self.acid = ChemSpecies(acid, index=index) if isinstance(acid, str) else acid
+        self.base = ChemSpecies(base, index=index+1) if isinstance(base, str) else base
         super().__init__(self.__str__(),
                          index=index,
                          cc_init=0)
 
     def __contains__(self, key: str) -> bool:
         return self.acid == key or self.base == key
+
+    def __getitem__(self, item: str) -> ChemSpecies:
+        match item:
+            case self.acid.label:
+                return self.acid
+            case self.base.label:
+                return self.base
+            case _:
+                raise KeyError
 
     @property
     def ka(self) -> float:
@@ -130,109 +136,6 @@ class ABCouple(ChemSpecies):
                 f"base='{self.base}', "
                 f"pKa={round(self.pKa, 5)}, "
                 f"index={self.index}")
-
-
-# class OLDABCouple():
-#     """
-#     Acid/Base couple definition. An A/B couple is composed of 2 chemical species, one
-#     base and one acid. The relative concentrations of both species is defined by the pKa
-#     constant of the A/B reaction. The relative concentrations can be computed based on
-#     the total concentration of both species and the concentration of H_plus ion.
-
-#     Attributes:
-#         acid: CstSpecies | DynSpecies
-#         base: CstSpecies | DynSpecies
-#         pKa: float
-#         ka: float (computed from pKa)
-
-#     Usage:
-#         >>> from radiopyo.species import ListSpecies
-#         >>> list_of_species = ListSpecies()
-#         >>> acid = list_of_species.get_or_create_dyn_species("OH_r")
-#         >>> base = list_of_species.get_or_create_dyn_species("O_r_minus")
-#         >>> ab = ABCouple(acid, base, pKa=11.9)
-#         >>> partition = ab.compute_partition(cc_tot, cc_H_plus)
-
-#     """
-#     acid: SimSpecies
-#     base: SimSpecies
-#     pKa: float
-
-#     def __init__(self, acid: SimSpecies, base: SimSpecies, pKa: float):
-#         self.pKa = pKa
-#         self.acid = acid
-#         self.base = base
-
-#     @property
-#     def ka(self) -> float:
-#         return 10**(-self.pKa)
-
-#     def make_hash(self, method: str = "sha256") -> str:
-#         """
-#         """
-#         hasher = hashlib.new(method, usedforsecurity=False)
-#         hasher.update(repr(self).encode())
-#         return hasher.hexdigest()
-
-#     @classmethod
-#     def from_dict(cls,
-#                   acid: str,
-#                   base: str,
-#                   pKa: float,
-#                   list_sp: tp.Optional[ListSpecies] = None,
-#                   ) -> OLDABCouple:
-#         """Class method to conveniently create a new Acid/Base couple from dictionary
-#         destructuring (from input file parsing). The method also require an argument
-#         "list_sp" which keeps track of the currently existing species so that new
-#         species can be created if necessary (assuming dynamic species).
-
-#         Args:
-#             acid: str
-#                 acid species name
-#             base: str
-#                 base species name
-#             pKa: float
-#                 pKa of the reaction
-#             list_sp: ListSpecies
-#                 Collection of species already involved in the simulation. This
-#                 collection will grow if acid and/or base do not exist yet.
-
-#         Returns:
-#             ABCouple
-#         """
-#         # Allow shallow creation (outside of a simulation env)
-#         if list_sp is None:
-#             list_sp = ListSpecies()
-#         return cls(acid=list_sp.get_or_create_dyn_species(acid.strip()),
-#                    base=list_sp.get_or_create_dyn_species(base.strip()),
-#                    pKa=pKa,
-#                    )
-
-#     def compute_partition(self, cc_tot: float, cc_H_plus: float) -> ABPartition:
-#         """
-#         Method to compute the Acid/base partition.
-
-#         Args:
-#             cc_tot: float
-#                 Total concentration of species i.e. [acid] + [base]
-#             cc_H_plus: float
-#                 Concentration of species H_plus
-
-#         Returns:
-#             ABPartition
-#         """
-#         return ABPartition(
-#             cc_tot / (1.0 + cc_H_plus / self.ka),  # Base
-#             cc_tot / (1.0 + self.ka / cc_H_plus),  # Acid
-#             1.0 / (1.0 + cc_H_plus / self.ka),     # dBase / dCt
-#             1.0 / (1.0 + self.ka / cc_H_plus),     # dAcid / dCt
-#         )
-
-#     def __str__(self) -> str:
-#         return f"{self.acid}/{self.base})"
-
-#     def __repr__(self) -> str:
-#         return f"ABCouple('{self.__str__()}', pKa={round(self.pKa, 5)})"
 
 
 class ABDict(tp.TypedDict):

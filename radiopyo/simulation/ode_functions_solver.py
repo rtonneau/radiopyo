@@ -44,9 +44,9 @@ EPSILON = 1e-25  # µmol/L
 def jacobian(t: float,
              y: NDArray[np.float64],
              beam: ParticleBeam,
+             H_plus_index: int,
              cst_sp: NDArray[np.float64],
              AB_mat: Tuple[NDArray[np.int8],
-                           NDArray[np.int8],
                            NDArray[np.float64]],
              Ki_mat: Tuple[NDArray[np.float64],
                            NDArray[np.int8],
@@ -58,8 +58,6 @@ def jacobian(t: float,
                                     NDArray[np.float64],
                                     NDArray[np.int8],
                                     ]] = None,
-             O2_mat: Optional[Tuple[NDArray[np.float64],
-                                    NDArray[np.float64]]] = None,
              ) -> NDArray[np.float64]:
     """ Computes the jacobian dy/ds_i where s_i are species[i]
     Returns:
@@ -72,8 +70,18 @@ def jacobian(t: float,
             ds_i | ds_i/ds_0   ds_i/ds_1 ....    ds_i/ds_j
     """
     y = y.clip(min=0.0, ) * 1e-6
+    # Compute some useful variables
+    AB_correction = np.zeros(len(AB_mat[1])*2)
+    AB_correction[::2] = 1 / (1 + AB_mat[1]/y[H_plus_index])  # Acid partition
+    AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
 
+    # Construct the cc vector with all relevant species
+    # ==> Dynamical species (already in y)
+    # ==> Extract A/B couples
+    # ==> Add constant species
+    y = np.matmul(y, AB_mat[0])
     y = np.append(y, cst_sp)
+    y[:len(AB_correction)] *= AB_correction
 
     # K Reactions component
     res = np.nan_to_num(np.einsum("j, jikl -> ikl ", y, Ki_mat[3]), nan=1)
@@ -92,17 +100,15 @@ def jacobian(t: float,
         res += JEnzi
 
     # Take into account Acid/Base
-    Jab = AB_mat[0] + AB_mat[2].sum(axis=1)
-    res = np.multiply(res, Jab[None, :])
     return res[:-len(cst_sp), :-len(cst_sp)]
 
 
 def derive(t: float,
            y: NDArray[np.float64],
            beam: ParticleBeam,
+           H_plus_index: int,
            cst_sp: NDArray[np.float64],
            AB_mat: Tuple[NDArray[np.int8],
-                         NDArray[np.int8],
                          NDArray[np.float64]],
            Ki_mat: Tuple[NDArray[np.float64],
                          NDArray[np.int8],
@@ -114,8 +120,6 @@ def derive(t: float,
                                   NDArray[np.float64],
                                   NDArray[np.int8],
                                   ]] = None,
-           O2_mat: Optional[Tuple[NDArray[np.float64],
-                                  NDArray[np.float64]]] = None,
            ) -> NDArray[np.float64]:
     """ Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
@@ -123,7 +127,21 @@ def derive(t: float,
     # Force negative cc values to 0 + convert to [mol/l]
     y = y.clip(min=0.0, ) * 1e-6
 
+    # Construct the cc vector with all relevant species
+    # ==> Dynamical species (already in y)
+    # ==> Extract A/B couples
+    # ==> Add constant species
+    y = np.matmul(y, AB_mat[0])
     y = np.append(y, cst_sp)
+
+    AB_correction = np.zeros(len(AB_mat[1])*2)
+    AB_correction[::2] = 1 / (1 + AB_mat[1]/y[H_plus_index])  # Acid partition
+    AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
+    y[:len(AB_correction)] *= AB_correction
+
+    ####################################################################################
+    # Compute evolution rate of cc'
+    ####################################################################################
 
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
@@ -146,17 +164,13 @@ def derive(t: float,
         # Add this term to the total
         dydt += np.matmul(Ez_mat[3], MM.T)
 
-    # Last step ==> Handling acid/base equilibrium
-    # => Force relationship between the total dydt's for A/B Partners
-    # ABy, ABi, ABo => ab_mat
-    dydt = AB_mat[0]*dydt + np.matmul(AB_mat[2], np.matmul(dydt, AB_mat[1]).T)
+    ####################################################################################
 
-    # Add O2 intake
-    if O2_mat is not None:
-        dydt = dydt + (O2_mat[1]-dydt*O2_mat[0])
-
-    # select only the DynSpecies and convert to [µmol/l]
-    return dydt[:-len(cst_sp)] * 1e6
+    # Reconstruct the cc vector as needed by the solver
+    # ==> A/B couples with only the total
+    # ==> dynamical species
+    # ==> convert back to [µmol/l]
+    return np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T) * 1e6
 
 
 # ------------------------------------------------------------------------------------ #

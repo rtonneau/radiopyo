@@ -50,6 +50,8 @@ class RawSpecies():
 
 class ChemSpecies(RawSpecies):
     """Class used for species with cc (cst or dyn)."""
+    LENGTH_INDEX: int = 1
+
     cc_init: float  # Store initial value
     index: int
 
@@ -72,7 +74,7 @@ class ChemSpecies(RawSpecies):
         return self.cc_init
 
     def initial_cc(self) -> float:
-        return self.cc_init
+        return self.cc_init if self.cc_init > 0 else 0
 
     def set_initial_cc(self, value: float) -> None:
         self.cc_init = float(value)

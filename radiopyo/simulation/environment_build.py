@@ -252,9 +252,11 @@ class SimEnv():
         Returns:
             NDArray[np.float64]: vector with initial concentrations in [µmol/l]
         """
-        out_dyn = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
-        for species in self.species.iter_dyn_species():
-            out_dyn[species.index] = species.initial_cc()*1e6
+        out_dyn = np.zeros(self.species.len_dyn_species()+self.species.len_AB(),
+                           dtype=np.float64)
+        for idx, species in enumerate(self.species.sorted_iter_dyn_species(),
+                                      start=self.species.len_AB()):
+            out_dyn[idx] = species.initial_cc()*1e6
 
         out_cst = np.array([], dtype=np.float64)
         if all:
@@ -273,31 +275,6 @@ class SimEnv():
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
 
-    def make_O2_intake_matrix(self) -> tp.Optional[tp.Tuple[NDArray[np.float64],
-                                                            NDArray[np.float64],]]:
-        """ 
-        Add here all terms related to environment interaction like O2 intake.
-        """
-        return None
-        Evi = np.zeros(len(self.species), dtype=np.float64)
-        Evo = np.zeros(len(self.species), dtype=np.float64)
-        sp = self.species.get("O2")
-        if sp is None or isinstance(sp, ChemSpecies):
-            return None
-
-        print("O2 intake enabled")  # noqa: T201
-        cell_memb_th = 10e-9  # Cell membrane thickness
-        cell_rad = 20e-6  # cell radius in µm
-        cell_surf = 4 * np.pi * cell_rad * cell_rad
-        cell_vol = cell_surf * cell_rad / 3
-        O2_diff = 1.7e-5*1e-4  # m²/s
-        x = O2_diff / cell_memb_th * cell_surf * Avogadro * 1e3 / cell_vol
-        x = O2_diff / cell_vol / cell_memb_th
-
-        Evi[sp.index] = x
-        Evo[sp.index] = x*sp.initial_cc()*1e6
-        return Evi, Evo
-
     def make_kreaction_matrix(self) -> tp.Tuple[NDArray[np.float64],
                                                 NDArray[np.int8],
                                                 NDArray[np.float32],
@@ -312,19 +289,19 @@ class SimEnv():
                                 reaction.tot_number_reactants())
 
         Ki = np.zeros(len(self.reactions.k_reaction), dtype=np.float64)
-        Riy = np.zeros([len(self.species), len(self.reactions.k_reaction)],
+        Riy = np.zeros([self.species.developed_len(), len(self.reactions.k_reaction)],
                        dtype=np.int8)
 
-        Rki = np.full([len(self.species),
+        Rki = np.full([self.species.developed_len(),
                        len(self.reactions.k_reaction),
                        max_reactants],
                       fill_value=np.nan,
                       dtype=np.float32)
 
-        JRki = np.full([len(self.species),
+        JRki = np.full([self.species.developed_len(),
                         len(self.reactions.k_reaction),
                         max_reactants,
-                        len(self.species),
+                        self.species.developed_len(),
                         ],
                        fill_value=np.nan,
                        dtype=np.float32)
@@ -380,7 +357,7 @@ class SimEnv():
         """ Construct matrix necessary to compute the variation of the species
         concentrations due irradiation via GValues.
         """
-        Gi = np.zeros([len(self.species), len(self.reactions.radiolytic)],
+        Gi = np.zeros([self.species.developed_len(), len(self.reactions.radiolytic)],
                       dtype=np.float64)
         for col, radiolytic in enumerate(self.reactions.radiolytic):
             for sp, _ in radiolytic.iter_products():
@@ -401,11 +378,11 @@ class SimEnv():
         if len(self.reactions.enzymatic) == 0:
             return None
 
-        Ez_substrate = np.full([len(self.species),
+        Ez_substrate = np.full([self.species.developed_len(),
                                 len(self.reactions.enzymatic)],
                                fill_value=0,
                                dtype=np.float32)
-        Ez_enzyme = np.full([len(self.species),
+        Ez_enzyme = np.full([self.species.developed_len(),
                              len(self.reactions.enzymatic)],
                             fill_value=0,
                             dtype=np.float32)
@@ -413,7 +390,7 @@ class SimEnv():
         Ez_kmki = np.zeros([2, len(self.reactions.enzymatic)],
                            dtype=np.float64)
 
-        Ez_iy = np.zeros([len(self.species),
+        Ez_iy = np.zeros([self.species.developed_len(),
                           len(self.reactions.enzymatic)],
                          dtype=np.int8,
                          )
@@ -434,34 +411,24 @@ class SimEnv():
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
 
     def make_acidBase_matrix(self) -> tp.Tuple[NDArray[np.int8],
-                                               NDArray[np.int8],
                                                NDArray[np.float64]]:
         """ Construct matrix necessary to compute to account for Acid/Base equilibrium 
         during the computation of the cc values variations.
         """
-        ABi = np.zeros([len(self.species), len(self.reactions.acid_base)],
-                       dtype=np.int8)
-        ABo = np.zeros_like(ABi, dtype=np.float64)
-        ABy = np.zeros(len(self.species), dtype=np.int8)
-        try:
-            cc_H_plus = self.species.cst_sp["H_plus"].cc  # mol/l
-        except KeyError:  # H_plus not a cst species
-            cc_H_plus = self.initial_cc["H_plus"]
+        # First matrix
+        n_lines = self.species.len_dyn_species()+self.species.len_AB()
+        n_cols = self.species.developed_len() - self.species.len_cst_species()
+        ABi = np.zeros([n_lines, n_cols], dtype=np.int8)
+        nAB = self.species.len_AB()
+        for idx in range(nAB):
+            col = idx*ABCouple.LENGTH_INDEX
+            ABi[idx, col:col+2] = 1
+        ABi[nAB:, nAB*2:] = np.diag(np.ones(self.species.len_dyn_species()))
 
-        for col, reaction in enumerate(self.reactions.acid_base):
-            ABi[reaction.acid.index, col] = 1
-            ABi[reaction.base.index, col] = 1
+        # Second Matrix
+        Ka = np.array([elt.ka for elt in self.species.iter_AB()], dtype=np.float64)
 
-            # Get AB partition with cc_tot = 1
-            part = reaction.compute_partition(1, cc_H_plus)
-            ABo[reaction.acid.index, col] = part.acid
-            ABo[reaction.base.index, col] = part.base
-
-        # To remember: operator '^' is bitwise XOR
-        # ABy will be use to reset cc values of acid and base in y (see derive)
-        ABy = np.logical_and.reduce(ABi ^ 1, axis=1).astype(np.int8)
-
-        return (ABy, ABi, ABo)
+        return (ABi, Ka)
 
     def make_cst_species_vector(self) -> NDArray[np.float64]:
         """ Create cc vector of Cst Species
@@ -471,7 +438,7 @@ class SimEnv():
         """
         out = np.zeros(self.species.len_cst_species(),
                        dtype=np.float64)
-        len_dyn = self.species.len_dyn_species()
+        len_dyn = self.species.len_dyn_species() + self.species.len_AB()*2
         for sp in self.iter_CstSpecies():
             out[sp.index-len_dyn] = sp.initial_cc()
         return out
