@@ -52,7 +52,6 @@ class ChemSpecies(RawSpecies):
     """Class used for species with cc (cst or dyn)."""
     cc_init: float  # Store initial value
     index: int
-    is_cst: bool
 
     def __init__(self,
                  label: str,
@@ -67,6 +66,10 @@ class ChemSpecies(RawSpecies):
 
     def __copy__(self) -> ChemSpecies:
         return ChemSpecies(self.label, self.index, self.cc_init)
+
+    @property
+    def cc(self) -> float:
+        return self.cc_init
 
     def initial_cc(self) -> float:
         return self.cc_init

@@ -444,7 +444,7 @@ class SimEnv():
         ABo = np.zeros_like(ABi, dtype=np.float64)
         ABy = np.zeros(len(self.species), dtype=np.int8)
         try:
-            cc_H_plus = self.species.cst_sp["H_plus"].cc_value  # mol/l
+            cc_H_plus = self.species.cst_sp["H_plus"].cc  # mol/l
         except KeyError:  # H_plus not a cst species
             cc_H_plus = self.initial_cc["H_plus"]
 

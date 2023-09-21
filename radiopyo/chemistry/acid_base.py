@@ -74,6 +74,8 @@ class ABCouple(ChemSpecies):
     acid: RawSpecies
     base: RawSpecies
     pKa: float
+    index_acid: int
+    index_base: int
 
     def __init__(self,
                  acid: RawSpecies | str,
@@ -83,6 +85,8 @@ class ABCouple(ChemSpecies):
         self.pKa = pKa
         self.acid = RawSpecies(acid) if isinstance(acid, str) else acid
         self.base = RawSpecies(base) if isinstance(base, str) else base
+        self.index_acid = index
+        self.index_base = index + 1
         super().__init__(self.__str__(),
                          index=index,
                          cc_init=0)
@@ -122,11 +126,10 @@ class ABCouple(ChemSpecies):
 
     def __repr__(self) -> str:
         return ("ABCouple("
-                f"acid='{self.base}', "
-                f"acid='{self.base}', "
+                f"acid='{self.acid}', "
+                f"base='{self.base}', "
                 f"pKa={round(self.pKa, 5)}, "
-                f"index={self.index}, "
-                f"is_cst={self.is_cst})")
+                f"index={self.index}")
 
 
 # class OLDABCouple():
