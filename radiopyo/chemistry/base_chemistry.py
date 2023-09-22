@@ -21,7 +21,7 @@ from typing import (
 )
 
 # --------------------------------- Internal imports --------------------------------- #
-from .species import RawSpecies, SimSpecies
+from .species import ChemSpecies, RawSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 # ------------------------------------------------------------------------------------ #
@@ -37,8 +37,8 @@ __all__ = [
 
 class IsChemicalReaction(Protocol):
     """Protocol => used for type hints"""
-    reactants: Dict[str, SimSpecies]
-    products: Dict[str, SimSpecies]
+    reactants: Dict[str, ChemSpecies]
+    products: Dict[str, ChemSpecies]
     stoi_reactants: Dict[str, int]
     stoi_products: Dict[str, int]
     index: Optional[int]
@@ -46,22 +46,22 @@ class IsChemicalReaction(Protocol):
     def __contains__(self, other: object) -> bool:
         """"""
 
-    def iter_species(self) -> Iterable[SimSpecies]:
+    def iter_species(self) -> Iterable[ChemSpecies]:
         """Iter over species involved in the reaction"""
 
-    def iter_reactants(self) -> Iterable[Tuple[SimSpecies, int]]:
+    def iter_reactants(self) -> Iterable[Tuple[ChemSpecies, int]]:
         """ Iter over reactants only"""
 
-    def iter_products(self) -> Iterable[Tuple[SimSpecies, int]]:
+    def iter_products(self) -> Iterable[Tuple[ChemSpecies, int]]:
         """Iter over products only"""
 
     def as_label(self) -> str:
         """ """
 
-    def has_product(self, product: SimSpecies | str) -> int:
+    def has_product(self, product: ChemSpecies | str) -> int:
         """"""
 
-    def has_reactant(self, product: SimSpecies | str) -> int:
+    def has_reactant(self, product: ChemSpecies | str) -> int:
         """"""
 
     def make_hash(self, method: str) -> str:
@@ -86,8 +86,8 @@ class BaseChemicalReaction():
         stoi_products: Dict[str, int]
         index: int
     """
-    reactants: Dict[str, SimSpecies]
-    products: Dict[str, SimSpecies]
+    reactants: Dict[str, ChemSpecies]
+    products: Dict[str, ChemSpecies]
     stoi_reactants: Dict[str, int]
     stoi_products: Dict[str, int]
     index: Optional[int]
@@ -132,7 +132,7 @@ class BaseChemicalReaction():
         """
         return reduce(add, list(self.stoi_reactants.values()))
 
-    def iter_species(self) -> Iterable[SimSpecies]:
+    def iter_species(self) -> Iterable[ChemSpecies]:
         """Iter over ALL the species involved in the reaction
 
         Returns:
@@ -140,7 +140,7 @@ class BaseChemicalReaction():
         """
         return chain(self.reactants.values(), self.products.values())
 
-    def iter_reactants(self) -> Iterable[Tuple[SimSpecies, int]]:
+    def iter_reactants(self) -> Iterable[Tuple[ChemSpecies, int]]:
         """ Iter over reactants only, including the stoichiometry.
 
         Returns:
@@ -150,7 +150,7 @@ class BaseChemicalReaction():
         return [(sp, self.stoi_reactants[label])
                 for label, sp in self.reactants.items()]
 
-    def iter_products(self) -> Iterable[Tuple[SimSpecies, int]]:
+    def iter_products(self) -> Iterable[Tuple[ChemSpecies, int]]:
         """Iter over products only, including the stoichiometry.
         Returns:
             Iterator: Tuple[SimSpecies, int]
@@ -185,7 +185,7 @@ class BaseChemicalReaction():
         """
         return len(list(self.iter_products()))
 
-    def has_product(self, product: SimSpecies | str) -> bool:
+    def has_product(self, product: ChemSpecies | str) -> bool:
         """Check if the reaction involves a specific product.
 
         Args:
@@ -199,7 +199,7 @@ class BaseChemicalReaction():
             return self.stoi_products.get(product, 0) > 0
         return self.stoi_products.get(product.label, 0) > 0
 
-    def has_reactant(self, reactant: SimSpecies | str) -> int:
+    def has_reactant(self, reactant: ChemSpecies | str) -> int:
         """Check if the reaction involves a specific reactant.
 
         Args:
@@ -213,7 +213,7 @@ class BaseChemicalReaction():
             return self.stoi_reactants.get(reactant, 0) > 0
         return self.stoi_reactants.get(reactant.label, 0) > 0
 
-    def add_as_product(self, sp: SimSpecies, multiple: int = 1) -> None:
+    def add_as_product(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """
         Method to conveniently add a new product to the reaction by keeping the
         stoichiometry relevant:
@@ -233,7 +233,7 @@ class BaseChemicalReaction():
             self.products[sp.label] = sp
             self.stoi_products[sp.label] = multiple
 
-    def add_as_reactant(self, sp: SimSpecies, multiple: int = 1) -> None:
+    def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """
         Method to conveniently add a new reactant to the reaction by keeping the
         stoichiometry relevant:

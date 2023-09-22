@@ -16,7 +16,7 @@ import typing as tp
 from radiopyo.chemistry.utils import RPARSER
 
 from .base_chemistry import BaseChemicalReaction
-from .species import ListSpecies
+from .collections import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -62,7 +62,7 @@ class KReaction(BaseChemicalReaction):
         """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
-            sp = list(self.reactants.keys())[0]
+            sp = next(iter(self.reactants.keys()))
             return self.k_value * self.stoi_reactants[sp]
         return self.k_value
 

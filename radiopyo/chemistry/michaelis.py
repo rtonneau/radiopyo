@@ -13,14 +13,14 @@ import hashlib
 import typing as tp
 
 from radiopyo.chemistry.base_chemistry import BaseChemicalReaction
-from radiopyo.chemistry.species import ListSpecies
+from radiopyo.chemistry.collections import ListSpecies
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.utils import RPARSER
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.species import SimSpecies
+    from radiopyo.chemistry.species import ChemSpecies
     from radiopyo.parser.reaction_parser import GenericReaction
 # ------------------------------------------------------------------------------------ #
 
@@ -54,8 +54,8 @@ class MichaelisMenten(BaseChemicalReaction):
     """
     k_value: float
     k_micha: float
-    substrate: SimSpecies
-    enzyme: SimSpecies
+    substrate: ChemSpecies
+    enzyme: ChemSpecies
 
     def __init__(self,
                  k_value: float,
@@ -71,7 +71,7 @@ class MichaelisMenten(BaseChemicalReaction):
         """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
-            sp = list(self.reactants.keys())[0]
+            sp = next(iter(self.reactants.keys()))
             return self.k_value * self.stoi_reactants[sp]
         return self.k_value
 
