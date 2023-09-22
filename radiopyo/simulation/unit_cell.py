@@ -20,7 +20,6 @@ import numpy as np
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry.species import CstSpecies
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.ron import RonFileParser
 from radiopyo.parser.toml import TOMLFileParser
@@ -93,7 +92,6 @@ class UnitCell(object):
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
-            O2_mat=self.env.make_O2_intake_matrix(),
         )
 
         self.g_val = GValuesBoscolo()  # To do before set_beam
@@ -178,16 +176,6 @@ class UnitCell(object):
         """
         return cls.from_parser(file, RonFileParser)
 
-    def use_acid_base(self, enable: bool = True) -> None:
-        """ """
-        if enable:
-            self.mat["AB_mat"] = self.env.make_acidBase_matrix()
-        else:
-            ABi = np.zeros([len(self.env.species), len(self.env.reactions.acid_base)],
-                           dtype=np.int8)
-            ABy = np.ones(len(self.env.species), dtype=np.int8)
-            self.mat["AB_mat"] = (ABy, ABi, self.mat["AB_mat"][2])
-
     def set_beam(self,
                  beam: ParticleBeam | str,
                  LET: tp.Optional[float] = None,
@@ -228,7 +216,7 @@ class UnitCell(object):
             f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
-            if sp.label not in self.g_val or isinstance(sp, CstSpecies):
+            if sp.label not in self.g_val or (not self.env.species.is_dyn_species(sp)):
                 continue
             reaction.update_from_ge(self.g_val.values_at(sp.label, let))
 
@@ -277,12 +265,12 @@ class UnitCell(object):
         sol: ScipyODEResult = solve_ivp(derive,
                                         t_span,
                                         args=(self.beam_list.current,
+                                              self.env.species["H_plus"].index,
                                               self.mat["cst_sp"],
                                               self.mat["AB_mat"],
                                               self.mat["Ki_mat"],
                                               self.mat["Gi_mat"],
                                               self.mat["Ez_mat"],
-                                              self.mat["O2_mat"],
                                               ),
                                         t_eval=t_eval,
                                         method=method,

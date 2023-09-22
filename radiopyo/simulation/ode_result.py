@@ -207,6 +207,7 @@ class ODEResult(object):
         for (idx, t_val) in enumerate(self.t):
             jac = jacobian(t_val, self.y[:, idx],
                            self.beam,
+                           self.env.species["H_plus"].index,
                            **self.mat,
                            )
             out.iloc[idx, :] = jac.flatten()
