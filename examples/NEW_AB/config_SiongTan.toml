@@ -1,0 +1,19 @@
+[includes]
+toml = [
+    "radiopyo/basic_water_radiolysis.toml",
+    "radiopyo/reactions_biology.toml",
+]
+
+#----------------------- Example of constant beam definition ---------------------------
+[[beam.constant]]
+dose_rate = 1e7 # Mean dose rate [Gy/s]
+max_dose = 10   # Dose [Gy], optionnal
+LET = 0.201     # Linear Energy Transfer [keV / µm],
+
+[[reactions.k_reaction]] # 37) Life time of ROO_r ~ 17 s (k~ln(2)/17) (Rb8 in R.Labarbe)
+reaction = "ROO_r -> trash"
+k_value = 0.65
+
+[[reactions.k_reaction]] # 31) Reaction of HO^. with thiols (RdOH in R.Labarbe)
+reaction = "OH_r + GSH -> RH_r"
+k_value = 1e2
