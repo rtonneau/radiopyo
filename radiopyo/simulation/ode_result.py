@@ -184,7 +184,7 @@ class ODEResult(object):
         """
         """
         labels = [(elt.label, elt.index)
-                  for elt in self.env.species.iter_dyn_species()]
+                  for elt in self.env.species.iter_sim_species()]
         labels = sorted(labels, key=lambda x: x[1])
         return pd.DataFrame(index=self.t,
                             columns=[elt[0] for elt in labels],

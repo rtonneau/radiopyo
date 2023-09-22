@@ -135,7 +135,7 @@ def derive(t: float,
     y = np.matmul(y, AB_mat[0])
     y = np.append(y, cst_sp)
 
-    AB_correction = np.zeros(len(AB_mat[1])*2)
+    AB_correction = np.ones(len(AB_mat[1])*2)
     AB_correction[::2] = 1 / (1 + AB_mat[1]/y[H_plus_index])  # Acid partition
     AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
     y[:len(AB_correction)] *= AB_correction

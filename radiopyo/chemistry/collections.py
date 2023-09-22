@@ -440,6 +440,11 @@ class ListSpecies():
         """
         return iter(self.dyn_AB.values())
 
+    def iter_sim_species(self) -> tp.Iterator[ABCouple | ChemSpecies]:
+        """ 
+        """
+        return chain(self.iter_AB(), self.iter_dyn_species())
+
     def sort(self, inplace: bool = True) -> tp.Optional[ListSpecies]:
         """
         Sort all SimSpecies according to the following: 
