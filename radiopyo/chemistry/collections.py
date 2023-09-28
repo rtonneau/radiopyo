@@ -98,7 +98,7 @@ class ListSpecies():
         """Total number of species => Cst + Dyn"""
         return self.len_cst_species() +\
             self.len_dyn_species() +\
-            self.len_dyn_AB()
+            self.len_AB()
 
     def __getitem__(self, item: str) -> ChemSpecies | ABCouple:
         """
@@ -127,15 +127,15 @@ class ListSpecies():
         return self.len_species() * ChemSpecies.LENGTH_INDEX + \
             self.len_AB() * ABCouple.LENGTH_INDEX
 
-    def len_dyn_AB(self) -> int:
-        """ 
+    def len_sim_species(self) -> int:
         """
-        return len(self.dyn_AB)
+        """
+        return self.len_AB() + self.len_dyn_species()
 
     def len_AB(self) -> int:
         """
         """
-        return self.len_dyn_AB()
+        return len(self.dyn_AB)
 
     def len_cst_species(self) -> int:
         """
@@ -178,6 +178,27 @@ class ListSpecies():
         with suppress(KeyError):
             return self.__getitem__(label)
         return default
+
+    def get_species_by_sim_index(self, index: int) -> ABCouple | ChemSpecies:
+        """
+        """
+        return list(self.iter_sim_species())[index]
+
+    def get_sim_index(self, label: str) -> int:
+        """
+        """
+        for idx, elt in enumerate(self.iter_sim_species()):
+            if label == elt.label or label in elt:
+                return idx
+        raise KeyError(f"{label} is not a valid dynamic species")
+
+    def get_sim_species(self, label: str) -> tp.Tuple[ABCouple | ChemSpecies, int]:
+        """
+        """
+        for idx, elt in enumerate(self.iter_sim_species()):
+            if label == elt.label or label in elt:
+                return elt, idx
+        raise KeyError(f"{label} is not a valid dynamic species")
 
     def add_acid_base(self,
                       acid: str,
@@ -484,7 +505,7 @@ class ListSpecies():
         # If CstSpecies from another sim, should still be tested for this one.
         if isinstance(key, ChemSpecies):
             key = key.label
-        return key in self.dyn_sp or key in self.dyn_AB
+        return key in self.dyn_sp or self.is_AB_species(key)
 
     def is_AB_species(self, key: str | ABCouple | ChemSpecies) -> bool:
         """ """

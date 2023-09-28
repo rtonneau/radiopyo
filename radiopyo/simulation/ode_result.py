@@ -96,10 +96,19 @@ class ODEResult(object):
 
     def __getitem__(self, key: str) -> pd.Series:
         """ """
+        if key not in self.env.species:
+            raise KeyError(f"'{key}' is not a valid species for this env.")
+
+        # Is it a constant species?
         if not self.env.species.is_dyn_species(key):
-            raise KeyError(f"'{key}' is not a valid DynSpecies label")
-        idx = self.env.species.dyn_sp[key].index
-        return pd.Series(data=self.y[idx, :], index=self.t)
+            return pd.Series(data=self.env.species["H_plus"].initial_cc()*1e6,
+                             index=self.t,
+                             name=key)
+
+        sp, idx = self.env.species.get_sim_species(key)
+        return pd.Series(data=self.y[idx, :],
+                         index=self.t,
+                         name=sp.label)
 
     def __add__(self, other: tp.Any) -> ODEResult:
         """ """
@@ -180,15 +189,41 @@ class ODEResult(object):
         self.exec_time.append(exec_time)
 
     # --------------------------------- Utils methods -------------------------------- #
-    def to_pandas(self, clip: bool = True) -> pd.DataFrame:
+    def to_pandas(self, clip: bool = True, compute_AB: bool = True) -> pd.DataFrame:
         """
         """
         labels = [elt.label for elt in self.env.species.iter_sim_species()]
-        return pd.DataFrame(index=self.t,
-                            columns=labels,
-                            dtype=np.float64,
-                            data=self.y.T,
-                            ).clip(0.0 if clip else None)
+        labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
+        n_AB = self.env.species.len_AB()
+
+        df_sp = pd.DataFrame(index=self.t,
+                             columns=labels[n_AB:],
+                             dtype=np.float64,
+                             data=self.y[n_AB:, :].T,
+                             ).clip(0.0 if clip else None)
+
+        df_cst = pd.DataFrame(index=self.t,
+                              columns=labels_cst,
+                              dtype=np.float64,
+                              )
+        for sp_cst in self.env.species.iter_cst_species():
+            df_cst.loc[:, sp_cst.label] = sp_cst.initial_cc()*1e6
+
+        df_AB = pd.DataFrame(index=self.t,
+                             columns=labels[:n_AB],
+                             dtype=np.float64,
+                             data=self.y[:n_AB, :].T,
+                             ).clip(0.0 if clip else None)
+
+        if compute_AB:
+            H_plus = self["H_plus"]
+            for ab in self.env.species.iter_AB():
+                df_AB.loc[:, ab.acid.label] = ab.compute_acid_partition(df_AB[ab.label],
+                                                                        H_plus)
+                df_AB.loc[:, ab.base.label] = ab.compute_base_partition(df_AB[ab.label],
+                                                                        H_plus)
+                df_AB.drop(ab.label, axis=1, inplace=True)
+        return pd.concat([df_AB, df_sp, df_cst], axis=1)
 
     def reconstruct_jacobian(self) -> pd.DataFrame:
         if self.beam is None:

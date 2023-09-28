@@ -15,7 +15,7 @@ from radiopyo.chemistry.species import ChemSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    from numpy.typing import NDArray
 
 __all__ = [
     "ABPartition",
@@ -104,6 +104,16 @@ class ABCouple(ChemSpecies):
     def ka(self) -> float:
         return 10**(-self.pKa)
 
+    def compute_acid_partition(self, cc_tot: NDArray, cc_H_plus: NDArray) -> NDArray:
+        """
+        """
+        return cc_tot / (1.0 + self.ka / cc_H_plus)
+
+    def compute_base_partition(self, cc_tot: NDArray, cc_H_plus: NDArray) -> NDArray:
+        """
+        """
+        return cc_tot / (1.0 + cc_H_plus / self.ka)
+
     def compute_partition(self, cc_tot: float, cc_H_plus: float) -> ABPartition:
         """
         Method to compute the Acid/base partition.
@@ -135,7 +145,8 @@ class ABCouple(ChemSpecies):
                 f"acid='{self.acid}', "
                 f"base='{self.base}', "
                 f"pKa={round(self.pKa, 5)}, "
-                f"index={self.index}")
+                f"index={self.index}"
+                ")")
 
 
 class ABDict(tp.TypedDict):

@@ -36,6 +36,9 @@ class RawSpecies():
     def __init__(self, label: str):
         self.label = label
 
+    def __contains__(self, other: object) -> bool:
+        return self.__eq__(other)
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, str):
             return self.label == other
@@ -52,7 +55,7 @@ class ChemSpecies(RawSpecies):
     """Class used for species with cc (cst or dyn)."""
     LENGTH_INDEX: int = 1
 
-    cc_init: float  # Store initial value
+    cc_init: float  # Store initial value as [mol/l]
     index: int
 
     def __init__(self,
