@@ -188,16 +188,23 @@ class UnitCell(object):
         Returns:
             None
         """
-        if LET is None:
-            LET = self.beam_list.current_LET
+        _OLD_LET = self.beam_list.current_LET
 
         if isinstance(beam, str):
             self.beam_list.use_beam(beam)
+            LET = LET or self.beam_list.current_LET
+            logger.info(f"Setting beam definition ({self.beam_list._current}): "
+                        f"{self.beam_list.current}, done!")
         else:
-            self.beam_list.add_beam(beam, beam.label, let=LET, use=True)
-        logger.info(f"Setting new beam definition ({self.beam_list._current}): "
-                    f"{self.beam_list.current}, done!")
-        with suppress(ValueError):
+            LET = LET or _OLD_LET
+            self.beam_list.add_beam(beam,
+                                    beam.label,
+                                    let=LET,
+                                    use=True)
+            logger.info(f"Setting new beam definition ({self.beam_list._current}): "
+                        f"{self.beam_list.current}, done!")
+
+        if LET is not None and LET != _OLD_LET:
             self.change_LET(LET)
 
     def change_LET(self, let: float) -> None:
