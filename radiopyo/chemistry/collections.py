@@ -402,6 +402,12 @@ class ListSpecies():
         return map(op.itemgetter(1),
                    sorted(self.dyn_sp.items(), key=lambda x: x[1].index))
 
+    def iter_sim_indexed(self) -> tp.Iterable[ChemSpecies | ABCouple]:
+        """
+        """
+        return map(op.itemgetter(1),
+                   sorted(self, key=lambda x: x.index))
+
     def iter_cst_species(self) -> tp.Iterable[ChemSpecies]:
         """
         Get an iterator over all the CstSpecies (not ordered).
@@ -443,7 +449,8 @@ class ListSpecies():
     def iter_sim_species(self) -> tp.Iterator[ABCouple | ChemSpecies]:
         """ 
         """
-        return chain(self.iter_AB(), self.iter_dyn_species())
+        return sorted(chain(self.iter_AB(), self.iter_dyn_species()),
+                      key=lambda x: x.index)
 
     def sort(self, inplace: bool = True) -> tp.Optional[ListSpecies]:
         """
@@ -477,7 +484,7 @@ class ListSpecies():
         # If CstSpecies from another sim, should still be tested for this one.
         if isinstance(key, ChemSpecies):
             key = key.label
-        return key in self.dyn_sp
+        return key in self.dyn_sp or key in self.dyn_AB
 
     def is_AB_species(self, key: str | ABCouple | ChemSpecies) -> bool:
         """ """

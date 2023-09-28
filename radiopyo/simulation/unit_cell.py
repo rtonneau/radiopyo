@@ -527,7 +527,7 @@ class SimChunksIter():
             with suppress(NameError):
                 gip = get_ipython()  # type: ignore[name-defined] # noqa: F821
                 if (gip.__class__.__name__ == "ZMQInteractiveShell"):
-                    from tqdm.notebook import tqdm  # type: ignore[import] # noqa: F811
+                    from tqdm.notebook import tqdm  # type: ignore[import]
             # Perform Simulation with TQDM.
             sim = tqdm(self)
         except ImportError:

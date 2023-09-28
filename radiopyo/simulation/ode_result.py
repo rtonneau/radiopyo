@@ -183,11 +183,9 @@ class ODEResult(object):
     def to_pandas(self, clip: bool = True) -> pd.DataFrame:
         """
         """
-        labels = [(elt.label, elt.index)
-                  for elt in self.env.species.iter_sim_species()]
-        labels = sorted(labels, key=lambda x: x[1])
+        labels = [elt.label for elt in self.env.species.iter_sim_species()]
         return pd.DataFrame(index=self.t,
-                            columns=[elt[0] for elt in labels],
+                            columns=labels,
                             dtype=np.float64,
                             data=self.y.T,
                             ).clip(0.0 if clip else None)

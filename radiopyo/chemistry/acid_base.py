@@ -98,7 +98,7 @@ class ABCouple(ChemSpecies):
             case self.base.label:
                 return self.base
             case _:
-                raise KeyError
+                raise KeyError(f"Unknown {item} for A/B couple: {self}")
 
     @property
     def ka(self) -> float:
