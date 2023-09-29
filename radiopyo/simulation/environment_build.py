@@ -322,9 +322,8 @@ class SimEnv():
             # Loop over all reaction's products
             for sp, stoi in reaction.iter_products():
                 # If declared as cst, keep it 0
-                if self.species.is_cst_species(sp):
-                    continue
-                Riy[sp.index, idx_r] += stoi
+                if not self.species.is_cst_species(sp):
+                    Riy[sp.index, idx_r] += stoi
 
             # Jacobian related loops:
             for sp in self.iter_species():

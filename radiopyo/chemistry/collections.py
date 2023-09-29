@@ -491,7 +491,8 @@ class ListSpecies():
         """
         out = copy.deepcopy(self) if not inplace else self
         for idx_ab, ab_couple in enumerate(out.iter_AB()):
-            out[ab_couple.label].index = idx_ab*ABCouple.LENGTH_INDEX
+            ab_couple.update_index(idx_ab*ABCouple.LENGTH_INDEX)
+
         for idx, species in enumerate(out.iter_species(),
                                       start=self.len_AB()*ABCouple.LENGTH_INDEX):
             out[species.label].index = idx*ChemSpecies.LENGTH_INDEX

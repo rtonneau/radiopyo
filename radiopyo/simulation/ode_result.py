@@ -276,9 +276,15 @@ class ODEResult(object):
         for label, reaction in zip(cols_gi, self.env.reactions.radiolytic):
             out.loc[:, label] = reaction.kr()
 
+        H_plus_index = self.env.species["H_plus"].index
         for ((idx, t_val), y) in zip(enumerate(self.t), self.y.T):
             y = y.clip(min=0.0,) * 1e-6
+            y = np.matmul(y, self.mat["AB_mat"][0])
             y = np.append(y, self.mat["cst_sp"])
+            AB_correction = np.ones(len(self.mat["AB_mat"][1])*2)
+            AB_correction[::2] = 1 / (1 + self.mat["AB_mat"][1]/y[H_plus_index])
+            AB_correction[1::2] = 1 - AB_correction[::2]
+            y[:len(AB_correction)] *= AB_correction
 
             # K Reactions
             Rki = np.nan_to_num(

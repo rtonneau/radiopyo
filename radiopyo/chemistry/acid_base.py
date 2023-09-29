@@ -104,6 +104,13 @@ class ABCouple(ChemSpecies):
     def ka(self) -> float:
         return 10**(-self.pKa)
 
+    def update_index(self, index: int) -> None:
+        """ 
+        """
+        self.index = index
+        self.acid.index = index
+        self.base.index = index + 1
+
     def compute_acid_partition(self, cc_tot: NDArray, cc_H_plus: NDArray) -> NDArray:
         """
         """
