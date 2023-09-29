@@ -313,7 +313,7 @@ class SimEnv():
             idx_reactant = 0
             for sp, stoi in reaction.iter_reactants():
                 # If declared as cst, keep it 0
-                if not isinstance(sp, ChemSpecies):
+                if not self.species.is_cst_species(sp):
                     Riy[sp.index, idx_r] -= stoi
                 for _ in range(stoi):
                     Rki[:, idx_r, idx_reactant] = 0
@@ -323,14 +323,14 @@ class SimEnv():
             # Loop over all reaction's products
             for sp, stoi in reaction.iter_products():
                 # If declared as cst, keep it 0
-                if isinstance(sp, ChemSpecies):
+                if self.species.is_cst_species(sp):
                     continue
                 Riy[sp.index, idx_r] += stoi
 
             # Jacobian related loops:
             for sp in self.iter_species():
                 # sp not involved in reaction => derivative = 0
-                if not reaction.has_reactant(sp) or isinstance(sp, ChemSpecies):
+                if not reaction.has_reactant(sp) or self.species.is_cst_species(sp):
                     JRki[:, idx_r, :, sp.index] = 0
                     continue
 
@@ -402,11 +402,11 @@ class SimEnv():
             Ez_kmki[0, col] = enzymatic.k_micha
             Ez_kmki[1, col] = enzymatic.k_value
             for sp, stoi in enzymatic.iter_reactants():
-                if isinstance(sp, ChemSpecies):
+                if self.species.is_cst_species(sp):
                     continue
                 Ez_iy[sp.index, col] = -stoi
             for sp, stoi in enzymatic.iter_products():
-                if isinstance(sp, ChemSpecies):
+                if self.species.is_cst_species(sp):
                     continue
                 Ez_iy[sp.index, col] = stoi
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy

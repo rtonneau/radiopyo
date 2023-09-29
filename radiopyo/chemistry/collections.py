@@ -500,6 +500,13 @@ class ListSpecies():
         out.sorted = True
         return out if not inplace else None
 
+    def is_cst_species(self, key: str | ChemSpecies) -> bool:
+        """ 
+        """
+        if isinstance(key, ChemSpecies):
+            key = key.label
+        return key in self.cst_sp
+
     def is_dyn_species(self, key: str | ChemSpecies) -> bool:
         """ """
         # If CstSpecies from another sim, should still be tested for this one.

@@ -134,7 +134,6 @@ def derive(t: float,
     # ==> Add constant species
     y = np.matmul(y, AB_mat[0])
     y = np.append(y, cst_sp)
-
     AB_correction = np.ones(len(AB_mat[1])*2)
     AB_correction[::2] = 1 / (1 + AB_mat[1]/y[H_plus_index])  # Acid partition
     AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
@@ -171,6 +170,10 @@ def derive(t: float,
     # ==> A/B couples with only the total
     # ==> dynamical species
     # ==> convert back to [µmol/l]
+    # print(dydt)
+    # print(np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T) * 1e6)
+    # print()
+    # print()
     return np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T) * 1e6
 
 
