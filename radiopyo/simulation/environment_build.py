@@ -18,7 +18,6 @@ from dataclasses import dataclass
 from itertools import chain
 
 import numpy as np
-from scipy.constants import Avogadro  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.acid_base import ABCouple
