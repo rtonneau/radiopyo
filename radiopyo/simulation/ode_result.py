@@ -328,15 +328,15 @@ class ODEResult(object):
     def integrate_species(self,
                           start: float = 0,
                           stop: float = float("inf"),
+                          compute_AB: bool = True
                           ) -> pd.Series:
         """ 
         """
-        labels = [(elt.label, elt.index)
-                  for elt in self.env.species.iter_dyn_species()]
-        out = pd.Series(index=[elt[0] for elt in sorted(labels, key=lambda x: x[1])],
+        df = self.to_pandas(compute_AB)
+        df = df[(df.index >= start) & (df.index < stop)]
+        out = pd.Series(index=df.columns,
                         dtype=np.float64)
-        mask = np.where((self.t >= start) & (self.t < stop))
-        for idx in range(len(self.y)):
-            out.iloc[idx] = simpson(
-                y=self.y[idx, mask].clip(min=0), x=self.t[mask])
+
+        for col, data in df.items():
+            out.loc[col] = simpson(y=data.values, x=data.index)
         return out

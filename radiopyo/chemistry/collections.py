@@ -179,6 +179,16 @@ class ListSpecies():
             return self.__getitem__(label)
         return default
 
+    def get_AB(self, label: str) -> ABCouple:
+        """ 
+        """
+        with suppress(KeyError):
+            return self.dyn_AB[label]
+        for ab_reaction in self.iter_AB():
+            if label in ab_reaction:
+                return ab_reaction
+        raise KeyError(f"{label} not involved in Acid/Base equilibrium")
+
     def get_species_by_sim_index(self, index: int) -> ABCouple | ChemSpecies:
         """
         """
@@ -313,7 +323,7 @@ class ListSpecies():
         self.add_cst_species(item.label, item.initial_cc())
         self.sorted = False
 
-    def add_dyn_species(self, label: str) -> None:
+    def add_dyn_species(self, label: str, cc_init: tp.Optional[float] = None) -> None:
         """
         Method use to add a new DynSpecies. The nex_index attributes is assigned to the
         species and increased.
@@ -335,7 +345,7 @@ class ListSpecies():
             raise radiopyo_exceptions.IsConstantSpeciesError(
                 f"{label} is already recorded as CstSpecies")
         if label not in self:
-            self.dyn_sp[label] = ChemSpecies(label, self.next_index)
+            self.dyn_sp[label] = ChemSpecies(label, self.next_index,  cc_init)
             self.next_index += ChemSpecies.LENGTH_INDEX
 
     def add_cst_species(self, label: str, cc: float) -> None:
@@ -422,12 +432,6 @@ class ListSpecies():
         """
         return map(op.itemgetter(1),
                    sorted(self.dyn_sp.items(), key=lambda x: x[1].index))
-
-    def iter_sim_indexed(self) -> tp.Iterable[ChemSpecies | ABCouple]:
-        """
-        """
-        return map(op.itemgetter(1),
-                   sorted(self, key=lambda x: x.index))
 
     def iter_cst_species(self) -> tp.Iterable[ChemSpecies]:
         """

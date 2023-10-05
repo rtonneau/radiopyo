@@ -182,12 +182,16 @@ class SimEnv():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
-        list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
-        # list_sp.add_dyn_species("H_plus")  # noqa: ERA001
-        # initial_cc["H_plus"] = 10**(-bio_param["pH"])  # noqa: ERA001
-        # list_sp.add_dyn_species("OH_minus")  # noqa: ERA001
-        # initial_cc["OH_minus"] = 10**(-14+bio_param["pH"])  # noqa: ERA001
+        if "force_cst_pH" in bio_param and not bio_param["force_cst_pH"]:
+            list_sp.add_acid_base("H_plus", "OH_minus", 14)
+            _ab = list_sp.get_AB("H_plus")
+            initial_cc[_ab.label] = 10**(-bio_param["pH"]) + 10**(-14+bio_param["pH"])
+            # list_sp.add_dyn_species("H_plus", cc_init=10**(-bio_param["pH"]))
+            # list_sp.add_dyn_species("OH_minus", cc_init=10**(-14+bio_param["pH"]))
+            # list_sp.add_acid_base("H_plus", "OH_minus", 14)
+        else:
+            list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
+            list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
 
         list_sp.sort(inplace=True)
         # Sanity check
@@ -252,10 +256,9 @@ class SimEnv():
         Returns:
             NDArray[np.float64]: vector with initial concentrations in [µmol/l]
         """
-        out_dyn = np.zeros(self.species.len_dyn_species()+self.species.len_AB(),
+        out_dyn = np.zeros(self.species.len_sim_species(),
                            dtype=np.float64)
-        for idx, species in enumerate(self.species.sorted_iter_dyn_species(),
-                                      start=self.species.len_AB()):
+        for idx, species in enumerate(self.species.iter_sim_species()):
             out_dyn[idx] = species.initial_cc()*1e6
 
         out_cst = np.array([], dtype=np.float64)
@@ -400,13 +403,11 @@ class SimEnv():
             Ez_kmki[0, col] = enzymatic.k_micha
             Ez_kmki[1, col] = enzymatic.k_value
             for sp, stoi in enzymatic.iter_reactants():
-                if self.species.is_cst_species(sp):
-                    continue
-                Ez_iy[sp.index, col] = -stoi
+                if not self.species.is_cst_species(sp):
+                    Ez_iy[sp.index, col] = -stoi
             for sp, stoi in enzymatic.iter_products():
-                if self.species.is_cst_species(sp):
-                    continue
-                Ez_iy[sp.index, col] = stoi
+                if not self.species.is_cst_species(sp):
+                    Ez_iy[sp.index, col] = stoi
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
 
     def make_acidBase_matrix(self) -> tp.Tuple[NDArray[np.int8],

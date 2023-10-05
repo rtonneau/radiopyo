@@ -73,7 +73,7 @@ class UnitCell(object):
             Initial time step of all simulation (default=1e-12)
 
     """
-    FIRST_STEP: float = 1e-12
+    FIRST_STEP: float = 1e-15
 
     env: SimEnv
     mat: SimMatrices
@@ -249,6 +249,8 @@ class UnitCell(object):
             rp_excep.NoBeamDefinedError("Simulation aborted")
         first_step = self.FIRST_STEP
 
+        if t_span[0] == t_span[1]:
+            t_span = (t_span[0]/1e2, t_span[1])
         # Building kwargs for solve_ivp:
         kwargs: tp.Dict[str, tp.Any] = {}
         kwargs["first_step"] = self.FIRST_STEP
@@ -267,6 +269,9 @@ class UnitCell(object):
             # Check if first step is lower than the defined max_step
             if first_step >= max_step:
                 kwargs["first_step"] = max_step / 10
+
+        if kwargs["first_step"] > t_span[1] - t_span[0]:
+            kwargs["first_step"] = (t_span[1] - t_span[0]) / 1e3
 
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(derive,

@@ -61,10 +61,10 @@ class ChemSpecies(RawSpecies):
     def __init__(self,
                  label: str,
                  index: int = -1,
-                 cc_init: float = -1) -> None:
+                 cc_init: tp.Optional[float] = None) -> None:
         super().__init__(label)
         self.index = index
-        self.cc_init = cc_init
+        self.cc_init = cc_init if cc_init is not None else -1
 
     def __repr__(self) -> str:
         return f"ChemSpecies('{self.label}', {self.index}, {self.cc_init})"

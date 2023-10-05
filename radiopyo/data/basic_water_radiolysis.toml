@@ -1,5 +1,6 @@
 [bio_param]
 pH = 7
+force_cst_pH = true
 
 [concentrations.fixed] # Unit is [mol]/[l]
 H2O = 55
@@ -13,6 +14,7 @@ OH_r = 2.8
 H_r = 0.62
 H2 = 0.47
 H2O2 = 0.73
+H3O_plus = 
 
 # ----------------------------------------------------------------------------------
 #                             DEFINE ACID-BASE REACTIONS                            
@@ -31,6 +33,7 @@ pKa = 11.7
 acid = "HO2_r"
 base = "O2_r_minus"
 pKa = 4.9
+
 # ----------------------------------------------------------------------------------
 #                                 DEFINE K-REACTIONS                             
 # ----------------------------------------------------------------------------------
@@ -67,7 +70,7 @@ reaction = "e_aq + H2O2 -> OH_minus + OH_r"
 k_value = 1.1e10
 
 [[reactions.k_reaction]]
-reaction = "e_aq + HO2_minus -> 2 OH_minus + OH_r"
+reaction = "e_aq + HO2_minus -> OH_minus + OH_r"
 k_value = 3.5e9
 
 [[reactions.k_reaction]]
@@ -107,6 +110,7 @@ k_value = 2.1e10
 reaction = "H_r + HO2_r -> H2O2"
 k_value = 1.0e10
 
+
 # --------------------- Reactions involving OH_r as reactant  ----------------------
 [[reactions.k_reaction]]
 reaction = "2OH_r -> H2O2"
@@ -134,7 +138,7 @@ reaction = "O_r_minus + H2O -> OH_minus + OH_r"
 k_value = 1.8e6
 
 [[reactions.k_reaction]]
-reaction = "O_r_minus + O2 -> O3_minus"
+reaction = "O_r_minus + O2 -> O3_r_minus"
 k_value = 3.6e9
 
 [[reactions.k_reaction]]
@@ -142,5 +146,5 @@ reaction = "O_r_minus + O2_r_minus -> 2 OH_minus + O2"
 k_value = 6.0e8
 
 [[reactions.k_reaction]]
-reaction = "2 O2_r_minus -> H2O2 + O2"
-k_value = 2e9                          # 2e5
+reaction = "2 O2_r_minus + 2 H_plus-> H2O2 + O2"
+k_value = 2e9                                    # 2e5

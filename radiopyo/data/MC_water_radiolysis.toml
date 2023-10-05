@@ -1,0 +1,144 @@
+[includes]
+toml = ["radiopyo/basic_water_radiolysis.toml"]
+
+
+# ----------------------------------------------------------------------------------
+#                                 DEFINE K-REACTIONS                             
+# ----------------------------------------------------------------------------------
+
+#For [X].[X] -> ... reactions, 2k value is given
+
+# ------------------ List of all reactions with e_aq as reactants ------------------ 
+[[reactions.k_reaction]]
+reaction = "e_aq + HO2_r -> HO2_minus"
+k_value = 1.3e10
+
+[[reactions.k_reaction]]
+reaction = "e_aq + O3 -> O3_r_minus"
+k_value = 3.6e10
+
+# -------------------- Reactions involving H_plus as reactant ----------------------
+[[reactions.k_reaction]]
+reaction = "H_plus + O_r_minus -> OH_r"
+k_value = 5.0e10
+
+[[reactions.k_reaction]]
+reaction = "H_plus + O2_r_minus -> HO2_r"
+k_value = 5.0e10
+
+[[reactions.k_reaction]]
+reaction = "H_plus + OH_minus -> H2O"
+k_value = 1.2e11
+
+[[reactions.k_reaction]]
+reaction = "H_plus + O3_r_minus -> OH_r + O2"
+k_value = 9.0e10
+
+[[reactions.k_reaction]]
+reaction = "H_plus + HO2_minus -> H2O2"
+k_value = 5.0e10
+
+# ---------------------- Reactions involving H_r as reactant -----------------------
+[[reactions.k_reaction]]
+reaction = "H_r + O2_r_minus -> HO2_minus"
+k_value = 1.1e10
+
+[[reactions.k_reaction]]
+reaction = "H_r + HO2_minus -> OH_r + OH_minus"
+k_value = 1.5e9
+
+[[reactions.k_reaction]]
+reaction = "H_r + O_r_minus -> OH_minus"
+k_value = 2.0e10
+
+[[reactions.k_reaction]]
+reaction = "H_r + O3 -> O2 + OH_r"
+k_value = 3.7e10
+
+[[reactions.k_reaction]]
+reaction = "H_r + O3_r_minus -> O2 + OH_minus"
+k_value = 1.0e10
+
+# --------------------- Reactions involving OH_r as reactant  ----------------------
+[[reactions.k_reaction]]
+reaction = "OH_r + H2 -> H_r + H2O"
+k_value = 4.0e7
+
+[[reactions.k_reaction]]
+reaction = "OH_r + HO2_r -> O2 + H2O"
+k_value = 9.0e9
+
+[[reactions.k_reaction]]
+reaction = "OH_r + O_r_minus -> HO2_minus"
+k_value = 1.0e9
+
+[[reactions.k_reaction]]
+reaction = "OH_r + O3_r_minus -> O2_r_minus + HO2_r"
+k_value = 8.5e9
+
+[[reactions.k_reaction]]
+reaction = "OH_r + O3 -> O2 + HO2_r"
+k_value = 1.11e8
+
+# ------------------- Reactions involving O_r_minus as reactant --------------------
+[[reactions.k_reaction]]
+reaction = "O_r_minus + O_r_minus -> H2O2 + 2 OH_minus"
+k_value = 1.0e8
+
+[[reactions.k_reaction]]
+reaction = "O_r_minus + O3_r_minus -> 2 O2_r_minus"
+k_value = 7.0e8
+
+[[reactions.k_reaction]]
+reaction = "O3_r_minus + H2O ->  O_r_minus + O2"
+k_value = 46.5
+
+# --------------------- Reactions involving H2O2 as reactant -----------------------
+[[reactions.k_reaction]]
+reaction = "H2O2 + OH_minus -> HO2_minus + H2O"
+k_value = 1.33e10
+
+[[reactions.k_reaction]]
+reaction = "H2O2 + O_r_minus -> HO2_r + OH_minus"
+k_value = 5.55e8
+
+# ----------------------- Reactions involving H2 as reactant -----------------------
+[[reactions.k_reaction]]
+reaction = "H2 + O_r_minus -> H_r + OH_minus"
+k_value = 1.3e8
+
+# -------------------- Reactions involving OH_minus as reactant --------------------
+[[reactions.k_reaction]]
+reaction = "OH_minus + HO2_r -> O2_r_minus + H2O"
+k_value = 1.3e10
+
+# ---------------------- Reactions involving HO2_r as reactant ---------------------
+[[reactions.k_reaction]]
+reaction = "HO2_r + O2_r_minus -> HO2_minus + O2"
+k_value = 9.7e7
+
+[[reactions.k_reaction]]
+reaction = "HO2_r + HO2_r -> H2O2 + O2"
+k_value = 3.88e8
+
+[[reactions.k_reaction]]
+reaction = "HO2_r + H2O -> H_plus + O2_r_minus"
+k_value = 1.4e4
+
+# ------------------ Reactions involving O2_r_minus as reactant --------------------
+[[reactions.k_reaction]]
+reaction = "O2_r_minus + H2O -> HO2_r + OH_minus"
+k_value = 0.155
+
+[[reactions.k_reaction]]
+reaction = "O2_r_minus + O3 -> O3_r_minus + O2"
+k_value = 1.5e9
+
+# ------------------- Reactions involving HO2_minus as reactant --------------------
+[[reactions.k_reaction]]
+reaction = "HO2_minus + H2O -> H2O2 + OH_minus"
+k_value = 1.27e8
+
+[[reactions.k_reaction]]
+reaction = "HO2_minus + O_r_minus -> O2_r_minus + OH_minus"
+k_value = 8.02e8
