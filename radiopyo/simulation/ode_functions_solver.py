@@ -44,7 +44,7 @@ EPSILON = 1e-25  # µmol/L
 def jacobian(t: float,
              y: NDArray[np.float64],
              beam: ParticleBeam,
-             H_plus_index: int,
+             pH_species_index: int,
              cst_sp: NDArray[np.float64],
              AB_mat: Tuple[NDArray[np.int8],
                            NDArray[np.float64]],
@@ -72,7 +72,7 @@ def jacobian(t: float,
     y = y.clip(min=0.0, ) * 1e-6
     # Compute some useful variables
     AB_correction = np.zeros(len(AB_mat[1])*2)
-    AB_correction[::2] = 1 / (1 + AB_mat[1]/y[H_plus_index])  # Acid partition
+    AB_correction[::2] = 1 / (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
     AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
 
     # Construct the cc vector with all relevant species
@@ -106,7 +106,7 @@ def jacobian(t: float,
 def derive(t: float,
            y: NDArray[np.float64],
            beam: ParticleBeam,
-           H_plus_index: int,
+           pH_species_index: int,
            cst_sp: NDArray[np.float64],
            AB_mat: Tuple[NDArray[np.int8],
                          NDArray[np.float64]],
@@ -134,8 +134,14 @@ def derive(t: float,
     # ==> Add constant species
     y = np.matmul(y, AB_mat[0])
     y = np.append(y, cst_sp)
+
+    # print(t, pH_species_index, y[pH_species_index])
+    # print(y)
     AB_correction = np.ones(len(AB_mat[1])*2)
-    AB_correction[::2] = 1 / (1 + AB_mat[1]/y[H_plus_index])  # Acid partition
+    if y[pH_species_index] > 0:
+        AB_correction[::2] = 1 / (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
+    else:
+        AB_correction[::2] = 0
     AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
     y[:len(AB_correction)] *= AB_correction
 
@@ -151,7 +157,7 @@ def derive(t: float,
 
     # Add the Time dependent Radiolytic term
     dydt += Gi_mat * beam.at(t).dose_rate()
-
+    # print(Gi_mat * beam.at(t).dose_rate())
     # Add Enzymatic term
     if Ez_mat is not None:
         # En_subs, En_enzy, En_kmki => Enzi[0], Enzi[1], Enzi[2]

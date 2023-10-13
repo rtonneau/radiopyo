@@ -14,7 +14,7 @@ import hashlib
 import logging
 import typing as tp
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import chain
 
 import numpy as np
@@ -74,7 +74,7 @@ class ReactionsList:
                                     self.enzymatic])
 
 
-@ dataclass
+@dataclass
 class SimEnv():
     """Environment class storing all pieces of information to build the matrices to
     solve the ODE.
@@ -89,10 +89,12 @@ class SimEnv():
         initial_cc: Dict[str, float]
             Dictionary with the initial concentration of some species
     """
+
     reactions: ReactionsList
     species: ListSpecies
     bio_param: tp.Dict[str, float]
     initial_cc: tp.Dict[str, float]
+    PH_SPECIES: str = field(init=False, repr=False, default="H_plus")
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -183,14 +185,14 @@ class SimEnv():
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
         if "force_cst_pH" in bio_param and not bio_param["force_cst_pH"]:
-            list_sp.add_acid_base("H_plus", "OH_minus", 14)
-            _ab = list_sp.get_AB("H_plus")
-            initial_cc[_ab.label] = 10**(-bio_param["pH"]) + 10**(-14+bio_param["pH"])
-            # list_sp.add_dyn_species("H_plus", cc_init=10**(-bio_param["pH"]))
-            # list_sp.add_dyn_species("OH_minus", cc_init=10**(-14+bio_param["pH"]))
-            # list_sp.add_acid_base("H_plus", "OH_minus", 14)
+            # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
+            # _ab = list_sp.get_AB(cls.PH_SPECIES)
+            # initial_cc[_ab.label] = 10**(-bio_param["pH"]) + 10**(-14+bio_param["pH"])
+            list_sp.add_dyn_species(cls.PH_SPECIES, cc_init=10**(-bio_param["pH"]))
+            list_sp.add_dyn_species("OH_minus", cc_init=10**(-14+bio_param["pH"]))
+            # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
         else:
-            list_sp.add_cst_species("H_plus", 10**(-bio_param["pH"]))
+            list_sp.add_cst_species(cls.PH_SPECIES, 10**(-bio_param["pH"]))
             list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
 
         list_sp.sort(inplace=True)

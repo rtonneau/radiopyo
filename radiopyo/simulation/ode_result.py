@@ -101,7 +101,7 @@ class ODEResult(object):
 
         # Is it a constant species?
         if not self.env.species.is_dyn_species(key):
-            return pd.Series(data=self.env.species["H_plus"].initial_cc()*1e6,
+            return pd.Series(data=self.env.species[key].initial_cc()*1e6,
                              index=self.t,
                              name=key)
 
@@ -216,7 +216,7 @@ class ODEResult(object):
                              ).clip(0.0 if clip else None)
 
         if compute_AB:
-            H_plus = self["H_plus"]
+            H_plus = self[self.env.PH_SPECIES]
             for ab in self.env.species.iter_AB():
                 df_AB.loc[:, ab.acid.label] = ab.compute_acid_partition(df_AB[ab.label],
                                                                         H_plus)
@@ -276,7 +276,7 @@ class ODEResult(object):
         for label, reaction in zip(cols_gi, self.env.reactions.radiolytic):
             out.loc[:, label] = reaction.kr()
 
-        H_plus_index = self.env.species["H_plus"].index
+        H_plus_index = self.env.species[self.env.PH_SPECIES].index
         for ((idx, t_val), y) in zip(enumerate(self.t), self.y.T):
             y = y.clip(min=0.0,) * 1e-6
             y = np.matmul(y, self.mat["AB_mat"][0])

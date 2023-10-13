@@ -277,7 +277,7 @@ class UnitCell(object):
         sol: ScipyODEResult = solve_ivp(derive,
                                         t_span,
                                         args=(self.beam_list.current,
-                                              self.env.species["H_plus"].index,
+                                              self.env.species[self.env.PH_SPECIES].index,
                                               self.mat["cst_sp"],
                                               self.mat["AB_mat"],
                                               self.mat["Ki_mat"],

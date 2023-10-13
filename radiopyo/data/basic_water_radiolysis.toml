@@ -14,7 +14,7 @@ OH_r = 2.8
 H_r = 0.62
 H2 = 0.47
 H2O2 = 0.73
-H3O_plus = 
+H3O_plus = 3.24
 
 # ----------------------------------------------------------------------------------
 #                             DEFINE ACID-BASE REACTIONS                            
@@ -35,10 +35,11 @@ base = "O2_r_minus"
 pKa = 4.9
 
 # ----------------------------------------------------------------------------------
-#                                 DEFINE K-REACTIONS                             
+#                                 DEFINE K-REACTIONS
+# For [X].[X] -> ... reactions, 2k value is given                             
 # ----------------------------------------------------------------------------------
 
-#For [X].[X] -> ... reactions, 2k value is given
+
 
 # ------------------ List of all reactions with e_aq as reactants ------------------ 
 [[reactions.k_reaction]]
