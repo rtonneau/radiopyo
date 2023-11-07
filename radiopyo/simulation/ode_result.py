@@ -21,10 +21,13 @@ from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
+    from pathlib import Path
+
     from numpy.typing import NDArray
 
     from radiopyo.physics.beam import ParticleBeam
     from radiopyo.simulation.environment_build import SimEnv
+    from radiopyo.simulation.utils import H5Manager
     from radiopyo.utils.sim_types import SimMatrices
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -61,8 +64,8 @@ class ODEResult(object):
     t: NDArray[np.float64]
     y: NDArray[np.float64]
     sol: tp.List[tp.Any]
-    t_events: tp.List[tp.Optional[tp.List[NDArray[np.float64]]]]
-    y_events: tp.List[tp.Optional[tp.List[NDArray[np.float64]]]]
+    t_events: tp.List[tp.List[NDArray[np.float64]]]
+    y_events: tp.List[tp.List[NDArray[np.float64]]]
     nfev: tp.List[int]
     njev: tp.List[int]
     nlu: tp.List[int]
@@ -125,9 +128,12 @@ class ODEResult(object):
         # Combine all together
         self.t = np.append(self.t, other.t)
         self.y = np.hstack([self.y, other.y])
-        self.sol = self.sol + other.sol
-        self.t_events += other.t_events
-        self.y_events += other.y_events
+        if other.sol is not None:
+            self.sol = self.sol + other.sol
+        if other.t_events is not None:
+            self.t_events += other.t_events
+        if other.y_events is not None:
+            self.y_events += other.y_events
         self.nfev += other.nfev
         self.njev += other.njev
         self.nlu += other.nlu
@@ -158,6 +164,34 @@ class ODEResult(object):
         """
         return self.env.initial_values(all=True)
 
+    def to_hdf(self,
+               file: str | Path,
+               name: str,
+               group: tp.Optional[str] = None) -> H5Manager:
+        """
+        """
+        from .utils import H5Manager
+        h5file = H5Manager.from_path(file)
+        with h5file:
+            grp = h5file.create_group(group)
+            data = self.to_pandas().reset_index()
+            ds = h5file.insert_dataset(grp, name, data.values)
+            labels = [str(_) for _ in data.columns]
+            labels[0] = "time"
+            ds.attrs["columns"] = labels
+            ds.attrs["sol"] = self.sol
+            ds.attrs["t_events"] = self.t_events
+            ds.attrs["y_events"] = self.y_events
+            ds.attrs["nfev"] = self.nfev
+            ds.attrs["njev"] = self.njev
+            ds.attrs["nlu"] = self.nlu
+            ds.attrs["status"] = self.status
+            ds.attrs["message"] = self.message
+            ds.attrs["success"] = self.success
+            ds.attrs["n_points"] = self.n_points
+            ds.attrs["exec_time"] = self.exec_time
+        return h5file
+
     def _default_init(self) -> None:
         self.t = np.array([], dtype=np.float64)
         self.y = np.array([], dtype=np.float64)
@@ -176,9 +210,12 @@ class ODEResult(object):
             self.y = sol.y
         else:
             self.y = np.hstack([self.y, sol.y])
-        self.sol.append(sol.sol)
-        self.t_events.append(sol.t_events)
-        self.y_events.append(sol.y_events)
+        if sol.sol is not None:
+            self.sol.append(sol.sol)
+        if sol.t_events is not None:
+            self.t_events.append(sol.t_events)
+        if sol.y_events is not None:
+            self.y_events.append(sol.y_events)
         self.nfev.append(sol.nfev)
         self.njev.append(sol.njev)
         self.nlu.append(sol.nlu)
@@ -216,12 +253,16 @@ class ODEResult(object):
                              ).clip(0.0 if clip else None)
 
         if compute_AB:
-            H_plus = self[self.env.PH_SPECIES]
+            H_plus = self[self.env.PH_SPECIES].to_numpy()
             for ab in self.env.species.iter_AB():
-                df_AB.loc[:, ab.acid.label] = ab.compute_acid_partition(df_AB[ab.label],
-                                                                        H_plus)
-                df_AB.loc[:, ab.base.label] = ab.compute_base_partition(df_AB[ab.label],
-                                                                        H_plus)
+                df_AB.loc[:, ab.acid.label] = ab.compute_acid_partition(
+                    df_AB[ab.label].to_numpy(),
+                    H_plus)
+
+                df_AB.loc[:, ab.base.label] = ab.compute_base_partition(
+                    df_AB[ab.label].to_numpy(),
+                    H_plus)
+
                 df_AB.drop(ab.label, axis=1, inplace=True)
         return pd.concat([df_AB, df_sp, df_cst], axis=1)
 
@@ -334,9 +375,8 @@ class ODEResult(object):
         """
         df = self.to_pandas(compute_AB)
         df = df[(df.index >= start) & (df.index < stop)]
-        out = pd.Series(index=df.columns,
-                        dtype=np.float64)
+        out = {}
 
         for col, data in df.items():
-            out.loc[col] = simpson(y=data.values, x=data.index)
-        return out
+            out[col] = simpson(y=data.values, x=data.index)
+        return pd.Series(out, dtype=np.float64)

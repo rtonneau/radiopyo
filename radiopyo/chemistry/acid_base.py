@@ -88,7 +88,7 @@ class ABCouple(ChemSpecies):
                          index=index,
                          cc_init=0)
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object) -> bool:
         return self.acid == key or self.base == key
 
     def __getitem__(self, item: str) -> ChemSpecies:
@@ -111,7 +111,9 @@ class ABCouple(ChemSpecies):
         self.acid.index = index
         self.base.index = index + 1
 
-    def compute_acid_partition(self, cc_tot: NDArray, cc_H_plus: NDArray) -> NDArray:
+    def compute_acid_partition(self,
+                               cc_tot: NDArray,
+                               cc_H_plus: NDArray) -> NDArray:
         """
         """
         return cc_tot / (1.0 + self.ka / cc_H_plus)
