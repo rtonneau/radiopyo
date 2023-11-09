@@ -17,7 +17,7 @@ import pandas as pd
 from scipy.integrate import simpson  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
+from radiopyo.simulation.ode_functions_solver import ScipyODEResult, derive, jacobian
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -230,7 +230,8 @@ class ODEResult(object):
         """
         """
         labels = [elt.label for elt in self.env.species.iter_sim_species()]
-        labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
+        labels_cst = [
+            elt.label for elt in self.env.species.sorted_iter_cst_species()]
         n_AB = self.env.species.len_AB()
 
         df_sp = pd.DataFrame(index=self.t,
@@ -287,7 +288,7 @@ class ODEResult(object):
             out.iloc[idx, :] = jac.flatten()
         return out
 
-    def reconstruct_reactions(self) -> pd.DataFrame:
+    def reconstruct_reactions(self, clip: float | bool | int = 1e-8) -> pd.DataFrame:
         """ 
         Rem: to integrate df
             >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
@@ -323,7 +324,8 @@ class ODEResult(object):
             y = np.matmul(y, self.mat["AB_mat"][0])
             y = np.append(y, self.mat["cst_sp"])
             AB_correction = np.ones(len(self.mat["AB_mat"][1])*2)
-            AB_correction[::2] = 1 / (1 + self.mat["AB_mat"][1]/y[H_plus_index])
+            AB_correction[::2] = 1 / \
+                (1 + self.mat["AB_mat"][1]/y[H_plus_index])
             AB_correction[1::2] = 1 - AB_correction[::2]
             y[:len(AB_correction)] *= AB_correction
 
@@ -347,6 +349,13 @@ class ODEResult(object):
                     S / (self.mat["Ez_mat"][2][0, :] + S)
                 out.iloc[idx, idx_ez] = MM
         return out
+        match clip:
+            case bool():
+                return out if not clip else out.clip(lower=1e-10)
+            case int() | float():
+                return out.clip(lower=clip)
+            case _:
+                return out
 
     def species_balance_evolution(self) -> pd.DataFrame:
         rr = self.reconstruct_reactions()

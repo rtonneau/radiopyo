@@ -72,7 +72,8 @@ def jacobian(t: float,
     y = y.clip(min=0.0, ) * 1e-6
     # Compute some useful variables
     AB_correction = np.zeros(len(AB_mat[1])*2)
-    AB_correction[::2] = 1 / (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
+    AB_correction[::2] = 1 / \
+        (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
     AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
 
     # Construct the cc vector with all relevant species
@@ -139,7 +140,8 @@ def derive(t: float,
     # print(y)
     AB_correction = np.ones(len(AB_mat[1])*2)
     if y[pH_species_index] > 0:
-        AB_correction[::2] = 1 / (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
+        AB_correction[::2] = 1 / \
+            (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
     else:
         AB_correction[::2] = 0
     AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
@@ -151,13 +153,13 @@ def derive(t: float,
 
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
-
+    Rki[Rki < 1e-18] = 0
     # Compute dydt, first only with k reactions term:
     dydt = np.matmul(Ki_mat[1], (np.prod(Rki, axis=1) * Ki_mat[0]).T)
 
     # Add the Time dependent Radiolytic term
     dydt += Gi_mat * beam.at(t).dose_rate()
-    # print(Gi_mat * beam.at(t).dose_rate())
+
     # Add Enzymatic term
     if Ez_mat is not None:
         # En_subs, En_enzy, En_kmki => Enzi[0], Enzi[1], Enzi[2]
@@ -180,7 +182,9 @@ def derive(t: float,
     # print(np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T) * 1e6)
     # print()
     # print()
-    return np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T) * 1e6
+    dydt = np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T)
+
+    return dydt * 1e6
 
 
 # ------------------------------------------------------------------------------------ #

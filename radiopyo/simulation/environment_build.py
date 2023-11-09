@@ -94,7 +94,7 @@ class SimEnv():
     species: ListSpecies
     bio_param: tp.Dict[str, float]
     initial_cc: tp.Dict[str, float]
-    PH_SPECIES: str = field(init=False, repr=False, default="H_plus")
+    PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -188,8 +188,10 @@ class SimEnv():
             # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
             # _ab = list_sp.get_AB(cls.PH_SPECIES)
             # initial_cc[_ab.label] = 10**(-bio_param["pH"]) + 10**(-14+bio_param["pH"])
-            list_sp.add_dyn_species(cls.PH_SPECIES, cc_init=10**(-bio_param["pH"]))
-            list_sp.add_dyn_species("OH_minus", cc_init=10**(-14+bio_param["pH"]))
+            list_sp.add_dyn_species(
+                cls.PH_SPECIES, cc_init=10**(-bio_param["pH"]))
+            list_sp.add_dyn_species(
+                "OH_minus", cc_init=10**(-14+bio_param["pH"]))
             # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
         else:
             list_sp.add_cst_species(cls.PH_SPECIES, 10**(-bio_param["pH"]))
@@ -428,7 +430,8 @@ class SimEnv():
         ABi[nAB:, nAB*2:] = np.diag(np.ones(self.species.len_dyn_species()))
 
         # Second Matrix
-        Ka = np.array([elt.ka for elt in self.species.iter_AB()], dtype=np.float64)
+        Ka = np.array([elt.ka for elt in self.species.iter_AB()],
+                      dtype=np.float64)
 
         return (ABi, Ka)
 
@@ -499,7 +502,8 @@ def acid_base_from_dict(reactions: tp.List[tp.Dict],
         sim_sp = ListSpecies()
 
     for reaction in reactions:
-        sim_sp.add_acid_base(reaction["acid"], reaction["base"], reaction["pKa"])
+        sim_sp.add_acid_base(
+            reaction["acid"], reaction["base"], reaction["pKa"])
     return sim_sp
 
 

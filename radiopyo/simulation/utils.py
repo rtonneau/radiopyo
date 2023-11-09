@@ -158,15 +158,18 @@ class H5Manager(AbstractContextManager):
         return self.close_h5file()
 
     @classmethod
-    def from_path(cls: tp.Type[T], path: str | Path) -> T:
+    def from_path(cls: tp.Type[T], path: str | Path, force_new: bool = False) -> T:
         """
         Creates h5 file is not existing.
         raises
             TypeError:
                 for wrong file extension (if not .h5)
         """
-        with suppress(FileNotFoundError):
+        exists = Path(path).exists()
+        if exists and not force_new:
             return cls(path)
+        if exists:
+            Path(path).unlink()
         # File does not exists, yet.
         h5py.File(path, mode="w").close()
         return cls(path)
@@ -200,6 +203,14 @@ class H5Manager(AbstractContextManager):
                 return
         self._opened = 0
         return
+
+    def delete_dataset(self,
+                       grp: h5py.Group,
+                       name: str,
+                       ) -> None:
+        if name not in grp:
+            return
+        del grp[name]
 
     def insert_dataset(self,
                        grp: h5py.Group,
@@ -238,7 +249,28 @@ class H5Manager(AbstractContextManager):
             labels = group[name].attrs["columns"]
         return pd.DataFrame(data=data, columns=labels).set_index(labels[0])
 
-    def _keys_to_path(self, keys: tp.Optional[tp.List[str]] = None) -> str:
+    @staticmethod
+    def parse_dataset_name(name: str) -> tp.Dict[str, tp.Any]:
+        """
+        """
+        out: tp.Dict[str, tp.Any] = {}
+        _ = name.split("/")
+        for elt in _[:-1]:
+            if len(elt) == 0:
+                continue
+            out[elt] = True
+        for elt in _[-1].strip(".sim").split("__"):
+            item = elt.split("_")
+            try:
+                out[item[0]] = float(item[1])
+                out[item[0]] = int(item[1])
+            except ValueError:
+                if item[0] not in out:
+                    out[item[0]] = item[1]
+        return out
+
+    @staticmethod
+    def _keys_to_path(keys: tp.Optional[tp.List[str]] = None) -> str:
         return "/"+"/".join(keys) if keys is not None else "/"
 
     def _keys_to_group(self, keys: tp.Optional[tp.List[str]] = None) -> h5py.Group:
@@ -249,11 +281,14 @@ class H5Manager(AbstractContextManager):
     def push_result(self,
                     name: str,
                     data: pd.DataFrame,
-                    keys: tp.Optional[tp.List[str]] = None) -> None:
+                    keys: tp.Optional[tp.List[str]] = None,
+                    overwrite: bool = False) -> None:
         """
         """
         with self:
             grp = self._keys_to_group(keys)
+            if name in grp and overwrite:
+                self.delete_dataset(grp, name)
             data = data.reset_index()
             ds = self.insert_dataset(grp, name, data.values)
             labels = [str(_) for _ in data.columns]
@@ -287,6 +322,7 @@ class H5Manager(AbstractContextManager):
                     for sub_elt in self.iter_dataset([*keys, elt], recursive):
                         yield sub_elt
                 elif isinstance(current_grp[elt], h5py.Dataset):
-                    yield (self._keys_to_path(keys), current_grp[elt][()])
+                    yield (self._keys_to_path([*keys, elt]),
+                           self.read_dataset(elt, current_grp))
                 else:
                     continue
