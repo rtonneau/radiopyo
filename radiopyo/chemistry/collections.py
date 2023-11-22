@@ -474,8 +474,8 @@ class ListSpecies():
     def iter_sim_species(self) -> tp.Iterator[ABCouple | ChemSpecies]:
         """ 
         """
-        return sorted(chain(self.iter_AB(), self.iter_dyn_species()),
-                      key=lambda x: x.index)
+        return iter(sorted(chain(self.iter_AB(), self.iter_dyn_species()),
+                           key=lambda x: x.index))
 
     def sort(self, inplace: bool = True) -> tp.Optional[ListSpecies]:
         """

@@ -320,7 +320,10 @@ class ODEResult(object):
 
         H_plus_index = self.env.species[self.env.PH_SPECIES].index
         for ((idx, t_val), y) in zip(enumerate(self.t), self.y.T):
-            y = y.clip(min=0.0,) * 1e-6
+            # y = y.clip(min=0.0,) * 1e-6
+            y = y*1.0e-6  # µmol/L => mol/l
+            y[y < 1e-18] = 0.0  # Cut off fmol/L
+
             y = np.matmul(y, self.mat["AB_mat"][0])
             y = np.append(y, self.mat["cst_sp"])
             AB_correction = np.ones(len(self.mat["AB_mat"][1])*2)
@@ -333,6 +336,7 @@ class ODEResult(object):
             Rki = np.nan_to_num(
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1)
             Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
+            Rki[Rki < 1e-25] = 0
             out.iloc[idx, idx_kr] = Rki
 
             # Radiolytic Reactions

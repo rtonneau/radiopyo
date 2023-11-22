@@ -106,8 +106,9 @@ def jacobian(t: float,
 
 def derive(t: float,
            y: NDArray[np.float64],
-           beam: ParticleBeam,
-           pH_species_index: int,
+           beam: Optional[ParticleBeam],
+           H3O_plus_index: int,
+           OH_minus_index: int,
            cst_sp: NDArray[np.float64],
            AB_mat: Tuple[NDArray[np.int8],
                          NDArray[np.float64]],
@@ -126,8 +127,12 @@ def derive(t: float,
     See the RPM_extended_doc.pdf file for a more detailed explanation.
     """
 
-    # Force negative cc values to 0 + convert to [mol/l]
-    y = y.clip(min=0.0, ) * 1e-6
+    # Force negative cc values to 0 + convert to [mol/L]
+    # y = y.clip(min=0.0, ) * 1e-6
+    y = y*1.0e-6  # µmol/L => mol/l
+    y[y < 1e-18] = 0.0  # Cut off
+
+    # y[OH_minus_index] = y[H3O_plus_index]
 
     # Construct the cc vector with all relevant species
     # ==> Dynamical species (already in y)
@@ -136,12 +141,10 @@ def derive(t: float,
     y = np.matmul(y, AB_mat[0])
     y = np.append(y, cst_sp)
 
-    # print(t, pH_species_index, y[pH_species_index])
-    # print(y)
     AB_correction = np.ones(len(AB_mat[1])*2)
-    if y[pH_species_index] > 0:
+    if y[H3O_plus_index] > 0:
         AB_correction[::2] = 1 / \
-            (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
+            (1 + AB_mat[1]/y[H3O_plus_index])  # Acid partition
     else:
         AB_correction[::2] = 0
     AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
@@ -153,12 +156,15 @@ def derive(t: float,
 
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
-    Rki[Rki < 1e-18] = 0
-    # Compute dydt, first only with k reactions term:
-    dydt = np.matmul(Ki_mat[1], (np.prod(Rki, axis=1) * Ki_mat[0]).T)
+    Rki = np.prod(Rki, axis=1) * Ki_mat[0]  # All reaction rates are here
+    Rki[Rki < 1e-25] = 0
 
-    # Add the Time dependent Radiolytic term
-    dydt += Gi_mat * beam.at(t).dose_rate()
+    # Compute dydt, first only with k reactions term:
+    dydt = np.matmul(Ki_mat[1], Rki.T)
+
+    if beam is not None:
+        # Add the Time dependent Radiolytic term
+        dydt += Gi_mat * beam.at(t).dose_rate()
 
     # Add Enzymatic term
     if Ez_mat is not None:
@@ -178,13 +184,12 @@ def derive(t: float,
     # ==> A/B couples with only the total
     # ==> dynamical species
     # ==> convert back to [µmol/l]
-    # print(dydt)
-    # print(np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T) * 1e6)
-    # print()
-    # print()
     dydt = np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T)
 
-    return dydt * 1e6
+    # dydt[H3O_plus_index] = (dydt[H3O_plus_index] + dydt[OH_minus_index])/2
+    # dydt[OH_minus_index] = dydt[H3O_plus_index]
+
+    return dydt * 1e6  # mol/l => µmol/l
 
 
 # ------------------------------------------------------------------------------------ #

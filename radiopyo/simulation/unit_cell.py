@@ -243,6 +243,7 @@ class UnitCell(object):
                  max_step: tp.Optional[float] = None,
                  y0: tp.Optional[NDArray[np.float64]] = None,
                  t_eval: tp.Optional[NDArray[np.float64]] = None,
+                 use_beam: bool = True,
                  ) -> ScipyODEResult:
 
         if len(self.beam_list) <= 0:
@@ -273,11 +274,13 @@ class UnitCell(object):
         if kwargs["first_step"] > t_span[1] - t_span[0]:
             kwargs["first_step"] = (t_span[1] - t_span[0]) / 1e3
 
+        beam = self.beam_list.current if use_beam else None
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(derive,
                                         t_span,
-                                        args=(self.beam_list.current,
-                                              self.env.species[self.env.PH_SPECIES].index,
+                                        args=(beam,
+                                              self.env.species["H3O_plus"].index,
+                                              self.env.species["OH_minus"].index,
                                               self.mat["cst_sp"],
                                               self.mat["AB_mat"],
                                               self.mat["Ki_mat"],
@@ -313,6 +316,7 @@ class UnitCell(object):
             rtol: tp.Optional[float] = None,
             max_step: tp.Optional[float] = None,
             y0: tp.Optional[NDArray[np.float64]] = None,
+            use_beam: bool = True,
             ) -> ODEResult:
         """ Solve ODE over t_span
         Args:
@@ -332,6 +336,8 @@ class UnitCell(object):
             y0: NDArray[np.float64], optional
                 Initial concentration of DynSpecies (default: None). If None, calls 
                 EnvSim.initial_values()
+            use_beam: bool, optional
+                whether to use the beam or not (default: True).
 
         Returns:
             ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
@@ -347,6 +353,7 @@ class UnitCell(object):
                             max_step,
                             y0,
                             t_eval,
+                            use_beam,
                             )
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
         return ODEResult(self.env,
@@ -365,6 +372,7 @@ class UnitCell(object):
                             max_step_size_off: tp.Optional[float] = None,
                             max_step_size_final: tp.Optional[float] = None,
                             y0: tp.Optional[NDArray[np.float64]] = None,
+                            use_beam: bool = True,
                             ) -> SimChunksIter:
         """ Method used to prepare a multi step ODE integration
         Args:
@@ -390,6 +398,8 @@ class UnitCell(object):
             y0: NDArray[np.float64], optional
                 Initial concentration of DynSpecies (default: None). If None, calls 
                 EnvSim.initial_values()
+            use_beam: bool, optional
+                whether to use the beam or not (default: True).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE integration
@@ -417,7 +427,9 @@ class UnitCell(object):
                              rtol=rtol,
                              use_jac=use_jac,
                              method=method,
-                             y0=y0,)
+                             y0=y0,
+                             use_beam=use_beam,
+                             )
 
 
 # ------------------------------ Chunked Simulation Run ------------------------------ #
@@ -472,6 +484,7 @@ class SimChunksIter():
     use_jac: bool
     method: str
     y0: tp.Optional[NDArray[np.float64]]
+    use_beam: bool
 
     def __init__(self, sim: UnitCell,
                  chunks: tp.List[SimChunk],
@@ -480,6 +493,7 @@ class SimChunksIter():
                  use_jac: bool = False,
                  method: str = "LSODA",
                  y0: tp.Optional[NDArray[np.float64]] = None,
+                 use_beam: bool = True,
                  ):
         self.sim = sim
         self.chunks = chunks
@@ -493,6 +507,7 @@ class SimChunksIter():
         self.method = method
         self.current = -1
         self.y0 = y0
+        self.use_beam = use_beam
 
     def __iter__(self) -> SimChunksIter:
         return self
@@ -511,6 +526,7 @@ class SimChunksIter():
             rtol=self.rtol,
             max_step=chunk.max_step_size,
             y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
+            use_beam=self.use_beam,
         )
         self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
         return self.sol

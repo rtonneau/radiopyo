@@ -441,7 +441,8 @@ class ParticleBeam():
         # ==> Only need to grow time interval def by line 1 - line 0
         if out.shape[0] == 3:
             out[0, 1] = 1.0
-            out[1, 0] = out[1, 0] + (out[1, 0]-out[0, 0])*self.GROWTH_FACTOR
+            # out[1, 0] = out[1, 0] + (out[1, 0]-out[0, 0])*self.GROWTH_FACTOR
+            out[1, 0] += 0.1
             if out[1, 0] >= out[2, 0]:
                 out = out[0:2, :]
             return out
@@ -485,6 +486,13 @@ class ParticleBeam():
         if indexes[0][-1] == out.shape[0]-1:
             indexes = (indexes[0][0:-1], indexes[1])
         out[indexes] = out[indexes] + (delta/2)
+
+        # Add 0.5 seconds for the last ON time to keep refined ODE resolution
+        if out[-2, 0] - out[-1, 0] > 0.5:
+            out[-2, 0] += 0.5
+        else:
+            out[-2, 0] = out[-1, 0]
+            out = out[:-1, :]
 
         # Set all Dose rate values (-> col 1) > 0 to 1
         out[:, 1] /= self.peak_dose_rate
@@ -556,8 +564,8 @@ class ConstantBeam(ParticleBeam):
             return np.vstack([out, [stop, self.peak_dose_rate]])
 
         return np.vstack([out,
-                          [self.time_at_max_dose, 0.0],
-                          [stop, 0.0],
+                         [self.time_at_max_dose, 0.0],
+                         [stop, 0.0],
                           ])
 
     def as_dict(self) -> tp.Dict[str, float]:
