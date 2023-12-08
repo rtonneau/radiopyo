@@ -9,16 +9,11 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import typing as tp
+from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import chain
 from operator import add
-from typing import (
-    Dict,
-    Iterable,
-    Optional,
-    Protocol,
-    Tuple,
-)
 
 # --------------------------------- Internal imports --------------------------------- #
 from .species import ChemSpecies, RawSpecies
@@ -35,24 +30,24 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 
 
-class IsChemicalReaction(Protocol):
+class IsChemicalReaction(tp.Protocol):
     """Protocol => used for type hints"""
-    reactants: Dict[str, ChemSpecies]
-    products: Dict[str, ChemSpecies]
-    stoi_reactants: Dict[str, int]
-    stoi_products: Dict[str, int]
-    index: Optional[int]
+    reactants: tp.Dict[str, ChemSpecies]
+    products: tp.Dict[str, ChemSpecies]
+    stoi_reactants: tp.Dict[str, int]
+    stoi_products: tp.Dict[str, int]
+    index: tp.Optional[int]
 
     def __contains__(self, other: object) -> bool:
         """"""
 
-    def iter_species(self) -> Iterable[ChemSpecies]:
+    def iter_species(self) -> tp.Iterable[ChemSpecies]:
         """Iter over species involved in the reaction"""
 
-    def iter_reactants(self) -> Iterable[Tuple[ChemSpecies, int]]:
+    def iter_reactants(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """ Iter over reactants only"""
 
-    def iter_products(self) -> Iterable[Tuple[ChemSpecies, int]]:
+    def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """Iter over products only"""
 
     def as_label(self) -> str:
@@ -68,7 +63,7 @@ class IsChemicalReaction(Protocol):
         """"""
 
 
-class BaseChemicalReaction():
+class BaseChemicalReaction(ABC):
     """
     Class for very basic chemical reaction. The most simple reaction is
     2A + B -> C + D
@@ -86,11 +81,11 @@ class BaseChemicalReaction():
         stoi_products: Dict[str, int]
         index: int
     """
-    reactants: Dict[str, ChemSpecies]
-    products: Dict[str, ChemSpecies]
-    stoi_reactants: Dict[str, int]
-    stoi_products: Dict[str, int]
-    index: Optional[int]
+    reactants: tp.Dict[str, ChemSpecies]
+    products: tp.Dict[str, ChemSpecies]
+    stoi_reactants: tp.Dict[str, int]
+    stoi_products: tp.Dict[str, int]
+    index: tp.Optional[int]
 
     def __init__(self) -> None:
         self.reactants = {}
@@ -116,10 +111,21 @@ class BaseChemicalReaction():
             return len([elt for elt in self.iter_species() if elt == other]) > 0
         raise NotImplementedError
 
+    @abstractmethod
     def make_hash(self, method: str = "sha256") -> str:
+        pass
+
+    @abstractmethod
+    def as_label(self) -> str:
+        """ 
+        This method is used for the data mining. It should be implemented by child
+        classes in order to easily define short labels for each reactions based on the
+        reaction type and the index of reaction. For instance, it can be used as column 
+        name in a pandas DataFrame.
+
+        Returns:
+            str
         """
-        """
-        raise NotImplementedError
 
     def tot_number_reactants(self) -> int:
         """
@@ -132,7 +138,7 @@ class BaseChemicalReaction():
         """
         return reduce(add, list(self.stoi_reactants.values()))
 
-    def iter_species(self) -> Iterable[ChemSpecies]:
+    def iter_species(self) -> tp.Iterable[ChemSpecies]:
         """Iter over ALL the species involved in the reaction
 
         Returns:
@@ -140,7 +146,7 @@ class BaseChemicalReaction():
         """
         return chain(self.reactants.values(), self.products.values())
 
-    def iter_reactants(self) -> Iterable[Tuple[ChemSpecies, int]]:
+    def iter_reactants(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """ Iter over reactants only, including the stoichiometry.
 
         Returns:
@@ -150,7 +156,7 @@ class BaseChemicalReaction():
         return [(sp, self.stoi_reactants[label])
                 for label, sp in self.reactants.items()]
 
-    def iter_products(self) -> Iterable[Tuple[ChemSpecies, int]]:
+    def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """Iter over products only, including the stoichiometry.
         Returns:
             Iterator: Tuple[SimSpecies, int]
@@ -252,15 +258,3 @@ class BaseChemicalReaction():
         else:
             self.reactants[sp.label] = sp
             self.stoi_reactants[sp.label] = multiple
-
-    def as_label(self) -> str:
-        """ 
-        This method is used for the data mining. It should be implemented by child
-        classes in order to easily define short labels for each reactions based on the
-        reaction type and the index of reaction. For instance, it can be used as column 
-        name in a pandas DataFrame.
-
-        Returns:
-            str
-        """
-        raise NotImplementedError

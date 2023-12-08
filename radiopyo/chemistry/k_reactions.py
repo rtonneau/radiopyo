@@ -12,6 +12,8 @@ from __future__ import annotations
 import hashlib
 import typing as tp
 
+import numpy as np
+
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.utils import RPARSER
 
@@ -45,26 +47,16 @@ class KReaction(BaseChemicalReaction):
     for during calculation of reaction rate.
 
     Attributes:
-        k_value: float
+        k_value: np.polynomial.Polynomial
             Reaction rate
     """
-    k_value: float
+    k_value: np.polynomial.Polynomial
 
     def __init__(self,
-                 k_value: float,
+                 k_value: float | tp.List[float],
                  ):
         super().__init__()
-        self.k_value = k_value
-
-    def raw_k_value(self) -> float:
-        """
-        Produce the k_value as provided by config files.
-        """
-        # Case of n*A -> B, then n*k is measured/given
-        if len(self.reactants) == 1:
-            sp = next(iter(self.reactants.keys()))
-            return self.k_value * self.stoi_reactants[sp]
-        return self.k_value
+        self.k_value = np.polynomial.Polynomial(k_value)
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -92,10 +84,23 @@ class KReaction(BaseChemicalReaction):
         raise KeyError(
             "Unknown reaction index. Cannot make a label without index.")
 
+    def raw_k_value(self) -> float | tp.List[float]:
+        """
+        Produce the k_value as provided by config files.
+        """
+        if len(self.k_value) > 1:
+            return self.k_value.coef
+
+        # Case of n*A -> B, then n*k is measured/given
+        if len(self.reactants) == 1:
+            sp = next(iter(self.reactants.keys()))
+            return self.k_value(25) * self.stoi_reactants[sp]
+        return self.k_value(25)
+
     @classmethod
     def from_generic(cls,
                      generic: GenericReaction,
-                     k_value: float,
+                     k_value: float | tp.List[float],
                      list_sp: tp.Optional[ListSpecies] = None,) -> KReaction:
         """
         Create a KReaction from a 'GenericReaction', Typed-Dict structure produced by
@@ -115,7 +120,8 @@ class KReaction(BaseChemicalReaction):
     @classmethod
     def from_kwargs(cls,
                     list_sp: tp.Optional[ListSpecies] = None,
-                    **kwargs: str | tp.List[str] | float, ) -> KReaction:
+                    **kwargs: str | tp.List[str] | float | tp.List[float],
+                    ) -> KReaction:
         """ 
         This method combines the two possible definitions of a KReaction in a config
         file.
@@ -146,7 +152,7 @@ class KReaction(BaseChemicalReaction):
     def from_dict(cls,
                   reactants: tp.List[str],
                   products: tp.List[str],
-                  k_value: float,
+                  k_value: float | tp.List[float],
                   list_sp: tp.Optional[ListSpecies] = None,
                   ) -> KReaction:
         """Create a KReaction from a dictionary (via destructuring)
@@ -156,8 +162,8 @@ class KReaction(BaseChemicalReaction):
                 List of reactants
             products: List[str]
                 List of products
-            k_value: float
-                k value of the reactions
+            k_value: float | tp.List[float]
+                k value of the reactions or the coefficients of the poly version
             list_sp: ListSpecies
                 Collection of species already involved in the simulation. This
                 collection will grow if some reactants and/or products do not exist yet.
@@ -175,7 +181,7 @@ class KReaction(BaseChemicalReaction):
             new.add_as_reactant(sim_sp)
 
         # Case of n*A -> B, then n*k is measured/given
-        if len(new.reactants) == 1:
+        if len(new.reactants) == 1 and len(new.k_value) > 1:
             # Compute k: divide by reactant's stoichio
             new.k_value /= new.stoi_reactants[sp]
 
@@ -199,7 +205,7 @@ class KReaction(BaseChemicalReaction):
 
     def __repr__(self) -> str:
         return (f"KReaction('{self.__str__()}', "
-                f"k_value={round(self.k_value,5)})")
+                f"k_value={self.raw_k_value()})")
 
 
 class KReactionDict(tp.TypedDict, total=False):
@@ -208,4 +214,4 @@ class KReactionDict(tp.TypedDict, total=False):
     products: tp.Optional[tp.List[str]]
     reaction: tp.Optional[str]
     constants: tp.Optional[tp.Dict[str, float]]
-    k_value: float
+    k_value: float | tp.List[float]
