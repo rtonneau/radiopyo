@@ -11,6 +11,7 @@ import logging
 import os
 import pathlib
 import typing as tp
+from abc import ABC, abstractmethod
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.parser.utils import combine_config
@@ -83,7 +84,7 @@ def resolve_includes(config: ConfigDict) -> ConfigDict:
 # ------------------------------------------------------------------------------------ #
 
 
-class FileParser(object):
+class FileParser(ABC):
     """
     Generic Class parsing files.
     """
@@ -96,6 +97,7 @@ class FileParser(object):
         if not os.path.exists(self.path):
             raise FileNotFoundError(self.path)
 
+    @abstractmethod
     def parse(self) -> ConfigDict:
         """ 
         Method parsing the file (self.path) and returning a ConfigDict.
@@ -103,7 +105,6 @@ class FileParser(object):
         Returns:
             ConfigDict: TypedDictionary use to build the simulation Environment.
         """
-        raise NotImplementedError
 
     def file_type(self) -> str:
         """

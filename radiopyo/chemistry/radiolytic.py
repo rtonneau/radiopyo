@@ -22,7 +22,7 @@ from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.collections import ListSpecies
 
-from .base_chemistry import BaseChemicalReaction
+from .basic_chemistry import BasicReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -63,7 +63,7 @@ def kr_to_ge(kr: float) -> float:
 # ------------------------------------------------------------------------------------ #
 
 
-class RadiolyticReaction(BaseChemicalReaction):
+class RadiolyticReaction(BasicReaction):
     """
     A radiolytic reaction is constructed from the BaseChemicalReaction. Here no reactant
     should be involved. Moreover, the production rate only depends on the nature and
@@ -138,7 +138,7 @@ class RadiolyticReaction(BaseChemicalReaction):
         """No reactant should be involved"""
         NotImplementedError("Not implemented for Radiolytic Reactions")
 
-    def as_label(self) -> str:
+    def as_label(self) -> tp.List[str]:
         """
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
@@ -153,7 +153,7 @@ class RadiolyticReaction(BaseChemicalReaction):
                 If index is None.
         """
         if self.index is not None:
-            return f"G_{self.species().label}"
+            return [f"G_{self.species().label}",]
         raise KeyError("Unknown reaction index. Cannot make a label.")
 
     def __str__(self) -> str:

@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import typing as tp
 
-from radiopyo.chemistry.base_chemistry import BaseChemicalReaction
+from radiopyo.chemistry.basic_chemistry import BasicReaction
 from radiopyo.chemistry.collections import ListSpecies
 
 # --------------------------------- Internal imports --------------------------------- #
@@ -33,7 +33,7 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 
 
-class MichaelisMenten(BaseChemicalReaction):
+class MichaelisMenten(BasicReaction):
     """ 
     Class implementing the Michaelis-Menten kinetic. Child class of BaseChemicalReaction
     with few additions. In the Michaelis-Menten kinetic the reaction rate is defined by:
@@ -88,7 +88,7 @@ class MichaelisMenten(BaseChemicalReaction):
                      generic: GenericReaction,
                      k_value: float,
                      k_micha: float,
-                     list_sp: tp.Optional[ListSpecies] = None,) -> MichaelisMenten:
+                     list_sp: tp.Optional[ListSpecies] = None,) -> tp.Self:
         """
         Create a KReaction from a 'GenericReaction', Typed-Dict structure produced by
         radiopyo module parser.
@@ -111,18 +111,18 @@ class MichaelisMenten(BaseChemicalReaction):
             substrate += [sp]*stoi
         for sp, (_, stoi) in generic["products"].items():
             products += [sp]*stoi
-        return MichaelisMenten.from_dict(enzyme=enzyme,
-                                         substrate=substrate,
-                                         products=products,
-                                         k_value=k_value,
-                                         k_micha=k_micha,
-                                         list_sp=list_sp)
+        return cls.from_dict(enzyme=enzyme,
+                             substrate=substrate,
+                             products=products,
+                             k_value=k_value,
+                             k_micha=k_micha,
+                             list_sp=list_sp)
 
     @classmethod
     def from_kwargs(cls,
-                    list_sp: tp.Optional[ListSpecies],
-                    **kwargs: str | tp.List[str] | float,
-                    ) -> MichaelisMenten:
+                    list_sp: tp.Optional[ListSpecies] = None,
+                    **kwargs: str | tp.List[str] | float | tp.List[float],
+                    ) -> tp.Self:
         """ 
         This method combines the two possible definitions of a MichaelisMenten reaction
         in a config file.
@@ -135,14 +135,14 @@ class MichaelisMenten(BaseChemicalReaction):
         match kwargs:
             case {"enzyme": _, "substrate": _, "products": _, "k_value": _,
                   "k_micha": _} if len(kwargs) == 5:
-                return MichaelisMenten.from_dict(
+                return cls.from_dict(
                     list_sp=list_sp,
                     **kwargs,  # type:ignore[arg-type]
                 )
             case {"reaction": r, "k_value": k_value, "k_micha": k_micha}\
                     if len(kwargs) == 3:
                 gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
-                return MichaelisMenten.from_generic(
+                return cls.from_generic(
                     generic=gen,
                     k_value=k_value,  # type:ignore[arg-type]
                     k_micha=k_micha,  # type:ignore[arg-type]
@@ -158,7 +158,7 @@ class MichaelisMenten(BaseChemicalReaction):
                   k_value: float,
                   k_micha: float,
                   list_sp: tp.Optional[ListSpecies] = None,
-                  ) -> MichaelisMenten:
+                  ) -> tp.Self:
         """Create a MichaelisMenten from a dictionary (via destructuring)
 
         Args:
@@ -208,7 +208,7 @@ class MichaelisMenten(BaseChemicalReaction):
             new.add_as_product(list_sp.get_or_create_dyn_species(sp.strip()))
         return new
 
-    def as_label(self) -> str:
+    def as_label(self) -> tp.List[str]:
         """
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
@@ -223,7 +223,7 @@ class MichaelisMenten(BaseChemicalReaction):
                 If index is None.
         """
         if self.index is not None:
-            return f"EZ_{self.index}"
+            return [f"EZ_{self.index}",]
         raise KeyError("Unknown reaction index. Cannot make a label.")
 
     def __str__(self) -> str:

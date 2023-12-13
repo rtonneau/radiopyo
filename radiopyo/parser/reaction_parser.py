@@ -46,7 +46,7 @@ logger = logging.getLogger("radiopyo")
 class GenericReaction(tp.TypedDict):
     products: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
     reactants: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
-    constants: tp.Dict[str, float]
+    constants: tp.Dict[str, float | tp.List[float]]
     enzyme: BasicSpecies | Atom | Molecule | None
 
 
@@ -58,7 +58,7 @@ class KwargsAtom(tp.TypedDict):
 
 
 class BasicSpecies(object):
-    """ The most simple building block. Basically just a named thing."""
+    """ The most simple building block. Basically just a named 'thing'."""
     name: str
 
     def __init__(self,
@@ -207,7 +207,8 @@ class Molecule(ChemicalSpecies):
     def to_latex(self) -> str:
         out = ["$"]
         for (atom, stoi) in self.atoms:
-            out.append(f"{atom.to_latex().strip('$')}{f'_{stoi}' if stoi>1 else ''}")
+            out.append(
+                f"{atom.to_latex().strip('$')}{f'_{stoi}' if stoi>1 else ''}")
         out.append(self._latex_radical_charge())
         out.append("$")
         return "".join(out)

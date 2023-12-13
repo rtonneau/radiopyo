@@ -18,10 +18,13 @@ from operator import add
 # --------------------------------- Internal imports --------------------------------- #
 from .species import ChemSpecies, RawSpecies
 
+if tp.TYPE_CHECKING:
+    from .collections import ListSpecies
+
 # ----------------------------- Type checking ONLY imports---------------------------- #
 # ------------------------------------------------------------------------------------ #
 __all__ = [
-    "BaseChemicalReaction",
+    "BasicReaction",
     "IsChemicalReaction",
 ]
 
@@ -63,7 +66,7 @@ class IsChemicalReaction(tp.Protocol):
         """"""
 
 
-class BaseChemicalReaction(ABC):
+class BasicReaction(ABC):
     """
     Class for very basic chemical reaction. The most simple reaction is
     2A + B -> C + D
@@ -116,7 +119,7 @@ class BaseChemicalReaction(ABC):
         pass
 
     @abstractmethod
-    def as_label(self) -> str:
+    def as_label(self) -> tp.List[str]:
         """ 
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
@@ -124,7 +127,16 @@ class BaseChemicalReaction(ABC):
         name in a pandas DataFrame.
 
         Returns:
-            str
+            tp.List[str]
+        """
+
+    @classmethod
+    @abstractmethod
+    def from_kwargs(cls,
+                    list_sp: tp.Optional[ListSpecies] = None,
+                    **kwargs: str | tp.List[str] | float | tp.List[float],
+                    ) -> tp.Self:
+        """ 
         """
 
     def tot_number_reactants(self) -> int:

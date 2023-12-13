@@ -17,7 +17,7 @@ import numpy as np
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.utils import RPARSER
 
-from .base_chemistry import BaseChemicalReaction
+from .basic_chemistry import BasicReaction
 from .collections import ListSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
@@ -29,14 +29,22 @@ if tp.TYPE_CHECKING:
 __all__ = [
     "KReaction",
     "KReactionDict",
+    "KReactionCollection",
+    "KValType"
 ]
 
 # ------------------------------------------------------------------------------------ #
 #                                   CLASS DEFINITIONS                                  #
 # ------------------------------------------------------------------------------------ #
 
+KValType: tp.TypeAlias = tp.Union[float,
+                                  tp.List[float],
+                                  np.polynomial.Polynomial,
+                                  tp.List[np.polynomial.Polynomial],
+                                  ]
 
-class KReaction(BaseChemicalReaction):
+
+class KReaction(BasicReaction):
     """
     Almost all the logic is already included in the BaseChemicalReaction class.
     Add the reaction rate as attribute.
@@ -47,16 +55,27 @@ class KReaction(BaseChemicalReaction):
     for during calculation of reaction rate.
 
     Attributes:
-        k_value: np.polynomial.Polynomial
+        k_value: List[np.polynomial.Polynomial, ]
             Reaction rate
     """
-    k_value: np.polynomial.Polynomial
+    k_value: tp.List[np.polynomial.Polynomial]
 
     def __init__(self,
-                 k_value: float | tp.List[float],
+                 k_value: KValType,
                  ):
         super().__init__()
-        self.k_value = np.polynomial.Polynomial(k_value)
+        self.k_value = []
+        if isinstance(k_value, (tuple, list)):
+            if len(k_value) == 0:
+                raise ValueError("Len 0 for k_value passed as a collection")
+            for elt in k_value:
+                if not isinstance(elt, np.polynomial.Polynomial):
+                    elt = np.polynomial.Polynomial(elt)
+                self.k_value.append(elt)
+        elif isinstance(k_value, np.polynomial.Polynomial):
+            self.k_value.append(k_value)
+        else:
+            self.k_value = [np.polynomial.Polynomial(k_value), ]
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -65,7 +84,7 @@ class KReaction(BaseChemicalReaction):
         hasher.update(repr(self).encode())
         return hasher.hexdigest()
 
-    def as_label(self) -> str:
+    def as_label(self) -> tp.List[str]:
         """
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
@@ -80,7 +99,7 @@ class KReaction(BaseChemicalReaction):
                 If index is None.
         """
         if self.index is not None:
-            return f"KR_{self.index}"
+            return [f"KR_{self.index}",]
         raise KeyError(
             "Unknown reaction index. Cannot make a label without index.")
 
@@ -100,8 +119,7 @@ class KReaction(BaseChemicalReaction):
     @classmethod
     def from_generic(cls,
                      generic: GenericReaction,
-                     k_value: float | tp.List[float],
-                     list_sp: tp.Optional[ListSpecies] = None,) -> KReaction:
+                     list_sp: tp.Optional[ListSpecies] = None,) -> tp.Self:
         """
         Create a KReaction from a 'GenericReaction', Typed-Dict structure produced by
         radiopyo module parser.
@@ -115,13 +133,16 @@ class KReaction(BaseChemicalReaction):
             reactants += [sp]*stoi
         for sp, (_, stoi) in generic["products"].items():
             products += [sp]*stoi
-        return KReaction.from_dict(reactants, products, k_value, list_sp)
+        return cls.from_dict(reactants,
+                             products,
+                             generic["constants"]["k_value"],
+                             list_sp)
 
     @classmethod
     def from_kwargs(cls,
                     list_sp: tp.Optional[ListSpecies] = None,
                     **kwargs: str | tp.List[str] | float | tp.List[float],
-                    ) -> KReaction:
+                    ) -> tp.Self:
         """ 
         This method combines the two possible definitions of a KReaction in a config
         file.
@@ -134,15 +155,15 @@ class KReaction(BaseChemicalReaction):
         match kwargs:
             case {"reactants": _, "products": _, "k_value": _}\
                     if len(kwargs) == 3:
-                return KReaction.from_dict(
+                return cls.from_dict(
                     list_sp=list_sp,
                     **kwargs,  # type:ignore[arg-type]
                 )
             case {"reaction": r, "k_value": k} if len(kwargs) == 2:
                 gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
-                return KReaction.from_generic(
+                gen["constants"]["k_value"] = k  # type:ignore[assignment]
+                return cls.from_generic(
                     gen,
-                    k,  # type:ignore[arg-type]
                     list_sp=list_sp,
                 )
 
@@ -154,7 +175,7 @@ class KReaction(BaseChemicalReaction):
                   products: tp.List[str],
                   k_value: float | tp.List[float],
                   list_sp: tp.Optional[ListSpecies] = None,
-                  ) -> KReaction:
+                  ) -> tp.Self:
         """Create a KReaction from a dictionary (via destructuring)
 
         Args:
@@ -215,3 +236,35 @@ class KReactionDict(tp.TypedDict, total=False):
     reaction: tp.Optional[str]
     constants: tp.Optional[tp.Dict[str, float]]
     k_value: float | tp.List[float]
+
+
+class KReactionCollection():
+    """
+    Attributes:
+        reactions: tp.Dict[str, KReaction]
+            All KReactions belonging to the collection.
+    """
+    reactions: tp.Dict[str, KReaction]
+
+    def __init__(self) -> None:
+        self.reactions = {}
+
+    def __len__(self) -> int:
+        return len(self.reactions)
+
+    def __iter__(self) -> tp.Iterator[KReaction]:
+        return iter(self.reactions.values())
+
+    def items(self) -> tp.Iterator[tp.Tuple[str, KReaction]]:
+        return iter(self.reactions.items())
+
+    def add_reaction(self,
+                     label: str,
+                     generic: GenericReaction,
+                     list_sp: tp.Optional[ListSpecies] = None,
+                     ) -> None:
+        """
+        Push a new Reaction in the Collection.
+        """
+        self.reactions[label] = KReaction.from_generic(generic,
+                                                       list_sp=list_sp, )

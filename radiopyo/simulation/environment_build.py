@@ -31,7 +31,7 @@ from radiopyo.chemistry.species import ChemSpecies
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.chemistry.base_chemistry import IsChemicalReaction
+    from radiopyo.chemistry.basic_chemistry import IsChemicalReaction
     from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -154,17 +154,17 @@ class SimEnv():
         logger.info("CONFIG::Configuring Simulation Environment")
         # Sanity check
         if "concentrations" not in config:
-            logger.warn("CONFIG::No concentration section found in config. It means, no"
-                        " species with constant concentration and all initial"
-                        " set to 0.")
+            logger.warning("CONFIG::No concentration section found in config."
+                           " It means, no species with constant concentration and all"
+                           " initial set to 0.")
             config["concentrations"] = {"fixed": {}, "initial": {}}
 
         # Sanity check
         if len(config["concentrations"]) > 2:
             extra = [elt for elt in config["concentrations"]
                      if elt not in ["fixed", "initial"]]
-            logger.warn(f"CONFIG::Found unknown, extra, key(s) in 'concentrations'"
-                        f"section: {extra}. These will not be used.")
+            logger.warning(f"CONFIG::Found unknown, extra, key(s) in 'concentrations'"
+                           f"section: {extra}. These will not be used.")
 
         # Read Constant species and create the species collection
         list_sp = constant_species_from_dict(
@@ -511,13 +511,13 @@ def kreaction_from_dict(reactions: tp.List[tp.Dict] | tp.Dict,
                         sim_sp: tp.Optional[ListSpecies] = None,
                         ) -> tp.Tuple[tp.List[KReaction], ListSpecies]:
     if sim_sp is None:
-        sim_sp = ListSpecies()
+        sim_sp = ListSpecies()  # Species container related to reaction added
 
-    if len(reactions) == 0:
+    if len(reactions) == 0:  # -> Nothing to do
         return ([], sim_sp)
 
-    if isinstance(reactions, dict):
-        reactions = [reactions, ]
+    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
+        reactions = [reactions, ]  # Need a list to loop over
 
     return ([KReaction.from_kwargs(list_sp=sim_sp, **reaction)
              for reaction in reactions],

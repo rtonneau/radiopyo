@@ -111,7 +111,7 @@ class UnitCell(object):
         return self.beam_list.current
 
     @classmethod
-    def from_config_dict(cls, config: ConfigDict) -> UnitCell:
+    def from_config_dict(cls, config: ConfigDict) -> tp.Self:
         """Create a Simulation Environment from a the generic ConfigDict:
 
         Args:
@@ -129,11 +129,11 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
-        return UnitCell(env=SimEnv.from_dict(config),
-                        beam=beam_list)
+        return cls(env=SimEnv.from_dict(config),
+                   beam=beam_list)
 
     @classmethod
-    def from_parser(cls, file: str | Path, Parser: tp.Type[FileParser]) -> UnitCell:
+    def from_parser(cls, file: str | Path, Parser: tp.Type[FileParser]) -> tp.Self:
         """Create a Simulation Environment from a user defined FileParser.
 
         Args:
@@ -148,10 +148,10 @@ class UnitCell(object):
         logger.info(f"Loading config from file: {file}")
         config = resolve_includes(Parser(file).parse())
         logger.info("File is loaded")
-        return UnitCell.from_config_dict(config)
+        return cls.from_config_dict(config)
 
     @classmethod
-    def from_toml(cls, file: str | Path) -> UnitCell:
+    def from_toml(cls, file: str | Path) -> tp.Self:
         """Create a Simulation Environment from a TOML file:
 
         Args:
@@ -164,7 +164,7 @@ class UnitCell(object):
         return cls.from_parser(file, TOMLFileParser)
 
     @ classmethod
-    def from_ron(cls, file: str | Path) -> UnitCell:
+    def from_ron(cls, file: str | Path) -> tp.Self:
         """Create a Simulation Environment from a RON file:
 
         Args:
