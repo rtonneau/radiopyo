@@ -3,165 +3,122 @@
 The acid_base submodule contains all class definitions related to acid-base equilibrium.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 14/12/2023 
 """
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
 import typing as tp
 
+import numpy as np
+
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry.e_reactions import EReaction
+
+from .k_reactions import KReaction, KReactionCollection
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from numpy.typing import NDArray
+    from radiopyo.parser.reaction_parser import GenericReaction
 
-__all__ = [
-    "ABPartition",
-    "ABCouple",
-    "ABDict",
-]
+    from .collections import ListSpecies
+
+__all__ = ["AcidBase",
+           ]
 
 # ------------------------------------------------------------------------------------ #
 #                                   CLASS DEFINITIONS                                  #
 # ------------------------------------------------------------------------------------ #
 
 
-class ABPartition(tp.NamedTuple):
+class AcidBase(KReactionCollection):
     """
-    Acid-Base equilibrium results are stored in a NamedTuple. It is computed
-    from the total concentration of the Acid-Base couple. The class provides several
-    attributes for a more detailed usage. 
-
-    Attributes:
-        A: float
-            Base concentration
-        HA: float
-            Acid concentration
-        dA: float
-            Derivative of the base concentration with respect to the total concentration
-            of the acid/base couple
-        dHA: float
-            Derivative of the acid concentration with respect to the total concentration
-            of the acid/base couple        
+    K_equilibrium = 10 ** (-pKa)
     """
-    A: float
-    HA: float
-    dA: float
-    dHA: float
-
-    @property
-    def acid(self) -> float: return self.HA
-
-    @property
-    def base(self) -> float: return self.A
-
-    @property
-    def derive_acid(self) -> float: return self.dHA
-
-    @property
-    def derive_base(self) -> float: return self.dA
-
-
-# ---------------------------------------------------------------------------- #
-#                         ACID BASE REACTION DEFINITION                        #
-# ---------------------------------------------------------------------------- #
-
-class ABCouple(ChemSpecies):
-    """ Class """
-    LENGTH_INDEX: int = 2
-
-    acid: ChemSpecies
-    base: ChemSpecies
-    pKa: float
+    _k_equilibrium: tp.Optional[np.polynomial.Polynomial]
+    _k_backward: tp.Optional[np.polynomial.Polynomial]
+    _k_forward: np.polynomial.Polynomial
+    T_inv: float
 
     def __init__(self,
-                 acid: ChemSpecies | str,
-                 base: ChemSpecies | str,
-                 pKa: float,
-                 index: int = -1):
-        self.pKa = pKa
-        self.acid = ChemSpecies(acid, index=index) if isinstance(acid, str) else acid
-        self.base = ChemSpecies(base, index=index+1) if isinstance(base, str) else base
-        super().__init__(self.__str__(),
-                         index=index,
-                         cc_init=0)
+                 forward: GenericReaction,
+                 backward: GenericReaction,
+                 pKa: tp.Optional[float | tp.List[float]] = None,
+                 temperature: tp.Optional[float] = None,
+                 list_sp: tp.Optional[ListSpecies] = None,
+                 ):
+        """
+        """
+        super().__init__()
+        # Check whether enough information is provided to compute all K's.
+        if pKa is None:
+            self._k_forward = np.polynomial.Polynomial(
+                forward["constants"]["k_value"])
+            self._k_backward = np.polynomial.Polynomial(
+                backward["constants"]["k_value"])
+            self._k_equilibrium = None
+        elif ("k_value" not in forward["constants"] or
+              forward["constants"]["k_value"] is None):
+            self._k_backward = np.polynomial.Polynomial(
+                backward["constants"]["k_value"])
+            self._k_equilibrium = np.polynomial.Polynomial(pKa)
+            self._k_forward = self._k_equilibrium * self._k_backward
+        elif ("k_value" not in backward["constants"] or
+              backward["constants"]["k_value"] is None):
+            self._k_forward = np.polynomial.Polynomial(
+                forward["constants"]["k_value"])
+            self._k_equilibrium = np.polynomial.Polynomial(pKa)
+            self._k_backward = None
+        else:
+            raise ValueError(
+                "EReaction needs 2 out of the 3 (K_equilibrium, K_forward, K_backward)")
 
-    def __contains__(self, key: object) -> bool:
-        return self.acid == key or self.base == key
+        # Need to add forward and backward reactions via the superclass
+        # KReactionCollection as this method is not allowed for an EReaction.
+        super().add_reaction("forward", forward, list_sp)
+        super().add_reaction("backward", backward, list_sp)
 
-    def __getitem__(self, item: str) -> ChemSpecies:
-        match item:
-            case self.acid.label:
-                return self.acid
-            case self.base.label:
-                return self.base
-            case _:
-                raise KeyError(f"Unknown {item} for A/B couple: {self}")
+    def add_reaction(self,
+                     label: str,
+                     generic: GenericReaction,
+                     list_sp: ListSpecies | None = None,
+                     ) -> None:
+        raise NotImplementedError(
+            "Not possible to add more reaction to an equilibrium collection")
 
-    @property
-    def ka(self) -> float:
-        return 10**(-self.pKa)
+    def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
+        """
+        """
+        T = T or self.T
+        if self._k_equilibrium is not None:
+            return self._k_equilibrium(T)
+        if self._k_backward is not None:
+            return self._k_forward(T) / self._k_backward(T)
+        raise ValueError(
+            "Not enough information about reaction constant to compute a value")
 
-    def update_index(self, index: int) -> None:
+    def k_forward(self, T: tp.Optional[float] = None) -> float:
+        """
+        """
+        T = T or self.T
+        return self.k_forward(T)
+
+    def k_backward(self, T: tp.Optional[float] = None) -> float:
         """ 
         """
-        self.index = index
-        self.acid.index = index
-        self.base.index = index + 1
+        T = T or self.T
+        if self._k_backward is not None:
+            return self._k_backward(T)
+        if self._k_equilibrium is not None:
+            return self._k_forward(T) / self._k_equilibrium(T)
+        raise ValueError(
+            "Not enough information about reaction constant to compute a value")
 
-    def compute_acid_partition(self,
-                               cc_tot: NDArray,
-                               cc_H_plus: NDArray) -> NDArray:
+    def iter_reactions_and_kvalues(self,
+                                   T: tp.Optional[float] = None,
+                                   ) -> tp.Iterator[str, KReaction, float]:
         """
         """
-        return cc_tot / (1.0 + self.ka / cc_H_plus)
-
-    def compute_base_partition(self, cc_tot: NDArray, cc_H_plus: NDArray) -> NDArray:
-        """
-        """
-        return cc_tot / (1.0 + cc_H_plus / self.ka)
-
-    def compute_partition(self, cc_tot: float, cc_H_plus: float) -> ABPartition:
-        """
-        Method to compute the Acid/base partition.
-
-        Args:
-            cc_tot: float
-                Total concentration of species i.e. [acid] + [base]
-            cc_H_plus: float
-                Concentration of species H_plus
-
-        Returns:
-            ABPartition
-        """
-        return ABPartition(
-            cc_tot / (1.0 + cc_H_plus / self.ka),  # Base
-            cc_tot / (1.0 + self.ka / cc_H_plus),  # Acid
-            1.0 / (1.0 + cc_H_plus / self.ka),     # dBase / dCt
-            1.0 / (1.0 + self.ka / cc_H_plus),     # dAcid / dCt
-        )
-
-    def __str__(self) -> str:
-        """
-        rem: pKa should not be included in order to easily find similar AB couples.
-        """
-        return f"{self.acid}/{self.base}"
-
-    def __repr__(self) -> str:
-        return ("ABCouple("
-                f"acid='{self.acid}', "
-                f"base='{self.base}', "
-                f"pKa={round(self.pKa, 5)}, "
-                f"index={self.index}"
-                ")")
-
-
-class ABDict(tp.TypedDict):
-    """
-    Typed-Dict used to parse config files like a breeze.
-    """
-    acid: str
-    base: str
-    pKa: float
+        T = T or self.T
+        yield "forward", self.get_reaction("forward"), self.k_forward(T)
+        yield "backward", self.get_reaction("backward"), self.k_backward(T)

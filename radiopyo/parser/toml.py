@@ -49,7 +49,7 @@ class TOMLFileParser(FileParser):
         # Produces a bare dict with all fields initiated
         out = default_ConfigDict()
         out["includes"] = config.get("includes", {})
-        out["bio_param"] = config.get("bio_param", {})
+        out["parameters"] = config.get("parameters", {})
         out["beam"] = config.get("beam", {})
         with suppress(KeyError):  # in case "concentrations" does not exist
             out["concentrations"]["fixed"] = config["concentrations"].get(
@@ -66,4 +66,6 @@ class TOMLFileParser(FileParser):
                 "k_reaction", [])
             out["reactions"]["enzymatic"] = config["reactions"].get(
                 "enzymatic", [])
+            out["reactions"]["equilibrium"] = config["reactions"].get(
+                "equilibrium", [])
         return out

@@ -56,11 +56,12 @@ class ReactionsDict(tp.TypedDict):
     acid_base: tp.List[tp.Dict]
     k_reaction: tp.List[tp.Dict]
     enzymatic: tp.List[tp.Dict]
+    equilibrium: tp.List[tp.Dict]
 
 
 class ConfigDict(tp.TypedDict):
     includes: tp.Dict[str, tp.List[str]]
-    bio_param: tp.Dict[str, float]
+    parameters: tp.Dict[str, float]
     concentrations: ConcentrationDict
     reactions: ReactionsDict
     beam: tp.Dict[str, tp.List[tp.Dict]]
@@ -81,7 +82,7 @@ class SimMatrices(tp.TypedDict):
 def default_ConfigDict() -> ConfigDict:
     """ """
     return {"includes": {},
-            "bio_param": {},
+            "parameters": {},
             "concentrations": {
                 "fixed": {},
                 "initial": {},
@@ -90,6 +91,7 @@ def default_ConfigDict() -> ConfigDict:
         "reactions": {
             "acid_base": [],
             "k_reaction": [],
+            "equilibrium": [],
             "enzymatic": [],
             "radiolytic": {},
     },

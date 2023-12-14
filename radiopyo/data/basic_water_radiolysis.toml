@@ -1,4 +1,4 @@
-[bio_param]
+[parameters]
 pH = 7
 force_cst_pH = true
 

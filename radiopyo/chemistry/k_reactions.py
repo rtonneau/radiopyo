@@ -58,24 +58,13 @@ class KReaction(BasicReaction):
         k_value: List[np.polynomial.Polynomial, ]
             Reaction rate
     """
-    k_value: tp.List[np.polynomial.Polynomial]
+    k_value: np.polynomial.Polynomial
 
     def __init__(self,
                  k_value: KValType,
                  ):
         super().__init__()
-        self.k_value = []
-        if isinstance(k_value, (tuple, list)):
-            if len(k_value) == 0:
-                raise ValueError("Len 0 for k_value passed as a collection")
-            for elt in k_value:
-                if not isinstance(elt, np.polynomial.Polynomial):
-                    elt = np.polynomial.Polynomial(elt)
-                self.k_value.append(elt)
-        elif isinstance(k_value, np.polynomial.Polynomial):
-            self.k_value.append(k_value)
-        else:
-            self.k_value = [np.polynomial.Polynomial(k_value), ]
+        self.k_value = np.polynomial.Polynomial(k_value)
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -244,19 +233,39 @@ class KReactionCollection():
         reactions: tp.Dict[str, KReaction]
             All KReactions belonging to the collection.
     """
-    reactions: tp.Dict[str, KReaction]
+    _DEFAULT_T: float = 25.0
+    _reactions: tp.List[tp.Tuple[str, KReaction]]
+    _indexer: tp.Dict[str, int]
+    T: float
 
-    def __init__(self) -> None:
-        self.reactions = {}
+    def __init__(self, temperature: tp.Optional[float] = None) -> None:
+        self._reactions = []
+        self._indexer = {}
+        self.T = temperature or self._DEFAULT_T
 
     def __len__(self) -> int:
-        return len(self.reactions)
+        return len(self._reactions)
 
-    def __iter__(self) -> tp.Iterator[KReaction]:
-        return iter(self.reactions.values())
+    def __iter__(self) -> tp.Iterator[str, KReaction]:
+        return iter(self._reactions)
 
-    def items(self) -> tp.Iterator[tp.Tuple[str, KReaction]]:
-        return iter(self.reactions.items())
+    def iter_reactions_and_kvalues(self,
+                                   T: tp.Optional[float] = None,
+                                   ) -> tp.Iterator[str, KReaction, float]:
+        """
+        """
+        T = T or self.T
+        for label, reaction in self:
+            yield label, reaction, reaction.k_value(T)
+
+    def _get_reaction_index(self, label: str) -> int:
+        return self._indexer[label]
+
+    def get_reaction(self, label: str) -> KReaction:
+        if label not in self._indexer:
+            raise KeyError(
+                f"No reaction labeled {label} in the reaction collection")
+        return self._reactions[self._get_reaction_index(label)][1]
 
     def add_reaction(self,
                      label: str,
@@ -266,5 +275,12 @@ class KReactionCollection():
         """
         Push a new Reaction in the Collection.
         """
-        self.reactions[label] = KReaction.from_generic(generic,
-                                                       list_sp=list_sp, )
+        if label in self._indexer:
+            raise KeyError(
+                f"Already existing reaction with label {label} in the collection")
+        self._indexer[label] = len(self)
+        self._reactions.append(
+            (label,
+             KReaction.from_generic(generic, list_sp=list_sp, ),
+             )
+        )

@@ -1,9 +1,10 @@
 // Main node definition
-start: kreaction | ereaction | species
+start: k_reaction | enzymatic_reaction | species
 
 // Main rules for reactions
-ereaction: species~1 "--"~1 enzyme ">>"~1 products
-kreaction: reactants "->"~1 products
+equilibrium_reaction: reactants "<->"~1 products
+enzymatic_reaction: species~1 "--"~1 enzyme ">>"~1 products
+k_reaction: reactants "->"~1 products
 
 reactants: species_list
 products: species_list

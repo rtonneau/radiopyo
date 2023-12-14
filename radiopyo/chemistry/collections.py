@@ -15,7 +15,6 @@ from itertools import chain
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
-from radiopyo.chemistry.acid_base import ABCouple
 from radiopyo.chemistry.species import ChemSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
@@ -66,41 +65,29 @@ class ListSpecies():
     """
     dyn_sp: tp.Dict[str, ChemSpecies]  # Dict like store for Chem species
     cst_sp: tp.Dict[str, ChemSpecies]
-    dyn_AB: tp.Dict[str, ABCouple]
     next_index: int
     sorted: bool
 
     def __init__(self) -> None:
         self.dyn_sp, self.cst_sp = {}, {}
-        self.dyn_AB = {}
         self.next_index = 0
         self.sorted = False
 
-    def __contains__(self, key: str | ChemSpecies | ABCouple) -> bool:
-        label = key.label if isinstance(key, (ChemSpecies, ABCouple)) else key
+    def __contains__(self, key: str | ChemSpecies) -> bool:
+        label = key.label if isinstance(key, (ChemSpecies, )) else key
 
-        if "/" in label:  # it is an A/B
-            return label in self.dyn_AB
-
-        # It is not an A/B.
-        # 1) Check if def as dyn_sp or cst_sp
-        if label in self.dyn_sp or label in self.cst_sp:
-            return True
-        # 2) if not, then check if member of an A/B couple
-        return any(label in ab_couple for ab_couple in self.iter_AB())
+        return label in self.dyn_sp or label in self.cst_sp
 
     def __iter__(self) -> tp.Iterator[ChemSpecies]:
-        return chain(self.dyn_AB.values(),
-                     self.dyn_sp.values(),
+        return chain(self.dyn_sp.values(),
                      self.cst_sp.values())
 
     def __len__(self) -> int:
         """Total number of species => Cst + Dyn"""
         return self.len_cst_species() +\
-            self.len_dyn_species() +\
-            self.len_AB()
+            self.len_dyn_species()
 
-    def __getitem__(self, item: str) -> ChemSpecies | ABCouple:
+    def __getitem__(self, item: str) -> ChemSpecies:
         """
         First look in dyn, then cst.
 
@@ -114,28 +101,7 @@ class ListSpecies():
             return self.dyn_sp[item]
         with suppress(KeyError):
             return self.cst_sp[item]
-        with suppress(KeyError):
-            return self.dyn_AB[item]
-        for ab_reaction in self.iter_AB():
-            with suppress(KeyError):
-                return ab_reaction[item]
         raise KeyError(item)
-
-    def developed_len(self) -> int:
-        """
-        """
-        return self.len_species() * ChemSpecies.LENGTH_INDEX + \
-            self.len_AB() * ABCouple.LENGTH_INDEX
-
-    def len_sim_species(self) -> int:
-        """
-        """
-        return self.len_AB() + self.len_dyn_species()
-
-    def len_AB(self) -> int:
-        """
-        """
-        return len(self.dyn_AB)
 
     def len_cst_species(self) -> int:
         """
@@ -154,11 +120,6 @@ class ListSpecies():
             int
         """
         return len(self.dyn_sp)
-
-    def len_species(self) -> int:
-        """ 
-        """
-        return self.len_cst_species() + self.len_dyn_species()
 
     def get(self,
             label: str,
@@ -179,118 +140,30 @@ class ListSpecies():
             return self.__getitem__(label)
         return default
 
-    def get_AB(self, label: str) -> ABCouple:
-        """ 
-        """
-        with suppress(KeyError):
-            return self.dyn_AB[label]
-        for ab_reaction in self.iter_AB():
-            if label in ab_reaction:
-                return ab_reaction
-        raise KeyError(f"{label} not involved in Acid/Base equilibrium")
-
-    def get_species_by_sim_index(self, index: int) -> ABCouple | ChemSpecies:
+    def get_species_by_sim_index(self, index: int) -> ChemSpecies:
         """
         """
-        return list(self.iter_sim_species())[index]
+        return list(self)[index]
 
     def get_sim_index(self, label: str) -> int:
         """
         """
-        for idx, elt in enumerate(self.iter_sim_species()):
+        for idx, elt in enumerate(self.iter_dyn_species()):
             if label == elt.label or label in elt:
                 return idx
         raise KeyError(f"{label} is not a valid dynamic species")
 
-    def get_sim_species(self, label: str) -> tp.Tuple[ABCouple | ChemSpecies, int]:
+    def get_sim_species(self, label: str) -> tp.Tuple[ChemSpecies, int]:
         """
         """
-        for idx, elt in enumerate(self.iter_sim_species()):
+        for idx, elt in enumerate(self.iter_dyn_species()):
             if label == elt.label or label in elt:
                 return elt, idx
         raise KeyError(f"{label} is not a valid dynamic species")
 
-    def add_acid_base(self,
-                      acid: str,
-                      base: str,
-                      pKa: float
-                      ) -> None:
-        """
-        Rem: There is no reason to have a constant_AB variable.  
-        """
-        match (self.get(acid, default=None), self.get(base, default=None)):
-            # Neither of acid nor base are pre-existing, easy.
-            case (None, None):
-                ab = ABCouple(acid,
-                              base,
-                              pKa,
-                              self.next_index,
-                              )
-            # Acid is existing but base is not, then check if cst. If not, delete it.
-            case (_acid, None) if isinstance(_acid, ChemSpecies):
-                if not self.is_dyn_species(_acid) or self.is_AB_species(_acid):
-                    # If cst, then error instead
-                    raise radiopyo_exceptions.ChemistryError(
-                        "Unable to define an AB couple with a cst species or a species "
-                        "already involved in another A/B in it"
-                    )
-                self.remove_species(acid)
-                ab = ABCouple(acid,
-                              base,
-                              pKa,
-                              self.next_index,
-                              )
-            # Base is existing but acid is not, then check if cst. If not, delete it.
-            case (None, _base) if isinstance(_base, ChemSpecies):
-                if not self.is_dyn_species(_base) or self.is_AB_species(_base):
-                    # If cst, then error instead
-                    raise radiopyo_exceptions.ChemistryError(
-                        "Unable to define an AB couple with a cst species or a species "
-                        "already involved in another A/B in it"
-                    )
-                self.remove_species(base)
-                ab = ABCouple(acid,
-                              base,
-                              pKa,
-                              self.next_index,
-                              )
-            # Both base and acid are already existing, then check if cst.
-            # If not, delete them both.
-            case (_acid, _base) if (isinstance(_acid, ChemSpecies) and
-                                    isinstance(_base, ChemSpecies)):
-                if not self.is_dyn_species(_acid) or self.is_AB_species(_acid):
-                    # If cst, then error instead
-                    raise radiopyo_exceptions.ChemistryError(
-                        "Unable to define an AB couple with a cst species or a species "
-                        "already involved in another A/B in it"
-                    )
-                if not self.is_dyn_species(_base) or self.is_AB_species(_base):
-                    # If cst, then error instead
-                    raise radiopyo_exceptions.ChemistryError(
-                        "Unable to define an AB couple with a cst species or a species "
-                        "already involved in another A/B in it"
-                    )
-                self.remove_species(base)
-                self.remove_species(acid)
-                ab = ABCouple(acid,
-                              base,
-                              pKa,
-                              self.next_index,
-                              )
-            # Default case, just in case...
-            case _:
-                raise radiopyo_exceptions.ChemistryError("Unable to add the A/B couple:"
-                                                         f" {acid}/{base} (pKa={pKa})")
-        if ab.label not in self.dyn_AB:
-            self.dyn_AB[ab.label] = ab
-            self.next_index += ABCouple.LENGTH_INDEX  # an A/B couple needs 2 locations
-
     def remove_species(self, label: str) -> None:
         """ 
         """
-        if "/" in label:
-            raise NotImplementedError("Unable to remove and Acid/Base link")
-
         if label in self.dyn_sp:
             self.dyn_sp.pop(label)
             return
@@ -313,10 +186,6 @@ class ListSpecies():
         """
         if isinstance(item, str):
             item = self.__getitem__(item)
-            if isinstance(item, ABCouple):
-                raise radiopyo_exceptions.ChemistryError(
-                    f"Conversion of A/B: {item} to a cst Species not allowed."
-                )
         if self.is_dyn_species(item):
             return
         self.dyn_sp.pop(item.label)
@@ -451,32 +320,6 @@ class ListSpecies():
         """
         return iter(self.dyn_sp.values())
 
-    def iter_species(self) -> tp.Iterable[ChemSpecies]:
-        """
-        Get an iterator over all the Species
-        (not ordered but all dyn first then cst)
-
-        Returns:
-            Iterator(ChemSpecies) 
-        """
-        return chain(self.iter_dyn_species(), self.iter_cst_species())
-
-    def iter_AB(self) -> tp.Iterator[ABCouple]:
-        """
-        Get an iterator over all the AB couples
-        (not ordered but all dyn first then cst).
-
-        Returns:
-            Iterator(ABCouple) 
-        """
-        return iter(self.dyn_AB.values())
-
-    def iter_sim_species(self) -> tp.Iterator[ABCouple | ChemSpecies]:
-        """ 
-        """
-        return iter(sorted(chain(self.iter_AB(), self.iter_dyn_species()),
-                           key=lambda x: x.index))
-
     def sort(self, inplace: bool = True) -> tp.Optional[ListSpecies]:
         """
         Sort all SimSpecies according to the following: 
@@ -494,12 +337,13 @@ class ListSpecies():
             ListSpecies if inplace = False
         """
         out = copy.deepcopy(self) if not inplace else self
-        for idx_ab, ab_couple in enumerate(out.iter_AB()):
-            ab_couple.update_index(idx_ab*ABCouple.LENGTH_INDEX)
 
-        for idx, species in enumerate(out.iter_species(),
-                                      start=self.len_AB()*ABCouple.LENGTH_INDEX):
-            out[species.label].index = idx*ChemSpecies.LENGTH_INDEX
+        for idx, species in enumerate(out.iter_dyn_species()):
+            out[species.label].index = idx
+
+        for idx, species in enumerate(out.iter_cst_species(),
+                                      start=out.len_dyn_species()):
+            out[species.label].index = idx
 
         out.next_index = idx + 1
         out.sorted = True
@@ -517,12 +361,4 @@ class ListSpecies():
         # If CstSpecies from another sim, should still be tested for this one.
         if isinstance(key, ChemSpecies):
             key = key.label
-        return key in self.dyn_sp or self.is_AB_species(key)
-
-    def is_AB_species(self, key: str | ABCouple | ChemSpecies) -> bool:
-        """ """
-        if isinstance(key, (ChemSpecies, ABCouple)):
-            key = key.label
-        if key in self.dyn_AB:
-            return True
-        return any(key in reaction for reaction in self.iter_AB())
+        return key in self.dyn_sp

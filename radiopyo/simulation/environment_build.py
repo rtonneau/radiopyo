@@ -22,6 +22,7 @@ import numpy as np
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.acid_base import ABCouple
 from radiopyo.chemistry.collections import ListSpecies
+from radiopyo.chemistry.e_reactions import EReaction
 from radiopyo.chemistry.k_reactions import KReaction
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
@@ -31,7 +32,7 @@ from radiopyo.chemistry.species import ChemSpecies
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.chemistry.basic_chemistry import IsChemicalReaction
+    from radiopyo.chemistry.basic_chemistry import BasicReaction
     from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -54,21 +55,24 @@ class ReactionsList:
     k_reaction: tp.List[KReaction]
     enzymatic: tp.List[MichaelisMenten]
     radiolytic: tp.List[RadiolyticReaction]
+    equilibrium: tp.List[EReaction]
 
     def __post_init__(self) -> None:
         for idx, k_reaction in enumerate(self.k_reaction):
             k_reaction.set_index(idx)
+        for idx, e_reaction in enumerate(self.equilibrium):
+            pass
         for idx, g_reaction in enumerate(self.radiolytic):
             g_reaction.set_index(idx)
-        for idx, e_reaction in enumerate(self.enzymatic):
-            e_reaction.set_index(idx)
+        for idx, enz_reaction in enumerate(self.enzymatic):
+            enz_reaction.set_index(idx)
 
-    def iter_isChemicalReaction(self) -> tp.Iterable[IsChemicalReaction]:
+    def iter_isChemicalReaction(self) -> tp.Iterable[BasicReaction]:
         return chain.from_iterable([self.k_reaction,
                                     self.radiolytic,
                                     self.enzymatic])
 
-    def iter_all(self) -> tp.Iterable[IsChemicalReaction | ABCouple]:
+    def iter_all(self) -> tp.Iterable[BasicReaction | ABCouple]:
         return chain.from_iterable([self.k_reaction,
                                     self.radiolytic,
                                     self.enzymatic])
@@ -128,27 +132,6 @@ class SimEnv():
         """Get iterable over all A/B couples/reactions"""
         return self.species.iter_AB()
 
-    def iter_DynSpecies(self) -> tp.Iterable[ChemSpecies]:
-        """Get iterable over all the Dynamic Species"""
-        return self.species.iter_dyn_species()
-
-    def iter_CstSpecies(self) -> tp.Iterable[ChemSpecies]:
-        """Get iterable over all the Cst Species"""
-        return self.species.iter_cst_species()
-
-    def iter_species(self) -> tp.Iterable[ChemSpecies]:
-        """Get (sorted) iterable over all the Species"""
-
-        return sorted(self.species, key=lambda x: x.index)
-
-    def number_dyn_species(self) -> int:
-        """Get the total number of DynSpecies 
-
-        Returns:
-            int
-        """
-        return self.species.len_dyn_species()
-
     @classmethod
     def from_dict(cls, config: ConfigDict) -> SimEnv:
         logger.info("CONFIG::Configuring Simulation Environment")
@@ -171,12 +154,12 @@ class SimEnv():
             config["concentrations"].get("fixed", {}))
 
         # Read bio param
-        bio_param = config.get("bio_param", {})
-        if "pH" not in bio_param:
+        parameters = config.get("parameters", {})
+        if "pH" not in parameters:
             logger.warning(
                 "CONFIG::pH is not defined in bio_param! Assuming pH=7",
             )
-            bio_param["pH"] = 7
+            parameters["pH"] = 7
 
         # Copy initial cc and strip species name on the fly.
         initial_cc = {}
@@ -184,18 +167,18 @@ class SimEnv():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        if "force_cst_pH" in bio_param and not bio_param["force_cst_pH"]:
+        if "force_cst_pH" in parameters and not parameters["force_cst_pH"]:
             # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
             # _ab = list_sp.get_AB(cls.PH_SPECIES)
             # initial_cc[_ab.label] = 10**(-bio_param["pH"]) + 10**(-14+bio_param["pH"])
             list_sp.add_dyn_species(
-                cls.PH_SPECIES, cc_init=10**(-bio_param["pH"]))
+                cls.PH_SPECIES, cc_init=10**(-parameters["pH"]))
             list_sp.add_dyn_species(
-                "OH_minus", cc_init=10**(-14+bio_param["pH"]))
+                "OH_minus", cc_init=10**(-14+parameters["pH"]))
             # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
         else:
-            list_sp.add_cst_species(cls.PH_SPECIES, 10**(-bio_param["pH"]))
-            list_sp.add_cst_species("OH_minus", 10**(-14+bio_param["pH"]))
+            list_sp.add_cst_species(cls.PH_SPECIES, 10**(-parameters["pH"]))
+            list_sp.add_cst_species("OH_minus", 10**(-14+parameters["pH"]))
 
         list_sp.sort(inplace=True)
         # Sanity check
@@ -203,7 +186,8 @@ class SimEnv():
             logger.warning("CONFIG::No 'reactions' section in the provided "
                            "configuration")
             config["reactions"] = {"acid_base": [], "k_reaction": [],
-                                   "enzymatic": [], "radiolytic": {}}
+                                   "enzymatic": [], "radiolytic": {},
+                                   "equilibrium": [], }
 
         # Read Acid/Base Reactions
         list_sp = acid_base_from_dict(config["reactions"].get("acid_base", []),
@@ -246,7 +230,7 @@ class SimEnv():
         logger.info("CONFIG::Simulation Configuration done!")
         return cls(reactions=ReactionsList(kr, enz, rad),
                    species=list_sp,
-                   bio_param=bio_param,
+                   bio_param=parameters,
                    initial_cc=initial_cc,
                    )
 
@@ -260,9 +244,9 @@ class SimEnv():
         Returns:
             NDArray[np.float64]: vector with initial concentrations in [µmol/l]
         """
-        out_dyn = np.zeros(self.species.len_sim_species(),
+        out_dyn = np.zeros(self.species.len_dyn_species(),
                            dtype=np.float64)
-        for idx, species in enumerate(self.species.iter_sim_species()):
+        for idx, species in enumerate(self.species.iter_dyn_species()):
             out_dyn[idx] = species.initial_cc()*1e6
 
         out_cst = np.array([], dtype=np.float64)
@@ -296,19 +280,19 @@ class SimEnv():
                                 reaction.tot_number_reactants())
 
         Ki = np.zeros(len(self.reactions.k_reaction), dtype=np.float64)
-        Riy = np.zeros([self.species.developed_len(), len(self.reactions.k_reaction)],
+        Riy = np.zeros([self.species.len_dyn_species(), len(self.reactions.k_reaction)],
                        dtype=np.int8)
 
-        Rki = np.full([self.species.developed_len(),
+        Rki = np.full([self.species.len_dyn_species(),
                        len(self.reactions.k_reaction),
                        max_reactants],
                       fill_value=np.nan,
                       dtype=np.float32)
 
-        JRki = np.full([self.species.developed_len(),
+        JRki = np.full([self.species.len_dyn_species(),
                         len(self.reactions.k_reaction),
                         max_reactants,
-                        self.species.developed_len(),
+                        self.species.len_dyn_species(),
                         ],
                        fill_value=np.nan,
                        dtype=np.float32)
@@ -333,7 +317,7 @@ class SimEnv():
                     Riy[sp.index, idx_r] += stoi
 
             # Jacobian related loops:
-            for sp in self.iter_species():
+            for sp in self.species:
                 # sp not involved in reaction => derivative = 0
                 if not reaction.has_reactant(sp) or self.species.is_cst_species(sp):
                     JRki[:, idx_r, :, sp.index] = 0
@@ -363,7 +347,7 @@ class SimEnv():
         """ Construct matrix necessary to compute the variation of the species
         concentrations due irradiation via GValues.
         """
-        Gi = np.zeros([self.species.developed_len(), len(self.reactions.radiolytic)],
+        Gi = np.zeros([self.species.len_dyn_species(), len(self.reactions.radiolytic)],
                       dtype=np.float64)
         for col, radiolytic in enumerate(self.reactions.radiolytic):
             for sp, _ in radiolytic.iter_products():
@@ -384,11 +368,11 @@ class SimEnv():
         if len(self.reactions.enzymatic) == 0:
             return None
 
-        Ez_substrate = np.full([self.species.developed_len(),
+        Ez_substrate = np.full([self.species.len_dyn_species(),
                                 len(self.reactions.enzymatic)],
                                fill_value=0,
                                dtype=np.float32)
-        Ez_enzyme = np.full([self.species.developed_len(),
+        Ez_enzyme = np.full([self.species.len_dyn_species(),
                              len(self.reactions.enzymatic)],
                             fill_value=0,
                             dtype=np.float32)
@@ -396,7 +380,7 @@ class SimEnv():
         Ez_kmki = np.zeros([2, len(self.reactions.enzymatic)],
                            dtype=np.float64)
 
-        Ez_iy = np.zeros([self.species.developed_len(),
+        Ez_iy = np.zeros([self.species.len_dyn_species(),
                           len(self.reactions.enzymatic)],
                          dtype=np.int8,
                          )
@@ -443,8 +427,8 @@ class SimEnv():
         """
         out = np.zeros(self.species.len_cst_species(),
                        dtype=np.float64)
-        len_dyn = self.species.len_dyn_species() + self.species.len_AB()*2
-        for sp in self.iter_CstSpecies():
+        len_dyn = self.species.len_dyn_species()
+        for sp in self.species.iter_cst_species():
             out[sp.index-len_dyn] = sp.initial_cc()
         return out
 
@@ -465,8 +449,8 @@ class SimEnv():
 
     def reactions_involving(self,
                             species: str | ChemSpecies,
-                            ) -> tp.List[IsChemicalReaction]:
-        out: tp.List[IsChemicalReaction] = []
+                            ) -> tp.List[BasicReaction]:
+        out: tp.List[BasicReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
             if species in reaction:
                 out.append(reaction)
@@ -474,8 +458,8 @@ class SimEnv():
 
     def reactions_involving_reactant(self,
                                      species: str | ChemSpecies,
-                                     ) -> tp.List[IsChemicalReaction]:
-        out: tp.List[IsChemicalReaction] = []
+                                     ) -> tp.List[BasicReaction]:
+        out: tp.List[BasicReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
             if reaction.has_reactant(species):
                 out.append(reaction)
@@ -483,8 +467,8 @@ class SimEnv():
 
     def reactions_involving_product(self,
                                     species: str | ChemSpecies,
-                                    ) -> tp.List[IsChemicalReaction]:
-        out: tp.List[IsChemicalReaction] = []
+                                    ) -> tp.List[BasicReaction]:
+        out: tp.List[BasicReaction] = []
         for reaction in self.reactions.iter_isChemicalReaction():
             if reaction.has_product(species):
                 out.append(reaction)

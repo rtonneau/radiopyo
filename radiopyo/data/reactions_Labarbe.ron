@@ -1,5 +1,5 @@
 (
-    bio_param: (
+    parameters: (
         pH: 7,
     ),
     fixed_concentrations:{ // Unit is [mol]/[l]

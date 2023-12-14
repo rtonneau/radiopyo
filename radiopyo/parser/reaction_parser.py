@@ -243,14 +243,20 @@ class TreeToReaction(lark.Transformer):
     def start(self, items: tp.List) -> GenericReaction | Atom | Molecule:
         return items[0]
 
-    def ereaction(self, items: tp.List) -> GenericReaction:
+    def equilibrium_reaction(self, items: tp.List) -> GenericReaction:
+        return GenericReaction(reactants=items[0],
+                               products=items[1],
+                               constants={},
+                               enzyme=None)
+
+    def enzymatic_reaction(self, items: tp.List) -> GenericReaction:
         return GenericReaction(reactants={items[0][0].label(): items[0]},
                                products=items[2],
                                enzyme=items[1],
                                constants={},
                                )
 
-    def kreaction(self, items: tp.List) -> GenericReaction:
+    def k_reaction(self, items: tp.List) -> GenericReaction:
         return GenericReaction(reactants=items[0],
                                products=items[1],
                                constants={},
