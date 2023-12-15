@@ -17,7 +17,7 @@ import pandas as pd
 from scipy.integrate import simpson  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.simulation.ode_functions_solver import ScipyODEResult, derive, jacobian
+from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -53,6 +53,7 @@ class ODEResult(object):
     Collection storing the results from scipy.integrate.solve_ivp in order to easily
     append together the results from several integration steps.
     """
+
     # Keep track of the original sim env
     env: SimEnv
     beam: ParticleBeam
@@ -77,13 +78,14 @@ class ODEResult(object):
     n_points: tp.List[int]
     exec_time: tp.List[tp.Optional[float]]
 
-    def __init__(self,
-                 env: SimEnv,
-                 beam: ParticleBeam,
-                 mat: SimMatrices,
-                 let: tp.Optional[float],
-                 sol: tp.Optional[ScipyODEResult] = None,
-                 ) -> None:
+    def __init__(
+        self,
+        env: SimEnv,
+        beam: ParticleBeam,
+        mat: SimMatrices,
+        let: tp.Optional[float],
+        sol: tp.Optional[ScipyODEResult] = None,
+    ) -> None:
         self.date = datetime.datetime.now()
         self.env = copy.deepcopy(env)
         self.beam = copy.deepcopy(beam)
@@ -104,14 +106,12 @@ class ODEResult(object):
 
         # Is it a constant species?
         if not self.env.species.is_dyn_species(key):
-            return pd.Series(data=self.env.species[key].initial_cc()*1e6,
-                             index=self.t,
-                             name=key)
+            return pd.Series(
+                data=self.env.species[key].initial_cc() * 1e6, index=self.t, name=key
+            )
 
         sp, idx = self.env.species.get_sim_species(key)
-        return pd.Series(data=self.y[idx, :],
-                         index=self.t,
-                         name=sp.label)
+        return pd.Series(data=self.y[idx, :], index=self.t, name=sp.label)
 
     def __add__(self, other: tp.Any) -> ODEResult:
         """ """
@@ -119,11 +119,14 @@ class ODEResult(object):
         if not isinstance(other, ODEResult):
             raise TypeError(f"Cannot add type: {type(other)}, to ODEResult")
         if other.t[0] < self.t[-1]:
-            raise TypeError("Trying to add ODEResult with starting "
-                            "time inferior to previous results")
+            raise TypeError(
+                "Trying to add ODEResult with starting "
+                "time inferior to previous results"
+            )
         if other.y.shape[0] != self.y.shape[0]:
-            raise TypeError("Trying to add ODEResults with different number of tracked"
-                            "species")
+            raise TypeError(
+                "Trying to add ODEResults with different number of tracked species"
+            )
 
         # Combine all together
         self.t = np.append(self.t, other.t)
@@ -154,23 +157,20 @@ class ODEResult(object):
 
     @property
     def final_cc(self) -> NDArray[np.float64]:
-        """
-        """
+        """ """
         return copy.copy(self.y[:, -1])
 
     @property
     def initial_cc(self) -> NDArray[np.float64]:
-        """
-        """
+        """ """
         return self.env.initial_values(all=True)
 
-    def to_hdf(self,
-               file: str | Path,
-               name: str,
-               group: tp.Optional[str] = None) -> H5Manager:
-        """
-        """
+    def to_hdf(
+        self, file: str | Path, name: str, group: tp.Optional[str] = None
+    ) -> H5Manager:
+        """ """
         from .utils import H5Manager
+
         h5file = H5Manager.from_path(file)
         with h5file:
             grp = h5file.create_group(group)
@@ -201,10 +201,11 @@ class ODEResult(object):
         self.status, self.message, self.success = [], [], []
         self.n_points, self.exec_time = [], []
 
-    def append_sol(self,
-                   sol: ScipyODEResult,
-                   exec_time: tp.Optional[float] = None,
-                   ) -> None:
+    def append_sol(
+        self,
+        sol: ScipyODEResult,
+        exec_time: tp.Optional[float] = None,
+    ) -> None:
         self.t = np.append(self.t, sol.t)
         if len(self.y) == 0:
             self.y = sol.y
@@ -226,70 +227,58 @@ class ODEResult(object):
         self.exec_time.append(exec_time)
 
     # --------------------------------- Utils methods -------------------------------- #
-    def to_pandas(self, clip: bool = True, compute_AB: bool = True) -> pd.DataFrame:
-        """
-        """
-        labels = [elt.label for elt in self.env.species.iter_sim_species()]
-        labels_cst = [
-            elt.label for elt in self.env.species.sorted_iter_cst_species()]
-        n_AB = self.env.species.len_AB()
+    def to_pandas(self, clip: bool = True) -> pd.DataFrame:
+        """ """
+        labels = [elt.label for elt in self.env.species]
+        labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
 
-        df_sp = pd.DataFrame(index=self.t,
-                             columns=labels[n_AB:],
-                             dtype=np.float64,
-                             data=self.y[n_AB:, :].T,
-                             ).clip(0.0 if clip else None)
+        df_sp = pd.DataFrame(
+            index=self.t,
+            columns=labels,
+            dtype=np.float64,
+            data=self.y.T,
+        ).clip(0.0 if clip else None)
 
-        df_cst = pd.DataFrame(index=self.t,
-                              columns=labels_cst,
-                              dtype=np.float64,
-                              )
+        df_cst = pd.DataFrame(
+            index=self.t,
+            columns=labels_cst,
+            dtype=np.float64,
+        )
         for sp_cst in self.env.species.iter_cst_species():
-            df_cst.loc[:, sp_cst.label] = sp_cst.initial_cc()*1e6
+            df_cst.loc[:, sp_cst.label] = (
+                sp_cst.initial_cc() * 1e6
+            )  # TODO include temperature!
 
-        df_AB = pd.DataFrame(index=self.t,
-                             columns=labels[:n_AB],
-                             dtype=np.float64,
-                             data=self.y[:n_AB, :].T,
-                             ).clip(0.0 if clip else None)
-
-        if compute_AB:
-            H_plus = self[self.env.PH_SPECIES].to_numpy()
-            for ab in self.env.species.iter_AB():
-                df_AB.loc[:, ab.acid.label] = ab.compute_acid_partition(
-                    df_AB[ab.label].to_numpy(),
-                    H_plus)
-
-                df_AB.loc[:, ab.base.label] = ab.compute_base_partition(
-                    df_AB[ab.label].to_numpy(),
-                    H_plus)
-
-                df_AB.drop(ab.label, axis=1, inplace=True)
-        return pd.concat([df_AB, df_sp, df_cst], axis=1)
+        return pd.concat([df_sp, df_cst], axis=1)
 
     def reconstruct_jacobian(self) -> pd.DataFrame:
         if self.beam is None:
             raise TypeError("Beam is None, unable to compute jacobian")
 
-        sp_label = [elt.label for elt in self.env.iter_DynSpecies()]
+        sp_label = [elt.label for elt in self.env.species.iter_dyn_species()]
         dsp_label = ["".join(["d", elt]) for elt in sp_label]
 
-        out = pd.DataFrame(index=self.t,
-                           columns=pd.MultiIndex.from_product([sp_label, dsp_label],
-                                                              names=["sp", "dsp"]),
-                           dtype=np.float64,)
+        out = pd.DataFrame(
+            index=self.t,
+            columns=pd.MultiIndex.from_product(
+                [sp_label, dsp_label], names=["sp", "dsp"]
+            ),
+            dtype=np.float64,
+        )
 
-        for (idx, t_val) in enumerate(self.t):
-            jac = jacobian(t_val, self.y[:, idx],
-                           self.beam,
-                           self.env.species["H_plus"].index,
-                           **self.mat,
-                           )
+        for idx, t_val in enumerate(self.t):
+            jac = jacobian(
+                t_val,
+                self.y[:, idx],
+                self.beam,
+                self.env.species["H_plus"].index,
+                **self.mat,
+            )
             out.iloc[idx, :] = jac.flatten()
         return out
 
     def reconstruct_reactions(self, clip: float | bool | int = 1e-8) -> pd.DataFrame:
-        """ 
+        """
         Rem: to integrate df
             >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
         """
@@ -299,42 +288,40 @@ class ODEResult(object):
         idx_kr = slice(0, len(cols_kr))
 
         cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
-        idx_gi = slice(idx_kr.stop, idx_kr.stop+len(cols_gi))
+        idx_gi = slice(idx_kr.stop, idx_kr.stop + len(cols_gi))
 
         if self.mat["Ez_mat"] is not None:
             cols_ez = [er.as_label() for er in self.env.reactions.enzymatic]
-            idx_ez = slice(idx_gi.stop, idx_gi.stop+len(cols_ez))
+            idx_ez = slice(idx_gi.stop, idx_gi.stop + len(cols_ez))
         else:
             cols_ez = []
 
-        out = pd.DataFrame(columns=list(chain.from_iterable([cols_kr,
-                                                             cols_gi,
-                                                             cols_ez])),
-                           index=self.t,
-                           dtype=np.float64,
-                           )
+        out = pd.DataFrame(
+            columns=list(chain.from_iterable([cols_kr, cols_gi, cols_ez])),
+            index=self.t,
+            dtype=np.float64,
+        )
 
         # Prefill values for radiolytic reactions
         for label, reaction in zip(cols_gi, self.env.reactions.radiolytic):
             out.loc[:, label] = reaction.kr()
 
         H_plus_index = self.env.species[self.env.PH_SPECIES].index
-        for ((idx, t_val), y) in zip(enumerate(self.t), self.y.T):
-            # y = y.clip(min=0.0,) * 1e-6
-            y = y*1.0e-6  # µmol/L => mol/l
+        for (idx, t_val), y in zip(enumerate(self.t), self.y.T):
+            y = y * 1.0e-6  # µmol/L => mol/l
             y[y < 1e-18] = 0.0  # Cut off fmol/L
 
             y = np.matmul(y, self.mat["AB_mat"][0])
             y = np.append(y, self.mat["cst_sp"])
-            AB_correction = np.ones(len(self.mat["AB_mat"][1])*2)
-            AB_correction[::2] = 1 / \
-                (1 + self.mat["AB_mat"][1]/y[H_plus_index])
+            AB_correction = np.ones(len(self.mat["AB_mat"][1]) * 2)
+            AB_correction[::2] = 1 / (1 + self.mat["AB_mat"][1] / y[H_plus_index])
             AB_correction[1::2] = 1 - AB_correction[::2]
-            y[:len(AB_correction)] *= AB_correction
+            y[: len(AB_correction)] *= AB_correction
 
             # K Reactions
             Rki = np.nan_to_num(
-                np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1)
+                np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
+            )
             Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
             Rki[Rki < 1e-25] = 0
             out.iloc[idx, idx_kr] = Rki
@@ -349,8 +336,12 @@ class ODEResult(object):
             if self.mat["Ez_mat"] is not None:
                 E = np.matmul(y, self.mat["Ez_mat"][1])
                 S = np.matmul(y, self.mat["Ez_mat"][0])
-                MM = self.mat["Ez_mat"][2][1, :] * E * \
-                    S / (self.mat["Ez_mat"][2][0, :] + S)
+                MM = (
+                    self.mat["Ez_mat"][2][1, :]
+                    * E
+                    * S
+                    / (self.mat["Ez_mat"][2][0, :] + S)
+                )
                 out.iloc[idx, idx_ez] = MM
         return out
         match clip:
@@ -363,14 +354,14 @@ class ODEResult(object):
 
     def species_balance_evolution(self) -> pd.DataFrame:
         rr = self.reconstruct_reactions()
-        out = pd.DataFrame(index=self.t,
-                           columns=[elt.label
-                                    for elt in self.env.iter_DynSpecies()],
-                           dtype=np.float64,
-                           )
+        out = pd.DataFrame(
+            index=self.t,
+            columns=[elt.label for elt in self.env.species.iter_dyn_species()],
+            dtype=np.float64,
+        )
         out.iloc[:, :] = 0
 
-        for species in self.env.iter_DynSpecies():
+        for species in self.env.species.iter_dyn_species():
             for reaction in self.env.reactions_involving_product(species):
                 stoi = reaction.stoi_products[species.label]
                 out.loc[:, species.label] += rr[reaction.as_label()] * stoi
@@ -379,13 +370,10 @@ class ODEResult(object):
                 out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
         return out
 
-    def integrate_species(self,
-                          start: float = 0,
-                          stop: float = float("inf"),
-                          compute_AB: bool = True
-                          ) -> pd.Series:
-        """ 
-        """
+    def integrate_species(
+        self, start: float = 0, stop: float = float("inf"), compute_AB: bool = True
+    ) -> pd.Series:
+        """ """
         df = self.to_pandas(compute_AB)
         df = df[(df.index >= start) & (df.index < stop)]
         out = {}

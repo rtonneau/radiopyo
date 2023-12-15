@@ -39,7 +39,7 @@ __all__: tp.List = []
 # ------------------------------------------------------------------------------------ #
 
 
-class ListSpecies():
+class ListSpecies:
     """
     Collection (i.e. container) of species. Main goal is to centralized species
     creation so that it is possible to easily attribute unique id
@@ -54,7 +54,7 @@ class ListSpecies():
             Index for the next Species (Cst or Dyn) creation
         sorted: bool
             Whether or not indexes of dyn species and cst species are contiguously
-            separated. For simulations (n DynSpecies & m cstSpecies), indexes should be 
+            separated. For simulations (n DynSpecies & m cstSpecies), indexes should be
             like:
                 DynSpecies: "O2"->0; "e_aq"->1; ... ;"H2O2"->n-1
                 CstSpecies: "H2O"->n; ... ; "catalase"->n+m-1
@@ -63,6 +63,7 @@ class ListSpecies():
     instead of just computing the global length to assign new index to species. That
     way, even upon deletion, no index will be attributed twice!
     """
+
     dyn_sp: tp.Dict[str, ChemSpecies]  # Dict like store for Chem species
     cst_sp: tp.Dict[str, ChemSpecies]
     next_index: int
@@ -74,18 +75,16 @@ class ListSpecies():
         self.sorted = False
 
     def __contains__(self, key: str | ChemSpecies) -> bool:
-        label = key.label if isinstance(key, (ChemSpecies, )) else key
+        label = key.label if isinstance(key, (ChemSpecies,)) else key
 
         return label in self.dyn_sp or label in self.cst_sp
 
     def __iter__(self) -> tp.Iterator[ChemSpecies]:
-        return chain(self.dyn_sp.values(),
-                     self.cst_sp.values())
+        return chain(self.dyn_sp.values(), self.cst_sp.values())
 
     def __len__(self) -> int:
         """Total number of species => Cst + Dyn"""
-        return self.len_cst_species() +\
-            self.len_dyn_species()
+        return self.len_cst_species() + self.len_dyn_species()
 
     def __getitem__(self, item: str) -> ChemSpecies:
         """
@@ -121,10 +120,11 @@ class ListSpecies():
         """
         return len(self.dyn_sp)
 
-    def get(self,
-            label: str,
-            default: tp.Optional[ChemSpecies] = None,
-            ) -> tp.Optional[ChemSpecies]:
+    def get(
+        self,
+        label: str,
+        default: tp.Optional[ChemSpecies] = None,
+    ) -> tp.Optional[ChemSpecies]:
         """
         Getter method emulating the dict one.
 
@@ -141,29 +141,25 @@ class ListSpecies():
         return default
 
     def get_species_by_sim_index(self, index: int) -> ChemSpecies:
-        """
-        """
+        """ """
         return list(self)[index]
 
     def get_sim_index(self, label: str) -> int:
-        """
-        """
+        """ """
         for idx, elt in enumerate(self.iter_dyn_species()):
             if label == elt.label or label in elt:
                 return idx
         raise KeyError(f"{label} is not a valid dynamic species")
 
     def get_sim_species(self, label: str) -> tp.Tuple[ChemSpecies, int]:
-        """
-        """
+        """ """
         for idx, elt in enumerate(self.iter_dyn_species()):
             if label == elt.label or label in elt:
                 return elt, idx
         raise KeyError(f"{label} is not a valid dynamic species")
 
     def remove_species(self, label: str) -> None:
-        """ 
-        """
+        """ """
         if label in self.dyn_sp:
             self.dyn_sp.pop(label)
             return
@@ -192,7 +188,9 @@ class ListSpecies():
         self.add_cst_species(item.label, item.initial_cc())
         self.sorted = False
 
-    def add_dyn_species(self, label: str, cc_init: tp.Optional[float] = None) -> None:
+    def add_dyn_species(
+        self, label: str, cc_init: tp.Optional[tp.List[float] | float] = None
+    ) -> None:
         """
         Method use to add a new DynSpecies. The nex_index attributes is assigned to the
         species and increased.
@@ -212,10 +210,11 @@ class ListSpecies():
         """
         if label in self.cst_sp:
             raise radiopyo_exceptions.IsConstantSpeciesError(
-                f"{label} is already recorded as CstSpecies")
+                f"{label} is already recorded as CstSpecies"
+            )
         if label not in self:
-            self.dyn_sp[label] = ChemSpecies(label, self.next_index,  cc_init)
-            self.next_index += ChemSpecies.LENGTH_INDEX
+            self.dyn_sp[label] = ChemSpecies(label, self.next_index, cc_init)
+            self.next_index += 1
 
     def add_cst_species(self, label: str, cc: float) -> None:
         """
@@ -234,17 +233,19 @@ class ListSpecies():
         """
         if label in self.cst_sp:
             raise radiopyo_exceptions.IsSimSpeciesError(
-                f"{label} is already recorded as CstSpecies")
+                f"{label} is already recorded as CstSpecies"
+            )
         if label not in self:
             self.cst_sp[label] = ChemSpecies(label, self.next_index, cc)
-            self.next_index += ChemSpecies.LENGTH_INDEX
+            self.next_index += 1
 
-    def get_or_create_dyn_species(self,
-                                  label: str,
-                                  ) -> ChemSpecies:
+    def get_or_create_dyn_species(
+        self,
+        label: str,
+    ) -> ChemSpecies:
         """
         Method use to retrieve a species. If it does not exist, the subsequent
-        DynSpecies is created via a call to ListSpecies.add_dyn_species. If the species 
+        DynSpecies is created via a call to ListSpecies.add_dyn_species. If the species
         does exist, it is return no matter what kind it is (Cst or Dyn).
 
         Args:
@@ -261,12 +262,13 @@ class ListSpecies():
             self.add_dyn_species(label)
         return self.__getitem__(label)
 
-    def get_or_create_cst_species(self,
-                                  label: str,
-                                  ) -> ChemSpecies:
+    def get_or_create_cst_species(
+        self,
+        label: str,
+    ) -> ChemSpecies:
         """
         Method use to retrieve a species. If it does not exist, the subsequent
-        CstSpecies is created via a call to ListSpecies.add_cst_species. If the species 
+        CstSpecies is created via a call to ListSpecies.add_cst_species. If the species
         does exist, it is return no matter what kind it is (Cst or Dyn).
 
         Args:
@@ -287,27 +289,29 @@ class ListSpecies():
         Get an iterator over all the CstSpecies (ordered).
 
         Returns:
-            Iterator(CstSpecies) 
+            Iterator(CstSpecies)
         """
-        return map(op.itemgetter(1),
-                   sorted(self.cst_sp.items(), key=lambda x: x[1].index))
+        return map(
+            op.itemgetter(1), sorted(self.cst_sp.items(), key=lambda x: x[1].index)
+        )
 
     def sorted_iter_dyn_species(self) -> tp.Iterable[ChemSpecies]:
         """
         Get an iterator over all the DynSpecies (ordered).
 
         Returns:
-            Iterator(DynSpecies) 
+            Iterator(DynSpecies)
         """
-        return map(op.itemgetter(1),
-                   sorted(self.dyn_sp.items(), key=lambda x: x[1].index))
+        return map(
+            op.itemgetter(1), sorted(self.dyn_sp.items(), key=lambda x: x[1].index)
+        )
 
     def iter_cst_species(self) -> tp.Iterable[ChemSpecies]:
         """
         Get an iterator over all the CstSpecies (not ordered).
 
         Returns:
-            Iterator(ChemSpecies) 
+            Iterator(ChemSpecies)
         """
         return iter(self.cst_sp.values())
 
@@ -316,20 +320,20 @@ class ListSpecies():
         Get an iterator over all the DynSpecies (not ordered).
 
         Returns:
-            Iterator(ChemSpecies) 
+            Iterator(ChemSpecies)
         """
         return iter(self.dyn_sp.values())
 
     def sort(self, inplace: bool = True) -> tp.Optional[ListSpecies]:
         """
-        Sort all SimSpecies according to the following: 
+        Sort all SimSpecies according to the following:
         For n DynSpecies & m cstSpecies, indexes should be like:
             - DynSpecies: "O2"->0; "e_aq"->1; ... ;"H2O2"->n-1
             - CstSpecies: "H2O"->n; ... ; "catalase"->n+m-1
 
         Args:
             inplace: bool, optional
-                Replace the existing index or return a deepcopy of the ListSpecies 
+                Replace the existing index or return a deepcopy of the ListSpecies
                 instance (default is True)
 
         Returns:
@@ -341,8 +345,9 @@ class ListSpecies():
         for idx, species in enumerate(out.iter_dyn_species()):
             out[species.label].index = idx
 
-        for idx, species in enumerate(out.iter_cst_species(),
-                                      start=out.len_dyn_species()):
+        for idx, species in enumerate(
+            out.iter_cst_species(), start=out.len_dyn_species()
+        ):
             out[species.label].index = idx
 
         out.next_index = idx + 1
@@ -350,8 +355,7 @@ class ListSpecies():
         return out if not inplace else None
 
     def is_cst_species(self, key: str | ChemSpecies) -> bool:
-        """ 
-        """
+        """ """
         if isinstance(key, ChemSpecies):
             key = key.label
         return key in self.cst_sp

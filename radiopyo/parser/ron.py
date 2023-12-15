@@ -38,6 +38,7 @@ if tp.TYPE_CHECKING:
 
 class TreeToRon(lark.Transformer):
     """ """
+
     list = list
     tuple = tuple
 
@@ -85,14 +86,14 @@ class RonFileParser(FileParser):
     """
     Class parsing RON files.
     """
+
     ext = ".ron"
     items: dict
 
     def parse(self) -> ConfigDict:
-        """ 
-        """
+        """ """
         # Read the grammar
-        with open(Path(__file__).parent/r"grammar//ron_grammar.lark", "r") as file:
+        with open(Path(__file__).parent / r"grammar//ron_grammar.lark", "r") as file:
             parser = lark.Lark(file.read())
 
         # Parses the config file
@@ -100,21 +101,19 @@ class RonFileParser(FileParser):
             items = TreeToRon().transform(parser.parse(file.read()))
 
         # Output a ConfigDict
-        return {"includes": items.get("includes", {}),
-                "bio_param": items.get("bio_param", {}),
-
-                "concentrations": {
-                    "fixed": items.get("fixed_concentrations", {}),
-                    "initial": items.get("initial_concentrations", {})
-        },
-
+        return {
+            "includes": items.get("includes", {}),
+            "parameters": items.get("bio_param", {}),
+            "concentrations": {
+                "fixed": items.get("fixed_concentrations", {}),
+                "initial": items.get("initial_concentrations", {}),
+            },
             "reactions": {
-                    "acid_base": items.get("acid_base", []),
-                    "k_reaction": items.get("k_reactions", []),
-                    "radiolytic": items.get("radiolytic", {}),
-                    "enzymatic": items.get("enzymatic_reactions", []),
-        },
-
+                "acid_base": items.get("acid_base", []),
+                "equilibrium": items.get("equilibrium", []),
+                "k_reaction": items.get("k_reactions", []),
+                "radiolytic": items.get("radiolytic", {}),
+                "enzymatic": items.get("enzymatic_reactions", []),
+            },
             "beam": items.get("beam", {}),
-
         }

@@ -58,12 +58,14 @@ class KwargsAtom(tp.TypedDict):
 
 
 class BasicSpecies(object):
-    """ The most simple building block. Basically just a named 'thing'."""
+    """The most simple building block. Basically just a named 'thing'."""
+
     name: str
 
-    def __init__(self,
-                 name: str,
-                 ) -> None:
+    def __init__(
+        self,
+        name: str,
+    ) -> None:
         self.name = name
 
     def __str__(self) -> str:
@@ -80,29 +82,33 @@ class ChemicalSpecies(BasicSpecies):
     """
     More complex entity. Contains charge, radical and mass.
     """
+
     charge: int
     radical: bool
     _mass: tp.Optional[float]
 
-    def __init__(self,
-                 name: str,
-                 charge: int = 0,
-                 radical: bool = False,
-                 mass: tp.Optional[float] = None
-                 ) -> None:
+    def __init__(
+        self,
+        name: str,
+        charge: int = 0,
+        radical: bool = False,
+        mass: tp.Optional[float] = None,
+    ) -> None:
         super().__init__(name)
         self.charge = charge
         self.radical = radical
         self._mass = mass
 
     def __str__(self) -> str:
-        out = [super().__str__(),]
+        out = [
+            super().__str__(),
+        ]
         if self.radical:
             out.append("_r")
         if self.charge > 0:
-            out += ["_plus"]*self.charge
+            out += ["_plus"] * self.charge
         elif self.charge < 0:
-            out += ["_minus"]*np.abs(self.charge)
+            out += ["_minus"] * np.abs(self.charge)
         return "".join(out)
 
     @property
@@ -116,7 +122,7 @@ class ChemicalSpecies(BasicSpecies):
         self._mass = value
 
     def _latex_radical_charge(self) -> str:
-        """ For LateX rendering of radical and charge only.
+        """For LateX rendering of radical and charge only.
         -> Shared by Atoms and Molecules.
         """
         out = ["^{"]
@@ -142,10 +148,7 @@ class HydratedElectron(ChemicalSpecies):
     """
 
     def __init__(self) -> None:
-        super().__init__(name="e_aq",
-                         charge=-1,
-                         radical=False,
-                         mass=0)
+        super().__init__(name="e_aq", charge=-1, radical=False, mass=0)
 
     def __str__(self) -> str:
         return self.name
@@ -154,8 +157,8 @@ class HydratedElectron(ChemicalSpecies):
         return "$e_{aq}$"
 
 
-class Atom (ChemicalSpecies):
-    """ Atom definition """
+class Atom(ChemicalSpecies):
+    """Atom definition"""
 
     def raw_label(self) -> str:
         """Just a getter for the name (does not include charge or radical)"""
@@ -163,30 +166,37 @@ class Atom (ChemicalSpecies):
 
 
 class Molecule(ChemicalSpecies):
-    """ Molecule definition -> Collection of Atoms.
-     To create a Molecule out of atoms, they cannot be ions nor radical. It is the
-     molecule which can be charged or radical"""
+    """Molecule definition -> Collection of Atoms.
+    To create a Molecule out of atoms, they cannot be ions nor radical. It is the
+    molecule which can be charged or radical"""
+
     atoms: tp.List[tp.Tuple[Atom, int]]
 
-    def __init__(self,
-                 atoms: tp.List[tp.Tuple[Atom, int]],
-                 charge: int = 0,
-                 radical: bool = False
-                 ):
+    def __init__(
+        self,
+        atoms: tp.List[tp.Tuple[Atom, int]],
+        charge: int = 0,
+        radical: bool = False,
+    ):
         super().__init__("", charge, radical)
         if len(atoms) == 2 and isinstance(atoms[0], Atom):
-            self.atoms = [atoms,]
+            self.atoms = [
+                atoms,
+            ]
         else:
             self.atoms = atoms
 
         # Let's do some checks
         for atom, _ in self.atoms:
             if atom.charge != 0:
-                raise ValueError(f"{atom} must be neutral (and not {atom.charge}) "
-                                 "to compose a molecule")
+                raise ValueError(
+                    f"{atom} must be neutral (and not {atom.charge}) "
+                    "to compose a molecule"
+                )
             if atom.radical is not False:
-                raise ValueError(f"{atom} must not be a radical "
-                                 "to compose a molecule")
+                raise ValueError(
+                    f"{atom} must not be a radical " "to compose a molecule"
+                )
 
     def __iter__(self) -> Iterator[tp.Tuple[Atom, int]]:
         """Let's easily iterate of (atoms, stoichiometry)"""
@@ -199,35 +209,33 @@ class Molecule(ChemicalSpecies):
         if self.radical:
             out.append("_r")
         if self.charge > 0:
-            out += ["_plus"]*self.charge
+            out += ["_plus"] * self.charge
         elif self.charge < 0:
-            out += ["_minus"]*np.abs(self.charge)
+            out += ["_minus"] * np.abs(self.charge)
         return "".join(out)
 
     def to_latex(self) -> str:
         out = ["$"]
-        for (atom, stoi) in self.atoms:
-            out.append(
-                f"{atom.to_latex().strip('$')}{f'_{stoi}' if stoi>1 else ''}")
+        for atom, stoi in self.atoms:
+            out.append(f"{atom.to_latex().strip('$')}{f'_{stoi}' if stoi>1 else ''}")
         out.append(self._latex_radical_charge())
         out.append("$")
         return "".join(out)
 
     @classmethod
-    def from_atom_dict(cls,
-                       atoms: tp.List[tp.Tuple[KwargsAtom, int]],
-                       charge: int = 0,
-                       radical: bool = False,
-                       ) -> Molecule:
-        return cls([(Atom(**elt), stoi) for elt, stoi in atoms],
-                   charge,
-                   radical)
+    def from_atom_dict(
+        cls,
+        atoms: tp.List[tp.Tuple[KwargsAtom, int]],
+        charge: int = 0,
+        radical: bool = False,
+    ) -> Molecule:
+        return cls([(Atom(**elt), stoi) for elt, stoi in atoms], charge, radical)
 
     @property
     def mass(self) -> float:
         if self._mass is not None:
             return self._mass
-        return reduce(lambda tot, atom: tot+atom[1]*atom[0].mass, self.atoms, 0.0)
+        return reduce(lambda tot, atom: tot + atom[1] * atom[0].mass, self.atoms, 0.0)
 
     @mass.setter
     def mass(self, value: float) -> None:
@@ -244,23 +252,22 @@ class TreeToReaction(lark.Transformer):
         return items[0]
 
     def equilibrium_reaction(self, items: tp.List) -> GenericReaction:
-        return GenericReaction(reactants=items[0],
-                               products=items[1],
-                               constants={},
-                               enzyme=None)
+        return GenericReaction(
+            reactants=items[0], products=items[1], constants={}, enzyme=None
+        )
 
     def enzymatic_reaction(self, items: tp.List) -> GenericReaction:
-        return GenericReaction(reactants={items[0][0].label(): items[0]},
-                               products=items[2],
-                               enzyme=items[1],
-                               constants={},
-                               )
+        return GenericReaction(
+            reactants={items[0][0].label(): items[0]},
+            products=items[2],
+            enzyme=items[1],
+            constants={},
+        )
 
     def k_reaction(self, items: tp.List) -> GenericReaction:
-        return GenericReaction(reactants=items[0],
-                               products=items[1],
-                               constants={},
-                               enzyme=None)
+        return GenericReaction(
+            reactants=items[0], products=items[1], constants={}, enzyme=None
+        )
 
     def reactants(self, items: tp.List) -> tp.List:
         return items[0]
@@ -273,11 +280,10 @@ class TreeToReaction(lark.Transformer):
         out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
         for species, stoi in items:
             label = species.label()
-            out[label] = (species, out.get(label, (0, 0))[1]+stoi)
+            out[label] = (species, out.get(label, (0, 0))[1] + stoi)
         return out
 
     def species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int]:
-
         if len(items) > 1:
             multiple = items[0]
             kwargs = items[1]
@@ -304,11 +310,11 @@ class TreeToReaction(lark.Transformer):
     def anion(self, items: tp.List) -> tp.Dict:
         if isinstance(items[0], lark.Token) and items[0].type == "ELECTRON":
             return {"name": "e_aq", "charge": -1, "radical": False, "stoi": 1}
-        items[0]["charge"] -= (len(items)-1)
+        items[0]["charge"] -= len(items) - 1
         return items[0]
 
     def cation(self, items: tp.List) -> tp.Dict:
-        items[0]["charge"] += (len(items)-1)
+        items[0]["charge"] += len(items) - 1
         return items[0]
 
     def radical(self, items: tp.List) -> tp.Dict:
@@ -319,7 +325,7 @@ class TreeToReaction(lark.Transformer):
         return {"name": "".join(items), "radical": False, "charge": 0}
 
     def sub_mol(self, items: tp.List) -> tp.Tuple[tp.Dict, int]:
-        stoi, = items[1:2] or [1]
+        (stoi,) = items[1:2] or [1]
         return (items[0], stoi)
 
     def molecule(self, items: tp.List) -> tp.Dict:
@@ -345,7 +351,8 @@ class ReactionParser(object):
     """
     Actual Parser using the Lark grammar/Transformer.
     """
-    GRAMMAR: Path = Path(__file__).parent/r"grammar//reaction_grammar.lark"
+
+    GRAMMAR: Path = Path(__file__).parent / r"grammar//reaction_grammar.lark"
 
     parser: lark.Lark
     atomix: Atomix
@@ -365,7 +372,7 @@ class ReactionParser(object):
         """
         Parse Reaction String.
         - K Reactions syntax: aA + bB -> cC + dD
-        - Enzymatic reactions syntax: aA --ENZYME>> cC + dD 
+        - Enzymatic reactions syntax: aA --ENZYME>> cC + dD
 
         Rem: Capital letters stand for Species, lower letters for stoichiometry.
 
@@ -379,30 +386,35 @@ class ReactionParser(object):
         """
         r = self._parse(reaction)
         if not isinstance(r, dict):
-            raise TypeError(
-                f"Unable to parse: '{reaction}' as a chemical reaction")
+            raise TypeError(f"Unable to parse: '{reaction}' as a chemical reaction")
         for _, (species, _) in r["reactants"].items():
             if isinstance(species, (Atom, Molecule)):
                 try:
                     self._set_mass(species)
                 except KeyError:
-                    logger.warning(f"Unable to compute mass of {species}. "
-                                   "Setting it to default mass, i.e. 0")
+                    logger.warning(
+                        f"Unable to compute mass of {species}. "
+                        "Setting it to default mass, i.e. 0"
+                    )
                     species.mass = 0
         for _, (species, _) in r["products"].items():
             if isinstance(species, (Atom, Molecule)):
                 try:
                     self._set_mass(species)
                 except KeyError:
-                    logger.warning(f"Unable to compute mass of {species}. "
-                                   "Setting it to default mass, i.e. 0")
+                    logger.warning(
+                        f"Unable to compute mass of {species}. "
+                        "Setting it to default mass, i.e. 0"
+                    )
                     species.mass = 0
         if isinstance(r["enzyme"], (Atom, Molecule)):
             try:
                 self._set_mass(r["enzyme"])
             except KeyError:
-                logger.warning(f"Unable to compute mass of {species}. "
-                               "Setting it to default mass, i.e. 0")
+                logger.warning(
+                    f"Unable to compute mass of {species}. "
+                    "Setting it to default mass, i.e. 0"
+                )
                 species.mass = 0
         return r
 
@@ -411,7 +423,7 @@ class ReactionParser(object):
         Method to Parse a single species Name.
 
         Returns:
-            BasicSpecies | Atom | Molecule        
+            BasicSpecies | Atom | Molecule
         """
         _ = self._parse(species)
         if isinstance(_, (Atom, Molecule)):
@@ -422,7 +434,7 @@ class ReactionParser(object):
         raise TypeError(f"Unable to parse: '{species}' as a chemical species")
 
     def _set_mass(self, species: Atom | Molecule) -> None:
-        """ 
+        """
         Try to get the mass of all Atoms.
 
         Raises:

@@ -10,7 +10,6 @@ from __future__ import annotations
 import typing as tp
 
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.chemistry.acid_base import ABCouple
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import (
     kreaction_from_dict,
@@ -36,15 +35,15 @@ __all__: tp.List = []
 
 
 def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
-    """" 
+    """ "
     Function for config files assembly. It allows to define the environment in several
-    independent config file. Convenient for reuse. 
+    independent config file. Convenient for reuse.
     General behavior:
         Keep 'root', erase entries from 'root' when 'other' has it and add entries from
         'other' not included in 'root'
     """
     # Easy part
-    root["bio_param"] |= other["bio_param"]
+    root["parameters"] |= other["parameters"]
     root["concentrations"]["fixed"] |= other["concentrations"]["fixed"]
     root["concentrations"]["initial"] |= other["concentrations"]["initial"]
 
@@ -127,7 +126,7 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
 
 
 def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Dict:
-    """ 
+    """
     Dictionary comparison, insightful.
     From:
     https://stackoverflow.com/questions/4527942
@@ -139,10 +138,8 @@ def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Dict:
     added = d2_keys - d1_keys
     modified = {o: (d1[o], d2[o]) for o in shared_keys if d1[o] != d2[o]}
     same = {o for o in shared_keys if d1[o] == d2[o]}
-    return {"added": added,
-            "removed": removed,
-            "modified": modified,
-            "same": same}
+    return {"added": added, "removed": removed, "modified": modified, "same": same}
+
 
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #

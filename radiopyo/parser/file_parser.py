@@ -40,7 +40,7 @@ logger = logging.getLogger("radiopyo")
 
 
 def list_available_parsers() -> tp.Dict[str, tp.Type[FileParser]]:
-    return {cls.ext: cls for cls in FileParser.__subclasses__()}
+    return {cls.ext: cls for cls in FileParser.__subclasses__()}  # type: ignore [type-abstract]
 
 
 def resolve_includes(config: ConfigDict) -> ConfigDict:
@@ -54,13 +54,14 @@ def resolve_includes(config: ConfigDict) -> ConfigDict:
     # Loop ovr all files in 'includes' section (sorted by extension)
     for ext, f_list in includes.items():
         # Check that it is a known extension
-        if ("."+ext) not in available_parsers:
-            logger.warning(f"Unable to include .{ext} file. "
-                           "No parser available")
+        if ("." + ext) not in available_parsers:
+            logger.warning(f"Unable to include .{ext} file. No parser available")
             continue
 
         if not isinstance(f_list, (list, tuple)):
-            f_list = [f_list, ]
+            f_list = [
+                f_list,
+            ]
 
         # Loop over all file with the same extension ('ext')
         for f in f_list:
@@ -75,10 +76,12 @@ def resolve_includes(config: ConfigDict) -> ConfigDict:
             if not path.exists():
                 raise FileNotFoundError(path)
             logger.info(f"Resolving include: {path}")
-            _ = resolve_includes(available_parsers["."+ext](path).parse())
+            _ = resolve_includes(available_parsers["." + ext](path).parse())
             config = combine_config(_, config)
 
     return config
+
+
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
@@ -88,6 +91,7 @@ class FileParser(ABC):
     """
     Generic Class parsing files.
     """
+
     path: str | pathlib.Path
     ext: tp.ClassVar[str]
 
@@ -99,7 +103,7 @@ class FileParser(ABC):
 
     @abstractmethod
     def parse(self) -> ConfigDict:
-        """ 
+        """
         Method parsing the file (self.path) and returning a ConfigDict.
 
         Returns:
@@ -115,8 +119,10 @@ class FileParser(ABC):
             str: file extension
         """
         try:
-            return self.ext if self.ext.startswith(".") else "."+self.ext
+            return self.ext if self.ext.startswith(".") else "." + self.ext
         except AttributeError as e:
-            raise AttributeError("You need to provide explicit file "
-                                 "extension for user defined FileParser via its "
-                                 "'ext' class attribute") from e
+            raise AttributeError(
+                "You need to provide explicit file "
+                "extension for user defined FileParser via its "
+                "'ext' class attribute"
+            ) from e
