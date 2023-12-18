@@ -288,6 +288,7 @@ class SimEnv:
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
 
+    Attention, ici il faut absolument tenir compte de la temperature et du calcul des k_values pour le cas des BiReactions
     def make_kreaction_matrix(
         self,
     ) -> tp.Tuple[
