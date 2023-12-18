@@ -383,6 +383,17 @@ class BiReaction(KReactionCollection, ABC):
             "Not possible to add more reaction to an equilibrium collection"
         )
 
+    def iter_reactions_and_kvalues(
+        self,
+        T: tp.Optional[float] = None,
+    ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
+        """
+        Args:
+            T: Temperature in °C (optional, default:25)
+        """
+        yield "forward", self.get_reaction("forward"), self.k_forward(T)
+        yield "backward", self.get_reaction("backward"), self.k_backward(T)
+
     @abstractmethod
     def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
         """ """
@@ -394,14 +405,3 @@ class BiReaction(KReactionCollection, ABC):
     @abstractmethod
     def k_backward(self, T: tp.Optional[float] = None) -> float:
         """ """
-
-    def iter_reactions_and_kvalues(
-        self,
-        T: tp.Optional[float] = None,
-    ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
-        """
-        Args:
-            T: Temperature in °C (optional, default:25)
-        """
-        yield "forward", self.get_reaction("forward"), self.k_forward(T)
-        yield "backward", self.get_reaction("backward"), self.k_backward(T)
