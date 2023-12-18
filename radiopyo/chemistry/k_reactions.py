@@ -265,16 +265,10 @@ class KReaction(BasicReaction):
 
     def __str__(self) -> str:
         out = []
-        for sp, stoi in self.iter_reactants():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_ + f"{sp.label}")
-            out.append("+")
-        out[-1] = "->"
-        for sp, stoi in self.iter_products():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_ + f"{sp.label}")
-            out.append("+")
-        return " ".join(out[:-1])
+        out.append(self.reactants_as_string())
+        out.append("->")
+        out.append(self.products_as_string())
+        return " ".join(out)
 
     def __repr__(self) -> str:
         return f"KReaction('{self.__str__()}', k_value={self.raw_k_value()})"
@@ -401,7 +395,7 @@ class BiReaction(KReactionCollection, ABC):
         out.append(self.forward.reactants_as_string())
         out.append("<->")
         out.append(self.forward.products_as_string())
-        return " ".join(out[:])
+        return " ".join(out)
 
     @abstractmethod
     def k_equilibrium(self, T: tp.Optional[float] = None) -> float:

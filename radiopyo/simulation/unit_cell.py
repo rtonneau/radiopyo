@@ -349,7 +349,7 @@ class UnitCell(object):
             ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
         """
         logger.info(
-            f"Starting simulation with t_span: {t_span} " f"(jacobian use: {use_jac})"
+            f"Starting simulation with t_span: {t_span} (jacobian use: {use_jac})"
         )
         sol = self._raw_run(
             t_span,

@@ -27,14 +27,12 @@ from radiopyo.chemistry.k_reactions import KReaction
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
 from radiopyo.chemistry.species import ChemSpecies
-from radiopyo.parser.reaction_parser import GenericReaction
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.basic_chemistry import BasicReaction
-    from radiopyo.chemistry.k_reactions import BiReaction
     from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -195,7 +193,7 @@ class SimEnv:
         # Sanity check
         if "reactions" not in config:
             logger.warning(
-                "CONFIG::No 'reactions' section in the provided " "configuration"
+                "CONFIG::No 'reactions' section in the provided configuration"
             )
             config["reactions"] = {
                 "acid_base": [],

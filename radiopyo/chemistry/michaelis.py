@@ -243,19 +243,12 @@ class MichaelisMenten(BasicReaction):
 
     def __str__(self) -> str:
         out = []
-        for sp, stoi in self.iter_reactants():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_ + f"{sp.label}")
-            out.append("+")
-        out[-1] = "--"
+        out.append(self.reactants_as_string())
+        out.append("--")
         out.append(f"{self.enzyme.label}")
         out.append(">>")
-
-        for sp, stoi in self.iter_products():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_ + f"{sp.label}")
-            out.append("+")
-        return " ".join(out[:-1])
+        out.append(self.products_as_string())
+        return " ".join(out)
 
     def __repr__(self) -> str:
         return (

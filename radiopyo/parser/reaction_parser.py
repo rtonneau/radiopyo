@@ -205,9 +205,7 @@ class Molecule(ChemicalSpecies):
                     "to compose a molecule"
                 )
             if atom.radical is not False:
-                raise ValueError(
-                    f"{atom} must not be a radical " "to compose a molecule"
-                )
+                raise ValueError(f"{atom} must not be a radical to compose a molecule")
 
     def __iter__(self) -> Iterator[tp.Tuple[Atom, int]]:
         """Let's easily iterate of (atoms, stoichiometry)"""
