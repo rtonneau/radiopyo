@@ -16,6 +16,7 @@ from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
 # --------------------------------- Internal imports --------------------------------- #
 from .k_reactions import (
+    BiReaction,
     KReaction,
     KReactionCollection,
     polynomial_factory,
@@ -35,7 +36,7 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 
 
-class AcidBase(KReactionCollection):
+class AcidBase(BiReaction):
     """
     This one is more tricky about temperature management as various polynomial forms
     are involved:
@@ -52,8 +53,6 @@ class AcidBase(KReactionCollection):
     """
 
     _pKa: np.polynomial.Polynomial
-    _k_backward: tp.Optional[np.polynomial.Polynomial]
-    _k_forward: tp.Optional[np.polynomial.Polynomial]
 
     def __init__(
         self,
@@ -82,27 +81,9 @@ class AcidBase(KReactionCollection):
 
         # Need to add forward and backward reactions via the superclass
         # KReactionCollection as this method is not allowed for an EReaction.
-        super().add_reaction("forward", reaction, list_sp)
-        super().add_reaction("backward", revert_reaction(reaction), list_sp)
-
-    @property
-    def forward(self) -> KReaction:
-        """ """
-        return self._reactions[0][1]
-
-    @property
-    def backward(self) -> KReaction:
-        """ """
-        return self._reactions[1][1]
-
-    def add_reaction(
-        self,
-        label: str,
-        generic: GenericReaction,
-        list_sp: ListSpecies | None = None,
-    ) -> None:
-        raise NotImplementedError(
-            "Not possible to add more reaction to an equilibrium collection"
+        KReactionCollection.add_reaction(self, "forward", reaction, list_sp)
+        KReactionCollection.add_reaction(
+            self, "backward", revert_reaction(reaction), list_sp
         )
 
     def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
@@ -140,14 +121,3 @@ class AcidBase(KReactionCollection):
         if self._k_backward is None:
             raise ValueError("AcidBase: Both K_forward and K_backward are None")
         return 10 ** self._k_backward(1.0 / _T.kelvin)
-
-    def iter_reactions_and_kvalues(
-        self,
-        T: tp.Optional[float] = None,
-    ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
-        """
-        Args:
-            T: Temperature in °C (optional, default:25)
-        """
-        yield "forward", self.get_reaction("forward"), self.k_forward(T)
-        yield "backward", self.get_reaction("backward"), self.k_backward(T)

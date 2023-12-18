@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import typing as tp
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -103,7 +104,6 @@ class KReaction(BasicReaction):
                 f"Unable to compute reaction constant. No data provided for reaction: {self}"
             )
         _T = Temperature(T, unit="celsius")
-        print(f"Temperature is {_T.kelvin}")
         return np.power(10, self._k_value(1.0 / _T.kelvin))
 
     def set_k_value(self, value: KValType) -> None:
@@ -355,3 +355,53 @@ class KReactionCollection:
                 ),
             )
         )
+
+
+class BiReaction(KReactionCollection, ABC):
+    """ """
+
+    _k_backward: tp.Optional[np.polynomial.Polynomial]
+    _k_forward: tp.Optional[np.polynomial.Polynomial]
+
+    @property
+    def forward(self) -> KReaction:
+        """ """
+        return self._reactions[0][1]
+
+    @property
+    def backward(self) -> KReaction:
+        """ """
+        return self._reactions[1][1]
+
+    def add_reaction(
+        self,
+        label: str,
+        generic: GenericReaction,
+        list_sp: ListSpecies | None = None,
+    ) -> None:
+        raise NotImplementedError(
+            "Not possible to add more reaction to an equilibrium collection"
+        )
+
+    @abstractmethod
+    def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
+        """ """
+
+    @abstractmethod
+    def k_forward(self, T: tp.Optional[float] = None) -> float:
+        """ """
+
+    @abstractmethod
+    def k_backward(self, T: tp.Optional[float] = None) -> float:
+        """ """
+
+    def iter_reactions_and_kvalues(
+        self,
+        T: tp.Optional[float] = None,
+    ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
+        """
+        Args:
+            T: Temperature in °C (optional, default:25)
+        """
+        yield "forward", self.get_reaction("forward"), self.k_forward(T)
+        yield "backward", self.get_reaction("backward"), self.k_backward(T)

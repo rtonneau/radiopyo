@@ -15,6 +15,7 @@ import typing as tp
 from radiopyo.parser.reaction_parser import revert_reaction
 
 from .k_reactions import (
+    BiReaction,
     KReaction,
     KReactionCollection,
     polynomial_factory,
@@ -40,7 +41,7 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 
 
-class EReaction(KReactionCollection):
+class EReaction(BiReaction):
     """
 
     The math for equilibrium constant are the following:
@@ -51,8 +52,6 @@ class EReaction(KReactionCollection):
     """
 
     _k_equilibrium: np.polynomial.Polynomial
-    _k_backward: np.polynomial.Polynomial
-    _k_forward: np.polynomial.Polynomial
 
     def __init__(
         self,
@@ -82,10 +81,6 @@ class EReaction(KReactionCollection):
             self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
             self._k_equilibrium = polynomial_factory(constant)
             self._k_forward = self._k_equilibrium + self._k_backward
-            print("--Init--")
-            print(self._k_backward)
-            print(self._k_equilibrium)
-            print(self._k_forward)
         elif (
             "k_forward" in reaction["constants"]
             and reaction["constants"]["k_forward"] is not None
@@ -100,30 +95,12 @@ class EReaction(KReactionCollection):
 
         # Need to add forward and backward reactions via the superclass
         # KReactionCollection as this method is not allowed for an EReaction.
-        super().add_reaction("forward", reaction, list_sp)
-        self.last.set_k_value(self._k_forward)
-        super().add_reaction("backward", revert_reaction(reaction), list_sp)
-        self.last.set_k_value(self._k_backward)
-
-    @property
-    def forward(self) -> KReaction:
-        """ """
-        return self._reactions[0][1]
-
-    @property
-    def backward(self) -> KReaction:
-        """ """
-        return self._reactions[1][1]
-
-    def add_reaction(
-        self,
-        label: str,
-        generic: GenericReaction,
-        list_sp: ListSpecies | None = None,
-    ) -> None:
-        raise NotImplementedError(
-            "Not possible to add more reaction to an equilibrium collection"
+        KReactionCollection.add_reaction(self, "forward", reaction, list_sp)
+        self.forward.set_k_value(self._k_forward)  # type: ignore [arg-type]
+        KReactionCollection.add_reaction(
+            self, "backward", revert_reaction(reaction), list_sp
         )
+        self.backward.set_k_value(self._k_backward)  # type: ignore [arg-type]
 
     def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
         """
@@ -146,14 +123,3 @@ class EReaction(KReactionCollection):
             T: temperature in °C.
         """
         return self.backward.k_value(T)
-
-    def iter_reactions_and_kvalues(
-        self,
-        T: tp.Optional[float] = None,
-    ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
-        """
-        Args:
-            T: temperature in °C.
-        """
-        yield "forward", self.get_reaction("forward"), self.k_forward(T)
-        yield "backward", self.get_reaction("backward"), self.k_backward(T)
