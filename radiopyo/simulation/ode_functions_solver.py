@@ -41,25 +41,29 @@ global EPSILON
 EPSILON = 1e-25  # µmol/L
 
 
-def jacobian(t: float,
-             y: NDArray[np.float64],
-             beam: ParticleBeam,
-             pH_species_index: int,
-             cst_sp: NDArray[np.float64],
-             AB_mat: Tuple[NDArray[np.int8],
-                           NDArray[np.float64]],
-             Ki_mat: Tuple[NDArray[np.float64],
-                           NDArray[np.int8],
-                           NDArray[np.float32],
-                           NDArray[np.float32]],
-             Gi_mat: NDArray[np.float64],
-             Ez_mat: Optional[Tuple[NDArray[np.float32],
-                                    NDArray[np.float32],
-                                    NDArray[np.float64],
-                                    NDArray[np.int8],
-                                    ]] = None,
-             ) -> NDArray[np.float64]:
-    """ Computes the jacobian dy/ds_i where s_i are species[i]
+def jacobian(
+    t: float,
+    y: NDArray[np.float64],
+    beam: ParticleBeam,
+    pH_species_index: int,
+    cst_sp: NDArray[np.float64],
+    Ki_mat: Tuple[
+        NDArray[np.float64],
+        NDArray[np.int8],
+        NDArray[np.float32],
+        NDArray[np.float32],
+    ],
+    Gi_mat: NDArray[np.float64],
+    Ez_mat: Optional[
+        Tuple[
+            NDArray[np.float32],
+            NDArray[np.float32],
+            NDArray[np.float64],
+            NDArray[np.int8],
+        ]
+    ] = None,
+) -> NDArray[np.float64]:
+    """Computes the jacobian dy/ds_i where s_i are species[i]
     Returns:
         NDArray[np.float64]: jacobian (square) matrix
                  |   ds_0        ds_1    ....      ds_j
@@ -69,20 +73,12 @@ def jacobian(t: float,
             .... |    ....        ....   ....      ....
             ds_i | ds_i/ds_0   ds_i/ds_1 ....    ds_i/ds_j
     """
-    y = y.clip(min=0.0, ) * 1e-6
-    # Compute some useful variables
-    AB_correction = np.zeros(len(AB_mat[1])*2)
-    AB_correction[::2] = 1 / \
-        (1 + AB_mat[1]/y[pH_species_index])  # Acid partition
-    AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
-
-    # Construct the cc vector with all relevant species
-    # ==> Dynamical species (already in y)
-    # ==> Extract A/B couples
-    # ==> Add constant species
-    y = np.matmul(y, AB_mat[0])
-    y = np.append(y, cst_sp)
-    y[:len(AB_correction)] *= AB_correction
+    y = (
+        y.clip(
+            min=0.0,
+        )
+        * 1e-6
+    )
 
     # K Reactions component
     res = np.nan_to_num(np.einsum("j, jikl -> ikl ", y, Ki_mat[3]), nan=1)
@@ -101,54 +97,47 @@ def jacobian(t: float,
         res += JEnzi
 
     # Take into account Acid/Base
-    return res[:-len(cst_sp), :-len(cst_sp)]
+    return res[: -len(cst_sp), : -len(cst_sp)]
 
 
-def derive(t: float,
-           y: NDArray[np.float64],
-           beam: Optional[ParticleBeam],
-           H3O_plus_index: int,
-           OH_minus_index: int,
-           cst_sp: NDArray[np.float64],
-           AB_mat: Tuple[NDArray[np.int8],
-                         NDArray[np.float64]],
-           Ki_mat: Tuple[NDArray[np.float64],
-                         NDArray[np.int8],
-                         NDArray[np.float32],
-                         NDArray[np.float32]],
-           Gi_mat: NDArray[np.float64],
-           Ez_mat: Optional[Tuple[NDArray[np.float32],
-                                  NDArray[np.float32],
-                                  NDArray[np.float64],
-                                  NDArray[np.int8],
-                                  ]] = None,
-           ) -> NDArray[np.float64]:
-    """ Compute the time derivative of species concentration
+def derive(
+    t: float,
+    y: NDArray[np.float64],
+    beam: Optional[ParticleBeam],
+    H3O_plus_index: int,
+    OH_minus_index: int,
+    cst_sp: NDArray[np.float64],
+    Ki_mat: Tuple[
+        NDArray[np.float64],
+        NDArray[np.int8],
+        NDArray[np.float32],
+        NDArray[np.float32],
+    ],
+    Gi_mat: NDArray[np.float64],
+    Ez_mat: Optional[
+        Tuple[
+            NDArray[np.float32],
+            NDArray[np.float32],
+            NDArray[np.float64],
+            NDArray[np.int8],
+        ]
+    ] = None,
+) -> NDArray[np.float64]:
+    """Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
     """
 
     # Force negative cc values to 0 + convert to [mol/L]
     # y = y.clip(min=0.0, ) * 1e-6
-    y = y*1.0e-6  # µmol/L => mol/l
+    y = y * 1.0e-6  # µmol/L => mol/l
     y[y < 1e-18] = 0.0  # Cut off
 
     # y[OH_minus_index] = y[H3O_plus_index]
 
     # Construct the cc vector with all relevant species
     # ==> Dynamical species (already in y)
-    # ==> Extract A/B couples
     # ==> Add constant species
-    y = np.matmul(y, AB_mat[0])
     y = np.append(y, cst_sp)
-
-    AB_correction = np.ones(len(AB_mat[1])*2)
-    if y[H3O_plus_index] > 0:
-        AB_correction[::2] = 1 / \
-            (1 + AB_mat[1]/y[H3O_plus_index])  # Acid partition
-    else:
-        AB_correction[::2] = 0
-    AB_correction[1::2] = 1 - AB_correction[::2]              # Base partition
-    y[:len(AB_correction)] *= AB_correction
 
     ####################################################################################
     # Compute evolution rate of cc'
@@ -184,7 +173,7 @@ def derive(t: float,
     # ==> A/B couples with only the total
     # ==> dynamical species
     # ==> convert back to [µmol/l]
-    dydt = np.matmul(dydt[:-len(cst_sp)], AB_mat[0].T)
+    dydt = dydt[: -len(cst_sp)]
 
     # dydt[H3O_plus_index] = (dydt[H3O_plus_index] + dydt[OH_minus_index])/2
     # dydt[OH_minus_index] = dydt[H3O_plus_index]
@@ -201,6 +190,7 @@ class ScipyODEResult(Protocol):
     """
     Protocol mapping the output of scipy.integrate.solve_ivp
     """
+
     t: NDArray[np.float64]
     y: NDArray[np.float64]
     sol: Optional[Any]

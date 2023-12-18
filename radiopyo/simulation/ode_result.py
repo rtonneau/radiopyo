@@ -284,7 +284,7 @@ class ODEResult(object):
         """
         # Compute column names and Pre compute slices to ease access in the dataframe
         # columns
-        cols_kr = [kr.as_label() for kr in self.env.reactions.k_reaction]
+        cols_kr = [kr.as_label() for kr in self.env.reactions.iter_all_kreactions()]
         idx_kr = slice(0, len(cols_kr))
 
         cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
@@ -311,13 +311,7 @@ class ODEResult(object):
             y = y * 1.0e-6  # µmol/L => mol/l
             y[y < 1e-18] = 0.0  # Cut off fmol/L
 
-            y = np.matmul(y, self.mat["AB_mat"][0])
             y = np.append(y, self.mat["cst_sp"])
-            AB_correction = np.ones(len(self.mat["AB_mat"][1]) * 2)
-            AB_correction[::2] = 1 / (1 + self.mat["AB_mat"][1] / y[H_plus_index])
-            AB_correction[1::2] = 1 - AB_correction[::2]
-            y[: len(AB_correction)] *= AB_correction
-
             # K Reactions
             Rki = np.nan_to_num(
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
@@ -344,13 +338,6 @@ class ODEResult(object):
                 )
                 out.iloc[idx, idx_ez] = MM
         return out
-        match clip:
-            case bool():
-                return out if not clip else out.clip(lower=1e-10)
-            case int() | float():
-                return out.clip(lower=clip)
-            case _:
-                return out
 
     def species_balance_evolution(self) -> pd.DataFrame:
         rr = self.reconstruct_reactions()

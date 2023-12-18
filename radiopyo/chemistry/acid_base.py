@@ -9,15 +9,16 @@ Author:
 from __future__ import annotations
 
 import typing as tp
+from contextlib import suppress
 
 import numpy as np
 
+# --------------------------------- Internal imports --------------------------------- #
+from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
-# --------------------------------- Internal imports --------------------------------- #
 from .k_reactions import (
     BiReaction,
-    KReaction,
     KReactionCollection,
     polynomial_factory,
 )
@@ -85,6 +86,42 @@ class AcidBase(BiReaction):
         KReactionCollection.add_reaction(
             self, "backward", revert_reaction(reaction), list_sp
         )
+
+    @classmethod
+    def from_kwargs(
+        cls,
+        list_sp: tp.Optional[ListSpecies] = None,
+        **kwargs: str | tp.List[str] | float | tp.List[float],
+    ) -> tp.Self:
+        """
+        This method combines the two possible definitions of a KReaction in a config
+        file.
+        TODO: remove the dict approach to keep only the single string reaction.
+        """
+        # Allow shallow creation (outside of a simulation env)
+        if list_sp is None:
+            list_sp = ListSpecies()
+
+        try:
+            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
+            pKa = kwargs["pKa"]
+        except KeyError as err:
+            raise AttributeError(
+                "Need a reaction string AND a pKa to create an Acid Base rel."
+            ) from err
+
+        if "k_value" in kwargs:
+            raise AttributeError(
+                "'k_value' is ambiguous for an AcidBase reaction. "
+                "Use k_forward or k_backward instead."
+            )
+
+        with suppress(KeyError):
+            gen["constants"]["k_forward"] = kwargs["k_forward"]  # type:ignore[assignment]
+        with suppress(KeyError):
+            gen["constants"]["k_backward"] = kwargs["k_backward"]  # type:ignore[assignment]
+
+        return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
     def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
         """

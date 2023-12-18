@@ -35,6 +35,7 @@ __all__ = [
 
 class IsChemicalReaction(tp.Protocol):
     """Protocol => used for type hints"""
+
     reactants: tp.Dict[str, ChemSpecies]
     products: tp.Dict[str, ChemSpecies]
     stoi_reactants: tp.Dict[str, int]
@@ -48,7 +49,7 @@ class IsChemicalReaction(tp.Protocol):
         """Iter over species involved in the reaction"""
 
     def iter_reactants(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
-        """ Iter over reactants only"""
+        """Iter over reactants only"""
 
     def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """Iter over products only"""
@@ -84,6 +85,7 @@ class BasicReaction(ABC):
         stoi_products: Dict[str, int]
         index: int
     """
+
     reactants: tp.Dict[str, ChemSpecies]
     products: tp.Dict[str, ChemSpecies]
     stoi_reactants: tp.Dict[str, int]
@@ -107,7 +109,7 @@ class BasicReaction(ABC):
             bool
 
         Raises:
-            NotImplementedError: 
+            NotImplementedError:
                 if 'other' have any other type
         """
         if isinstance(other, (str, RawSpecies)):
@@ -120,10 +122,10 @@ class BasicReaction(ABC):
 
     @abstractmethod
     def as_label(self) -> tp.List[str]:
-        """ 
+        """
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
-        reaction type and the index of reaction. For instance, it can be used as column 
+        reaction type and the index of reaction. For instance, it can be used as column
         name in a pandas DataFrame.
 
         Returns:
@@ -132,12 +134,12 @@ class BasicReaction(ABC):
 
     @classmethod
     @abstractmethod
-    def from_kwargs(cls,
-                    list_sp: tp.Optional[ListSpecies] = None,
-                    **kwargs: str | tp.List[str] | float | tp.List[float],
-                    ) -> tp.Self:
-        """ 
-        """
+    def from_kwargs(
+        cls,
+        list_sp: tp.Optional[ListSpecies] = None,
+        **kwargs: str | tp.List[str] | float | tp.List[float],
+    ) -> tp.Self:
+        """ """
 
     def tot_number_reactants(self) -> int:
         """
@@ -159,14 +161,15 @@ class BasicReaction(ABC):
         return chain(self.reactants.values(), self.products.values())
 
     def iter_reactants(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
-        """ Iter over reactants only, including the stoichiometry.
+        """Iter over reactants only, including the stoichiometry.
 
         Returns:
             Iterator: Tuple[SimSpecies, int]
                 The second element is the stoichiometry of the reactant.
         """
-        return [(sp, self.stoi_reactants[label])
-                for label, sp in self.reactants.items()]
+        return [
+            (sp, self.stoi_reactants[label]) for label, sp in self.reactants.items()
+        ]
 
     def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """Iter over products only, including the stoichiometry.
@@ -174,11 +177,10 @@ class BasicReaction(ABC):
             Iterator: Tuple[SimSpecies, int]
                 The second element is the stoichiometry of the product.
         """
-        return [(sp, self.stoi_products[label])
-                for label, sp in self.products.items()]
+        return [(sp, self.stoi_products[label]) for label, sp in self.products.items()]
 
     def set_index(self, index: int) -> None:
-        """ Set the index of the reaction.
+        """Set the index of the reaction.
 
         Args:
             index: int
@@ -270,3 +272,21 @@ class BasicReaction(ABC):
         else:
             self.reactants[sp.label] = sp
             self.stoi_reactants[sp.label] = multiple
+
+    def reactants_as_string(self) -> str:
+        """ """
+        out = []
+        for sp, stoi in self.iter_reactants():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_ + f"{sp.label}")
+            out.append("+")
+        return " ".join(out[:-1])
+
+    def products_as_string(self) -> str:
+        """ """
+        out = []
+        for sp, stoi in self.iter_products():
+            _ = "" if stoi <= 1 else f"{stoi}"
+            out.append(_ + f"{sp.label}")
+            out.append("+")
+        return " ".join(out[:-1])

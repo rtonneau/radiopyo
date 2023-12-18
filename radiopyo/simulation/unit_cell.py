@@ -53,7 +53,7 @@ logger = logging.getLogger("radiopyo")
 
 
 class UnitCell(object):
-    """ 
+    """
     Class UnitCell represents the tiniest simulation volume. All concentrations are
     assumed to be homogenous in it. It also defines method to solve ODE's in order to
     compute the evolution of concentration over time.
@@ -73,6 +73,7 @@ class UnitCell(object):
             Initial time step of all simulation (default=1e-12)
 
     """
+
     FIRST_STEP: float = 1e-15
 
     env: SimEnv
@@ -81,13 +82,13 @@ class UnitCell(object):
     last_exec_time: float
     g_val: GValuesBoscolo
 
-    def __init__(self,
-                 env: SimEnv,
-                 beam: tp.Optional[ParticleBeam | BeamCollection] = None,
-                 ) -> None:
+    def __init__(
+        self,
+        env: SimEnv,
+        beam: tp.Optional[ParticleBeam | BeamCollection] = None,
+    ) -> None:
         self.env = env
         self.mat = SimMatrices(
-            AB_mat=self.env.make_acidBase_matrix(),
             Ki_mat=self.env.make_kreaction_matrix(),
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
@@ -119,7 +120,7 @@ class UnitCell(object):
                 Dictionary (see radiopyo.sim_types.py) containing simulation parameters.
 
         Returns:
-            UnitCell 
+            UnitCell
         """
         beam_list: tp.Optional[BeamCollection] = None
 
@@ -129,8 +130,7 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
-        return cls(env=SimEnv.from_dict(config),
-                   beam=beam_list)
+        return cls(env=SimEnv.from_dict(config), beam=beam_list)
 
     @classmethod
     def from_parser(cls, file: str | Path, Parser: tp.Type[FileParser]) -> tp.Self:
@@ -163,7 +163,7 @@ class UnitCell(object):
         """
         return cls.from_parser(file, TOMLFileParser)
 
-    @ classmethod
+    @classmethod
     def from_ron(cls, file: str | Path) -> tp.Self:
         """Create a Simulation Environment from a RON file:
 
@@ -176,10 +176,11 @@ class UnitCell(object):
         """
         return cls.from_parser(file, RonFileParser)
 
-    def set_beam(self,
-                 beam: ParticleBeam | str,
-                 LET: tp.Optional[float] = None,
-                 ) -> None:
+    def set_beam(
+        self,
+        beam: ParticleBeam | str,
+        LET: tp.Optional[float] = None,
+    ) -> None:
         """Define Radiation Source structure/parameters
 
         Args:
@@ -193,16 +194,17 @@ class UnitCell(object):
         if isinstance(beam, str):
             self.beam_list.use_beam(beam)
             LET = LET or self.beam_list.current_LET
-            logger.info(f"Setting beam definition ({self.beam_list._current}): "
-                        f"{self.beam_list.current}, done!")
+            logger.info(
+                f"Setting beam definition ({self.beam_list._current}): "
+                f"{self.beam_list.current}, done!"
+            )
         else:
             LET = LET or _OLD_LET
-            self.beam_list.add_beam(beam,
-                                    beam.label,
-                                    let=LET,
-                                    use=True)
-            logger.info(f"Setting new beam definition ({self.beam_list._current}): "
-                        f"{self.beam_list.current}, done!")
+            self.beam_list.add_beam(beam, beam.label, let=LET, use=True)
+            logger.info(
+                f"Setting new beam definition ({self.beam_list._current}): "
+                f"{self.beam_list.current}, done!"
+            )
 
         if LET is not None and LET != _OLD_LET:
             self.change_LET(LET)
@@ -219,8 +221,7 @@ class UnitCell(object):
             None
         """
         self.beam_list.update_let(let)
-        logger.info(
-            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
+        logger.info(f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
             if sp.label not in self.g_val or (not self.env.species.is_dyn_species(sp)):
@@ -234,24 +235,24 @@ class UnitCell(object):
         for reaction in self.env.reactions.radiolytic:
             logger.debug(f"-> {reaction.label()}: {reaction.ge():.3f}")
 
-    def _raw_run(self,
-                 t_span: tp.Tuple[float, float],
-                 use_jac: bool,
-                 method: str,
-                 atol: tp.Optional[float] = None,
-                 rtol: tp.Optional[float] = None,
-                 max_step: tp.Optional[float] = None,
-                 y0: tp.Optional[NDArray[np.float64]] = None,
-                 t_eval: tp.Optional[NDArray[np.float64]] = None,
-                 use_beam: bool = True,
-                 ) -> ScipyODEResult:
-
+    def _raw_run(
+        self,
+        t_span: tp.Tuple[float, float],
+        use_jac: bool,
+        method: str,
+        atol: tp.Optional[float] = None,
+        rtol: tp.Optional[float] = None,
+        max_step: tp.Optional[float] = None,
+        y0: tp.Optional[NDArray[np.float64]] = None,
+        t_eval: tp.Optional[NDArray[np.float64]] = None,
+        use_beam: bool = True,
+    ) -> ScipyODEResult:
         if len(self.beam_list) <= 0:
             rp_excep.NoBeamDefinedError("Simulation aborted")
         first_step = self.FIRST_STEP
 
         if t_span[0] == t_span[1]:
-            t_span = (t_span[0]/1e2, t_span[1])
+            t_span = (t_span[0] / 1e2, t_span[1])
         # Building kwargs for solve_ivp:
         kwargs: tp.Dict[str, tp.Any] = {}
         kwargs["first_step"] = self.FIRST_STEP
@@ -276,49 +277,54 @@ class UnitCell(object):
 
         beam = self.beam_list.current if use_beam else None
         t0 = time.time()
-        sol: ScipyODEResult = solve_ivp(derive,
-                                        t_span,
-                                        args=(beam,
-                                              self.env.species["H3O_plus"].index,
-                                              self.env.species["OH_minus"].index,
-                                              self.mat["cst_sp"],
-                                              self.mat["AB_mat"],
-                                              self.mat["Ki_mat"],
-                                              self.mat["Gi_mat"],
-                                              self.mat["Ez_mat"],
-                                              ),
-                                        t_eval=t_eval,
-                                        method=method,
-                                        **kwargs
-                                        )
+        sol: ScipyODEResult = solve_ivp(
+            derive,
+            t_span,
+            args=(
+                beam,
+                self.env.species["H3O_plus"].index,
+                self.env.species["OH_minus"].index,
+                self.mat["cst_sp"],
+                self.mat["Ki_mat"],
+                self.mat["Gi_mat"],
+                self.mat["Ez_mat"],
+            ),
+            t_eval=t_eval,
+            method=method,
+            **kwargs,
+        )
         t1 = time.time()
         self.last_exec_time = t1 - t0
         return sol
 
     def run_till_max_dose(
-            self,
-            time_start: float = 1e-9,
-            **kwargs: tp.Unpack[KwargsRun],  # type: ignore [misc]
+        self,
+        time_start: float = 1e-9,
+        **kwargs: tp.Unpack[KwargsRun],  # type: ignore [misc]
     ) -> ODEResult:
         """ """
         if self.beam_list.current.time_at_max_dose >= np.inf:
-            raise ValueError("Unable to use 'run_till_max_dose', time at max dose "
-                             f"is inf (-> {self.beam_list.current.time_at_max_dose})")
-        return self.run(t_span=(time_start, self.beam_list.current.time_at_max_dose),
-                        **kwargs)
+            raise ValueError(
+                "Unable to use 'run_till_max_dose', time at max dose "
+                f"is inf (-> {self.beam_list.current.time_at_max_dose})"
+            )
+        return self.run(
+            t_span=(time_start, self.beam_list.current.time_at_max_dose), **kwargs
+        )
 
-    def run(self,
-            t_span: tp.Tuple[float, float],
-            t_eval: tp.Optional[NDArray[np.float64]] = None,
-            use_jac: bool = False,
-            method: str = "LSODA",
-            atol: tp.Optional[float] = None,
-            rtol: tp.Optional[float] = None,
-            max_step: tp.Optional[float] = None,
-            y0: tp.Optional[NDArray[np.float64]] = None,
-            use_beam: bool = True,
-            ) -> ODEResult:
-        """ Solve ODE over t_span
+    def run(
+        self,
+        t_span: tp.Tuple[float, float],
+        t_eval: tp.Optional[NDArray[np.float64]] = None,
+        use_jac: bool = False,
+        method: str = "LSODA",
+        atol: tp.Optional[float] = None,
+        rtol: tp.Optional[float] = None,
+        max_step: tp.Optional[float] = None,
+        y0: tp.Optional[NDArray[np.float64]] = None,
+        use_beam: bool = True,
+    ) -> ODEResult:
+        """Solve ODE over t_span
         Args:
             t_span: Tuple[float, float]
                 t_span[0] -> start time, in seconds
@@ -334,7 +340,7 @@ class UnitCell(object):
             max_step: float, optional
                 Larger authorized time step for the ODE solver (default: inf)
             y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None). If None, calls 
+                Initial concentration of DynSpecies (default: None). If None, calls
                 EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
@@ -343,38 +349,38 @@ class UnitCell(object):
             ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
         """
         logger.info(
-            f"Starting simulation with t_span: {t_span} "
-            f"(jacobian use: {use_jac})")
-        sol = self._raw_run(t_span,
-                            use_jac,
-                            method,
-                            atol,
-                            rtol,
-                            max_step,
-                            y0,
-                            t_eval,
-                            use_beam,
-                            )
+            f"Starting simulation with t_span: {t_span} " f"(jacobian use: {use_jac})"
+        )
+        sol = self._raw_run(
+            t_span,
+            use_jac,
+            method,
+            atol,
+            rtol,
+            max_step,
+            y0,
+            t_eval,
+            use_beam,
+        )
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
-        return ODEResult(self.env,
-                         self.beam_list.current,
-                         self.mat,
-                         self.beam_list.current_LET,
-                         sol)
+        return ODEResult(
+            self.env, self.beam_list.current, self.mat, self.beam_list.current_LET, sol
+        )
 
-    def prepare_chunked_run(self,
-                            t_span: tp.Tuple[float, float],
-                            use_jac: bool = False,
-                            method: str = "LSODA",
-                            atol: tp.Optional[float] = None,
-                            rtol: tp.Optional[float] = None,
-                            max_step_size_on: tp.Optional[float] = None,
-                            max_step_size_off: tp.Optional[float] = None,
-                            max_step_size_final: tp.Optional[float] = None,
-                            y0: tp.Optional[NDArray[np.float64]] = None,
-                            use_beam: bool = True,
-                            ) -> SimChunksIter:
-        """ Method used to prepare a multi step ODE integration
+    def prepare_chunked_run(
+        self,
+        t_span: tp.Tuple[float, float],
+        use_jac: bool = False,
+        method: str = "LSODA",
+        atol: tp.Optional[float] = None,
+        rtol: tp.Optional[float] = None,
+        max_step_size_on: tp.Optional[float] = None,
+        max_step_size_off: tp.Optional[float] = None,
+        max_step_size_final: tp.Optional[float] = None,
+        y0: tp.Optional[NDArray[np.float64]] = None,
+        use_beam: bool = True,
+    ) -> SimChunksIter:
+        """Method used to prepare a multi step ODE integration
         Args:
             t_span: Tuple[float, float]
                 t_span[0] -> start time, in seconds
@@ -396,7 +402,7 @@ class UnitCell(object):
                 integration step (can be the larger if long sim time and few pulses).
                 If None, 'max_step_size_off|on' is used instead (default: None).
             y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None). If None, calls 
+                Initial concentration of DynSpecies (default: None). If None, calls
                 EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
@@ -407,8 +413,9 @@ class UnitCell(object):
         if len(self.beam_list) <= 0:
             logger.error("No beam is defined for the simulation")
             raise rp_excep.NoBeamDefinedError
-        chunks = self.beam_list.current.make_time_intervals(start=t_span[0],
-                                                            stop=t_span[1])
+        chunks = self.beam_list.current.make_time_intervals(
+            start=t_span[0], stop=t_span[1]
+        )
         chunks[np.where(chunks[:, 1] > 0)[0], 1] = max_step_size_on
         chunks[np.where(chunks[:, 1] == 0)[0], 1] = max_step_size_off
         if max_step_size_final is not None:
@@ -416,20 +423,23 @@ class UnitCell(object):
 
         chunk_list: tp.List[SimChunk] = []
         for idx in range(len(chunks[0:-1, :])):
-            chunk = SimChunk(start=chunks[idx, 0],
-                             stop=chunks[idx+1, 0],
-                             max_step_size=chunks[idx, 1])
+            chunk = SimChunk(
+                start=chunks[idx, 0],
+                stop=chunks[idx + 1, 0],
+                max_step_size=chunks[idx, 1],
+            )
             chunk_list.append(chunk)
         logger.info(f"Simulation divided in {len(chunk_list)} chunks")
-        return SimChunksIter(sim=self,
-                             chunks=chunk_list,
-                             atol=atol,
-                             rtol=rtol,
-                             use_jac=use_jac,
-                             method=method,
-                             y0=y0,
-                             use_beam=use_beam,
-                             )
+        return SimChunksIter(
+            sim=self,
+            chunks=chunk_list,
+            atol=atol,
+            rtol=rtol,
+            use_jac=use_jac,
+            method=method,
+            y0=y0,
+            use_beam=use_beam,
+        )
 
 
 # ------------------------------ Chunked Simulation Run ------------------------------ #
@@ -446,13 +456,14 @@ class SimChunk(tp.NamedTuple):
         max_step_size: float
             Max step size allowed over this integration step
     """
+
     start: float
     stop: float
     max_step_size: float
 
 
-class SimChunksIter():
-    """ Iterable class performing a multi-step integration.
+class SimChunksIter:
+    """Iterable class performing a multi-step integration.
 
     Attributes:
         sim: UniCell
@@ -470,11 +481,12 @@ class SimChunksIter():
         method: str
             Defines the ODE method used with scipy.integrate.solve_ivp
         y0: NDArray[np.float64], optional
-            Initial concentration of DynSpecies (default: None). If None, calls 
+            Initial concentration of DynSpecies (default: None). If None, calls
             EnvSim.initial_values()
     Usage:
-        >>> 
+        >>>
     """
+
     sim: UnitCell
     chunks: tp.List[SimChunk]
     sol: ODEResult
@@ -486,21 +498,25 @@ class SimChunksIter():
     y0: tp.Optional[NDArray[np.float64]]
     use_beam: bool
 
-    def __init__(self, sim: UnitCell,
-                 chunks: tp.List[SimChunk],
-                 atol: tp.Optional[float] = None,
-                 rtol: tp.Optional[float] = None,
-                 use_jac: bool = False,
-                 method: str = "LSODA",
-                 y0: tp.Optional[NDArray[np.float64]] = None,
-                 use_beam: bool = True,
-                 ):
+    def __init__(
+        self,
+        sim: UnitCell,
+        chunks: tp.List[SimChunk],
+        atol: tp.Optional[float] = None,
+        rtol: tp.Optional[float] = None,
+        use_jac: bool = False,
+        method: str = "LSODA",
+        y0: tp.Optional[NDArray[np.float64]] = None,
+        use_beam: bool = True,
+    ):
         self.sim = sim
         self.chunks = chunks
-        self.sol = ODEResult(self.sim.env,
-                             self.sim.beam_list.current,
-                             self.sim.mat,
-                             self.sim.beam_list.current_LET)
+        self.sol = ODEResult(
+            self.sim.env,
+            self.sim.beam_list.current,
+            self.sim.mat,
+            self.sim.beam_list.current_LET,
+        )
         self.atol = atol
         self.rtol = rtol
         self.use_jac = use_jac
@@ -536,18 +552,19 @@ class SimChunksIter():
 
     def run(self) -> ODEResult:
         """Run all simulation chunks
-        Tries to import tqdm to give a nice progressbar to the user. But it can safely 
+        Tries to import tqdm to give a nice progressbar to the user. But it can safely
         fail.
-        get_ipython().__class__.__name__ --> detect if python was started from a 
+        get_ipython().__class__.__name__ --> detect if python was started from a
         Jupyter Notebook (=="ZMQInteractiveShell").
         If ran from a regular python, the call to "get_ipython()" produces a NameError.
         """
         logger.info("Running all simulation chunks")
         try:
             from tqdm import tqdm  # type: ignore[import]
+
             with suppress(NameError):
                 gip = get_ipython()  # type: ignore[name-defined] # noqa: F821
-                if (gip.__class__.__name__ == "ZMQInteractiveShell"):
+                if gip.__class__.__name__ == "ZMQInteractiveShell":
                     from tqdm.notebook import tqdm  # type: ignore[import]
             # Perform Simulation with TQDM.
             sim = tqdm(self)
@@ -559,29 +576,31 @@ class SimChunksIter():
         logger.info("Simulation done!")
         return res
 
-    def subdivide_last_chunk(self,
-                             n: int,
-                             max_step_size: tp.Optional[float] = None,
-                             scale: str = "log",
-                             ) -> SimChunksIter:
+    def subdivide_last_chunk(
+        self,
+        n: int,
+        max_step_size: tp.Optional[float] = None,
+        scale: str = "log",
+    ) -> SimChunksIter:
         last = self.chunks.pop()
         if max_step_size is None or max_step_size < last.max_step_size:
             max_step_size = last.max_step_size
 
         if scale == "linear":
-            chunks = np.linspace(last.start, last.stop, num=n+1)
+            chunks = np.linspace(last.start, last.stop, num=n + 1)
             steps = np.linspace(last.max_step_size, max_step_size, num=n)
         elif scale == "log":
-            chunks = np.logspace(np.log10(last.start),
-                                 np.log10(last.stop),
-                                 num=n+1)
-            steps = np.logspace(np.log10(last.max_step_size),
-                                np.log10(max_step_size),
-                                num=n)
+            chunks = np.logspace(np.log10(last.start), np.log10(last.stop), num=n + 1)
+            steps = np.logspace(
+                np.log10(last.max_step_size), np.log10(max_step_size), num=n
+            )
 
         for idx in range(n):
-            self.chunks.append(SimChunk(chunks[idx],
-                                        chunks[idx+1],
-                                        steps[idx],
-                                        ))
+            self.chunks.append(
+                SimChunk(
+                    chunks[idx],
+                    chunks[idx + 1],
+                    steps[idx],
+                )
+            )
         return self

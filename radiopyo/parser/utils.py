@@ -12,6 +12,8 @@ import typing as tp
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import (
+    acid_base_from_dict,
+    eq_reaction_from_dict,
     kreaction_from_dict,
     michaelis_from_dict,
 )
@@ -66,20 +68,63 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # are parsed to extract their string. if it exists in the dict, their constants are
     # compared and updated accordingly.
 
-    ## => Acid Base ##
+    ## => AcidBase Reactions ##
+    # First, let's make a set of the AB presents in root. Each one should have a
+    # unique ID ==> Make AcidBase and then use the str version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["acid_base"]):
-        _ = ABCouple(_["acid"], _["base"], _["pKa"])
+        _ = acid_base_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
+
+    # Loop over all KReaction in other and check whether it is also in root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["acid_base"]:
-        ar = ABCouple(_["acid"], _["base"], _["pKa"])
-        if str(ar) in r_root:
-            idx = r_root[str(ar)][1]
-            root["reactions"]["acid_base"][idx]["pKa"] = ar.pKa
+        ab = acid_base_from_dict(_, sim_sp=None)[0][0]
+        # Same reaction in root => just make sur the kvalue comes from 'other'
+        if str(ab) in r_root:
+            idx = r_root[str(ab)][1]
+            root["reactions"]["acid_base"][idx]["pKa"] = _["pKa"]
+            if "k_forward" in _:
+                if "k_backward" in root["reactions"]["acid_base"][idx]:
+                    del root["reactions"]["acid_base"][idx]["k_backward"]
+                root["reactions"]["acid_base"][idx]["k_forward"] = _["k_forward"]
+            elif "k_backward" in _:
+                if "k_forward" in root["reactions"]["acid_base"][idx]:
+                    del root["reactions"]["acid_base"][idx]["k_forward"]
+                root["reactions"]["acid_base"][idx]["k_backward"] = _["backward"]
             continue
+        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
         to_add.append(_.copy())
+    # All shared reactions are updated at this point. Now just add all new reactions
+    # from 'other' --> stored in 'to_add'
     root["reactions"]["acid_base"] += to_add
+
+    ## => Equilibrium Reactions ##
+    # First, let's make a set of the AB presents in root. Each one should have a
+    # unique ID ==> Make AcidBase and then use the str version of it!
+    r_root = {}
+    for idx, _ in enumerate(root["reactions"]["equilibrium"]):
+        _ = eq_reaction_from_dict(_, sim_sp=None)[0][0]
+        r_root[str(_)] = (_, idx)
+
+    # Loop over all KReaction in other and check whether it is also in root or not.
+    to_add = []  # List of all reaction to add to root afterward
+    for _ in other["reactions"]["equilibrium"]:
+        eq = eq_reaction_from_dict(_, sim_sp=None)[0][0]
+        # Same reaction in root => just make sur the kvalue comes from 'other'
+        if str(eq) in r_root:
+            idx = r_root[str(eq)][1]
+            for elt in ["k_forward", "k_backward", "k_value"]:
+                if elt in root["reactions"]["equilibrium"][idx]:
+                    del root["reactions"]["equilibrium"][idx][elt]
+                if elt in _:
+                    root["reactions"]["equilibrium"][idx][elt] = _[elt]
+            continue
+        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
+        to_add.append(_.copy())
+    # All shared reactions are updated at this point. Now just add all new reactions
+    # from 'other' --> stored in 'to_add'
+    root["reactions"]["equilibrium"] += to_add
 
     ## => k_reactions ##
     # First, let's make a set of the kreaction presents in root. Each one should have a

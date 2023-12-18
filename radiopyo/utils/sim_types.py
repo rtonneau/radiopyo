@@ -35,7 +35,6 @@ __all__ = [
 # ------------------------------------------------------------------------------------ #
 
 
-
 class KwargsRun(tp.TypedDict):
     t_span: tp.Tuple[float, float]
     t_eval: tp.Optional[NDArray[np.float64]]
@@ -71,23 +70,34 @@ class ConfigDict(tp.TypedDict):
 class SimMatrices(tp.TypedDict):
     """Convenient TypedDict use to leverage type checking and store matrices used in ODE
     solver."""
-    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.float64]]
-    Ki_mat: tp.Tuple[NDArray[np.float64], NDArray[np.int8],
-                     NDArray[np.float32], NDArray[np.float32]]
+
+    Ki_mat: tp.Tuple[
+        NDArray[np.float64],
+        NDArray[np.int8],
+        NDArray[np.float32],
+        NDArray[np.float32],
+    ]
     Gi_mat: NDArray[np.float64]
-    Ez_mat: tp.Optional[tp.Tuple[NDArray[np.float32], NDArray[np.float32],
-                                 NDArray[np.float64], NDArray[np.int8],]]
+    Ez_mat: tp.Optional[
+        tp.Tuple[
+            NDArray[np.float32],
+            NDArray[np.float32],
+            NDArray[np.float64],
+            NDArray[np.int8],
+        ]
+    ]
     cst_sp: NDArray[np.float64]
 
 
 def default_ConfigDict() -> ConfigDict:
     """ """
-    return {"includes": {},
-            "parameters": {},
-            "concentrations": {
-                "fixed": {},
-                "initial": {},
-    },
+    return {
+        "includes": {},
+        "parameters": {},
+        "concentrations": {
+            "fixed": {},
+            "initial": {},
+        },
         "beam": {},
         "reactions": {
             "acid_base": [],
@@ -95,5 +105,5 @@ def default_ConfigDict() -> ConfigDict:
             "equilibrium": [],
             "enzymatic": [],
             "radiolytic": {},
-    },
+        },
     }

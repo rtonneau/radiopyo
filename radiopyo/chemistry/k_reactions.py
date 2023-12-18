@@ -10,6 +10,7 @@ Author:
 from __future__ import annotations
 
 import hashlib
+import operator
 import typing as tp
 from abc import ABC, abstractmethod
 
@@ -307,7 +308,7 @@ class KReactionCollection:
         return len(self._reactions)
 
     def __iter__(self) -> tp.Iterator[tp.Tuple[str, KReaction]]:
-        return iter(self._reactions)
+        return iter(map(operator.itemgetter(1), self._reactions))
 
     @property
     def last(self) -> KReaction:
@@ -393,6 +394,14 @@ class BiReaction(KReactionCollection, ABC):
         """
         yield "forward", self.get_reaction("forward"), self.k_forward(T)
         yield "backward", self.get_reaction("backward"), self.k_backward(T)
+
+    def __str__(self) -> str:
+        """ """
+        out = []
+        out.append(self.forward.reactants_as_string())
+        out.append("<->")
+        out.append(self.forward.products_as_string())
+        return " ".join(out[:])
 
     @abstractmethod
     def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
