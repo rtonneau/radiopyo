@@ -9,6 +9,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import copy
 import logging
 import typing as tp
 from functools import reduce
@@ -34,9 +35,19 @@ logger = logging.getLogger("radiopyo")
 #                                DECORATOR DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
 
+
 # ------------------------------------------------------------------------------------ #
 #                                 FUNCTION DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
+def revert_reaction(reaction: GenericReaction) -> GenericReaction:
+    """ """
+    return GenericReaction(
+        products=reaction["reactants"].copy(),
+        reactants=reaction["products"].copy(),
+        constants=reaction["constants"].copy(),
+        enzyme=copy.copy(reaction["enzyme"]),
+    )
+
 
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #

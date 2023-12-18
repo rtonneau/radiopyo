@@ -19,6 +19,7 @@ from radiopyo.parser import RPARSER
 
 from .basic_chemistry import BasicReaction
 from .collections import ListSpecies
+from .utils.units import Temperature
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -77,10 +78,10 @@ class KReaction(BasicReaction):
     Attributes:
         k_value: List[np.polynomial.Polynomial, ]
             Reaction rate
+        T: Temperature in °C (optional, default:25).
     """
 
-    _DEFAULT_T: float = 25
-    T_inv: float
+    T: Temperature
     _k_value: tp.Optional[np.polynomial.Polynomial]
 
     def __init__(
@@ -89,26 +90,31 @@ class KReaction(BasicReaction):
         T: tp.Optional[float] = None,
     ):
         super().__init__()
-        self.T_inv = 1.0 / T if T is not None else 1.0 / self._DEFAULT_T
+        self.T = Temperature(T, unit="celsius")
         self._k_value = polynomial_factory(k_value) if k_value is not None else None
 
     def k_value(self, T: tp.Optional[float] = None) -> float:
+        """
+        Args:
+            T: Temperature in °C
+        """
         if self._k_value is None:
             raise ValueError(
                 f"Unable to compute reaction constant. No data provided for reaction: {self}"
             )
-        T_inv = 1.0 / T if T is not None else self.T_inv
-        return np.power(10, self._k_value(T_inv))
+        _T = Temperature(T, unit="celsius")
+        print(f"Temperature is {_T.kelvin}")
+        return np.power(10, self._k_value(1.0 / _T.kelvin))
 
     def set_k_value(self, value: KValType) -> None:
         """ """
         self._k_value = polynomial_factory(value)
 
-    def set_T(self, value: float) -> None:
-        self.T_inv = 1.0 / value
+    def set_T(self, value: float, unit: str = "celsius") -> None:
+        self.T = Temperature(value, unit)
 
-    def get_T(self) -> float:
-        return 1.0 / self.T_inv
+    def get_T(self, unit: str = "celsius") -> float:
+        return self.T.get(unit)
 
     def make_hash(self, method: str = "sha256") -> str:
         """ """
@@ -136,14 +142,12 @@ class KReaction(BasicReaction):
             ]
         raise KeyError("Unknown reaction index. Cannot make a label without index.")
 
-    def raw_k_value(self) -> float | tp.List[float]:
+    def raw_k_value(self) -> float | tp.List[float] | None:
         """
         Produce the k_value as provided by config files.
         """
         if self._k_value is None:
-            raise ValueError(
-                f"Unable to compute reaction constant. No data provided for reaction: {self}"
-            )
+            return None
         if len(self._k_value) > 1:
             return self._k_value.coef
 
@@ -173,7 +177,12 @@ class KReaction(BasicReaction):
         for sp, (_, stoi) in generic["products"].items():
             products += [sp] * stoi
         return cls.from_dict(
-            reactants, products, generic["constants"]["k_value"], list_sp
+            reactants,
+            products,
+            generic["constants"]["k_value"]
+            if "k_value" in generic["constants"]
+            else None,
+            list_sp,
         )
 
     @classmethod
@@ -212,7 +221,7 @@ class KReaction(BasicReaction):
         cls,
         reactants: tp.List[str],
         products: tp.List[str],
-        k_value: float | tp.List[float],
+        k_value: None | float | tp.List[float],
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> tp.Self:
         """Create a KReaction from a dictionary (via destructuring)
@@ -244,7 +253,7 @@ class KReaction(BasicReaction):
             new.add_as_reactant(sim_sp)
 
         # Case of n*A -> B, then n*k is measured/given
-        if len(new.reactants) == 1 and len(k_value) == 1:
+        if k_value is not None and len(new.reactants) == 1 and len(k_value) == 1:
             # Compute k: divide by reactant's stoichio
             new.set_k_value(k_value[0] / new.stoi_reactants[sp])
 
@@ -308,7 +317,10 @@ class KReactionCollection:
         self,
         T: tp.Optional[float] = None,
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
-        """ """
+        """
+        Args:
+            T: Temperature in °C (optional, default:25).
+        """
         for label, reaction in self:
             yield label, reaction, reaction.k_value(T)
 
