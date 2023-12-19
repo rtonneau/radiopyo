@@ -19,6 +19,8 @@ from contextlib import suppress
 import numpy as np
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
+from radiopyo.chemistry.utils.units import Temperature
+
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.ron import RonFileParser
@@ -59,6 +61,8 @@ class UnitCell(object):
     compute the evolution of concentration over time.
 
     Attributes:
+        T: Temperature
+            Sets the values of chemical reaction constants (default=25). Unit = °C.
         env: SimEnv
             SimEnv build from the input file
         mat: SimMatrices
@@ -76,6 +80,7 @@ class UnitCell(object):
 
     FIRST_STEP: float = 1e-15
 
+    _T: Temperature
     env: SimEnv
     mat: SimMatrices
     beam_list: BeamCollection
@@ -94,7 +99,7 @@ class UnitCell(object):
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
         )
-
+        self._T = Temperature()
         self.g_val = GValuesBoscolo()  # To do before set_beam
 
         if isinstance(beam, BeamCollection):
@@ -106,6 +111,10 @@ class UnitCell(object):
                 self.beam_list.add_beam(beam, beam.label)
 
         self.last_exec_time = -1
+
+    @property
+    def T(self) -> float:
+        return self._T.celsius
 
     @property
     def beam(self) -> ParticleBeam:
@@ -175,6 +184,16 @@ class UnitCell(object):
             UnitCell
         """
         return cls.from_parser(file, RonFileParser)
+
+    def set_temperature(self, T: float, unit: str = "celsius") -> None:
+        """ """
+        self._T = Temperature(T, unit)
+        self.mat = SimMatrices(
+            Ki_mat=self.env.make_kreaction_matrix(),
+            Gi_mat=self.env.make_radiolytic_vector(),
+            Ez_mat=self.env.make_enzymatic_matrix(),
+            cst_sp=self.env.make_cst_species_vector(),
+        )
 
     def set_beam(
         self,

@@ -179,6 +179,10 @@ class BasicReaction(ABC):
         """
         return [(sp, self.stoi_products[label]) for label, sp in self.products.items()]
 
+    def get_index(self, default: int = -1) -> int:
+        """ """
+        return self.index if self.index is not None else default
+
     def set_index(self, index: int) -> None:
         """Set the index of the reaction.
 

@@ -23,7 +23,7 @@ import numpy as np
 from radiopyo.chemistry.acid_base import AcidBase
 from radiopyo.chemistry.collections import ListSpecies
 from radiopyo.chemistry.e_reactions import EReaction
-from radiopyo.chemistry.k_reactions import KReaction
+from radiopyo.chemistry.k_reactions import KReaction, KReactionCollection
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
 from radiopyo.chemistry.species import ChemSpecies
@@ -33,6 +33,7 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.basic_chemistry import BasicReaction
+    from radiopyo.chemistry.utils.units import Temperature
     from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -56,7 +57,7 @@ class ReactionsList:
 
     ab_reaction: tp.List[AcidBase]
     eq_reaction: tp.List[EReaction]
-    k_reaction: tp.List[KReaction]
+    k_reaction: KReactionCollection
     enzymatic: tp.List[MichaelisMenten]
     radiolytic: tp.List[RadiolyticReaction]
 
@@ -82,6 +83,13 @@ class ReactionsList:
         ):
             enz_reaction.set_index(idx)
 
+        # Now we can sort some collections
+        self.k_reaction.sort_by_reaction_index()
+        self.ab_reaction = sorted(self.ab_reaction, key=lambda x: x.forward.get_index())
+        self.eq_reaction = sorted(self.eq_reaction, key=lambda x: x.forward.get_index())
+        self.enzymatic = sorted(self.enzymatic, key=lambda x: x.get_index())
+        self.radiolytic = sorted(self.radiolytic, key=lambda x: x.get_index())
+
     def total_kreactions(self) -> int:
         return (
             len(self.k_reaction) + len(self.ab_reaction) * 2 + len(self.eq_reaction) * 2
@@ -90,11 +98,10 @@ class ReactionsList:
     def total_reactions(self) -> int:
         return self.total_kreactions() + len(self.enzymatic) + len(self.radiolytic)
 
-    def iter_isChemicalReaction(self) -> tp.Iterable[BasicReaction]:
-        return chain.from_iterable([self.k_reaction, self.radiolytic, self.enzymatic])
-
     def iter_all(self) -> tp.Iterable[BasicReaction]:
-        return chain.from_iterable([self.k_reaction, self.radiolytic, self.enzymatic])
+        return chain.from_iterable(
+            [self.iter_all_kreactions(), self.enzymatic, self.radiolytic]
+        )
 
     def iter_all_kreactions(self) -> tp.Iterator[KReaction]:
         for bireaction in chain(self.ab_reaction, self.eq_reaction):
@@ -102,6 +109,16 @@ class ReactionsList:
             yield bireaction.backward
         for r in self.k_reaction:
             yield r
+
+    def iter_all_kreactions_and_kvalues(
+        self, T: tp.Optional[Temperature] = None
+    ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
+        """"""
+        for bireaction in chain(self.ab_reaction, self.eq_reaction):
+            for values in bireaction.iter_reactions_and_kvalues(T):
+                yield values
+        for values in self.k_reaction.iter_reactions_and_kvalues(T):
+            yield values
 
 
 @dataclass
@@ -288,9 +305,9 @@ class SimEnv:
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
 
-    Attention, ici il faut absolument tenir compte de la temperature et du calcul des k_values pour le cas des BiReactions
     def make_kreaction_matrix(
         self,
+        T: tp.Optional[Temperature] = None,
     ) -> tp.Tuple[
         NDArray[np.float64],
         NDArray[np.int8],
@@ -332,10 +349,11 @@ class SimEnv:
             dtype=np.float32,
         )
 
-        for idx_r, reaction in enumerate(self.reactions.iter_all_kreactions()):
-            Ki[idx_r] = reaction.k_value
+        for _, reaction, k_value in self.reactions.iter_all_kreactions_and_kvalues(T):
+            idx_r: int = reaction.get_index()
+            Ki[idx_r] = k_value
             # Loop over all reaction's reactants
-            idx_reactant = 0
+            idx_reactant: int = 0
             for sp, stoi in reaction.iter_reactants():
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(sp):
@@ -452,26 +470,30 @@ class SimEnv:
         self,
         species: str | ChemSpecies,
     ) -> tp.List[KReaction]:
-        return [r for r in self.reactions.k_reaction if species in r]
+        return [r for r in self.reactions.iter_all_kreactions() if species in r]
 
     def kreactions_involving_reactant(
         self,
         species: str | ChemSpecies,
     ) -> tp.List[KReaction]:
-        return [r for r in self.reactions.k_reaction if r.has_reactant(species)]
+        return [
+            r for r in self.reactions.iter_all_kreactions() if r.has_reactant(species)
+        ]
 
     def kreactions_involving_product(
         self,
         species: str | ChemSpecies,
     ) -> tp.List[KReaction]:
-        return [r for r in self.reactions.k_reaction if r.has_product(species)]
+        return [
+            r for r in self.reactions.iter_all_kreactions() if r.has_product(species)
+        ]
 
     def reactions_involving(
         self,
         species: str | ChemSpecies,
     ) -> tp.List[BasicReaction]:
         out: tp.List[BasicReaction] = []
-        for reaction in self.reactions.iter_isChemicalReaction():
+        for reaction in self.reactions.iter_all():
             if species in reaction:
                 out.append(reaction)
         return out
@@ -481,7 +503,7 @@ class SimEnv:
         species: str | ChemSpecies,
     ) -> tp.List[BasicReaction]:
         out: tp.List[BasicReaction] = []
-        for reaction in self.reactions.iter_isChemicalReaction():
+        for reaction in self.reactions.iter_all():
             if reaction.has_reactant(species):
                 out.append(reaction)
         return out
@@ -491,7 +513,7 @@ class SimEnv:
         species: str | ChemSpecies,
     ) -> tp.List[BasicReaction]:
         out: tp.List[BasicReaction] = []
-        for reaction in self.reactions.iter_isChemicalReaction():
+        for reaction in self.reactions.iter_all():
             if reaction.has_product(species):
                 out.append(reaction)
         return out
@@ -547,22 +569,22 @@ def eq_reaction_from_dict(
 def kreaction_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
     sim_sp: tp.Optional[ListSpecies] = None,
-) -> tp.Tuple[tp.List[KReaction], ListSpecies]:
+) -> tp.Tuple[KReactionCollection, ListSpecies]:
     if sim_sp is None:
         sim_sp = ListSpecies()  # Species container related to reaction added
 
     if len(reactions) == 0:  # -> Nothing to do
-        return ([], sim_sp)
+        return (KReactionCollection(), sim_sp)
 
     if isinstance(reactions, dict):  # -> i.e. only one reaction to add
         reactions = [
             reactions,
         ]  # Need a list to loop over
 
-    return (
-        [KReaction.from_kwargs(list_sp=sim_sp, **reaction) for reaction in reactions],
-        sim_sp,
-    )
+    out = KReactionCollection()
+    for r in reactions:
+        out.add_reaction(KReaction.from_kwargs(list_sp=sim_sp, **r))
+    return (out, sim_sp)
 
 
 def michaelis_from_dict(

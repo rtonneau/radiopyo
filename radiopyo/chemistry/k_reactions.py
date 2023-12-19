@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import operator
 import typing as tp
+import uuid
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -95,7 +96,7 @@ class KReaction(BasicReaction):
         self.T = Temperature(T, unit="celsius")
         self._k_value = polynomial_factory(k_value) if k_value is not None else None
 
-    def k_value(self, T: tp.Optional[float] = None) -> float:
+    def k_value(self, T: tp.Optional[Temperature] = None) -> float:
         """
         Args:
             T: Temperature in °C
@@ -104,7 +105,7 @@ class KReaction(BasicReaction):
             raise ValueError(
                 f"Unable to compute reaction constant. No data provided for reaction: {self}"
             )
-        _T = Temperature(T, unit="celsius")
+        _T = T if T is not None else Temperature()
         return np.power(10, self._k_value(1.0 / _T.kelvin))
 
     def set_k_value(self, value: KValType) -> None:
@@ -301,23 +302,66 @@ class KReactionCollection:
     def __len__(self) -> int:
         return len(self._reactions)
 
-    def __iter__(self) -> tp.Iterator[tp.Tuple[str, KReaction]]:
+    def __iter__(self) -> tp.Iterator[KReaction]:
         return iter(map(operator.itemgetter(1), self._reactions))
+
+    def __getitem__(self, index: int) -> KReaction:
+        return self._reactions[index][1]
 
     @property
     def last(self) -> KReaction:
         return self._reactions[-1][1]
 
+    def update_label(self, current: str, new: str) -> tp.Self:
+        """ """
+        try:
+            idx = self._indexer[current]
+        except KeyError as err:
+            raise KeyError(
+                f"Reaction label: {current} not in KReactionCollection"
+            ) from err
+        if new in self._indexer:
+            raise KeyError(f"Reaction label: {new} already in KReactionCollection")
+
+        del self._indexer[current]
+        self._indexer[new] = idx
+        reaction = self._reactions[idx][1]
+        self._reactions.append((new, reaction))
+        del self._reactions[idx]
+        return self
+
+    def sort_by_label(self) -> tp.Self:
+        """
+        May be useful to sort the list of reactions so that iteration is not random.
+        """
+        self._reactions = sorted(self._reactions, key=operator.itemgetter(0))
+        return self
+
+    def sort_by_reaction_index(self) -> tp.Self:
+        """
+        May be useful to sort the list of reactions so that iteration is not random.
+        """
+        self._reactions = sorted(self._reactions, key=lambda x: x[1].get_index())
+        return self
+
+    def iter_labels_and_reactions(self) -> tp.Iterator[tp.Tuple[str, KReaction]]:
+        """ """
+        return iter(self._reactions)
+
     def iter_reactions_and_kvalues(
         self,
-        T: tp.Optional[float] = None,
+        T: tp.Optional[Temperature] = None,
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
         """
         Args:
-            T: Temperature in °C (optional, default:25).
+            T: Temperature object (optional, default:25).
         """
-        for label, reaction in self:
-            yield label, reaction, reaction.k_value(T)
+        for label, reaction in self.iter_labels_and_reactions():
+            yield (
+                label,
+                reaction,
+                reaction.k_value(T),
+            )
 
     def _get_reaction_index(self, label: str) -> int:
         return self._indexer[label]
@@ -329,27 +373,27 @@ class KReactionCollection:
 
     def add_reaction(
         self,
-        label: str,
-        generic: GenericReaction,
+        reaction: GenericReaction | KReaction,
+        label: tp.Optional[str] = None,
         list_sp: tp.Optional[ListSpecies] = None,
-    ) -> None:
+    ) -> tp.Self:
         """
         Push a new Reaction in the Collection.
         """
+        if label is None:
+            label = str(uuid.uuid4())  # Make a unique ID
         if label in self._indexer:
             raise KeyError(
                 f"Already existing reaction with label {label} in the collection"
             )
         self._indexer[label] = len(self)
-        self._reactions.append(
-            (
-                label,
-                KReaction.from_generic(
-                    generic,
-                    list_sp=list_sp,
-                ),
+        if isinstance(reaction, dict):
+            reaction = KReaction.from_generic(
+                reaction,
+                list_sp=list_sp,
             )
-        )
+        self._reactions.append((label, reaction))
+        return self
 
 
 class BiReaction(KReactionCollection, ABC):
@@ -370,17 +414,17 @@ class BiReaction(KReactionCollection, ABC):
 
     def add_reaction(
         self,
-        label: str,
-        generic: GenericReaction,
-        list_sp: ListSpecies | None = None,
-    ) -> None:
+        reaction: GenericReaction | KReaction,
+        label: tp.Optional[str] = None,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> tp.Self:
         raise NotImplementedError(
             "Not possible to add more reaction to an equilibrium collection"
         )
 
     def iter_reactions_and_kvalues(
         self,
-        T: tp.Optional[float] = None,
+        T: tp.Optional[Temperature] = None,
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
         """
         Args:
@@ -398,13 +442,13 @@ class BiReaction(KReactionCollection, ABC):
         return " ".join(out)
 
     @abstractmethod
-    def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
+    def k_equilibrium(self, T: tp.Optional[Temperature] = None) -> float:
         """ """
 
     @abstractmethod
-    def k_forward(self, T: tp.Optional[float] = None) -> float:
+    def k_forward(self, T: tp.Optional[Temperature] = None) -> float:
         """ """
 
     @abstractmethod
-    def k_backward(self, T: tp.Optional[float] = None) -> float:
+    def k_backward(self, T: tp.Optional[Temperature] = None) -> float:
         """ """

@@ -17,6 +17,7 @@ import numpy as np
 from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
+from .collections import ListSpecies
 from .k_reactions import (
     BiReaction,
     KReactionCollection,
@@ -26,7 +27,7 @@ from .utils.units import Temperature
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from .collections import ListSpecies
+    pass
 
 __all__ = [
     "AcidBase",
@@ -82,9 +83,11 @@ class AcidBase(BiReaction):
 
         # Need to add forward and backward reactions via the superclass
         # KReactionCollection as this method is not allowed for an EReaction.
-        KReactionCollection.add_reaction(self, "forward", reaction, list_sp)
         KReactionCollection.add_reaction(
-            self, "backward", revert_reaction(reaction), list_sp
+            self, reaction, label="forward", list_sp=list_sp
+        )
+        KReactionCollection.add_reaction(
+            self, revert_reaction(reaction), label="backward", list_sp=list_sp
         )
 
     @classmethod
@@ -123,22 +126,22 @@ class AcidBase(BiReaction):
 
         return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
-    def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
+    def k_equilibrium(self, T: tp.Optional[Temperature] = None) -> float:
         """
         Args:
             T: Temperature in °C (optional, default:25)
 
         For pKa, polynomial form depends on T in °C.
         """
-        _T = Temperature(T, unit="celsius")
+        _T = T if T is not None else Temperature()
         return 10 ** (-self._pKa(_T.celsius))
 
-    def k_forward(self, T: tp.Optional[float] = None) -> float:
+    def k_forward(self, T: tp.Optional[Temperature] = None) -> float:
         """
         Args:
             T: Temperature in °C (optional, default:25)
         """
-        _T = Temperature(T, unit="celsius")
+        _T = T if T is not None else Temperature()
         if self._k_backward is not None:
             _val = self._k_backward(1.0 / _T.kelvin) - self._pKa(_T.celsius)
             return 10**_val
@@ -146,12 +149,12 @@ class AcidBase(BiReaction):
             raise ValueError("AcidBase: Both K_forward and K_backward are None")
         return 10 ** self._k_forward(1.0 / _T.kelvin)
 
-    def k_backward(self, T: tp.Optional[float] = None) -> float:
+    def k_backward(self, T: tp.Optional[Temperature] = None) -> float:
         """
         Args:
             T: Temperature in °C (optional, default:25)
         """
-        _T = Temperature(T, unit="celsius")
+        _T = T if T is not None else Temperature()
         if self._k_forward is not None:
             _val = self._k_forward(1.0 / _T.kelvin) + self._pKa(_T.celsius)
             return 10**_val

@@ -96,10 +96,12 @@ class EReaction(BiReaction):
 
         # Need to add forward and backward reactions via the superclass
         # KReactionCollection as this method is not allowed for an EReaction.
-        KReactionCollection.add_reaction(self, "forward", reaction, list_sp)
+        KReactionCollection.add_reaction(
+            self, reaction, label="forward", list_sp=list_sp
+        )
         self.forward.set_k_value(self._k_forward)  # type: ignore [arg-type]
         KReactionCollection.add_reaction(
-            self, "backward", revert_reaction(reaction), list_sp
+            self, revert_reaction(reaction), label="backward", list_sp=list_sp
         )
         self.backward.set_k_value(self._k_backward)  # type: ignore [arg-type]
 
@@ -139,22 +141,22 @@ class EReaction(BiReaction):
 
         return cls(gen, constant=constant, list_sp=list_sp)  # type:ignore[arg-type]
 
-    def k_equilibrium(self, T: tp.Optional[float] = None) -> float:
+    def k_equilibrium(self, T: tp.Optional[Temperature] = None) -> float:
         """
         Args:
             T: temperature in °C.
         """
-        _T = Temperature(T, unit="celsius")
+        _T = T if T is not None else Temperature(unit="celsius")
         return 10 ** self._k_equilibrium(1 / _T.kelvin)
 
-    def k_forward(self, T: tp.Optional[float] = None) -> float:
+    def k_forward(self, T: tp.Optional[Temperature] = None) -> float:
         """
         Args:
             T: temperature in °C.
         """
         return self.forward.k_value(T)
 
-    def k_backward(self, T: tp.Optional[float] = None) -> float:
+    def k_backward(self, T: tp.Optional[Temperature] = None) -> float:
         """
         Args:
             T: temperature in °C.
