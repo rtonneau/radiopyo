@@ -91,16 +91,19 @@ class UnitCell(object):
         self,
         env: SimEnv,
         beam: tp.Optional[ParticleBeam | BeamCollection] = None,
+        init: bool = True,
     ) -> None:
         self.env = env
-        self.mat = SimMatrices(
-            Ki_mat=self.env.make_kreaction_matrix(),
-            Gi_mat=self.env.make_radiolytic_vector(),
-            Ez_mat=self.env.make_enzymatic_matrix(),
-            cst_sp=self.env.make_cst_species_vector(),
-        )
         self._T = Temperature()
         self.g_val = GValuesBoscolo()  # To do before set_beam
+
+        if init:
+            self.mat = SimMatrices(
+                Ki_mat=self.env.make_kreaction_matrix(),
+                Gi_mat=self.env.make_radiolytic_vector(),
+                Ez_mat=self.env.make_enzymatic_matrix(),
+                cst_sp=self.env.make_cst_species_vector(),
+            )
 
         if isinstance(beam, BeamCollection):
             self.beam_list = beam
@@ -121,7 +124,7 @@ class UnitCell(object):
         return self.beam_list.current
 
     @classmethod
-    def from_config_dict(cls, config: ConfigDict) -> tp.Self:
+    def from_config_dict(cls, config: ConfigDict, init: bool = True) -> tp.Self:
         """Create a Simulation Environment from a the generic ConfigDict:
 
         Args:
@@ -139,10 +142,12 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
-        return cls(env=SimEnv.from_dict(config), beam=beam_list)
+        return cls(env=SimEnv.from_dict(config), beam=beam_list, init=init)
 
     @classmethod
-    def from_parser(cls, file: str | Path, Parser: tp.Type[FileParser]) -> tp.Self:
+    def from_parser(
+        cls, file: str | Path, Parser: tp.Type[FileParser], init: bool = True
+    ) -> tp.Self:
         """Create a Simulation Environment from a user defined FileParser.
 
         Args:
@@ -156,11 +161,10 @@ class UnitCell(object):
         """
         logger.info(f"Loading config from file: {file}")
         config = resolve_includes(Parser(file).parse())
-        logger.info("File is loaded")
-        return cls.from_config_dict(config)
+        return cls.from_config_dict(config, init)
 
     @classmethod
-    def from_toml(cls, file: str | Path) -> tp.Self:
+    def from_toml(cls, file: str | Path, init: bool = True) -> tp.Self:
         """Create a Simulation Environment from a TOML file:
 
         Args:
@@ -170,7 +174,7 @@ class UnitCell(object):
         Returns:
             UnitCell
         """
-        return cls.from_parser(file, TOMLFileParser)
+        return cls.from_parser(file, TOMLFileParser, init)
 
     @classmethod
     def from_ron(cls, file: str | Path) -> tp.Self:
@@ -189,7 +193,7 @@ class UnitCell(object):
         """ """
         self._T = Temperature(T, unit)
         self.mat = SimMatrices(
-            Ki_mat=self.env.make_kreaction_matrix(),
+            Ki_mat=self.env.make_kreaction_matrix(self._T),
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),

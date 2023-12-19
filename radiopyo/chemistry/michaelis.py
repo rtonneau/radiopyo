@@ -221,7 +221,7 @@ class MichaelisMenten(BasicReaction):
             new.add_as_product(list_sp.get_or_create_dyn_species(sp.strip()))
         return new
 
-    def as_label(self) -> tp.List[str]:
+    def as_label(self) -> str:
         """
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
@@ -235,10 +235,9 @@ class MichaelisMenten(BasicReaction):
             KeyError
                 If index is None.
         """
-        if self.index is not None:
-            return [
-                f"EZ_{self.index}",
-            ]
+        if self.index is not None and self.index >= 0:
+            return f"EZ_{self.index}"
+
         raise KeyError("Unknown reaction index. Cannot make a label.")
 
     def __str__(self) -> str:

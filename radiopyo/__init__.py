@@ -11,9 +11,9 @@ import typing as tp
 from pathlib import Path
 
 # --------------------------------- Internal imports --------------------------------- #
-# from radiopyo.physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
-# from radiopyo.simulation.unit_cell import UnitCell
-# from radiopyo.utils import LABARBE_CONFIG_FILE, PACKAGE_DATA_PATH
+from radiopyo.physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
+from radiopyo.simulation.unit_cell import UnitCell
+from radiopyo.utils import LABARBE_CONFIG_FILE, PACKAGE_DATA_PATH
 from radiopyo.utils.logging import (
     disable_logging,
     enable_logging,

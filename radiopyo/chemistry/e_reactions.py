@@ -12,6 +12,8 @@ from __future__ import annotations
 import typing as tp
 from contextlib import suppress
 
+import numpy as np
+
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import revert_reaction
@@ -69,7 +71,10 @@ class EReaction(BiReaction):
                 self._k_backward = polynomial_factory(
                     reaction["constants"]["k_backward"]
                 )
-                self._k_equilibrium = self._k_forward - self._k_backward
+                if not np.isinf(self._k_forward.coef[0]) and not np.isinf(
+                    self._k_backward.coef[0]
+                ):
+                    self._k_equilibrium = self._k_forward - self._k_backward
             except KeyError as err:
                 raise ValueError(
                     "EReaction needs 2 out of the 3 (K_equilibrium, K_forward, K_backward)"

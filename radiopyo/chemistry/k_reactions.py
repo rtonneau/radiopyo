@@ -56,7 +56,7 @@ def polynomial_factory(
         else:
             raise ValueError("Cannot make a polynomial with no coeff!")
     else:
-        _coef = [np.log10(value)]
+        _coef = [-np.inf] if value <= 0 else [np.log10(value)]
 
     return np.polynomial.Polynomial(_coef)
 
@@ -124,7 +124,7 @@ class KReaction(BasicReaction):
         hasher.update(repr(self).encode())
         return hasher.hexdigest()
 
-    def as_label(self) -> tp.List[str]:
+    def as_label(self) -> str:
         """
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
@@ -138,10 +138,9 @@ class KReaction(BasicReaction):
             KeyError
                 If index is None.
         """
-        if self.index is not None:
-            return [
-                f"KR_{self.index}",
-            ]
+        if self.index is not None and self.index >= 0:
+            return f"KR_{self.index}"
+
         raise KeyError("Unknown reaction index. Cannot make a label without index.")
 
     def raw_k_value(self) -> float | tp.List[float] | None:

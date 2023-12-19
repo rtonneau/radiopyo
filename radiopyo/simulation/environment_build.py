@@ -62,26 +62,28 @@ class ReactionsList:
     radiolytic: tp.List[RadiolyticReaction]
 
     def __post_init__(self) -> None:
-        for idx, ab_reaction in enumerate(self.ab_reaction):
-            ab_reaction.forward.set_index(idx)
-            ab_reaction.backward.set_index(idx)
+        for idx, ab_reaction in enumerate(self.ab_reaction, start=0):
+            ab_reaction.forward.set_index(idx * 2)
+            ab_reaction.backward.set_index(idx * 2 + 1)
 
-        for idx, e_reaction in enumerate(
-            self.eq_reaction, start=self.total_reactions()
+        for idx, e_reaction in enumerate(self.eq_reaction, start=len(self.ab_reaction)):
+            e_reaction.forward.set_index(idx * 2)
+            e_reaction.backward.set_index(idx * 2 + 1)
+
+        for idx, k_reaction in enumerate(
+            self.k_reaction, start=(len(self.ab_reaction) + len(self.eq_reaction)) * 2
         ):
-            e_reaction.forward.set_index(idx)
-            e_reaction.backward.set_index(idx)
-
-        for idx, k_reaction in enumerate(self.k_reaction, start=self.total_reactions()):
             k_reaction.set_index(idx)
 
-        for idx, g_reaction in enumerate(self.radiolytic, start=self.total_reactions()):
-            g_reaction.set_index(idx)
-
         for idx, enz_reaction in enumerate(
-            self.enzymatic, start=self.total_reactions()
+            self.enzymatic, start=self.total_kreactions()
         ):
             enz_reaction.set_index(idx)
+
+        for idx, g_reaction in enumerate(
+            self.radiolytic, start=self.total_kreactions() + len(self.enzymatic)
+        ):
+            g_reaction.set_index(idx)
 
         # Now we can sort some collections
         self.k_reaction.sort_by_reaction_index()
@@ -196,12 +198,8 @@ class SimEnv:
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
         if "force_cst_pH" in parameters and not parameters["force_cst_pH"]:
-            # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
-            # _ab = list_sp.get_AB(cls.PH_SPECIES)
-            # initial_cc[_ab.label] = 10**(-bio_param["pH"]) + 10**(-14+bio_param["pH"])
             list_sp.add_dyn_species(cls.PH_SPECIES, cc_init=10 ** (-parameters["pH"]))
             list_sp.add_dyn_species("OH_minus", cc_init=10 ** (-14 + parameters["pH"]))
-            # list_sp.add_acid_base(cls.PH_SPECIES, "OH_minus", 14)
         else:
             list_sp.add_cst_species(cls.PH_SPECIES, 10 ** (-parameters["pH"]))
             list_sp.add_cst_species("OH_minus", 10 ** (-14 + parameters["pH"]))
@@ -237,6 +235,10 @@ class SimEnv:
             config["reactions"].get("k_reaction", []), list_sp
         )
         logger.info(f"CONFIG::{len(kr)} K-reactions added")
+        logger.info(
+            f"CONFIG::A total of ({len(ab)} + {len(er)})*2 + {len(kr)} = "
+            f"{(len(ab)+len(er))*2+len(kr)} k-reactions have been added"
+        )
 
         # Read Enzymatic Reactions
         enz, list_sp = michaelis_from_dict(
@@ -324,13 +326,13 @@ class SimEnv:
 
         Ki = np.zeros(self.reactions.total_kreactions(), dtype=np.float64)
         Riy = np.zeros(
-            [self.species.len_dyn_species(), self.reactions.total_kreactions()],
+            [len(self.species), self.reactions.total_kreactions()],
             dtype=np.int8,
         )
 
         Rki = np.full(
             [
-                self.species.len_dyn_species(),
+                len(self.species),
                 self.reactions.total_kreactions(),
                 max_reactants,
             ],
@@ -340,10 +342,10 @@ class SimEnv:
 
         JRki = np.full(
             [
-                self.species.len_dyn_species(),
+                len(self.species),
                 self.reactions.total_kreactions(),
                 max_reactants,
-                self.species.len_dyn_species(),
+                len(self.species),
             ],
             fill_value=np.nan,
             dtype=np.float32,
@@ -400,7 +402,7 @@ class SimEnv:
         concentrations due irradiation via GValues.
         """
         Gi = np.zeros(
-            [self.species.len_dyn_species(), len(self.reactions.radiolytic)],
+            [len(self.species), len(self.reactions.radiolytic)],
             dtype=np.float64,
         )
         for col, radiolytic in enumerate(self.reactions.radiolytic):
@@ -427,12 +429,12 @@ class SimEnv:
             return None
 
         Ez_substrate = np.full(
-            [self.species.len_dyn_species(), len(self.reactions.enzymatic)],
+            [len(self.species), len(self.reactions.enzymatic)],
             fill_value=0,
             dtype=np.float32,
         )
         Ez_enzyme = np.full(
-            [self.species.len_dyn_species(), len(self.reactions.enzymatic)],
+            [len(self.species), len(self.reactions.enzymatic)],
             fill_value=0,
             dtype=np.float32,
         )
@@ -440,7 +442,7 @@ class SimEnv:
         Ez_kmki = np.zeros([2, len(self.reactions.enzymatic)], dtype=np.float64)
 
         Ez_iy = np.zeros(
-            [self.species.len_dyn_species(), len(self.reactions.enzymatic)],
+            [len(self.species), len(self.reactions.enzymatic)],
             dtype=np.int8,
         )
 

@@ -229,7 +229,7 @@ class ODEResult(object):
     # --------------------------------- Utils methods -------------------------------- #
     def to_pandas(self, clip: bool = True) -> pd.DataFrame:
         """ """
-        labels = [elt.label for elt in self.env.species]
+        labels = [elt.label for elt in self.env.species.sorted_iter_dyn_species()]
         labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
 
         df_sp = pd.DataFrame(
@@ -306,7 +306,6 @@ class ODEResult(object):
         for label, reaction in zip(cols_gi, self.env.reactions.radiolytic):
             out.loc[:, label] = reaction.kr()
 
-        H_plus_index = self.env.species[self.env.PH_SPECIES].index
         for (idx, t_val), y in zip(enumerate(self.t), self.y.T):
             y = y * 1.0e-6  # µmol/L => mol/l
             y[y < 1e-18] = 0.0  # Cut off fmol/L

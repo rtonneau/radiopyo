@@ -121,7 +121,7 @@ class BasicReaction(ABC):
         pass
 
     @abstractmethod
-    def as_label(self) -> tp.List[str]:
+    def as_label(self) -> str:
         """
         This method is used for the data mining. It should be implemented by child
         classes in order to easily define short labels for each reactions based on the
@@ -129,7 +129,7 @@ class BasicReaction(ABC):
         name in a pandas DataFrame.
 
         Returns:
-            tp.List[str]
+            str
         """
 
     @classmethod

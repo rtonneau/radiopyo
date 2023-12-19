@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 The radiolytic submodule contains all class and function definitions to include
@@ -16,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import typing as tp
+from typing import List
 
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
@@ -30,11 +30,12 @@ if tp.TYPE_CHECKING:
 
 # ------------------------------------------------------------------------------------ #
 
-__all__ = ["ge_to_kr",
-           "RadiolyticReaction",
-           "umol_per_joule_to_ge",
-           "RadiolyticReactionDict",
-           ]
+__all__ = [
+    "ge_to_kr",
+    "RadiolyticReaction",
+    "umol_per_joule_to_ge",
+    "RadiolyticReactionDict",
+]
 
 # ------------------------------------------------------------------------------------ #
 #                                 FUNCTION DEFINITIONS                                 #
@@ -58,6 +59,7 @@ def kr_to_ge(kr: float) -> float:
     d: float = 1.0  # Solvent density [kg/l]
     return kr / d * elementary_charge * 100.0 * Avogadro
 
+
 # ------------------------------------------------------------------------------------ #
 #                                   CLASS DEFINITIONS                                  #
 # ------------------------------------------------------------------------------------ #
@@ -74,6 +76,7 @@ class RadiolyticReaction(BasicReaction):
         _reaction_cst: float
             The G value of the reaction in [mol/l/Gy]
     """
+
     _reaction_cst: float
 
     def __init__(self, reaction_cst: float):
@@ -91,6 +94,32 @@ class RadiolyticReaction(BasicReaction):
         hasher.update(repr(self).encode())
         return hasher.hexdigest()
 
+    def as_label(self) -> str:
+        """
+        This method is used for the data mining. It should be implemented by child
+        classes in order to easily define short labels for each reactions based on the
+        reaction type and the index of reaction. For instance, it can be used as column
+        name in a pandas DataFrame.
+
+        Returns:
+            str
+
+        Raises:
+            KeyError
+                If index is None.
+        """
+        if self.index is not None and self.index >= 0:
+            return f"G_{self.species().label}"
+        raise KeyError("Unknown reaction index. Cannot make a label.")
+
+    @classmethod
+    def from_kwargs(
+        cls,
+        list_sp: ListSpecies | None = None,
+        **kwargs: str | List[str] | float | List[float],
+    ) -> tp.Self:
+        raise NotImplementedError
+
     def species(self) -> ChemSpecies:
         return self.products[self.label()]
 
@@ -107,11 +136,12 @@ class RadiolyticReaction(BasicReaction):
         self._reaction_cst = ge_to_kr(value)
 
     @classmethod
-    def from_dict(cls,
-                  product: str,
-                  ge: float,
-                  list_sp: tp.Optional[ListSpecies] = None,
-                  ) -> RadiolyticReaction:
+    def from_dict(
+        cls,
+        product: str,
+        ge: float,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> RadiolyticReaction:
         """Create a RadiolyticReaction from a dictionary (via destructuring)
 
         Args:
@@ -138,26 +168,8 @@ class RadiolyticReaction(BasicReaction):
         """No reactant should be involved"""
         NotImplementedError("Not implemented for Radiolytic Reactions")
 
-    def as_label(self) -> tp.List[str]:
-        """
-        This method is used for the data mining. It should be implemented by child
-        classes in order to easily define short labels for each reactions based on the
-        reaction type and the index of reaction. For instance, it can be used as column 
-        name in a pandas DataFrame.
-
-        Returns:
-            str
-
-        Raises:
-            KeyError
-                If index is None.
-        """
-        if self.index is not None:
-            return [f"G_{self.species().label}",]
-        raise KeyError("Unknown reaction index. Cannot make a label.")
-
     def __str__(self) -> str:
-        return (f"RadiolyticReaction('{self.label()}')")
+        return f"RadiolyticReaction('{self.label()}')"
 
     def __repr__(self) -> str:
         return self.__str__()

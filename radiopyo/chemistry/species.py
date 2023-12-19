@@ -89,6 +89,3 @@ class ChemSpecies(RawSpecies):
 
 # Define H2O here
 H2O = ChemSpecies("H2O", cc_init=[55.50, 6.075e-3, 4.110e-4, 1.496e-6, 2.619e-9])
-
-# 55.50 + 6.075×10-3 t – 4.110×10-4 t2 + 1.496×10-6 t3 – 2.619×10-9 t4 ici est un test
-# de auto xr
