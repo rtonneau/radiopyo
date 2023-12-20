@@ -28,8 +28,6 @@ from .utils.units import Temperature
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    import numpy as np
-
     from radiopyo.parser.reaction_parser import GenericReaction
 
 
@@ -146,22 +144,22 @@ class EReaction(BiReaction):
 
         return cls(gen, constant=constant, list_sp=list_sp)  # type:ignore[arg-type]
 
-    def k_equilibrium(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
             T: temperature in °C.
         """
-        _T = T if T is not None else Temperature(unit="celsius")
+        _T = Temperature(T) if T is not None else Temperature(unit="celsius")
         return 10 ** self._k_equilibrium(1 / _T.kelvin)
 
-    def k_forward(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
             T: temperature in °C.
         """
         return self.forward.k_value(T)
 
-    def k_backward(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
             T: temperature in °C.

@@ -96,7 +96,7 @@ class KReaction(BasicReaction):
         self.T = Temperature(T, unit="celsius")
         self._k_value = polynomial_factory(k_value) if k_value is not None else None
 
-    def k_value(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_value(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
             T: Temperature in °C
@@ -105,7 +105,7 @@ class KReaction(BasicReaction):
             raise ValueError(
                 f"Unable to compute reaction constant. No data provided for reaction: {self}"
             )
-        _T = T if T is not None else Temperature()
+        _T = Temperature(T) if T is not None else Temperature()
         return np.power(10, self._k_value(1.0 / _T.kelvin))
 
     def set_k_value(self, value: KValType) -> None:
@@ -349,7 +349,7 @@ class KReactionCollection:
 
     def iter_reactions_and_kvalues(
         self,
-        T: tp.Optional[Temperature] = None,
+        T: tp.Optional[Temperature | float] = None,
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
         """
         Args:
@@ -423,7 +423,7 @@ class BiReaction(KReactionCollection, ABC):
 
     def iter_reactions_and_kvalues(
         self,
-        T: tp.Optional[Temperature] = None,
+        T: tp.Optional[Temperature | float] = None,
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
         """
         Args:
@@ -441,13 +441,13 @@ class BiReaction(KReactionCollection, ABC):
         return " ".join(out)
 
     @abstractmethod
-    def k_equilibrium(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """ """
 
     @abstractmethod
-    def k_forward(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """ """
 
     @abstractmethod
-    def k_backward(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """ """

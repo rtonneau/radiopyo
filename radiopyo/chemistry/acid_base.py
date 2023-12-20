@@ -126,22 +126,22 @@ class AcidBase(BiReaction):
 
         return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
-    def k_equilibrium(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
             T: Temperature in °C (optional, default:25)
 
         For pKa, polynomial form depends on T in °C.
         """
-        _T = T if T is not None else Temperature()
+        _T = Temperature(T) if T is not None else Temperature()
         return 10 ** (-self._pKa(_T.celsius))
 
-    def k_forward(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
             T: Temperature in °C (optional, default:25)
         """
-        _T = T if T is not None else Temperature()
+        _T = Temperature(T) if T is not None else Temperature()
         if self._k_backward is not None:
             _val = self._k_backward(1.0 / _T.kelvin) - self._pKa(_T.celsius)
             return 10**_val
@@ -149,12 +149,12 @@ class AcidBase(BiReaction):
             raise ValueError("AcidBase: Both K_forward and K_backward are None")
         return 10 ** self._k_forward(1.0 / _T.kelvin)
 
-    def k_backward(self, T: tp.Optional[Temperature] = None) -> float:
+    def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
             T: Temperature in °C (optional, default:25)
         """
-        _T = T if T is not None else Temperature()
+        _T = Temperature(T) if T is not None else Temperature()
         if self._k_forward is not None:
             _val = self._k_forward(1.0 / _T.kelvin) + self._pKa(_T.celsius)
             return 10**_val

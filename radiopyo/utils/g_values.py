@@ -21,10 +21,10 @@ __all__ = [
 ]
 
 # Path to the data file.
-_data_dir = Path(__file__).parent.parent/"data/G_VALUES"
+_data_dir = Path(__file__).parent.parent / "data/G_VALUES"
 
 
-class GValuesBoscolo():
+class GValuesBoscolo:
     """
     Class providing G values.
     Data are interpolated (quadratic) so that any LET within the date range can be
@@ -37,9 +37,9 @@ class GValuesBoscolo():
         >>> species = "e_aq"
         >>> LET = 12.5  # keV/µm
         >>> g_e_aq = g_values.values_at(species, LET)
-        >>> 
+        >>>
         >>> # This also works
-        >>> g_values[(1, 5, 10, 12.5)] # ==> returns a dataframe 
+        >>> g_values[(1, 5, 10, 12.5)] # ==> returns a dataframe
 
     Attributes:
         df: pandas.DataFrame
@@ -49,20 +49,23 @@ class GValuesBoscolo():
                 keys -> species label
                 value -> Interpolation of GValues to handle any LET within valid range.
     """
+
     df: pd.DataFrame
     interpol: tp.Dict[str, interp1d]
 
     DATA = Path("gvalues_from_Boscolo_2020.csv")
 
     def __init__(self) -> None:
-        self.df = pd.read_csv(_data_dir/GValuesBoscolo.DATA,
-                              index_col=0,
-                              header=0)
-        self.interpol = {str(col): interp1d(x=self.df.index,
-                                            y=self.df[col],
-                                            kind="quadratic",
-                                            bounds_error=True,
-                                            ) for col in self.df}
+        self.df = pd.read_csv(_data_dir / GValuesBoscolo.DATA, index_col=0, header=0)
+        self.interpol = {
+            str(col): interp1d(
+                x=self.df.index,
+                y=self.df[col],
+                kind="quadratic",
+                bounds_error=True,
+            )
+            for col in self.df
+        }
 
     def __contains__(self, key: str) -> bool:
         return key in self.interpol
@@ -70,14 +73,18 @@ class GValuesBoscolo():
     def __getitem__(self, key: float | tp.Iterable) -> pd.DataFrame:
         out = {}
         if not hasattr(key, "__iter__"):
-            key = [key,]
+            key = [
+                key,
+            ]
 
         for species in self.species():
             out[species] = self.values_at(species, key)
-        return pd.DataFrame.from_dict(out, )
+        return pd.DataFrame.from_dict(
+            out,
+        )
 
     def values_at(self, species: str, let: float | tp.Iterable) -> float:
-        """ 
+        """
         Method retrieving the G value from interpolated data.
 
         Args:
@@ -89,10 +96,12 @@ class GValuesBoscolo():
         Returns:
             float: G Value of species: 'species' with LET: 'let'
         """
+        if species == "H3O_plus":
+            species = "e_aq"
         return self.interpol[species](let)
 
     def species(self) -> tp.Iterable[str]:
-        """Get all species whose GValues are available. 
+        """Get all species whose GValues are available.
 
         Returns:
             Iterable[str]: iterable over all species available.

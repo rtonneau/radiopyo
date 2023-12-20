@@ -14,6 +14,7 @@ import typing as tp
 import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
+from .utils.units import Temperature
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -57,8 +58,6 @@ class RawSpecies:
 class ChemSpecies(RawSpecies):
     """Class used for species with cc (cst or dyn)."""
 
-    _DEFAULT_T: float = 25
-
     cc_init: np.polynomial.Polynomial  # Store initial value as [mol/l]
     index: int
 
@@ -79,13 +78,18 @@ class ChemSpecies(RawSpecies):
     def __copy__(self) -> ChemSpecies:
         return ChemSpecies(self.label, self.index, self.cc_init.coef)
 
-    def initial_cc(self, T: tp.Optional[float] = None) -> float:
-        T = T if T is not None else self._DEFAULT_T  # Default value
-        return self.cc_init(T) if self.cc_init(T) > 0 else 0
+    def initial_cc(self, T: tp.Optional[float | Temperature] = None) -> float:
+        T = Temperature() if T is None else Temperature(T)
+        return self.cc_init(T.celsius) if self.cc_init(T.celsius) > 0 else 0
 
     def set_initial_cc(self, value: float | tp.List[float]) -> None:
         self.cc_init = np.polynomial.Polynomial(value)
 
 
-# Define H2O here
 H2O = ChemSpecies("H2O", cc_init=[55.50, 6.075e-3, 4.110e-4, 1.496e-6, 2.619e-9])
+
+
+# Define H2O here
+def get_H2O_cc(T: tp.Optional[float | Temperature] = None) -> float:
+    """ """
+    return H2O.initial_cc(T)

@@ -26,7 +26,7 @@ from radiopyo.chemistry.e_reactions import EReaction
 from radiopyo.chemistry.k_reactions import KReaction, KReactionCollection
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
-from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry.species import H2O, ChemSpecies
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -113,7 +113,7 @@ class ReactionsList:
             yield r
 
     def iter_all_kreactions_and_kvalues(
-        self, T: tp.Optional[Temperature] = None
+        self, T: tp.Optional[Temperature | float] = None
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
         """"""
         for bireaction in chain(self.ab_reaction, self.eq_reaction):
@@ -193,6 +193,7 @@ class SimEnv:
 
         # Copy initial cc and strip species name on the fly.
         initial_cc = {}
+        list_sp.add_cst_species("H2O", cc=H2O.cc_init.coef)
         for key, cc in config["concentrations"].get("initial", {}).items():
             initial_cc[key.strip()] = cc
 
@@ -276,7 +277,11 @@ class SimEnv:
             initial_cc=initial_cc,
         )
 
-    def initial_values(self, all: bool = False) -> NDArray[np.float64]:
+    def initial_values(
+        self,
+        T: tp.Optional[Temperature | float] = None,
+        all: bool = False,
+    ) -> NDArray[np.float64]:
         """Construct the vector containing initial concentrations values of species
 
         Args:
@@ -288,14 +293,14 @@ class SimEnv:
         """
         out_dyn = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
         for idx, species in enumerate(self.species.iter_dyn_species()):
-            out_dyn[idx] = species.initial_cc() * 1e6
+            out_dyn[idx] = species.initial_cc(T) * 1e6
 
         out_cst = np.array([], dtype=np.float64)
         if all:
             out_cst = np.zeros(self.species.len_cst_species(), dtype=np.float64)
             for cst_species in self.species.iter_cst_species():
                 out_cst[cst_species.index - len(out_dyn)] = (
-                    cst_species.initial_cc() * 1e6
+                    cst_species.initial_cc(T) * 1e6
                 )
         return np.append(out_dyn, out_cst)
 
@@ -309,7 +314,7 @@ class SimEnv:
 
     def make_kreaction_matrix(
         self,
-        T: tp.Optional[Temperature] = None,
+        T: tp.Optional[Temperature | float] = None,
     ) -> tp.Tuple[
         NDArray[np.float64],
         NDArray[np.int8],
@@ -456,16 +461,21 @@ class SimEnv:
                     Ez_iy[sp.index, col] = stoi
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
 
-    def make_cst_species_vector(self) -> NDArray[np.float64]:
+    def make_cst_species_vector(
+        self,
+        T: tp.Optional[Temperature | float] = None,
+    ) -> NDArray[np.float64]:
         """Create cc vector of Cst Species
 
+        Args:
+            T Temperature object or float
         Returns:
             NDArray[np.float64]
         """
         out = np.zeros(self.species.len_cst_species(), dtype=np.float64)
         len_dyn = self.species.len_dyn_species()
         for sp in self.species.iter_cst_species():
-            out[sp.index - len_dyn] = sp.initial_cc()
+            out[sp.index - len_dyn] = sp.initial_cc(T)
         return out
 
     def kreactions_involving(

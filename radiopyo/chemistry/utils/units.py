@@ -40,9 +40,14 @@ class Temperature(object):
     _DEFAULT: float = 25  # Default temperature in °C
     _value: float  # Temperature in Kelvin
 
-    def __init__(self, value: tp.Optional[float] = None, unit: str = "celsius") -> None:
+    def __init__(
+        self, value: tp.Optional[float | Temperature] = None, unit: str = "celsius"
+    ) -> None:
         """ """
-        if value is None:
+        if isinstance(value, Temperature):
+            value = value._value
+            unit = "kelvin"
+        elif value is None:
             value = self._DEFAULT
         unit = unit.lower()
         match unit:
@@ -86,3 +91,7 @@ class Temperature(object):
                 return self.kelvin
             case _:
                 raise ValueError(f"Unknown temperature unit: {unit}")
+
+    def copy(self) -> tp.Self:
+        """ """
+        return self.__class__(value=self._value, unit="kelvin")
