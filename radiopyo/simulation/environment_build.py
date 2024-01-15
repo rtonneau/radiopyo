@@ -23,7 +23,7 @@ import numpy as np
 from radiopyo.chemistry.acid_base import AcidBase
 from radiopyo.chemistry.collections import ListSpecies
 from radiopyo.chemistry.e_reactions import EReaction
-from radiopyo.chemistry.k_reactions import KReaction, KReactionCollection
+from radiopyo.chemistry.k_reactions import Arrhenius, KReaction, KReactionCollection
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
 from radiopyo.chemistry.species import H2O, ChemSpecies
@@ -71,7 +71,8 @@ class ReactionsList:
             e_reaction.backward.set_index(idx * 2 + 1)
 
         for idx, k_reaction in enumerate(
-            self.k_reaction, start=(len(self.ab_reaction) + len(self.eq_reaction)) * 2
+            self.k_reaction, start=(
+                len(self.ab_reaction) + len(self.eq_reaction)) * 2
         ):
             k_reaction.set_index(idx)
 
@@ -87,14 +88,17 @@ class ReactionsList:
 
         # Now we can sort some collections
         self.k_reaction.sort_by_reaction_index()
-        self.ab_reaction = sorted(self.ab_reaction, key=lambda x: x.forward.get_index())
-        self.eq_reaction = sorted(self.eq_reaction, key=lambda x: x.forward.get_index())
+        self.ab_reaction = sorted(
+            self.ab_reaction, key=lambda x: x.forward.get_index())
+        self.eq_reaction = sorted(
+            self.eq_reaction, key=lambda x: x.forward.get_index())
         self.enzymatic = sorted(self.enzymatic, key=lambda x: x.get_index())
         self.radiolytic = sorted(self.radiolytic, key=lambda x: x.get_index())
 
     def total_kreactions(self) -> int:
         return (
-            len(self.k_reaction) + len(self.ab_reaction) * 2 + len(self.eq_reaction) * 2
+            len(self.k_reaction) + len(self.ab_reaction) *
+            2 + len(self.eq_reaction) * 2
         )
 
     def total_reactions(self) -> int:
@@ -181,7 +185,8 @@ class SimEnv:
             )
 
         # Read Constant species and create the species collection
-        list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
+        list_sp = constant_species_from_dict(
+            config["concentrations"].get("fixed", {}))
 
         # Read bio param
         parameters = config.get("parameters", {})
@@ -199,8 +204,10 @@ class SimEnv:
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
         if "force_cst_pH" in parameters and not parameters["force_cst_pH"]:
-            list_sp.add_dyn_species(cls.PH_SPECIES, cc_init=10 ** (-parameters["pH"]))
-            list_sp.add_dyn_species("OH_minus", cc_init=10 ** (-14 + parameters["pH"]))
+            list_sp.add_dyn_species(
+                cls.PH_SPECIES, cc_init=10 ** (-parameters["pH"]))
+            list_sp.add_dyn_species(
+                "OH_minus", cc_init=10 ** (-14 + parameters["pH"]))
         else:
             list_sp.add_cst_species(cls.PH_SPECIES, 10 ** (-parameters["pH"]))
             list_sp.add_cst_species("OH_minus", 10 ** (-14 + parameters["pH"]))
@@ -217,6 +224,7 @@ class SimEnv:
                 "enzymatic": [],
                 "radiolytic": {},
                 "equilibrium": [],
+                "arrhenius": [],
             }
 
         # Read Acid/Base Reactions
@@ -236,10 +244,20 @@ class SimEnv:
             config["reactions"].get("k_reaction", []), list_sp
         )
         logger.info(f"CONFIG::{len(kr)} K-reactions added")
+
+        # Read Arrhenius reactions
+        ar, list_sp = arrhenius_from_dict(
+            config["reactions"].get("arrhenius", []), list_sp)
+        logger.info(f"CONFIG::{len(ar)} Arrhenius reactions added")
+
         logger.info(
-            f"CONFIG::A total of ({len(ab)} + {len(er)})*2 + {len(kr)} = "
-            f"{(len(ab)+len(er))*2+len(kr)} k-reactions have been added"
+            f"CONFIG::A total of ({len(ab)} + {len(er)})*2 + {len(kr)} + {len(ar)} = "
+            f"{(len(ab)+len(er))*2+len(kr)+len(ar)} k-reactions have been added"
         )
+
+        # Merge Arrhenius with KReaction Collection
+        for elt in ar:
+            kr.add_reaction(elt)
 
         # Read Enzymatic Reactions
         enz, list_sp = michaelis_from_dict(
@@ -267,8 +285,10 @@ class SimEnv:
         # Sort species so that all constant species are at the end.
         list_sp.sort(inplace=True)
 
-        logger.info(f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
-        logger.info(f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
+        logger.info(
+            f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
+        logger.info(
+            f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
         logger.info("CONFIG::Simulation Configuration done!")
         return cls(
             reactions=ReactionsList(ab, er, kr, enz, rad),
@@ -297,7 +317,8 @@ class SimEnv:
 
         out_cst = np.array([], dtype=np.float64)
         if all:
-            out_cst = np.zeros(self.species.len_cst_species(), dtype=np.float64)
+            out_cst = np.zeros(
+                self.species.len_cst_species(), dtype=np.float64)
             for cst_species in self.species.iter_cst_species():
                 out_cst[cst_species.index - len(out_dyn)] = (
                     cst_species.initial_cc(T) * 1e6
@@ -388,7 +409,8 @@ class SimEnv:
                     if reactant != sp:
                         for _ in range(stoi):
                             JRki[:, idx_r, idx_reactant, sp.index] = 0
-                            JRki[reactant.index, idx_r, idx_reactant, sp.index] = 1
+                            JRki[reactant.index, idx_r,
+                                 idx_reactant, sp.index] = 1
                             idx_reactant += 1
                         continue
                     derive = stoi - 1
@@ -444,7 +466,8 @@ class SimEnv:
             dtype=np.float32,
         )
 
-        Ez_kmki = np.zeros([2, len(self.reactions.enzymatic)], dtype=np.float64)
+        Ez_kmki = np.zeros(
+            [2, len(self.reactions.enzymatic)], dtype=np.float64)
 
         Ez_iy = np.zeros(
             [len(self.species), len(self.reactions.enzymatic)],
@@ -486,11 +509,17 @@ class SimEnv:
 
     def kreactions_involving_reactant(
         self,
-        species: str | ChemSpecies,
+        species: str | ChemSpecies | tp.List[str | ChemSpecies],
     ) -> tp.List[KReaction]:
-        return [
-            r for r in self.reactions.iter_all_kreactions() if r.has_reactant(species)
-        ]
+
+        out: tp.List[KReaction] = []
+        if isinstance(species, (str | ChemSpecies)):
+            species = [species]
+
+        for r in self.reactions.iter_all_kreactions():
+            if all(r.has_reactant(elt) for elt in species):
+                out.append(r)
+        return out
 
     def kreactions_involving_product(
         self,
@@ -552,7 +581,8 @@ def acid_base_from_dict(
         ]  # Need a list to loop over
 
     return (
-        [AcidBase.from_kwargs(list_sp=sim_sp, **reaction) for reaction in reactions],
+        [AcidBase.from_kwargs(list_sp=sim_sp, **reaction)
+         for reaction in reactions],
         sim_sp,
     )
 
@@ -573,9 +603,28 @@ def eq_reaction_from_dict(
         ]  # Need a list to loop over
 
     return (
-        [EReaction.from_kwargs(list_sp=sim_sp, **reaction) for reaction in reactions],
+        [EReaction.from_kwargs(list_sp=sim_sp, **reaction)
+         for reaction in reactions],
         sim_sp,
     )
+
+
+def arrhenius_from_dict(
+    reactions: tp.List[tp.Dict] | tp.Dict,
+    sim_sp: tp.Optional[ListSpecies] = None,
+) -> tp.Tuple[tp.List[Arrhenius], ListSpecies]:
+    if sim_sp is None:
+        sim_sp = ListSpecies()  # Species container related to reaction added
+
+    if len(reactions) == 0:  # -> Nothing to do
+        return ([], sim_sp)
+
+    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
+        reactions = [
+            reactions,
+        ]  # Need a list to loop over
+
+    return ([Arrhenius.from_kwargs(list_sp=sim_sp, **elt) for elt in reactions], sim_sp)
 
 
 def kreaction_from_dict(

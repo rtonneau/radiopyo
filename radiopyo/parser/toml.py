@@ -68,4 +68,6 @@ class TOMLFileParser(FileParser):
                 "enzymatic", [])
             out["reactions"]["equilibrium"] = config["reactions"].get(
                 "equilibrium", [])
+            out["reactions"]["arrhenius"] = config["reactions"].get(
+                "arrhenius", [])
         return out

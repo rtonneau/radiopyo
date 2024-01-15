@@ -2,9 +2,6 @@
 pH = 7
 force_cst_pH = true
 
-[concentrations.fixed] # Unit is [mol]/[l]
-H2O = 55
-
 # ----------------------------------------------------------------------------------
 #                             DEFINE RADIOLYTIC REACTIONS                            
 # ----------------------------------------------------------------------------------
@@ -14,7 +11,7 @@ OH_r = 2.8
 H_r = 0.62
 H2 = 0.47
 H2O2 = 0.73
-H3O_plus = 3.24
+H3O_plus = 2.8 #3.24
 
 # ----------------------------------------------------------------------------------
 #                             DEFINE ACID-BASE REACTIONS                            
@@ -50,147 +47,182 @@ pKa = [4.943, -6.230e-3, 4.125e-5, -8.182e-9]
 k_backward = [16.41, -4.888e3, 1.622e6, -2.004e8]
 
 [[reactions.acid_base]]
-reaction = "OH_minus + H3O_plus <-> 2 H2O"
-pKa = [16.690, -4.262e-2, 2.071e-4, -5.594e-7, 7.161e-10]
+reaction = "2H2O <-> OH_minus + H3O_plus"
+pKa = 17.5                                                   #[16.690, -4.262e-2, 2.071e-4, -5.594e-7, 7.161e-10]
 k_backward = [20.934, -1.236e4, 6.364e6, -1.475e9, 1.237e11]
 
+
+[[reactions.equilibrium]]
+reaction = "H_r + H2O <-> H2 + OH_r"
+k_forward = [9.408, -2.827e3, -3.792e5]
+k_backward = [-11.556, 3.2546e4, -1.8623e7, 4.5543e9, -4.1364e11]
+
+
+[[reactions.k_reaction]]
+reaction = "e_aq + e_aq + 2H2O -> H2 + 2 OH_minus"
+k_value = [12.281, -3.768e2, -6.673e4, -1.075e7]   # PK below 150 °C
+
+[[reactions.arrhenius]]
+reaction = "2 H_r -> H2"
+A = 2.70e12              # pre exponential coefficent [L/mol/s]
+Ea = 1867.5              # Activation Energy [kJ/mol]
+
+[[reactions.k_reaction]]
+reaction = "2 OH_r -> H2O2"
+k_value = [8.054, 2.193e3, -7.395e5, 6.87e7] # => k, not 2k!
+
+[[reactions.arrhenius]]
+reaction = "e_aq + H_r -> H2 + OH_minus"
+A = 1.14e13                              # pre exponential coefficent [L/mol/s]
+Ea = 1795.7                              # Activation Energy [kJ/mol]
+
+[[reactions.k_reaction]]
+reaction = "e_aq + OH_r -> OH_minus"
+k_value = [13.123, -1.023e3, 7.634e4] # ==< 3.5e10 at 25°C
+
+[[reactions.arrhenius]]
+reaction = "H_r + OH_r -> H2O"
+A = 4.26e11                    # pre exponential coefficent [L/mol/s]
+Ea = 1091.9                    # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "e_aq + H2O2 -> OH_minus + OH_r"
+A = 7.70e12                                 # pre exponential coefficent [L/mol/s]
+Ea = 1889.6                                 # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "e_aq + O2 -> O2_r_minus"
+A = 2.52e12                          # pre exponential coefficent [L/mol/s]
+Ea = 1401.5                          # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "e_aq + O2_r_minus + H2O -> H2O2 + 2OH_minus"
+A = 2.46e12                                              # pre exponential coefficent [L/mol/s]
+Ea = 1563.6                                              # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "e_aq + HO2_r -> HO2_minus"
+A = 2.46e12                            # pre exponential coefficent [L/mol/s]
+Ea = 1563.6                            # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "H_r + H2O2 -> OH_r + H2O"
+A = 1.79e11                           # pre exponential coefficent [L/mol/s]
+Ea = 2533.6                           # Activation Energy [kJ/mol]
+
+[[reactions.k_reaction]]
+reaction = "H_r + O2 -> HO2_r"
+k_value = [10.704, 2.840e2, -1.369e5]
+
+[[reactions.arrhenius]]
+reaction = "H_r + HO2_r -> H2O2"
+A = 5.17e12                      # pre exponential coefficent [L/mol/s]
+Ea = 1824.2                      # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "H_r + O2_r_minus -> HO2_minus"
+A = 5.17e12                                # pre exponential coefficent [L/mol/s]
+Ea = 1824.2                                # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "OH_r + H2O2 -> HO2_r + H2O"
+A = 7.68e9                              # pre exponential coefficent [L/mol/s]
+Ea = 1661.4                             # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "OH_r + O2_r_minus -> OH_minus + O2"
+A = 8.77e11                                     # pre exponential coefficent [L/mol/s]
+Ea = 1306.2                                     # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "OH_r + HO2_r -> H2O + O2"
+A = 1.29e11                           # pre exponential coefficent [L/mol/s]
+Ea = 799.2                            # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "2 HO2_r -> H2O2 + O2"
+A = 2.78e9                        # pre exponential coefficent [L/mol/s]
+Ea = 2416.4                       # Activation Energy [kJ/mol]
+
+[[reactions.arrhenius]]
+reaction = "O2_r_minus + HO2_r + H2O -> H2O2 + O2 + OH_r"
+A = 2.63e9                                                # pre exponential coefficent [L/mol/s]
+Ea = 974.3                                                # Activation Energy [kJ/mol]
 
 # ----------------------------------------------------------------------------------
 #                                 DEFINE K-REACTIONS
 # For [X].[X] -> ... reactions, 2k value is given                             
 # ----------------------------------------------------------------------------------
 # -------------------- List of all reactions related to H3Oplus -------------------- 
-[[reactions.k_reaction]]
-reaction = "e_aq + H3O_plus -> H_r + H2O"
-k_value = 2.1e10
-
-#[[reactions.k_reaction]] ## Now in Acid/Base
-#reaction = "O2_r_minus + H3O_plus -> HO2_r + H2O"
-#k_value = 5.02e10
-
 #[[reactions.k_reaction]]
-#reaction = "O3_r_minus + H3O_plus -> OH_r + O2"
-#k_value = 8.99e10
-
-#[[reactions.k_reaction]] ## Now in Acid/Base
-#reaction = "HO2_minus + H3O_plus -> H2O2"
-#k_value = 5.0e10
-
-#[[reactions.k_reaction]] ## Now in Acid/Base
-#reaction = "O_r_minus + H3O_plus -> H2O2"
-#k_value = 4.78e10
+#reaction = "e_aq + H3O_plus -> H_r + H2O"
+#k_value = 2.1e10
 
 # ------------------ List of all reactions with e_aq as reactants ------------------ 
-[[reactions.k_reaction]]
-reaction = "e_aq + H2O -> H_r + OH_minus"
-k_value = 1.9e1
+#[[reactions.k_reaction]]
+#reaction = "e_aq + H2O -> H_r + OH_minus"
+#k_value = 1.9e1
 
-[[reactions.k_reaction]]
-reaction = "e_aq + e_aq -> H2 + 2 OH_minus"
-k_value = 1.1e10
 
-[[reactions.k_reaction]]
-reaction = "e_aq + H_r -> H2 + OH_minus"
-k_value = 2.5e10
+#[[reactions.k_reaction]]
+#reaction = "e_aq + O_r_minus -> 2 OH_minus"
+#k_value = 2.2e10
 
-[[reactions.k_reaction]]
-reaction = "e_aq + OH_r -> OH_minus"
-k_value = 3.0e10
+#[[reactions.k_reaction]]
+#reaction = "e_aq +  H_plus -> H_r"
+#k_value = 2.3e10
 
-[[reactions.k_reaction]]
-reaction = "e_aq + O_r_minus -> 2 OH_minus"
-k_value = 2.2e10
 
-[[reactions.k_reaction]]
-reaction = "e_aq +  H_plus -> H_r"
-k_value = 2.3e10
+#[[reactions.k_reaction]]
+#reaction = "e_aq + HO2_minus -> OH_minus + OH_r"
+#k_value = 3.5e9
 
-[[reactions.k_reaction]]
-reaction = "e_aq + H2O2 -> OH_minus + OH_r"
-k_value = 1.1e10
 
-[[reactions.k_reaction]]
-reaction = "e_aq + HO2_minus -> OH_minus + OH_r"
-k_value = 3.5e9
-
-[[reactions.k_reaction]]
-reaction = "e_aq + O2 -> O2_r_minus"
-k_value = 1.9e10
-
-[[reactions.k_reaction]]
-reaction = "e_aq + O2_r_minus -> O2_minus_minus"
-k_value = 1.3e10
+#[[reactions.k_reaction]]
+#reaction = "e_aq + O2_r_minus -> O2_minus_minus"
+#k_value = 1.3e10
 
 # ---------------------- Reactions involving H_r as reactant -----------------------
-[[reactions.equilibrium]]
-reaction = "H_r + H2O <-> H2 + OH_r"
-k_forward = [9.408, -2.827e3, -3.792e5]
-k_backward = [-11.556, 3.2546e4, -1.8623e7, 4.5543e9, -4.1364e11]
 
 #[[reactions.k_reaction]]
 #reaction = "H_r + H2O -> H2 + OH_r"
 #k_value = 1.0e1
 
 
-[[reactions.k_reaction]]
-reaction = "2 H_r -> H2"
-k_value = 1.55e10
-
-[[reactions.k_reaction]]
-reaction = "H_r + OH_r -> H2O"
-k_value = 7e9
-
-[[reactions.k_reaction]]
-reaction = "H_r + OH_minus -> e_aq + H2O"
-k_value = 2.2e7
-
-[[reactions.k_reaction]]
-reaction = "H_r + H2O2 -> OH_r + H2O"
-k_value = 9.0e7
-
-[[reactions.k_reaction]]
-reaction = "H_r + O2 -> HO2_r"
-k_value = 2.1e10
-
-[[reactions.k_reaction]]
-reaction = "H_r + HO2_r -> H2O2"
-k_value = 1.0e10
+#[[reactions.k_reaction]]
+#reaction = "H_r + OH_minus -> e_aq + H2O"
+#k_value = 2.2e7
 
 
 # --------------------- Reactions involving OH_r as reactant  ----------------------
-[[reactions.k_reaction]]
-reaction = "2OH_r -> H2O2"
-k_value = 1.1e10
 
-[[reactions.k_reaction]]
-reaction = "OH_r + H2 -> H_r + H2O"
-k_value = 4.2e7
+
+#[[reactions.k_reaction]]
+#reaction = "OH_r + H2 -> H_r + H2O"
+#k_value = 4.2e7
 
 #[[reactions.k_reaction]] ## -> Now in Acid Base
 #reaction = "OH_r + OH_minus -> O_r_minus + H2O"
 #k_value = 1.3e10
 
-[[reactions.k_reaction]]
-reaction = "OH_r + HO2_minus -> OH_minus + HO2_r"
-k_value = 7.5e9
+#[[reactions.k_reaction]]
+#reaction = "OH_r + HO2_minus -> OH_minus + HO2_r"
+#k_value = 7.5e9
 
-[[reactions.k_reaction]]
-reaction = "OH_r + O2_r_minus -> OH_minus + O2"
-k_value = 8.0e9
 
 # ------------------- Reactions involving O_r_minus as reactant --------------------
-[[reactions.k_reaction]]
-reaction = "O_r_minus + H2O -> OH_minus + OH_r"
-k_value = 1.8e6
+#[[reactions.k_reaction]]
+#reaction = "O_r_minus + H2O -> OH_minus + OH_r"
+#k_value = 1.8e6
 
-[[reactions.k_reaction]]
-reaction = "O_r_minus + O2 -> O3_r_minus"
-k_value = 3.6e9
+#[[reactions.k_reaction]]
+#reaction = "O_r_minus + O2 -> O3_r_minus"
+#k_value = 3.6e9
 
-[[reactions.k_reaction]]
-reaction = "O_r_minus + O2_r_minus -> 2 OH_minus + O2"
-k_value = 6.0e8
+#[[reactions.k_reaction]]
+#reaction = "O_r_minus + O2_r_minus -> 2 OH_minus + O2"
+#k_value = 6.0e8
 
-[[reactions.k_reaction]]
-reaction = "2 O2_r_minus + 2 H_plus-> H2O2 + O2"
-k_value = 2e9                                    # 2e5
+#[[reactions.k_reaction]]
+#reaction = "2 O2_r_minus + 2 H_plus-> H2O2 + O2"
+#k_value = 2e9                                    # 2e5

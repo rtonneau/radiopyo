@@ -57,6 +57,7 @@ class ReactionsDict(tp.TypedDict):
     k_reaction: tp.List[tp.Dict]
     enzymatic: tp.List[tp.Dict]
     equilibrium: tp.List[tp.Dict]
+    arrhenius: tp.List[tp.Dict]
 
 
 class ConfigDict(tp.TypedDict):
@@ -105,5 +106,6 @@ def default_ConfigDict() -> ConfigDict:
             "equilibrium": [],
             "enzymatic": [],
             "radiolytic": {},
+            "arrhenius": [],
         },
     }

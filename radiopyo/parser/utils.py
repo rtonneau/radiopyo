@@ -13,6 +13,7 @@ import typing as tp
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import (
     acid_base_from_dict,
+    arrhenius_from_dict,
     eq_reaction_from_dict,
     kreaction_from_dict,
     michaelis_from_dict,
@@ -150,6 +151,31 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # All shared reactions are updated at this point. Now just add all new reactions
     # from 'other' --> stored in 'to_add'
     root["reactions"]["k_reaction"] += to_add
+
+    ## => Arrhenius Reactions ##
+    # First, let's make a set of the Arrhenius presents in root. Each one should have a
+    # unique ID ==> Make kReaction and then use the str version of it!
+    r_root = {}
+    for idx, _ in enumerate(root["reactions"]["arrhenius"]):
+        _ = arrhenius_from_dict(_, sim_sp=None)[0][0]
+        r_root[str(_)] = (_, idx)
+
+    # Loop over all KReaction in other and check whether it is also in root or not.
+    to_add = []  # List of all reaction to add to root afterward
+    for _ in other["reactions"]["arrhenius"]:
+        print(f"reading from other: {_}")
+        ar = arrhenius_from_dict(_, sim_sp=None)[0][0]
+        # Same reaction in root => just make sur the cst values comes from 'other'
+        if str(ar) in r_root:
+            idx = r_root[str(ar)][1]
+            root["reactions"]["arrhenius"][idx]["A"] = ar._pre_exp
+            root["reactions"]["arrhenius"][idx]["Ea"] = ar._activation_energy
+            continue
+        # arrhenius from 'other' not in 'root'. Make a copy of the dict version.
+        to_add.append(_.copy())
+    # All shared reactions are updated at this point. Now just add all new reactions
+    # from 'other' --> stored in 'to_add'
+    root["reactions"]["arrhenius"] += to_add
 
     ## => Enzymatic ##
     r_root = {}

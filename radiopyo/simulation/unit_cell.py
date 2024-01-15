@@ -189,9 +189,9 @@ class UnitCell(object):
         """
         return cls.from_parser(file, RonFileParser)
 
-    def set_temperature(self, T: float, unit: str = "celsius") -> None:
-        """ """
-        self._T = Temperature(T, unit)
+    def _update_matrices(self) -> None:
+        """ 
+        """
         self.mat = SimMatrices(
             Ki_mat=self.env.make_kreaction_matrix(self._T),
             Gi_mat=self.env.make_radiolytic_vector(),
@@ -199,11 +199,17 @@ class UnitCell(object):
             cst_sp=self.env.make_cst_species_vector(),
         )
 
+    def set_temperature(self, T: float, unit: str = "celsius") -> tp.Self:
+        """ """
+        self._T = Temperature(T, unit)
+        self._update_matrices()
+        return self
+
     def set_beam(
         self,
         beam: ParticleBeam | str,
         LET: tp.Optional[float] = None,
-    ) -> None:
+    ) -> tp.Self:
         """Define Radiation Source structure/parameters
 
         Args:
@@ -212,7 +218,10 @@ class UnitCell(object):
         Returns:
             None
         """
-        _OLD_LET = self.beam_list.current_LET
+        try:
+            _OLD_LET = self.beam_list.current_LET
+        except ValueError:
+            _OLD_LET = None
 
         if isinstance(beam, str):
             self.beam_list.use_beam(beam)
@@ -231,6 +240,7 @@ class UnitCell(object):
 
         if LET is not None and LET != _OLD_LET:
             self.change_LET(LET)
+        return self
 
     def change_LET(self, let: float) -> None:
         """Update the radiolytic yields from the simulation env according to literature
@@ -244,7 +254,8 @@ class UnitCell(object):
             None
         """
         self.beam_list.update_let(let)
-        logger.info(f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
+        logger.info(
+            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
             if sp.label not in self.g_val or (not self.env.species.is_dyn_species(sp)):
@@ -613,7 +624,8 @@ class SimChunksIter:
             chunks = np.linspace(last.start, last.stop, num=n + 1)
             steps = np.linspace(last.max_step_size, max_step_size, num=n)
         elif scale == "log":
-            chunks = np.logspace(np.log10(last.start), np.log10(last.stop), num=n + 1)
+            chunks = np.logspace(np.log10(last.start),
+                                 np.log10(last.stop), num=n + 1)
             steps = np.logspace(
                 np.log10(last.max_step_size), np.log10(max_step_size), num=n
             )

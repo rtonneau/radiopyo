@@ -44,8 +44,9 @@ EPSILON = 1e-25  # µmol/L
 def jacobian(
     t: float,
     y: NDArray[np.float64],
-    beam: ParticleBeam,
-    pH_species_index: int,
+    beam: Optional[ParticleBeam],
+    H3O_plus_index: int,
+    OH_minus_index: int,
     cst_sp: NDArray[np.float64],
     Ki_mat: Tuple[
         NDArray[np.float64],
@@ -130,7 +131,7 @@ def derive(
     # Force negative cc values to 0 + convert to [mol/L]
     # y = y.clip(min=0.0, ) * 1e-6
     y = y * 1.0e-6  # µmol/L => mol/l
-    y[y < 1e-18] = 0.0  # Cut off
+    y[y < 1e-15] = 0.0  # Cut offop
 
     # y[OH_minus_index] = y[H3O_plus_index]
 

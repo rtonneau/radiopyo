@@ -230,7 +230,8 @@ class ODEResult(object):
     def to_pandas(self, clip: bool = True) -> pd.DataFrame:
         """ """
         labels = [elt.label for elt in self.env.species.sorted_iter_dyn_species()]
-        labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
+        labels_cst = [
+            elt.label for elt in self.env.species.sorted_iter_cst_species()]
 
         df_sp = pd.DataFrame(
             index=self.t,
@@ -284,7 +285,8 @@ class ODEResult(object):
         """
         # Compute column names and Pre compute slices to ease access in the dataframe
         # columns
-        cols_kr = [kr.as_label() for kr in self.env.reactions.iter_all_kreactions()]
+        cols_kr = [kr.as_label()
+                   for kr in self.env.reactions.iter_all_kreactions()]
         idx_kr = slice(0, len(cols_kr))
 
         cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
@@ -308,7 +310,7 @@ class ODEResult(object):
 
         for (idx, t_val), y in zip(enumerate(self.t), self.y.T):
             y = y * 1.0e-6  # µmol/L => mol/l
-            y[y < 1e-18] = 0.0  # Cut off fmol/L
+            # y[y < 1e-18] = 0.0  # Cut off fmol/L
 
             y = np.append(y, self.mat["cst_sp"])
             # K Reactions
@@ -316,7 +318,7 @@ class ODEResult(object):
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
             )
             Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
-            Rki[Rki < 1e-25] = 0
+            # Rki[Rki < 1e-25] = 0
             out.iloc[idx, idx_kr] = Rki
 
             # Radiolytic Reactions

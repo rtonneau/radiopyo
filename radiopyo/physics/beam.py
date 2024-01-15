@@ -960,10 +960,10 @@ class BeamCollection(object):
         return self._current
 
     @property
-    def current_LET(self) -> float:
+    def current_LET(self) -> float | None:
         if self._let[self._current] is not None:
             return self._let[self._current]  # type: ignore [return-value]
-        raise ValueError(f"No LET defined for beam: {self._current}")
+        return None
 
     def remove_beam(self, key: str) -> None:
         """Remove a beam entry.
@@ -1023,7 +1023,7 @@ class BeamCollection(object):
         if use or len(self._current) == 0:
             self._current = key
 
-    def use_beam(self, key: str) -> tp.Tuple[ParticleBeam, float]:
+    def use_beam(self, key: str) -> tp.Tuple[ParticleBeam, float | None]:
         """
         Defines which beam to use
         Args:
