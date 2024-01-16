@@ -74,12 +74,8 @@ def jacobian(
             .... |    ....        ....   ....      ....
             ds_i | ds_i/ds_0   ds_i/ds_1 ....    ds_i/ds_j
     """
-    y = (
-        y.clip(
-            min=0.0,
-        )
-        * 1e-6
-    )
+
+    y = np.append(y, cst_sp)
 
     # K Reactions component
     res = np.nan_to_num(np.einsum("j, jikl -> ikl ", y, Ki_mat[3]), nan=1)
@@ -131,7 +127,7 @@ def derive(
     # Force negative cc values to 0 + convert to [mol/L]
     # y = y.clip(min=0.0, ) * 1e-6
     y = y * 1.0e-6  # µmol/L => mol/l
-    y[y < 1e-15] = 0.0  # Cut offop
+    # y[y < 1e-15] = 0.0  # Cut offop
 
     # y[OH_minus_index] = y[H3O_plus_index]
 
@@ -147,7 +143,7 @@ def derive(
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
     Rki = np.prod(Rki, axis=1) * Ki_mat[0]  # All reaction rates are here
-    Rki[Rki < 1e-25] = 0
+    # Rki[Rki < 1e-25] = 0
 
     # Compute dydt, first only with k reactions term:
     dydt = np.matmul(Ki_mat[1], Rki.T)
