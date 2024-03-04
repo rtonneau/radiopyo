@@ -65,8 +65,7 @@ def polynomial_factory(
 #                                   CLASS DEFINITIONS                                  #
 # ------------------------------------------------------------------------------------ #
 
-KValType: tp.TypeAlias = tp.Union[float,
-                                  tp.List[float], np.polynomial.Polynomial]
+KValType: tp.TypeAlias = tp.Union[float, tp.List[float], np.polynomial.Polynomial]
 
 
 class KReaction(BasicReaction):
@@ -95,8 +94,7 @@ class KReaction(BasicReaction):
     ):
         super().__init__()
         self.T = Temperature(T, unit="celsius")
-        self._k_value = polynomial_factory(
-            k_value) if k_value is not None else None
+        self._k_value = polynomial_factory(k_value) if k_value is not None else None
 
     def k_value(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
@@ -143,8 +141,7 @@ class KReaction(BasicReaction):
         if self.index is not None and self.index >= 0:
             return f"KR_{self.index}"
 
-        raise KeyError(
-            "Unknown reaction index. Cannot make a label without index.")
+        raise KeyError("Unknown reaction index. Cannot make a label without index.")
 
     def raw_k_value(self) -> float | tp.List[float] | None:
         """
@@ -183,9 +180,7 @@ class KReaction(BasicReaction):
         return cls.from_dict(
             reactants,
             products,
-            generic["constants"]["k_value"]
-            if "k_value" in generic["constants"]
-            else None,
+            generic["constants"].get("k_value", None),
             list_sp,
         )
 
@@ -278,13 +273,14 @@ class KReaction(BasicReaction):
 
 
 class Arrhenius(KReaction):
-    """ 
+    """
     Args:
         A: float
             pre-exponential factor [L/mol/s]
         Ea: float
             Activation Energy [kJ/mol]
     """
+
     _pre_exp: float
     _activation_energy: float
 
@@ -294,8 +290,7 @@ class Arrhenius(KReaction):
         Ea: float,
         T: tp.Optional[float] = None,
     ):
-        """
-        """
+        """ """
         super().__init__(k_value=None, T=T)
         self._pre_exp = A
         self._activation_energy = Ea
@@ -307,7 +302,7 @@ class Arrhenius(KReaction):
                 Temperature value in °C
         """
         T = Temperature(T)
-        return self._pre_exp * np.exp(-self._activation_energy/T.kelvin)
+        return self._pre_exp * np.exp(-self._activation_energy / T.kelvin)
 
     def raw_k_value(self) -> tp.List[float]:
         """
@@ -337,8 +332,10 @@ class Arrhenius(KReaction):
         return cls.from_dict(
             reactants,
             products,
-            [generic["constants"]["A"],  # type: ignore [list-item]
-             generic["constants"]["Ea"]],  # type: ignore [list-item]
+            [
+                generic["constants"]["A"],  # type: ignore [list-item]
+                generic["constants"]["Ea"],  # type: ignore [list-item]
+            ],
             list_sp,
         )
 
@@ -366,7 +363,7 @@ class Arrhenius(KReaction):
             case {"reaction": r, "A": _, "Ea": _} if len(kwargs) == 3:
                 gen = RPARSER.parse_reaction(r)  # type: ignore[arg-type]
                 gen["constants"]["A"] = kwargs["A"]  # type: ignore[assignment]
-                gen["constants"]["Ea"] = kwargs["Ea"]
+                gen["constants"]["Ea"] = kwargs["Ea"]  # type: ignore[assignment]
 
                 return cls.from_generic(
                     gen,
@@ -455,11 +452,11 @@ class KReactionCollection:
         return self._reactions[-1][1]
 
     def merge_with(
-            self,
-            other: tp.Self,
-            list_sp: tp.Optional[ListSpecies] = None,) -> None:
-        """
-        """
+        self,
+        other: tp.Self,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> None:
+        """ """
         for label, reaction in other.iter_labels_and_reactions():
             self.add_reaction(reaction, label=label, list_sp=list_sp)
 
@@ -472,8 +469,7 @@ class KReactionCollection:
                 f"Reaction label: {current} not in KReactionCollection"
             ) from err
         if new in self._indexer:
-            raise KeyError(
-                f"Reaction label: {new} already in KReactionCollection")
+            raise KeyError(f"Reaction label: {new} already in KReactionCollection")
 
         del self._indexer[current]
         self._indexer[new] = idx
@@ -493,8 +489,7 @@ class KReactionCollection:
         """
         May be useful to sort the list of reactions so that iteration is not random.
         """
-        self._reactions = sorted(
-            self._reactions, key=lambda x: x[1].get_index())
+        self._reactions = sorted(self._reactions, key=lambda x: x[1].get_index())
         return self
 
     def iter_labels_and_reactions(self) -> tp.Iterator[tp.Tuple[str, KReaction]]:
@@ -521,8 +516,7 @@ class KReactionCollection:
 
     def get_reaction(self, label: str) -> KReaction:
         if label not in self._indexer:
-            raise KeyError(
-                f"No reaction labeled {label} in the reaction collection")
+            raise KeyError(f"No reaction labeled {label} in the reaction collection")
         return self._reactions[self._get_reaction_index(label)][1]
 
     def add_reaction(
@@ -594,6 +588,22 @@ class BiReaction(KReactionCollection, ABC):
         out.append("<->")
         out.append(self.forward.products_as_string())
         return " ".join(out)
+
+    def add_forward_reaction(
+        self,
+        reaction: GenericReaction | KReaction,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> tp.Self:
+        super().add_reaction(reaction, label="forward", list_sp=list_sp)
+        return self
+
+    def add_backward_reaction(
+        self,
+        reaction: GenericReaction | KReaction,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> tp.Self:
+        super().add_reaction(reaction, label="backward", list_sp=list_sp)
+        return self
 
     @abstractmethod
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:

@@ -78,6 +78,9 @@ class SimMatrices(tp.TypedDict):
         NDArray[np.float32],
         NDArray[np.float32],
     ]
+    AB_mat: tp.Tuple[
+        NDArray[np.float64],  # Need the Pka's
+    ]
     Gi_mat: NDArray[np.float64]
     Ez_mat: tp.Optional[
         tp.Tuple[

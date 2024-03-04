@@ -1,3 +1,8 @@
 {
-    "python.analysis.exclude": ["./examples"]
+    "python.analysis.exclude": [
+        "./examples"
+    ],
+    "cSpell.words": [
+        "deprotonation"
+    ]
 }

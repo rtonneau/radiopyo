@@ -119,17 +119,14 @@ def derive(
             NDArray[np.int8],
         ]
     ] = None,
+    AB_mat: Optional[Tuple[NDArray[np.float64],]] = None,
 ) -> NDArray[np.float64]:
     """Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
     """
 
     # Force negative cc values to 0 + convert to [mol/L]
-    # y = y.clip(min=0.0, ) * 1e-6
     y = y * 1.0e-6  # µmol/L => mol/l
-    # y[y < 1e-15] = 0.0  # Cut offop
-
-    # y[OH_minus_index] = y[H3O_plus_index]
 
     # Construct the cc vector with all relevant species
     # ==> Dynamical species (already in y)
@@ -143,7 +140,6 @@ def derive(
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
     Rki = np.prod(Rki, axis=1) * Ki_mat[0]  # All reaction rates are here
-    # Rki[Rki < 1e-25] = 0
 
     # Compute dydt, first only with k reactions term:
     dydt = np.matmul(Ki_mat[1], Rki.T)
@@ -171,9 +167,6 @@ def derive(
     # ==> dynamical species
     # ==> convert back to [µmol/l]
     dydt = dydt[: -len(cst_sp)]
-
-    # dydt[H3O_plus_index] = (dydt[H3O_plus_index] + dydt[OH_minus_index])/2
-    # dydt[OH_minus_index] = dydt[H3O_plus_index]
 
     return dydt * 1e6  # mol/l => µmol/l
 

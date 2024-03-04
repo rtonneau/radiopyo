@@ -65,8 +65,7 @@ class EReaction(BiReaction):
         # Check whether enough information is provided to compute all K's.
         if constant is None:
             try:
-                self._k_forward = polynomial_factory(
-                    reaction["constants"]["k_forward"])
+                self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
                 self._k_backward = polynomial_factory(
                     reaction["constants"]["k_backward"]
                 )
@@ -84,16 +83,14 @@ class EReaction(BiReaction):
             "k_backward" in reaction["constants"]
             and reaction["constants"]["k_backward"] is not None
         ):
-            self._k_backward = polynomial_factory(
-                reaction["constants"]["k_backward"])
+            self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
             self._k_equilibrium = polynomial_factory(constant)
             self._k_forward = self._k_equilibrium + self._k_backward
         elif (
             "k_forward" in reaction["constants"]
             and reaction["constants"]["k_forward"] is not None
         ):
-            self._k_forward = polynomial_factory(
-                reaction["constants"]["k_forward"])
+            self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
             self._k_equilibrium = polynomial_factory(constant)
             self._k_backward = self._k_forward - self._k_equilibrium
         else:
@@ -128,8 +125,7 @@ class EReaction(BiReaction):
             list_sp = ListSpecies()
 
         try:
-            gen = RPARSER.parse_reaction(
-                kwargs["reaction"])  # type:ignore[arg-type]
+            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
         except KeyError as err:
             raise AttributeError(
                 "Need a reaction string to create an Equilibrium Reaction"
@@ -146,7 +142,7 @@ class EReaction(BiReaction):
         with suppress(KeyError):
             gen["constants"]["k_backward"] = kwargs["k_backward"]
 
-        constant = kwargs["k_equilibrium"] if "k_equilibrium" in kwargs else None
+        constant = kwargs.get("k_equilibrium", None)
 
         # type:ignore[arg-type]
         return cls(gen, constant=constant, list_sp=list_sp)

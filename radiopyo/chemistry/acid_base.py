@@ -20,22 +20,37 @@ from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 from .collections import ListSpecies
 from .k_reactions import (
     BiReaction,
-    KReactionCollection,
+    KReaction,
     polynomial_factory,
 )
 from .utils.units import Temperature
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    from .species import ChemSpecies
+
 
 __all__ = [
     "AcidBase",
+    "ABCouple",
 ]
 
 # ------------------------------------------------------------------------------------ #
 #                                   CLASS DEFINITIONS                                  #
 # ------------------------------------------------------------------------------------ #
+
+
+class ABCouple(tp.NamedTuple):
+    """
+    Attributes:
+        species: ChemSpecies
+            Acid or Base
+        conjugate: ChemSpecies
+            Conjugate base from Acid or Conjugate acid from Base.
+    """
+
+    species: ChemSpecies
+    conjugate: ChemSpecies
 
 
 class AcidBase(BiReaction):
@@ -54,6 +69,8 @@ class AcidBase(BiReaction):
     K_equilibrium = 10 ** (-pKa)
     """
 
+    _k_backward: np.polynomial.Polynomial
+    _k_forward: np.polynomial.Polynomial
     _pKa: np.polynomial.Polynomial
 
     def __init__(
@@ -66,29 +83,17 @@ class AcidBase(BiReaction):
         super().__init__()
         self._pKa = np.polynomial.Polynomial(pKa)
 
-        if (
-            "k_backward" in reaction["constants"]
-            and reaction["constants"]["k_backward"] is not None
-        ):
-            self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
-            self._k_forward = None
-        elif (
-            "k_forward" in reaction["constants"]
-            and reaction["constants"]["k_forward"] is not None
-        ):
-            self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
-            self._k_backward = None
-        else:
-            raise ValueError("AcidBase needs at least one of K_forward or K_backward")
+        if reaction["constants"].get("k_backward", None) is None:
+            raise ValueError("For A/B reaction, k_backward must be defined")
+        if reaction["constants"].get("k_forward", None) is None:
+            raise ValueError("For A/B reaction, k_forward must be defined")
+
+        self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
+        self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
 
         # Need to add forward and backward reactions via the superclass
-        # KReactionCollection as this method is not allowed for an EReaction.
-        KReactionCollection.add_reaction(
-            self, reaction, label="forward", list_sp=list_sp
-        )
-        KReactionCollection.add_reaction(
-            self, revert_reaction(reaction), label="backward", list_sp=list_sp
-        )
+        self.add_forward_reaction(reaction, list_sp=list_sp)
+        self.add_backward_reaction(revert_reaction(reaction), list_sp=list_sp)
 
     @classmethod
     def from_kwargs(
@@ -120,9 +125,13 @@ class AcidBase(BiReaction):
             )
 
         with suppress(KeyError):
-            gen["constants"]["k_forward"] = kwargs["k_forward"]  # type:ignore[assignment]
+            gen["constants"]["k_forward"] = kwargs[
+                "k_forward"
+            ]  # type:ignore[assignment]
         with suppress(KeyError):
-            gen["constants"]["k_backward"] = kwargs["k_backward"]  # type:ignore[assignment]
+            gen["constants"]["k_backward"] = kwargs[
+                "k_backward"
+            ]  # type:ignore[assignment]
 
         return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
@@ -142,11 +151,6 @@ class AcidBase(BiReaction):
             T: Temperature in °C (optional, default:25)
         """
         _T = Temperature(T) if T is not None else Temperature()
-        if self._k_backward is not None:
-            _val = self._k_backward(1.0 / _T.kelvin) - self._pKa(_T.celsius)
-            return 10**_val
-        if self._k_forward is None:
-            raise ValueError("AcidBase: Both K_forward and K_backward are None")
         return 10 ** self._k_forward(1.0 / _T.kelvin)
 
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
@@ -155,9 +159,109 @@ class AcidBase(BiReaction):
             T: Temperature in °C (optional, default:25)
         """
         _T = Temperature(T) if T is not None else Temperature()
-        if self._k_forward is not None:
-            _val = self._k_forward(1.0 / _T.kelvin) + self._pKa(_T.celsius)
-            return 10**_val
-        if self._k_backward is None:
-            raise ValueError("AcidBase: Both K_forward and K_backward are None")
         return 10 ** self._k_backward(1.0 / _T.kelvin)
+
+    def is_acid(self) -> bool:
+        if "H3O_plus" in self.forward or "H_plus" in self.forward:
+            return True
+        return False
+
+    def is_base(self) -> bool:
+        if "OH_minus" in self.forward:
+            return True
+        return False
+
+    def get_deprotonation_reaction(self) -> KReaction:
+        """ """
+        if self.is_acid():
+            if self.forward.has_product("H3O_plus") or self.forward.has_product(
+                "H_plus"
+            ):
+                return self.forward
+            return self.backward
+
+        if self.is_base():
+            if self.forward.has_reactant("OH_minus"):
+                return self.forward
+            return self.backward
+
+        raise ValueError(f"Unable to identify Acid or Base nature of {self}")
+
+    def get_couple(self) -> ABCouple:
+        """
+        Ugly function but working function
+        ==> TODO: Refactor
+        """
+        r = self.get_deprotonation_reaction()
+
+        if self.is_acid():
+            _l = len(r.reactants)
+            if _l > 2:
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"than 2 different reactants ({_l} reactants)"
+                )
+            if _l == 2 and not r.has_reactant("H2O"):
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    "than 1 reactant but none of them is H2O."
+                )
+
+            for sp, _ in r.iter_reactants():
+                if sp == "H2O":
+                    continue
+                species = sp
+
+            _l = len(r.products)
+            if _l > 2:
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"than 2 different products ({_l} products)"
+                )
+            if _l == 2 and not (r.has_product("H3O_plus") or r.has_product("H_plus")):
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    "than 1 product but none of them is H3O_plus or H_plus."
+                )
+
+            for sp, _ in r.iter_products():
+                if sp == "H3O_plus" or sp == "H_plus":
+                    continue
+                conjugate = sp
+
+        else:
+            _l = len(r.products)
+            if _l > 2:
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"than 2 different products ({_l} products)"
+                )
+            if _l == 2 and not r.has_product("H2O"):
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    "than 1 product but none of them is H2O."
+                )
+
+            for sp, _ in r.iter_products():
+                if sp == "H2O":
+                    continue
+                conjugate = sp
+
+            _l = len(r.reactants)
+            if _l > 2:
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"than 2 different reactants ({_l} reactants)"
+                )
+            if _l == 2 and not r.has_reactant("OH_minus"):
+                raise ValueError(
+                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    "than 1 reactant but none of them is OH_minus."
+                )
+
+            for sp, _ in r.iter_reactants():
+                if sp == "OH_minus":
+                    continue
+                species = sp
+
+        return ABCouple(species, conjugate)

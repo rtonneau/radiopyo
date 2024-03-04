@@ -103,6 +103,7 @@ class UnitCell(object):
                 Gi_mat=self.env.make_radiolytic_vector(),
                 Ez_mat=self.env.make_enzymatic_matrix(),
                 cst_sp=self.env.make_cst_species_vector(),
+                AB_mat=self.env.make_AK_matrix(),
             )
 
         if isinstance(beam, BeamCollection):
@@ -190,8 +191,7 @@ class UnitCell(object):
         return cls.from_parser(file, RonFileParser)
 
     def _update_matrices(self) -> None:
-        """ 
-        """
+        """ """
         self.mat = SimMatrices(
             Ki_mat=self.env.make_kreaction_matrix(self._T),
             Gi_mat=self.env.make_radiolytic_vector(),
@@ -254,8 +254,7 @@ class UnitCell(object):
             None
         """
         self.beam_list.update_let(let)
-        logger.info(
-            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
+        logger.info(f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
             if sp.label not in self.g_val or (not self.env.species.is_dyn_species(sp)):
@@ -624,8 +623,7 @@ class SimChunksIter:
             chunks = np.linspace(last.start, last.stop, num=n + 1)
             steps = np.linspace(last.max_step_size, max_step_size, num=n)
         elif scale == "log":
-            chunks = np.logspace(np.log10(last.start),
-                                 np.log10(last.stop), num=n + 1)
+            chunks = np.logspace(np.log10(last.start), np.log10(last.stop), num=n + 1)
             steps = np.logspace(
                 np.log10(last.max_step_size), np.log10(max_step_size), num=n
             )
