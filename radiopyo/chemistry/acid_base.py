@@ -47,10 +47,18 @@ class ABCouple(tp.NamedTuple):
             Acid or Base
         conjugate: ChemSpecies
             Conjugate base from Acid or Conjugate acid from Base.
+        pKa: float
+        k_forward: float
+        k_backward: float
+        temperature: float | None
     """
 
     species: ChemSpecies
     conjugate: ChemSpecies
+    pKa: float
+    k_forward: float
+    k_backward: float
+    temperature: None | float
 
 
 class AcidBase(BiReaction):
@@ -135,6 +143,11 @@ class AcidBase(BiReaction):
 
         return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
+    def pKa(self, T: tp.Optional[Temperature | float] = None) -> float:
+        """ """
+        _T = Temperature(T) if T is not None else Temperature()
+        return self._pKa(_T.celsius)
+
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
         Args:
@@ -187,7 +200,7 @@ class AcidBase(BiReaction):
 
         raise ValueError(f"Unable to identify Acid or Base nature of {self}")
 
-    def get_couple(self) -> ABCouple:
+    def get_couple(self, T: tp.Optional[Temperature | float] = None) -> ABCouple:
         """
         Ugly function but working function
         ==> TODO: Refactor
@@ -207,10 +220,13 @@ class AcidBase(BiReaction):
                     "than 1 reactant but none of them is H2O."
                 )
 
+            species = None
             for sp, _ in r.iter_reactants():
                 if sp == "H2O":
                     continue
                 species = sp
+            else:
+                species = sp if species is None else species
 
             _l = len(r.products)
             if _l > 2:
@@ -224,11 +240,13 @@ class AcidBase(BiReaction):
                     "than 1 product but none of them is H3O_plus or H_plus."
                 )
 
+            conjugate = None
             for sp, _ in r.iter_products():
                 if sp == "H3O_plus" or sp == "H_plus":
                     continue
                 conjugate = sp
-
+            else:
+                conjugate = sp if conjugate is None else conjugate
         else:
             _l = len(r.products)
             if _l > 2:
@@ -242,10 +260,13 @@ class AcidBase(BiReaction):
                     "than 1 product but none of them is H2O."
                 )
 
+            conjugate = None
             for sp, _ in r.iter_products():
                 if sp == "H2O":
                     continue
                 conjugate = sp
+            else:
+                conjugate = sp if conjugate is None else conjugate
 
             _l = len(r.reactants)
             if _l > 2:
@@ -259,9 +280,19 @@ class AcidBase(BiReaction):
                     "than 1 reactant but none of them is OH_minus."
                 )
 
+            species = None
             for sp, _ in r.iter_reactants():
                 if sp == "OH_minus":
                     continue
                 species = sp
+            else:
+                species = sp if species is None else species
 
-        return ABCouple(species, conjugate)
+        return ABCouple(
+            species=species,
+            conjugate=conjugate,
+            pKa=self.pKa(T),
+            k_forward=self.k_forward(T),
+            k_backward=self.k_backward(T),
+            temperature=(Temperature(T).celsius if T is not None else None),
+        )

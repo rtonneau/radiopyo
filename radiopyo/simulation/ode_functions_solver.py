@@ -8,20 +8,13 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    List,
-    Optional,
-    Protocol,
-    Tuple,
-)
+import typing as tp
 
 import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
 # ----------------------------- Type checking ONLY imports---------------------------- #
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.physics.beam import ParticleBeam
@@ -44,19 +37,19 @@ EPSILON = 1e-25  # µmol/L
 def jacobian(
     t: float,
     y: NDArray[np.float64],
-    beam: Optional[ParticleBeam],
+    beam: tp.Optional[ParticleBeam],
     H3O_plus_index: int,
     OH_minus_index: int,
     cst_sp: NDArray[np.float64],
-    Ki_mat: Tuple[
+    Ki_mat: tp.Tuple[
         NDArray[np.float64],
         NDArray[np.int8],
         NDArray[np.float32],
         NDArray[np.float32],
     ],
     Gi_mat: NDArray[np.float64],
-    Ez_mat: Optional[
-        Tuple[
+    Ez_mat: tp.Optional[
+        tp.Tuple[
             NDArray[np.float32],
             NDArray[np.float32],
             NDArray[np.float64],
@@ -100,26 +93,27 @@ def jacobian(
 def derive(
     t: float,
     y: NDArray[np.float64],
-    beam: Optional[ParticleBeam],
+    beam: tp.Optional[ParticleBeam],
     H3O_plus_index: int,
     OH_minus_index: int,
+    k_water: float,
     cst_sp: NDArray[np.float64],
-    Ki_mat: Tuple[
+    Ki_mat: tp.Tuple[
         NDArray[np.float64],
         NDArray[np.int8],
         NDArray[np.float32],
         NDArray[np.float32],
     ],
     Gi_mat: NDArray[np.float64],
-    Ez_mat: Optional[
-        Tuple[
+    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]],
+    Ez_mat: tp.Optional[
+        tp.Tuple[
             NDArray[np.float32],
             NDArray[np.float32],
             NDArray[np.float64],
             NDArray[np.int8],
         ]
     ] = None,
-    AB_mat: Optional[Tuple[NDArray[np.float64],]] = None,
 ) -> NDArray[np.float64]:
     """Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
@@ -162,6 +156,16 @@ def derive(
 
     ####################################################################################
 
+    # 1) make sure ionic product of water is ok
+    # ct = dydt[H3O_plus_index] + dydt[OH_minus_index]
+    # dydt[OH_minus_index] = 0.5 + np.sqrt(0.25 + (k_water / ct))
+    # dydt[H3O_plus_index] = k_water / dydt[OH_minus_index]
+
+    # 2) Check A/B equilibrium based on pKa values
+    # -> Compute the total concentration of each A/B couple
+    ct = np.matmul((AB_mat[0] + AB_mat[1]).T, dydt)
+    dydt[AB_mat[0].sum(axis=1)] = ct
+
     # Reconstruct the cc vector as needed by the solver
     # ==> A/B couples with only the total
     # ==> dynamical species
@@ -176,16 +180,16 @@ def derive(
 # ------------------------------------------------------------------------------------ #
 
 
-class ScipyODEResult(Protocol):
+class ScipyODEResult(tp.Protocol):
     """
     Protocol mapping the output of scipy.integrate.solve_ivp
     """
 
     t: NDArray[np.float64]
     y: NDArray[np.float64]
-    sol: Optional[Any]
-    t_events: Optional[List[NDArray[np.float64]]]
-    y_events: Optional[List[NDArray[np.float64]]]
+    sol: tp.Optional[tp.Any]
+    t_events: tp.Optional[tp.List[NDArray[np.float64]]]
+    y_events: tp.Optional[tp.List[NDArray[np.float64]]]
     nfev: int
     njev: int
     nlu: int

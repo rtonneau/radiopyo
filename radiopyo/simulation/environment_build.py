@@ -144,6 +144,20 @@ class SimEnv:
     bio_param: tp.Dict[str, float]
     initial_cc: tp.Dict[str, float]
     PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
+    pKw: np.polynomial.Polynomial = field(
+        init=False,
+        repr=False,
+        default=np.polynomial.Polynomial(
+            [14.947, -4.273e-2, 2.115e-4, -5.786e-7, 7.529e-10]
+        ),
+    )
+    pKH2O: np.polynomial.Polynomial = field(
+        init=False,
+        repr=False,
+        default=np.polynomial.Polynomial(
+            [16.690, -4.262e-2, 2.071e-4, -5.594e-7, 7.161e-10]
+        ),
+    )
 
     def make_hash(self, method: str = "sha256") -> str:
         """ """
@@ -331,25 +345,23 @@ class SimEnv:
         """Construct matrix necessary to compute to account for Acid/Base equilibrium
         during the computation of the cc values variations.
         """
+        list_ab = [elt.get_couple(T) for elt in self.reactions.ab_reaction]
+
         # First matrix
-        acids = np.zeros(
-            [self.species.len_dyn_species(), len(self.reactions.ab_reaction)],
+        species = np.zeros(
+            [len(self.species), len(list_ab)],
             dtype=np.int8,
         )
-        bases = np.zeros(
-            [self.species.len_dyn_species(), len(self.reactions.ab_reaction)],
-            dtype=np.int8,
-        )
-        # for idx, r in enumerate(self.reactions.ab_reaction):
-        #    ABi[r., idx] = 1
+        conjugates = np.zeros_like(species)
 
-        # Second Matrix
-        Ka = np.array(
-            [elt.k_equilibrium(T) for elt in self.reactions.ab_reaction],
-            dtype=np.float64,
-        )
+        pka = np.zeros(len(list_ab), dtype=np.float64)
+        for idx, ab_couple in enumerate(list_ab):
+            print(idx, ab_couple)
+            species[ab_couple.species.index, idx] = 1
+            conjugates[ab_couple.conjugate.index, idx] = 1
+            pka[idx] = ab_couple.pKa
 
-        return (acids, bases, Ka)
+        return (species, conjugates, np.power(10, -pka))
 
     def make_kreaction_matrix(
         self,

@@ -98,13 +98,7 @@ class UnitCell(object):
         self.g_val = GValuesBoscolo()  # To do before set_beam
 
         if init:
-            self.mat = SimMatrices(
-                Ki_mat=self.env.make_kreaction_matrix(),
-                Gi_mat=self.env.make_radiolytic_vector(),
-                Ez_mat=self.env.make_enzymatic_matrix(),
-                cst_sp=self.env.make_cst_species_vector(),
-                AB_mat=self.env.make_AK_matrix(),
-            )
+            self._update_matrices()
 
         if isinstance(beam, BeamCollection):
             self.beam_list = beam
@@ -197,6 +191,7 @@ class UnitCell(object):
             Gi_mat=self.env.make_radiolytic_vector(),
             Ez_mat=self.env.make_enzymatic_matrix(),
             cst_sp=self.env.make_cst_species_vector(),
+            AB_mat=self.env.make_AB_matrix(self._T),
         )
 
     def set_temperature(self, T: float, unit: str = "celsius") -> tp.Self:
@@ -317,6 +312,7 @@ class UnitCell(object):
                 beam,
                 self.env.species["H3O_plus"].index,
                 self.env.species["OH_minus"].index,
+                10 ** (-self.env.pKw(self._T.celsius)),
                 self.mat["cst_sp"],
                 self.mat["Ki_mat"],
                 self.mat["Gi_mat"],
