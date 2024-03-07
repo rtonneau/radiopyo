@@ -80,6 +80,8 @@ class AcidBase(BiReaction):
     _k_backward: np.polynomial.Polynomial
     _k_forward: np.polynomial.Polynomial
     _pKa: np.polynomial.Polynomial
+    _A: ChemSpecies
+    _HA: ChemSpecies
 
     def __init__(
         self,
@@ -102,6 +104,18 @@ class AcidBase(BiReaction):
         # Need to add forward and backward reactions via the superclass
         self.add_forward_reaction(reaction, list_sp=list_sp)
         self.add_backward_reaction(revert_reaction(reaction), list_sp=list_sp)
+
+        _ = self.get_couple()
+        self._HA = _.species
+        self._A = _.conjugate
+
+    @property
+    def acid(self) -> ChemSpecies:
+        return self._HA
+
+    @property
+    def base(self) -> ChemSpecies:
+        return self._A
 
     @classmethod
     def from_kwargs(

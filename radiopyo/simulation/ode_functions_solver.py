@@ -96,7 +96,6 @@ def derive(
     beam: tp.Optional[ParticleBeam],
     H3O_plus_index: int,
     OH_minus_index: int,
-    k_water: float,
     cst_sp: NDArray[np.float64],
     Ki_mat: tp.Tuple[
         NDArray[np.float64],
@@ -105,7 +104,7 @@ def derive(
         NDArray[np.float32],
     ],
     Gi_mat: NDArray[np.float64],
-    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]],
+    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.float64]],
     Ez_mat: tp.Optional[
         tp.Tuple[
             NDArray[np.float32],
@@ -155,16 +154,17 @@ def derive(
         dydt += np.matmul(Ez_mat[3], MM.T)
 
     ####################################################################################
-
-    # 1) make sure ionic product of water is ok
-    # ct = dydt[H3O_plus_index] + dydt[OH_minus_index]
-    # dydt[OH_minus_index] = 0.5 + np.sqrt(0.25 + (k_water / ct))
-    # dydt[H3O_plus_index] = k_water / dydt[OH_minus_index]
-
     # 2) Check A/B equilibrium based on pKa values
     # -> Compute the total concentration of each A/B couple
-    ct = np.matmul((AB_mat[0] + AB_mat[1]).T, dydt)
-    dydt[AB_mat[0].sum(axis=1)] = ct
+    ct = np.matmul(AB_mat[0].T, dydt)
+    _ = len(AB_mat[1]) * 2
+    slice_acid, slice_base = np.index_exp[0:_:2], np.index_exp[1:_:2]
+
+    # Acid part:
+    dydt[slice_acid] = ct / (1 + (AB_mat[1] / y[H3O_plus_index]))
+
+    # Base part:
+    dydt[slice_base] = ct / (1 + (y[H3O_plus_index] / AB_mat[1]))
 
     # Reconstruct the cc vector as needed by the solver
     # ==> A/B couples with only the total

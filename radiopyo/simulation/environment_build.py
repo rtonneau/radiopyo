@@ -144,20 +144,6 @@ class SimEnv:
     bio_param: tp.Dict[str, float]
     initial_cc: tp.Dict[str, float]
     PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
-    pKw: np.polynomial.Polynomial = field(
-        init=False,
-        repr=False,
-        default=np.polynomial.Polynomial(
-            [14.947, -4.273e-2, 2.115e-4, -5.786e-7, 7.529e-10]
-        ),
-    )
-    pKH2O: np.polynomial.Polynomial = field(
-        init=False,
-        repr=False,
-        default=np.polynomial.Polynomial(
-            [16.690, -4.262e-2, 2.071e-4, -5.594e-7, 7.161e-10]
-        ),
-    )
 
     def make_hash(self, method: str = "sha256") -> str:
         """ """
@@ -291,7 +277,11 @@ class SimEnv:
             list_sp._convert_to_CstSpecies("trash")
 
         # Sort species so that all constant species are at the end.
-        list_sp.sort(inplace=True)
+        starter = []
+        for r in ab:
+            starter.append(r.acid.label)
+            starter.append(r.base.label)
+        list_sp.sort(inplace=True, starter=starter)
 
         logger.info(f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
         logger.info(f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
@@ -318,8 +308,8 @@ class SimEnv:
             NDArray[np.float64]: vector with initial concentrations in [µmol/l]
         """
         out_dyn = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
-        for idx, species in enumerate(self.species.iter_dyn_species()):
-            out_dyn[idx] = species.initial_cc(T) * 1e6
+        for species in self.species.iter_dyn_species():
+            out_dyn[species.index] = species.initial_cc(T) * 1e6
 
         out_cst = np.array([], dtype=np.float64)
         if all:
@@ -341,27 +331,23 @@ class SimEnv:
     def make_AB_matrix(
         self,
         T: tp.Optional[Temperature | float] = None,
-    ) -> tp.Tuple[NDArray[np.int8], NDArray[np.int8], NDArray[np.float64]]:
+    ) -> tp.Tuple[NDArray[np.int8], NDArray[np.float64]]:
         """Construct matrix necessary to compute to account for Acid/Base equilibrium
         during the computation of the cc values variations.
         """
-        list_ab = [elt.get_couple(T) for elt in self.reactions.ab_reaction]
-
         # First matrix
-        species = np.zeros(
-            [len(self.species), len(list_ab)],
+        couples = np.zeros(
+            [len(self.species), len(self.reactions.ab_reaction)],
             dtype=np.int8,
         )
-        conjugates = np.zeros_like(species)
 
-        pka = np.zeros(len(list_ab), dtype=np.float64)
-        for idx, ab_couple in enumerate(list_ab):
-            print(idx, ab_couple)
-            species[ab_couple.species.index, idx] = 1
-            conjugates[ab_couple.conjugate.index, idx] = 1
-            pka[idx] = ab_couple.pKa
+        pka = np.zeros(len(self.reactions.ab_reaction), dtype=np.float64)
+        for idx, r in enumerate(self.reactions.ab_reaction):
+            couples[r.acid.index, idx] = 1
+            couples[r.base.index, idx] = 1
+            pka[idx] = r.pKa(T)
 
-        return (species, conjugates, np.power(10, -pka))
+        return (couples, np.power(10, -pka))
 
     def make_kreaction_matrix(
         self,

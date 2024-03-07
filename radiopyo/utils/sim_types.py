@@ -80,7 +80,6 @@ class SimMatrices(tp.TypedDict):
     ]
     AB_mat: tp.Tuple[
         NDArray[np.int8],
-        NDArray[np.int8],
         NDArray[np.float64],  # Need the Pka's
     ]
     Gi_mat: NDArray[np.float64]

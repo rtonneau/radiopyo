@@ -324,7 +324,9 @@ class ListSpecies:
         """
         return iter(self.dyn_sp.values())
 
-    def sort(self, inplace: bool = True) -> tp.Optional[ListSpecies]:
+    def sort(
+        self, inplace: bool = True, starter: tp.Optional[tp.List[str]] = None
+    ) -> tp.Optional[ListSpecies]:
         """
         Sort all SimSpecies according to the following:
         For n DynSpecies & m cstSpecies, indexes should be like:
@@ -341,9 +343,20 @@ class ListSpecies:
             ListSpecies if inplace = False
         """
         out = copy.deepcopy(self) if not inplace else self
+        if starter is None:
+            starter = []
+        all_dyn = {elt.label for elt in out.iter_dyn_species()}
 
-        for idx, species in enumerate(out.iter_dyn_species()):
-            out[species.label].index = idx
+        for idx, label in enumerate(starter):
+            if self.is_cst_species(label):
+                raise TypeError(
+                    f"{label} is defined as constant. Not able to use "
+                    "it in an A/B equilibrium"
+                )
+            out[label].index = idx
+
+        for idx, label in enumerate(all_dyn - set(starter), start=len(starter)):
+            out[label].index = idx
 
         for idx, species in enumerate(
             out.iter_cst_species(), start=out.len_dyn_species()
