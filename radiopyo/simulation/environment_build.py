@@ -27,13 +27,13 @@ from radiopyo.chemistry.k_reactions import Arrhenius, KReaction, KReactionCollec
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
 from radiopyo.chemistry.species import H2O, ChemSpecies
+from radiopyo.chemistry.utils.units import Temperature
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.basic_chemistry import BasicReaction
-    from radiopyo.chemistry.utils.units import Temperature
     from radiopyo.utils.sim_types import ConfigDict
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -144,6 +144,22 @@ class SimEnv:
     bio_param: tp.Dict[str, float]
     initial_cc: tp.Dict[str, float]
     PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
+
+    def pKw(self, T: tp.Optional[Temperature | float] = None) -> float:
+        """ """
+        _T = Temperature(T) if T is not None else Temperature(unit="celsius")
+        _poly = np.polynomial.Polynomial(
+            [14.947, -4.273e-2, 2.115e-4, -5.786e-7, 7.529e-10]
+        )
+        return _poly(_T.celsius)
+
+    def pKH2O(self, T: tp.Optional[Temperature | float] = None) -> float:
+        """ """
+        _T = Temperature(T) if T is not None else Temperature(unit="celsius")
+        _poly = np.polynomial.Polynomial(
+            [16.690, -4.262e-2, 2.071e-4, -5.594e-7, 7.161e-10]
+        )
+        return _poly(_T.celsius)
 
     def make_hash(self, method: str = "sha256") -> str:
         """ """

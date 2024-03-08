@@ -310,8 +310,10 @@ class UnitCell(object):
             t_span,
             args=(
                 beam,
+                self.env.species["H2O"].index,
                 self.env.species["H3O_plus"].index,
                 self.env.species["OH_minus"].index,
+                10 ** -self.env.pKw(self._T),
                 self.mat["cst_sp"],
                 self.mat["Ki_mat"],
                 self.mat["Gi_mat"],

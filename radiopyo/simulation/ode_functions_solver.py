@@ -94,8 +94,10 @@ def derive(
     t: float,
     y: NDArray[np.float64],
     beam: tp.Optional[ParticleBeam],
+    H2O_index: int,
     H3O_plus_index: int,
     OH_minus_index: int,
+    k_water: float,
     cst_sp: NDArray[np.float64],
     Ki_mat: tp.Tuple[
         NDArray[np.float64],
@@ -153,7 +155,14 @@ def derive(
         # Add this term to the total
         dydt += np.matmul(Ez_mat[3], MM.T)
 
+    dydt[np.where((y < 0) & (dydt < 0))] = 0.0
+
     ####################################################################################
+    # Check the ionic product of water
+    _delta = dydt[H3O_plus_index] - dydt[OH_minus_index]
+    dydt[H3O_plus_index] += _delta
+    dydt[OH_minus_index] -= _delta
+
     # 2) Check A/B equilibrium based on pKa values
     # -> Compute the total concentration of each A/B couple
     ct = np.matmul(AB_mat[0].T, dydt)
