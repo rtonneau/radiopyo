@@ -415,6 +415,8 @@ class SimEnv:
             # Loop over all reaction's reactants
             idx_reactant: int = 0
             for sp, stoi in reaction.iter_reactants():
+                # if sp == "H2O":
+                #    continue
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(sp):
                     Riy[sp.index, idx_r] -= stoi

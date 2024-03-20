@@ -139,10 +139,6 @@ def derive(
     # Compute dydt, first only with k reactions term:
     dydt = np.matmul(Ki_mat[1], Rki.T)
 
-    if beam is not None:
-        # Add the Time dependent Radiolytic term
-        dydt += Gi_mat * beam.at(t).dose_rate()
-
     # Add Enzymatic term
     if Ez_mat is not None:
         # En_subs, En_enzy, En_kmki => Enzi[0], Enzi[1], Enzi[2]
@@ -155,31 +151,37 @@ def derive(
         # Add this term to the total
         dydt += np.matmul(Ez_mat[3], MM.T)
 
-    dydt[np.where((y < 0) & (dydt < 0))] = 0.0
-
     ####################################################################################
-    # Check the ionic product of water
-    _delta = dydt[H3O_plus_index] - dydt[OH_minus_index]
-    dydt[H3O_plus_index] += _delta
-    dydt[OH_minus_index] -= _delta
 
-    # 2) Check A/B equilibrium based on pKa values
+    # Check A/B equilibrium based on pKa values
     # -> Compute the total concentration of each A/B couple
     ct = np.matmul(AB_mat[0].T, dydt)
     _ = len(AB_mat[1]) * 2
     slice_acid, slice_base = np.index_exp[0:_:2], np.index_exp[1:_:2]
 
-    # Acid part:
-    dydt[slice_acid] = ct / (1 + (AB_mat[1] / y[H3O_plus_index]))
+    ab_parts = np.ones_like(dydt) * np.inf
 
+    # Acid part:
+    ab_parts[slice_acid] = ct / (1 + (AB_mat[1] / y[H3O_plus_index]))
     # Base part:
-    dydt[slice_base] = ct / (1 + (y[H3O_plus_index] / AB_mat[1]))
+    ab_parts[slice_base] = ct / (1 + (y[H3O_plus_index] / AB_mat[1]))
+
+    # dydt = np.minimum(dydt, ab_parts)
 
     # Reconstruct the cc vector as needed by the solver
     # ==> A/B couples with only the total
+
+    if beam is not None:
+        # Add the Time dependent Radiolytic term
+        dydt += Gi_mat * beam.at(t).dose_rate()
+
+    dydt[np.where((y < 0) & (dydt < 0))] = 0
+
     # ==> dynamical species
     # ==> convert back to [µmol/l]
     dydt = dydt[: -len(cst_sp)]
+
+    # print(np.where((y < 0) & (dydt < 0)))
 
     return dydt * 1e6  # mol/l => µmol/l
 
