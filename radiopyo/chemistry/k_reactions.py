@@ -414,6 +414,91 @@ class Arrhenius(KReaction):
         return new
 
 
+class CstReaction(KReaction):
+    """ """
+
+    def as_label(self) -> str:
+        """
+        This method is used for the data mining. It should be implemented by child
+        classes in order to easily define short labels for each reactions based on the
+        reaction type and the index of reaction. For instance, it can be used as column
+        name in a pandas DataFrame.
+
+        Returns:
+            str
+
+        Raises:
+            KeyError
+                If index is None.
+        """
+        if self.index is not None and self.index >= 0:
+            return f"CR_{self.index}"
+
+        raise KeyError("Unknown reaction index. Cannot make a label without index.")
+
+    @classmethod
+    def from_generic(
+        cls,
+        generic: GenericReaction,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> tp.Self:
+        """
+        Create a KReaction from a 'GenericReaction', Typed-Dict structure produced by
+        radiopyo module parser.
+        TODO: k_value should probably be contained in the GenericReaction instance.
+        """
+        products: tp.List[str] = []
+
+        for sp, (_, stoi) in generic["products"].items():
+            products += [sp] * stoi
+        return cls.from_dict(
+            [],
+            products,
+            generic["constants"].get("k_value", None),
+            list_sp,
+        )
+
+    @classmethod
+    def from_kwargs(
+        cls,
+        list_sp: tp.Optional[ListSpecies] = None,
+        **kwargs: str | tp.List[str] | float | tp.List[float],
+    ) -> tp.Self:
+        """
+        This method combines the two possible definitions of a KReaction in a config
+        file.
+        TODO: remove the dict approach to keep only the single string reaction.
+        """
+        # Allow shallow creation (outside of a simulation env)
+        if list_sp is None:
+            list_sp = ListSpecies()
+
+        match kwargs:
+            case {"reactants": _, "products": _, "k_value": _} if len(kwargs) == 3:
+                return cls.from_dict(
+                    list_sp=list_sp,
+                    **kwargs,  # type:ignore[arg-type]
+                )
+            case {"reaction": r, "k_value": k} if len(kwargs) == 2:
+                gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
+                gen["constants"]["k_value"] = k  # type:ignore[assignment]
+                return cls.from_generic(
+                    gen,
+                    list_sp=list_sp,
+                )
+
+        raise ValueError(f"Wrong KReaction syntax {kwargs}")
+
+    def __str__(self) -> str:
+        out = []
+        out.append("->")
+        out.append(self.products_as_string())
+        return " ".join(out)
+
+    def __repr__(self) -> str:
+        return f"CstReaction('{self.__str__()}', k_value={self.raw_k_value()})"
+
+
 class KReactionDict(tp.TypedDict, total=False):
     """ """
 

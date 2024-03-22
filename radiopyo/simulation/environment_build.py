@@ -23,7 +23,12 @@ import numpy as np
 from radiopyo.chemistry.acid_base import AcidBase
 from radiopyo.chemistry.collections import ListSpecies
 from radiopyo.chemistry.e_reactions import EReaction
-from radiopyo.chemistry.k_reactions import Arrhenius, KReaction, KReactionCollection
+from radiopyo.chemistry.k_reactions import (
+    Arrhenius,
+    CstReaction,
+    KReaction,
+    KReactionCollection,
+)
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
 from radiopyo.chemistry.species import H2O, ChemSpecies
@@ -254,6 +259,12 @@ class SimEnv:
         )
         logger.info(f"CONFIG::{len(kr)} K-reactions added")
 
+        # Read ConstantReactions
+        cr, list_sp = cst_reaction_from_dict(
+            config["reactions"].get("constant", []), list_sp
+        )
+        logger.info(f"CONFIG::{len(kr)} Constant reactions added")
+
         # Read Arrhenius reactions
         ar, list_sp = arrhenius_from_dict(
             config["reactions"].get("arrhenius", []), list_sp
@@ -265,8 +276,8 @@ class SimEnv:
             f"{(len(ab)+len(er))*2+len(kr)+len(ar)} k-reactions have been added"
         )
 
-        # Merge Arrhenius with KReaction Collection
-        for elt in ar:
+        # Merge Arrhenius & Constant with KReaction Collection
+        for elt in chain(ar, cr):
             kr.add_reaction(elt)
 
         # Read Enzymatic Reactions
@@ -675,6 +686,27 @@ def kreaction_from_dict(
     out = KReactionCollection()
     for r in reactions:
         out.add_reaction(KReaction.from_kwargs(list_sp=sim_sp, **r))
+    return (out, sim_sp)
+
+
+def cst_reaction_from_dict(
+    reactions: tp.List[tp.Dict] | tp.Dict,
+    sim_sp: tp.Optional[ListSpecies] = None,
+) -> tp.Tuple[KReactionCollection, ListSpecies]:
+    if sim_sp is None:
+        sim_sp = ListSpecies()  # Species container related to reaction added
+
+    if len(reactions) == 0:  # -> Nothing to do
+        return (KReactionCollection(), sim_sp)
+
+    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
+        reactions = [
+            reactions,
+        ]  # Need a list to loop over
+
+    out = KReactionCollection()
+    for r in reactions:
+        out.add_reaction(CstReaction.from_kwargs(list_sp=sim_sp, **r))
     return (out, sim_sp)
 
 

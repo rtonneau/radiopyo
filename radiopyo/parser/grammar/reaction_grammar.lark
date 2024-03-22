@@ -2,6 +2,7 @@
 start: k_reaction | enzymatic_reaction | species | equilibrium_reaction
 
 // Main rules for reactions
+constant_reaction: "->"~1 products
 equilibrium_reaction: reactants "<->"~1 products
 enzymatic_reaction: species~1 "--"~1 enzyme ">>"~1 products
 k_reaction: reactants "->"~1 products

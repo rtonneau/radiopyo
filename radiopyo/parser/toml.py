@@ -37,11 +37,12 @@ class TOMLFileParser(FileParser):
     """
     Class parsing TOML files.
     """
+
     ext = ".toml"
 
     def parse(self) -> ConfigDict:
         """
-        No Need for Lark grammar, "tomllib" works just fine =) 
+        No Need for Lark grammar, "tomllib" works just fine =)
         """
         with open(self.path, mode="rb") as fb:
             config = tomllib.load(fb)
@@ -52,22 +53,17 @@ class TOMLFileParser(FileParser):
         out["parameters"] = config.get("parameters", {})
         out["beam"] = config.get("beam", {})
         with suppress(KeyError):  # in case "concentrations" does not exist
-            out["concentrations"]["fixed"] = config["concentrations"].get(
-                "fixed", {})
+            out["concentrations"]["fixed"] = config["concentrations"].get("fixed", {})
             out["concentrations"]["initial"] = config["concentrations"].get(
-                "initial", {})
+                "initial", {}
+            )
 
         with suppress(KeyError):  # in case "reactions" does not exist
-            out["reactions"]["acid_base"] = config["reactions"].get(
-                "acid_base", [])
-            out["reactions"]["radiolytic"] = config["reactions"].get(
-                "radiolytic", {})
-            out["reactions"]["k_reaction"] = config["reactions"].get(
-                "k_reaction", [])
-            out["reactions"]["enzymatic"] = config["reactions"].get(
-                "enzymatic", [])
-            out["reactions"]["equilibrium"] = config["reactions"].get(
-                "equilibrium", [])
-            out["reactions"]["arrhenius"] = config["reactions"].get(
-                "arrhenius", [])
+            out["reactions"]["acid_base"] = config["reactions"].get("acid_base", [])
+            out["reactions"]["radiolytic"] = config["reactions"].get("radiolytic", {})
+            out["reactions"]["k_reaction"] = config["reactions"].get("k_reaction", [])
+            out["reactions"]["enzymatic"] = config["reactions"].get("enzymatic", [])
+            out["reactions"]["equilibrium"] = config["reactions"].get("equilibrium", [])
+            out["reactions"]["arrhenius"] = config["reactions"].get("arrhenius", [])
+            out["reactions"]["constant"] = config["reactions"].get("constant", [])
         return out

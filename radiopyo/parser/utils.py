@@ -14,6 +14,7 @@ from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import (
     acid_base_from_dict,
     arrhenius_from_dict,
+    cst_reaction_from_dict,
     eq_reaction_from_dict,
     kreaction_from_dict,
     michaelis_from_dict,
@@ -152,6 +153,23 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # from 'other' --> stored in 'to_add'
     root["reactions"]["k_reaction"] += to_add
 
+    ## => Loop over all Constant Reactions ##
+    to_add = []  # List of all reaction to add to root afterward
+    for _ in other["reactions"]["constant"]:
+        kr = cst_reaction_from_dict(_, sim_sp=None)[0][0]
+        # Same reaction in root => just make sur the kvalue comes from 'other'
+        if str(kr) in r_root:
+            idx = r_root[str(kr)][1]
+            # raw_k_value is necessary to avoid multiple divide for reactions like
+            # xA -> B + C (in this case, xk should be provided)
+            root["reactions"]["constant"][idx]["k_value"] = kr.raw_k_value()
+            continue
+        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
+        to_add.append(_.copy())
+    # All shared reactions are updated at this point. Now just add all new reactions
+    # from 'other' --> stored in 'to_add'
+    root["reactions"]["constant"] += to_add
+
     ## => Arrhenius Reactions ##
     # First, let's make a set of the Arrhenius presents in root. Each one should have a
     # unique ID ==> Make kReaction and then use the str version of it!
@@ -163,7 +181,6 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # Loop over all KReaction in other and check whether it is also in root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["arrhenius"]:
-        print(f"reading from other: {_}")
         ar = arrhenius_from_dict(_, sim_sp=None)[0][0]
         # Same reaction in root => just make sur the cst values comes from 'other'
         if str(ar) in r_root:
