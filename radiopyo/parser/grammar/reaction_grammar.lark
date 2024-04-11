@@ -1,5 +1,5 @@
 // Main node definition
-start: k_reaction | enzymatic_reaction | species | equilibrium_reaction
+start: k_reaction | enzymatic_reaction | species | equilibrium_reaction | constant_reaction
 
 // Main rules for reactions
 constant_reaction: "->"~1 products

@@ -129,7 +129,7 @@ def derive(
     y = np.append(y, cst_sp)
 
     ####################################################################################
-    # Compute evolution rate of cc'
+    # Compute evolution rate of the species (contained in vector y)
     ####################################################################################
 
     # Compute the reaction rate of all k_reactions
@@ -162,9 +162,9 @@ def derive(
     ab_parts = np.ones_like(dydt) * np.inf
 
     # Acid part:
-    ab_parts[slice_acid] = ct / (1 + (AB_mat[1] / y[H3O_plus_index]))
+    # ab_parts[slice_acid] = ct / (1 + (AB_mat[1] / y[H3O_plus_index]))
     # Base part:
-    ab_parts[slice_base] = ct / (1 + (y[H3O_plus_index] / AB_mat[1]))
+    # ab_parts[slice_base] = ct / (1 + (y[H3O_plus_index] / AB_mat[1]))
 
     # dydt = np.minimum(dydt, ab_parts)
 

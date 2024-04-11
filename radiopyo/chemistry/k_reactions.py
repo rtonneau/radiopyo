@@ -498,6 +498,17 @@ class CstReaction(KReaction):
     def __repr__(self) -> str:
         return f"CstReaction('{self.__str__()}', k_value={self.raw_k_value()})"
 
+    def tot_number_reactants(self) -> int:
+        """
+        Count the total number of reactants involved in the reaction
+        => Stoichiometry dependent! In other words, it counts the number of
+        molecules/entities defined as reactants.
+
+        Returns:
+            int
+        """
+        return 0
+
 
 class KReactionDict(tp.TypedDict, total=False):
     """ """

@@ -239,6 +239,7 @@ class SimEnv:
                 "radiolytic": {},
                 "equilibrium": [],
                 "arrhenius": [],
+                "constant": [],
             }
 
         # Read Acid/Base Reactions
@@ -263,7 +264,7 @@ class SimEnv:
         cr, list_sp = cst_reaction_from_dict(
             config["reactions"].get("constant", []), list_sp
         )
-        logger.info(f"CONFIG::{len(kr)} Constant reactions added")
+        logger.info(f"CONFIG::{len(cr)} Constant reactions added")
 
         # Read Arrhenius reactions
         ar, list_sp = arrhenius_from_dict(
@@ -272,8 +273,9 @@ class SimEnv:
         logger.info(f"CONFIG::{len(ar)} Arrhenius reactions added")
 
         logger.info(
-            f"CONFIG::A total of ({len(ab)} + {len(er)})*2 + {len(kr)} + {len(ar)} = "
-            f"{(len(ab)+len(er))*2+len(kr)+len(ar)} k-reactions have been added"
+            f"CONFIG::A total of ({len(ab)} + {len(er)})*2 + {len(kr)} + {len(ar)} "
+            f"+ {len(cr)} = {(len(ab)+len(er))*2+len(kr)+len(ar)+len(cr)}"
+            f" k-reactions have been added"
         )
 
         # Merge Arrhenius & Constant with KReaction Collection
