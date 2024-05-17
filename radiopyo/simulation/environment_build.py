@@ -14,6 +14,7 @@ import hashlib
 import logging
 import typing as tp
 from contextlib import suppress
+from copy import deepcopy
 from dataclasses import dataclass, field
 from itertools import chain
 
@@ -33,6 +34,7 @@ from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
 from radiopyo.chemistry.species import H2O, ChemSpecies
 from radiopyo.chemistry.utils.units import Temperature
+from radiopyo.utils.sim_types import SimMatrices, default_ConfigDict
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -149,6 +151,9 @@ class SimEnv:
     bio_param: tp.Dict[str, float]
     initial_cc: tp.Dict[str, float]
     PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
+    _config_dict: ConfigDict = field(
+        init=False, repr=False, default_factory=default_ConfigDict
+    )
 
     def pKw(self, T: tp.Optional[Temperature | float] = None) -> float:
         """ """
@@ -315,12 +320,14 @@ class SimEnv:
         logger.info(f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
         logger.info(f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
         logger.info("CONFIG::Simulation Configuration done!")
-        return cls(
+        out = cls(
             reactions=ReactionsList(ab, er, kr, enz, rad),
             species=list_sp,
             bio_param=parameters,
             initial_cc=initial_cc,
         )
+        out._config_dict = deepcopy(config)
+        return out
 
     def initial_values(
         self,
@@ -356,6 +363,19 @@ class SimEnv:
             List[str]
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
+
+    def build_all_matrices(
+        self,
+        T: tp.Optional[Temperature | float] = None,
+    ) -> SimMatrices:
+        """ """
+        return SimMatrices(
+            Ki_mat=self.make_kreaction_matrix(T),
+            Gi_mat=self.make_radiolytic_vector(),
+            Ez_mat=self.make_enzymatic_matrix(),
+            cst_sp=self.make_cst_species_vector(),
+            AB_mat=self.make_AB_matrix(T),
+        )
 
     def make_AB_matrix(
         self,
@@ -602,6 +622,21 @@ class SimEnv:
         for reaction in self.reactions.iter_all():
             if reaction.has_product(species):
                 out.append(reaction)
+        return out
+
+    def convert_to_config_dict(self) -> ConfigDict:
+        """ """
+        out = deepcopy(self._config_dict)
+        _T = out["parameters"].get("temperature", None)
+
+        for elt in self.species.iter_dyn_species():
+            if elt.label in ["H3O_plus", "OH_minus"] or elt.initial_cc(_T) < 0:
+                continue
+            out["concentrations"]["initial"][elt.label] = elt.initial_cc(_T)
+        for elt in self.species.iter_cst_species():
+            if elt.label in ["H2O"]:
+                continue
+            out["concentrations"]["fixed"][elt.label] = elt.initial_cc(_T)
         return out
 
 

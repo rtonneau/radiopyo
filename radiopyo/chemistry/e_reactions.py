@@ -99,15 +99,10 @@ class EReaction(BiReaction):
                 f"{reaction} & constant: {constant}"
             )
 
-        # Need to add forward and backward reactions via the superclass
-        # KReactionCollection as this method is not allowed for an EReaction.
-        KReactionCollection.add_reaction(
-            self, reaction, label="forward", list_sp=list_sp
-        )
+        self.add_forward_reaction(reaction, list_sp)
         self.forward.set_k_value(self._k_forward)  # type: ignore [arg-type]
-        KReactionCollection.add_reaction(
-            self, revert_reaction(reaction), label="backward", list_sp=list_sp
-        )
+
+        self.add_backward_reaction(revert_reaction(reaction), list_sp)
         self.backward.set_k_value(self._k_backward)  # type: ignore [arg-type]
 
     @classmethod

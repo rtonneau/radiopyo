@@ -24,6 +24,7 @@ if tp.TYPE_CHECKING:
     from pandas import DataFrame
 
     from .ode_result import ODEResult
+
     T = tp.TypeVar("T", bound="H5Manager")
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
@@ -42,6 +43,7 @@ class ResCollection(object):
     """
     Container class storing ODEResult instances.
     """
+
     # Dictionary storing ODEResult
     _results: tp.Dict[tp.Any, ODEResult]
     # General label (variable) of the collection e.g. "dose_rate [Gy]" -> ideal for plot
@@ -78,7 +80,7 @@ class ResCollection(object):
         return self._key_label
 
     def push(self, label: tp.Any, sim: ODEResult) -> None:
-        """ 
+        """
         Args:
             label: Any
                 Label of the ODEResult to push in.
@@ -90,8 +92,7 @@ class ResCollection(object):
                 if label already in the collection.
         """
         if label in self._results:
-            raise KeyError(
-                f"Simulation label: {label}, already exists. cannot push.")
+            raise KeyError(f"Simulation label: {label}, already exists. cannot push.")
         self._order.append(label)
         self._results[label] = sim
 
@@ -109,14 +110,14 @@ class ResCollection(object):
                 if label not in the collection.
         """
         if label not in self._results:
-            raise KeyError(
-                f"Simulation label: {label}, not existing. Cannot update.")
+            raise KeyError(f"Simulation label: {label}, not existing. Cannot update.")
         self._results[label] = sim
 
-    def sort(self,
-             key: tp.Optional[tp.Callable] = None,
-             reverse: bool = False,
-             ) -> None:
+    def sort(
+        self,
+        key: tp.Optional[tp.Callable] = None,
+        reverse: bool = False,
+    ) -> None:
         """ """
         self._order = sorted(self._key_label, key=key, reverse=reverse)
 
@@ -134,16 +135,15 @@ class GroupNotFound(HDFManagerException):
 
 
 class H5Manager(AbstractContextManager):
-    """
-    """
+    """ """
+
     hdf_path: Path
     _hdf: h5py.File
 
     def __init__(self, path: Path | str):
         self.hdf_path = Path(path)
         if self.hdf_path.suffix != ".h5":
-            raise TypeError(
-                f"HDF5 file must have .h5 ext not: {self.hdf_path.name}")
+            raise TypeError(f"HDF5 file must have .h5 ext not: {self.hdf_path.name}")
         if not self.hdf_path.exists():
             raise FileNotFoundError(self.hdf_path)
         self._is_open: int = 0
@@ -151,10 +151,12 @@ class H5Manager(AbstractContextManager):
     def __enter__(self) -> tp.Any:
         return self.open_f5file()
 
-    def __exit__(self,
-                 __exc_type: tp.Type[BaseException] | None,
-                 __exc_value: BaseException | None,
-                 __traceback: TracebackType | None) -> None:
+    def __exit__(
+        self,
+        __exc_type: tp.Type[BaseException] | None,
+        __exc_value: BaseException | None,
+        __traceback: TracebackType | None,
+    ) -> None:
         return self.close_h5file()
 
     @classmethod
@@ -175,13 +177,11 @@ class H5Manager(AbstractContextManager):
         return cls(path)
 
     def exists(self) -> bool:
-        """ 
-        """
+        """ """
         return self.hdf_path.exists()
 
     def open_f5file(self, mode: str = "r+") -> h5py.File:
-        """ 
-        """
+        """ """
         if self._is_open == 0:
             self._hdf = h5py.File(self.hdf_path, mode)
         self._is_open += 1
@@ -204,26 +204,26 @@ class H5Manager(AbstractContextManager):
         self._opened = 0
         return
 
-    def delete_dataset(self,
-                       grp: h5py.Group,
-                       name: str,
-                       ) -> None:
+    def delete_dataset(
+        self,
+        grp: h5py.Group,
+        name: str,
+    ) -> None:
         if name not in grp:
             return
         del grp[name]
 
-    def insert_dataset(self,
-                       grp: h5py.Group,
-                       name: str,
-                       dataset: NDArray,
-                       ) -> h5py.Dataset:
-        """ 
-        """
+    def insert_dataset(
+        self,
+        grp: h5py.Group,
+        name: str,
+        dataset: NDArray,
+    ) -> h5py.Dataset:
+        """ """
         return grp.create_dataset(name, data=dataset, compression="gzip")
 
     def create_group(self, name: str | tp.Optional[str] = None) -> h5py.Group:
-        """ 
-        """
+        """ """
         if name is None or len(name) == 0:
             return self._hdf
         with suppress(KeyError):
@@ -231,28 +231,27 @@ class H5Manager(AbstractContextManager):
         return self._hdf.create_group(name)
 
     def group(self, name: tp.Optional[str] = None) -> h5py.Group:
-        """ 
+        """
         raises
             KeyError:
                 if group name doesn't exists
         """
         return self._hdf[name] if name is not None else self._hdf
 
-    def read_dataset(self,
-                     name: str,
-                     grp: tp.Optional[h5py.Group | str] = None,
-                     ) -> pd.DataFrame:
+    def read_dataset(
+        self,
+        name: str,
+        grp: tp.Optional[h5py.Group | str] = None,
+    ) -> pd.DataFrame:
         with self:
-            group = self.group(grp) if grp is None or isinstance(
-                grp, str) else grp
+            group = self.group(grp) if grp is None or isinstance(grp, str) else grp
             data = group[name][()]
             labels = group[name].attrs["columns"]
         return pd.DataFrame(data=data, columns=labels).set_index(labels[0])
 
     @staticmethod
     def parse_dataset_name(name: str) -> tp.Dict[str, tp.Any]:
-        """
-        """
+        """ """
         out: tp.Dict[str, tp.Any] = {}
         _ = name.split("/")
         for elt in _[:-1]:
@@ -271,20 +270,20 @@ class H5Manager(AbstractContextManager):
 
     @staticmethod
     def _keys_to_path(keys: tp.Optional[tp.List[str]] = None) -> str:
-        return "/"+"/".join(keys) if keys is not None else "/"
+        return "/" + "/".join(keys) if keys is not None else "/"
 
     def _keys_to_group(self, keys: tp.Optional[tp.List[str]] = None) -> h5py.Group:
-        """
-        """
+        """ """
         return self.create_group(self._keys_to_path(keys))
 
-    def push_result(self,
-                    name: str,
-                    data: pd.DataFrame,
-                    keys: tp.Optional[tp.List[str]] = None,
-                    overwrite: bool = False) -> None:
-        """
-        """
+    def push_result(
+        self,
+        name: str,
+        data: pd.DataFrame,
+        keys: tp.Optional[tp.List[str]] = None,
+        overwrite: bool = False,
+    ) -> None:
+        """ """
         with self:
             grp = self._keys_to_group(keys)
             if name in grp and overwrite:
@@ -295,9 +294,9 @@ class H5Manager(AbstractContextManager):
             labels[0] = "time"
             ds.attrs["columns"] = labels
 
-    def read_result(self,
-                    name: str,
-                    keys: tp.Optional[tp.List[str]] = None) -> pd.DataFrame:
+    def read_result(
+        self, name: str, keys: tp.Optional[tp.List[str]] = None
+    ) -> pd.DataFrame:
         with self:
             grp = self._keys_to_group(keys)
             return self.read_dataset(name, grp)
@@ -308,10 +307,29 @@ class H5Manager(AbstractContextManager):
             for elt in grp:
                 yield elt
 
-    def iter_dataset(self,
-                     keys: tp.Optional[tp.List[str]] = None,
-                     recursive: bool = False,
-                     ) -> tp.Iterator[tp.Tuple[str, pd.DataFrame]]:
+    def push_ODEResult(
+        self,
+        name: str,
+        result: ODEResult,
+        keys: tp.Optional[tp.List[str]] = None,
+        overwrite: bool = False,
+    ) -> None:
+        """ """
+        with self:
+            grp = self._keys_to_group(keys)
+            if name in grp and overwrite:
+                self.delete_dataset(grp, name)
+            data = result.to_pandas().reset_index()
+            ds = self.insert_dataset(grp, name, data.values)
+            labels = [str(_) for _ in data.columns]
+            labels[0] = "time"
+            ds.attrs["columns"] = labels
+
+    def iter_dataset(
+        self,
+        keys: tp.Optional[tp.List[str]] = None,
+        recursive: bool = False,
+    ) -> tp.Iterator[tp.Tuple[str, pd.DataFrame]]:
         """ """
         if keys is None:
             keys = []
@@ -322,7 +340,31 @@ class H5Manager(AbstractContextManager):
                     for sub_elt in self.iter_dataset([*keys, elt], recursive):
                         yield sub_elt
                 elif isinstance(current_grp[elt], h5py.Dataset):
-                    yield (self._keys_to_path([*keys, elt]),
-                           self.read_dataset(elt, current_grp))
+                    yield (
+                        self._keys_to_path([*keys, elt]),
+                        self.read_dataset(elt, current_grp),
+                    )
+                else:
+                    continue
+
+    def iter_ODEResults(
+        self,
+        keys: tp.Optional[tp.List[str]] = None,
+        recursive: bool = False,
+    ) -> tp.Iterator[tp.Tuple[str, pd.DataFrame]]:
+        """ """
+        if keys is None:
+            keys = []
+        with self:
+            current_grp = self._keys_to_group(keys)
+            for elt in current_grp:
+                if isinstance(current_grp[elt], h5py.Group) and recursive:
+                    for sub_elt in self.iter_dataset([*keys, elt], recursive):
+                        yield sub_elt
+                elif isinstance(current_grp[elt], h5py.Dataset):
+                    yield (
+                        self._keys_to_path([*keys, elt]),
+                        self.read_dataset(elt, current_grp),
+                    )
                 else:
                     continue

@@ -86,6 +86,7 @@ class KReaction(BasicReaction):
 
     T: Temperature
     _k_value: tp.Optional[np.polynomial.Polynomial]
+    _OPE_STRING: str = "->"
 
     def __init__(
         self,
@@ -264,7 +265,7 @@ class KReaction(BasicReaction):
     def __str__(self) -> str:
         out = []
         out.append(self.reactants_as_string())
-        out.append("->")
+        out.append(self._OPE_STRING)
         out.append(self.products_as_string())
         return " ".join(out)
 
@@ -491,7 +492,7 @@ class CstReaction(KReaction):
 
     def __str__(self) -> str:
         out = []
-        out.append("->")
+        out.append(self._OPE_STRING)
         out.append(self.products_as_string())
         return " ".join(out)
 
@@ -643,18 +644,19 @@ class KReactionCollection:
 class BiReaction(KReactionCollection, ABC):
     """ """
 
+    _OPE_STRING: str = "<->"
     _k_backward: tp.Optional[np.polynomial.Polynomial]
     _k_forward: tp.Optional[np.polynomial.Polynomial]
 
     @property
     def forward(self) -> KReaction:
         """ """
-        return self._reactions[0][1]
+        return self.get_reaction("forward")
 
     @property
     def backward(self) -> KReaction:
         """ """
-        return self._reactions[1][1]
+        return self.get_reaction("backward")
 
     def add_reaction(
         self,
@@ -691,6 +693,7 @@ class BiReaction(KReactionCollection, ABC):
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> tp.Self:
         super().add_reaction(reaction, label="forward", list_sp=list_sp)
+        self.forward._OPE_STRING = "<->"
         return self
 
     def add_backward_reaction(
@@ -699,6 +702,7 @@ class BiReaction(KReactionCollection, ABC):
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> tp.Self:
         super().add_reaction(reaction, label="backward", list_sp=list_sp)
+        self.backward._OPE_STRING = "<->"
         return self
 
     @abstractmethod

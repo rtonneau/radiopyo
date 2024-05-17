@@ -38,8 +38,10 @@ def jacobian(
     t: float,
     y: NDArray[np.float64],
     beam: tp.Optional[ParticleBeam],
+    H2O_index: int,
     H3O_plus_index: int,
     OH_minus_index: int,
+    k_water: float,
     cst_sp: NDArray[np.float64],
     Ki_mat: tp.Tuple[
         NDArray[np.float64],
@@ -48,6 +50,7 @@ def jacobian(
         NDArray[np.float32],
     ],
     Gi_mat: NDArray[np.float64],
+    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.float64]],
     Ez_mat: tp.Optional[
         tp.Tuple[
             NDArray[np.float32],
@@ -86,7 +89,9 @@ def jacobian(
         JEnzi = np.matmul(Ez_mat[3], JEnzi.T)
         res += JEnzi
 
-    # Take into account Acid/Base
+    # Take into account Acid/Base?
+
+    ##
     return res[: -len(cst_sp), : -len(cst_sp)]
 
 
@@ -152,30 +157,11 @@ def derive(
         dydt += np.matmul(Ez_mat[3], MM.T)
 
     ####################################################################################
-
-    # Check A/B equilibrium based on pKa values
-    # -> Compute the total concentration of each A/B couple
-    ct = np.matmul(AB_mat[0].T, dydt)
-    _ = len(AB_mat[1]) * 2
-    slice_acid, slice_base = np.index_exp[0:_:2], np.index_exp[1:_:2]
-
-    ab_parts = np.ones_like(dydt) * np.inf
-
-    # Acid part:
-    # ab_parts[slice_acid] = ct / (1 + (AB_mat[1] / y[H3O_plus_index]))
-    # Base part:
-    # ab_parts[slice_base] = ct / (1 + (y[H3O_plus_index] / AB_mat[1]))
-
-    # dydt = np.minimum(dydt, ab_parts)
-
-    # Reconstruct the cc vector as needed by the solver
-    # ==> A/B couples with only the total
-
     if beam is not None:
         # Add the Time dependent Radiolytic term
         dydt += Gi_mat * beam.at(t).dose_rate()
 
-    dydt[np.where((y < 0) & (dydt < 0))] = 0
+    #dydt[np.where((y < 0) & (dydt < 0))] = 0
 
     # ==> dynamical species
     # ==> convert back to [µmol/l]

@@ -186,13 +186,7 @@ class UnitCell(object):
 
     def _update_matrices(self) -> None:
         """ """
-        self.mat = SimMatrices(
-            Ki_mat=self.env.make_kreaction_matrix(self._T),
-            Gi_mat=self.env.make_radiolytic_vector(),
-            Ez_mat=self.env.make_enzymatic_matrix(),
-            cst_sp=self.env.make_cst_species_vector(),
-            AB_mat=self.env.make_AB_matrix(self._T),
-        )
+        self.mat = self.env.build_all_matrices(self._T)
 
     def set_temperature(self, T: float, unit: str = "celsius") -> tp.Self:
         """ """

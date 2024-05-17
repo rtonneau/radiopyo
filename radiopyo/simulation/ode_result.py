@@ -9,26 +9,31 @@ from __future__ import annotations
 
 import copy
 import datetime
+import json
 import typing as tp
 from itertools import chain
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from scipy.integrate import simpson  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.chemistry.utils.units import Temperature
+from radiopyo.physics.beam import BeamCollection
+from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-    from pathlib import Path
 
     from numpy.typing import NDArray
 
     from radiopyo.physics.beam import ParticleBeam
-    from radiopyo.simulation.environment_build import SimEnv
     from radiopyo.simulation.utils import H5Manager
     from radiopyo.utils.sim_types import SimMatrices
+
+    T = tp.TypeVar("T", bound="ODEResult")
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__: tp.List = []
@@ -60,6 +65,7 @@ class ODEResult(object):
     mat: SimMatrices
     LET: tp.Optional[float]
     date: datetime.datetime
+    T: Temperature
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -85,12 +91,14 @@ class ODEResult(object):
         mat: SimMatrices,
         let: tp.Optional[float],
         sol: tp.Optional[ScipyODEResult] = None,
+        temperature: tp.Optional[Temperature] = None,
     ) -> None:
         self.date = datetime.datetime.now()
         self.env = copy.deepcopy(env)
         self.beam = copy.deepcopy(beam)
         self.mat = copy.deepcopy(mat)
         self.LET = let
+        self.T = temperature if temperature is not None else Temperature()
         self._default_init()
         if sol is not None:
             self.append_sol(sol)
@@ -252,6 +260,7 @@ class ODEResult(object):
         return pd.concat([df_sp, df_cst], axis=1)
 
     def reconstruct_jacobian(self) -> pd.DataFrame:
+        raise NotImplementedError
         if self.beam is None:
             raise TypeError("Beam is None, unable to compute jacobian")
 
@@ -277,7 +286,7 @@ class ODEResult(object):
             out.iloc[idx, :] = jac.flatten()
         return out
 
-    def reconstruct_reactions(self, clip: float | bool | int = 1e-8) -> pd.DataFrame:
+    def reconstruct_reactions(self) -> pd.DataFrame:
         """
         Rem: to integrate df
             >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
@@ -365,3 +374,45 @@ class ODEResult(object):
         for col, data in df.items():
             out[col] = simpson(y=data.values, x=data.index)
         return pd.Series(out, dtype=np.float64)
+
+    def env_to_json(self, file_path: Path | str, overwrite: bool = False) -> None:
+        """ """
+        file_path = Path(file_path)
+        if not overwrite and file_path.exists():
+            raise FileExistsError(file_path)
+        out = self.env.convert_to_config_dict()
+        out["parameters"]["timestamp"] = self.date.timestamp()
+        out["parameters"]["temperature"] = self.T.kelvin
+        kwargs = {}
+        if self.LET is not None:
+            kwargs["LET"] = self.LET
+        out["beam"] = self.beam.serialize(**kwargs)
+        with file_path.open("w") as fp:
+            json.dump(out, fp, indent=4)
+
+    @classmethod
+    def from_json_env(cls: tp.Type[tp.Self], file_path: str | Path) -> tp.Self:
+        """
+            def __init__(
+        self,
+        env: SimEnv,
+        beam: ParticleBeam,
+        mat: SimMatrices,
+        let: tp.Optional[float],
+        sol: tp.Optional[ScipyODEResult] = None,
+        """
+        file_path = Path(file_path)
+        with file_path.open("r") as fp:
+            config = json.load(fp)
+        env = SimEnv.from_dict(config)
+        T = (
+            Temperature(config["parameters"]["temperature"], unit="kelvin")
+            if "temperature" in config["parameters"]
+            else Temperature()
+        )
+        beam_type, beam_config = next(iter(config["beam"].items()))
+        label, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
+        mat = env.build_all_matrices()
+        out = cls(env, beam, mat, LET, temperature=T)
+        out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
+        return out
