@@ -63,7 +63,7 @@ class ReactionsDict(tp.TypedDict):
 
 class ConfigDict(tp.TypedDict):
     includes: tp.Dict[str, tp.List[str]]
-    parameters: tp.Dict[str, float]
+    parameters: tp.Dict[str, float | tp.Dict]
     concentrations: ConcentrationDict
     reactions: ReactionsDict
     beam: tp.Dict[str, tp.List[tp.Dict]]

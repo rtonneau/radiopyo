@@ -15,6 +15,7 @@ import h5py  # type: ignore[import]
 import pandas as pd
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
@@ -22,8 +23,6 @@ if tp.TYPE_CHECKING:
 
     from numpy.typing import NDArray
     from pandas import DataFrame
-
-    from .ode_result import ODEResult
 
     T = tp.TypeVar("T", bound="H5Manager")
 
@@ -139,6 +138,7 @@ class H5Manager(AbstractContextManager):
 
     hdf_path: Path
     _hdf: h5py.File
+    _store_folder: Path
 
     def __init__(self, path: Path | str):
         self.hdf_path = Path(path)
@@ -147,6 +147,9 @@ class H5Manager(AbstractContextManager):
         if not self.hdf_path.exists():
             raise FileNotFoundError(self.hdf_path)
         self._is_open: int = 0
+        self._store_folder = self.hdf_path.parent / f".{self.hdf_path.stem}"
+        if not self._store_folder.exists():
+            self._store_folder.mkdir()
 
     def __enter__(self) -> tp.Any:
         return self.open_f5file()
@@ -167,13 +170,13 @@ class H5Manager(AbstractContextManager):
             TypeError:
                 for wrong file extension (if not .h5)
         """
-        exists = Path(path).exists()
-        if exists and not force_new:
-            return cls(path)
-        if exists:
-            Path(path).unlink()
+        p = Path(path)
+        if p.exists():
+            if not force_new:
+                return cls(path)
+            p.unlink()
         # File does not exists, yet.
-        h5py.File(path, mode="w").close()
+        h5py.File(p, mode="w").close()
         return cls(path)
 
     def exists(self) -> bool:
@@ -284,6 +287,7 @@ class H5Manager(AbstractContextManager):
         overwrite: bool = False,
     ) -> None:
         """ """
+        raise NotImplementedError
         with self:
             grp = self._keys_to_group(keys)
             if name in grp and overwrite:
@@ -297,6 +301,7 @@ class H5Manager(AbstractContextManager):
     def read_result(
         self, name: str, keys: tp.Optional[tp.List[str]] = None
     ) -> pd.DataFrame:
+        raise NotImplementedError
         with self:
             grp = self._keys_to_group(keys)
             return self.read_dataset(name, grp)
@@ -306,6 +311,16 @@ class H5Manager(AbstractContextManager):
             grp = self._keys_to_group(keys)
             for elt in grp:
                 yield elt
+
+    def delete_ODEResult(
+        self,
+        grp: h5py.Group,
+        name: str,
+    ) -> None:
+        """ """
+        if "json_config" in grp[name].attrs:
+            Path(grp[name].attrs["json_config"]).unlink()
+        return self.delete_dataset(grp, name)
 
     def push_ODEResult(
         self,
@@ -318,12 +333,31 @@ class H5Manager(AbstractContextManager):
         with self:
             grp = self._keys_to_group(keys)
             if name in grp and overwrite:
-                self.delete_dataset(grp, name)
+                self.delete_ODEResult(grp, name)
             data = result.to_pandas().reset_index()
             ds = self.insert_dataset(grp, name, data.values)
             labels = [str(_) for _ in data.columns]
             labels[0] = "time"
             ds.attrs["columns"] = labels
+            json_file = self._store_folder / f"{name}.json"
+            ds.attrs["json_config"] = str(json_file)
+            result.to_json_config(ds.attrs["json_config"], overwrite)
+
+    def read_ODEResult(
+        self, name: str, keys: tp.Optional[tp.List[str]] = None
+    ) -> ODEResult:
+        with self:
+            grp = self._keys_to_group(keys)
+
+            out = ODEResult.from_json_config(grp[name].attrs["json_config"])
+            dummy_result = DummyScipyOdeResult.from_dataframe(
+                self.read_dataset(name, grp),
+                order=out.env._config_dict["parameters"]["species_order"]["dynamical"],
+            )
+            if "json_config" not in grp[name].attrs:
+                raise KeyError(f"No json file recorded with stored ODE sol {name}")
+            out.append_sol(dummy_result)
+            return out
 
     def iter_dataset(
         self,

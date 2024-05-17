@@ -11,6 +11,7 @@ import copy
 import datetime
 import json
 import typing as tp
+from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import Path
 
@@ -375,7 +376,7 @@ class ODEResult(object):
             out[col] = simpson(y=data.values, x=data.index)
         return pd.Series(out, dtype=np.float64)
 
-    def env_to_json(self, file_path: Path | str, overwrite: bool = False) -> None:
+    def to_json_config(self, file_path: Path | str, overwrite: bool = False) -> None:
         """ """
         file_path = Path(file_path)
         if not overwrite and file_path.exists():
@@ -383,6 +384,12 @@ class ODEResult(object):
         out = self.env.convert_to_config_dict()
         out["parameters"]["timestamp"] = self.date.timestamp()
         out["parameters"]["temperature"] = self.T.kelvin
+        out["parameters"]["species_order"] = {
+            "dynamical": [
+                sp.label for sp in self.env.species.sorted_iter_dyn_species()
+            ],
+            "constant": [sp.label for sp in self.env.species.sorted_iter_cst_species()],
+        }
         kwargs = {}
         if self.LET is not None:
             kwargs["LET"] = self.LET
@@ -391,7 +398,7 @@ class ODEResult(object):
             json.dump(out, fp, indent=4)
 
     @classmethod
-    def from_json_env(cls: tp.Type[tp.Self], file_path: str | Path) -> tp.Self:
+    def from_json_config(cls: tp.Type[tp.Self], file_path: str | Path) -> tp.Self:
         """
             def __init__(
         self,
@@ -416,3 +423,34 @@ class ODEResult(object):
         out = cls(env, beam, mat, LET, temperature=T)
         out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
         return out
+
+
+@dataclass
+class DummyScipyOdeResult:
+    """ """
+
+    t: NDArray[np.float64]
+    y: NDArray[np.float64]
+    sol: tp.Optional[tp.Any] = field(repr=False, default_factory=list)
+    t_events: tp.Optional[tp.List[NDArray[np.float64]]] = field(
+        repr=False,
+        default=None,
+    )
+    y_events: tp.Optional[tp.List[NDArray[np.float64]]] = field(
+        repr=False,
+        default=None,
+    )
+    nfev: int = field(repr=False, default=0)
+    njev: int = field(repr=False, default=0)
+    nlu: int = field(repr=False, default=0)
+    status: int = field(repr=False, default=0)
+    message: str = field(repr=False, default="")
+    success: bool = field(repr=False, default=True)
+
+    @classmethod
+    def from_dataframe(cls, df: pd.DataFrame, order: tp.List[str]) -> tp.Self:
+        df = df.reindex(columns=order)
+        return cls(
+            t=df.index.values,
+            y=df.values.T,
+        )

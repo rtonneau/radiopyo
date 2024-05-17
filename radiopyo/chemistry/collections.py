@@ -324,6 +324,23 @@ class ListSpecies:
         """
         return iter(self.dyn_sp.values())
 
+    def set_order(self, dyn_sp: tp.List, cst_sp: tp.List) -> None:
+        """ """
+        if len(dyn_sp) != len(self.dyn_sp) or len(cst_sp) != len(self.cst_sp):
+
+            raise ValueError(
+                "Unable to sort species, different numbers\n"
+                f"Number of dyn sp read: {len(self.dyn_sp)}\n"
+                f"Number of cst sp read: {len(self.cst_sp)}\n"
+                f"Length of order list: {len(dyn_sp)} - {len(cst_sp)}"
+            )
+        for idx, label in enumerate(dyn_sp):
+            self[label].index = idx
+        for idx, label in enumerate(cst_sp, start=len(dyn_sp)):
+            self[label].index = idx
+        self.next_index = idx + 1
+        self.sorted = True
+
     def sort(
         self, inplace: bool = True, starter: tp.Optional[tp.List[str]] = None
     ) -> tp.Optional[ListSpecies]:

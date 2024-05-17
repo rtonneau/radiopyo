@@ -231,7 +231,6 @@ class SimEnv:
             list_sp.add_cst_species(cls.PH_SPECIES, 10 ** (-parameters["pH"]))
             list_sp.add_cst_species("OH_minus", 10 ** (-14 + parameters["pH"]))
 
-        list_sp.sort(inplace=True)
         # Sanity check
         if "reactions" not in config:
             logger.warning(
@@ -311,11 +310,18 @@ class SimEnv:
             list_sp._convert_to_CstSpecies("trash")
 
         # Sort species so that all constant species are at the end.
-        starter = []
-        for r in ab:
-            starter.append(r.acid.label)
-            starter.append(r.base.label)
-        list_sp.sort(inplace=True, starter=starter)
+        if "species_order" in parameters:
+            print("found species order in config")
+            list_sp.set_order(
+                dyn_sp=parameters["species_order"]["dynamical"],
+                cst_sp=parameters["species_order"]["constant"],
+            )
+        else:
+            starter = []
+            for r in ab:
+                starter.append(r.acid.label)
+                starter.append(r.base.label)
+            list_sp.sort(inplace=True, starter=starter)
 
         logger.info(f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
         logger.info(f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
