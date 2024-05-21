@@ -41,7 +41,7 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.basic_chemistry import BasicReaction
-    from radiopyo.utils.sim_types import ConfigDict
+    from radiopyo.utils.sim_types import ConfigDict, SimParameters
 
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__ = [
@@ -140,7 +140,7 @@ class SimEnv:
             List of all chemical reactions involved
         species: ListSpecies
             List of all species involved, cst and dyn
-        bio_param: Dict[str, float]
+        parameters: Dict[str, float]
             Dictionary with some biological parameter like pH
         initial_cc: Dict[str, float]
             Dictionary with the initial concentration of some species
@@ -148,7 +148,7 @@ class SimEnv:
 
     reactions: ReactionsList
     species: ListSpecies
-    bio_param: tp.Dict[str, float]
+    parameters: SimParameters
     initial_cc: tp.Dict[str, float]
     PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
     _config_dict: ConfigDict = field(
@@ -174,7 +174,7 @@ class SimEnv:
     def make_hash(self, method: str = "sha256") -> str:
         """ """
         hasher = hashlib.new(method, usedforsecurity=False)
-        hasher.update(repr(frozenset(self.bio_param.items())).encode())
+        hasher.update(repr(frozenset(self.parameters.items())).encode())
         hasher.update(repr(frozenset(self.initial_cc.items())).encode())
         for species in self.species:
             hasher.update(repr(species).encode())
@@ -213,7 +213,7 @@ class SimEnv:
         parameters = config.get("parameters", {})
         if "pH" not in parameters:
             logger.warning(
-                "CONFIG::pH is not defined in bio_param! Assuming pH=7",
+                "CONFIG::pH is not defined in Sim parameters! Assuming pH=7",
             )
             parameters["pH"] = 7
 
@@ -311,7 +311,7 @@ class SimEnv:
 
         # Sort species so that all constant species are at the end.
         if "species_order" in parameters:
-            print("found species order in config")
+            logger.info("CONFIG::Reading previous species order.")
             list_sp.set_order(
                 dyn_sp=parameters["species_order"]["dynamical"],
                 cst_sp=parameters["species_order"]["constant"],
@@ -329,7 +329,7 @@ class SimEnv:
         out = cls(
             reactions=ReactionsList(ab, er, kr, enz, rad),
             species=list_sp,
-            bio_param=parameters,
+            parameters=parameters,
             initial_cc=initial_cc,
         )
         out._config_dict = deepcopy(config)
@@ -454,8 +454,8 @@ class SimEnv:
             # Loop over all reaction's reactants
             idx_reactant: int = 0
             for sp, stoi in reaction.iter_reactants():
-                # if sp == "H2O":
-                #    continue
+                if sp == "H2O":
+                    continue
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(sp):
                     Riy[sp.index, idx_r] -= stoi

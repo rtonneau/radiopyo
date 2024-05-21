@@ -61,9 +61,16 @@ class ReactionsDict(tp.TypedDict):
     constant: tp.List[tp.Dict]
 
 
-class ConfigDict(tp.TypedDict):
+class SimParameters(tp.TypedDict, total=False):
+    pH: float
+    force_cst_pH: bool
+    species_order: tp.Dict[str, tp.List[str]]
+    temperature: float
+
+
+class ConfigDict(tp.TypedDict, total=False):
     includes: tp.Dict[str, tp.List[str]]
-    parameters: tp.Dict[str, float | tp.Dict]
+    parameters: SimParameters
     concentrations: ConcentrationDict
     reactions: ReactionsDict
     beam: tp.Dict[str, tp.List[tp.Dict]]
