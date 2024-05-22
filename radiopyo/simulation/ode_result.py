@@ -71,6 +71,7 @@ class ODEResult(object):
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
     y: NDArray[np.float64]
+    dydt: NDArray[np.float64]
     sol: tp.List[tp.Any]
     t_events: tp.List[tp.List[NDArray[np.float64]]]
     y_events: tp.List[tp.List[NDArray[np.float64]]]
@@ -204,6 +205,7 @@ class ODEResult(object):
     def _default_init(self) -> None:
         self.t = np.array([], dtype=np.float64)
         self.y = np.array([], dtype=np.float64)
+        self.dydt = np.array([], dtype=np.float64)
         self.sol = []
         self.t_events, self.y_events = [], []
         self.nfev, self.njev, self.nlu = [], [], []
@@ -287,7 +289,7 @@ class ODEResult(object):
             out.iloc[idx, :] = jac.flatten()
         return out
 
-    def reconstruct_reactions(self) -> pd.DataFrame:
+    def reconstruct_reactions(self, recompute: bool = False) -> pd.DataFrame:
         """
         Rem: to integrate df
             >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
@@ -305,6 +307,14 @@ class ODEResult(object):
             idx_ez = slice(idx_gi.stop, idx_gi.stop + len(cols_ez))
         else:
             cols_ez = []
+
+        if self.dydt.shape[-1] == self.y.shape[-1] > 0 and not recompute:
+            return pd.DataFrame(
+                columns=list(chain.from_iterable([cols_kr, cols_gi, cols_ez])),
+                index=self.t,
+                dtype=np.float64,
+                data=self.dydt.T,
+            )
 
         out = pd.DataFrame(
             columns=list(chain.from_iterable([cols_kr, cols_gi, cols_ez])),
@@ -344,10 +354,12 @@ class ODEResult(object):
                     / (self.mat["Ez_mat"][2][0, :] + S)
                 )
                 out.iloc[idx, idx_ez] = MM
+        self.dydt = out.values.T
         return out
 
     def species_balance_evolution(self) -> pd.DataFrame:
-        rr = self.reconstruct_reactions()
+        if self.dydt.shape[-1] == self.y.shape[-1] > 0:
+            rr = self.reconstruct_reactions()
         out = pd.DataFrame(
             index=self.t,
             columns=[elt.label for elt in self.env.species.iter_dyn_species()],

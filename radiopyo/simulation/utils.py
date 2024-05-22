@@ -7,6 +7,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import dataclasses as dc
 import typing as tp
 from contextlib import AbstractContextManager, suppress
 from pathlib import Path
@@ -133,6 +134,52 @@ class GroupNotFound(HDFManagerException):
     """ """
 
 
+@dc.dataclass(kw_only=True)
+class SimIdentifier:
+    _FIELD_DELIMITER: str = dc.field(default="##", repr=False, init=False)
+    _VALUE_DELIMITER: str = dc.field(default="#", repr=False, init=False)
+
+    def replace(self, **kwargs: tp.Any) -> tp.Self:
+        """ """
+        return dc.replace(self, **kwargs)
+
+    @classmethod
+    def iter_fields(cls) -> tp.Iterator[dc.Field]:
+        """ """
+        for field in dc.fields(cls):
+            if field.name in ["_FIELD_DELIMITER", "_VALUE_DELIMITER"]:
+                continue
+            yield field
+
+    def to_string(self) -> str:
+        """ """
+        out: tp.List[str] = []
+        for field in self.iter_fields():
+            value = field.type(getattr(self, field.name))
+            match value:
+                case float():
+                    out.append(
+                        self._VALUE_DELIMITER.join([field.name, f"{round(value,3)}"])
+                    )
+                case str() | int():
+                    out.append(self._VALUE_DELIMITER.join([field.name, str(value)]))
+                case _:
+                    raise TypeError(f"Unsupported Field type {type(value)}")
+        return self._FIELD_DELIMITER.join(out)
+
+    @classmethod
+    def from_string(cls: tp.Type[tp.Self], value: str) -> tp.Self:
+        """ """
+        kwargs = {}
+        value = value.split("/")[-1]
+        for elt in value.split(cls._FIELD_DELIMITER):
+            key, val = elt.split(cls._VALUE_DELIMITER)
+            kwargs[key] = val
+        for field in cls.iter_fields():
+            kwargs[field.name] = field.type(kwargs[field.name])
+        return cls(**kwargs)
+
+
 class H5Manager(AbstractContextManager):
     """ """
 
@@ -152,7 +199,7 @@ class H5Manager(AbstractContextManager):
             self._store_folder.mkdir()
 
     def __enter__(self) -> tp.Any:
-        return self.open_f5file()
+        return self.open_h5file()
 
     def __exit__(
         self,
@@ -183,7 +230,7 @@ class H5Manager(AbstractContextManager):
         """ """
         return self.hdf_path.exists()
 
-    def open_f5file(self, mode: str = "r+") -> h5py.File:
+    def open_h5file(self, mode: str = "r+") -> h5py.File:
         """ """
         if self._is_open == 0:
             self._hdf = h5py.File(self.hdf_path, mode)
@@ -204,7 +251,7 @@ class H5Manager(AbstractContextManager):
                 self._hdf = None
             else:
                 return
-        self._opened = 0
+        self._is_open = 0
         return
 
     def delete_dataset(
@@ -272,6 +319,11 @@ class H5Manager(AbstractContextManager):
         return out
 
     @staticmethod
+    def _dataset_name_to_prod_name(name: str) -> str:
+        """ """
+        return name + ".prod"
+
+    @staticmethod
     def _keys_to_path(keys: tp.Optional[tp.List[str]] = None) -> str:
         return "/" + "/".join(keys) if keys is not None else "/"
 
@@ -306,9 +358,11 @@ class H5Manager(AbstractContextManager):
             grp = self._keys_to_group(keys)
             return self.read_dataset(name, grp)
 
-    def look_at(self, keys: tp.Optional[tp.List[str]] = None) -> tp.Iterator[str]:
+    def look_at(
+        self, keys: tp.Optional[tp.List[str] | h5py.Group] = None
+    ) -> tp.Iterator[str]:
         with self:
-            grp = self._keys_to_group(keys)
+            grp = keys if isinstance(keys, h5py.Group) else self._keys_to_group(keys)
             for elt in grp:
                 yield elt
 
@@ -320,16 +374,21 @@ class H5Manager(AbstractContextManager):
         """ """
         if "json_config" in grp[name].attrs:
             Path(grp[name].attrs["json_config"]).unlink()
+        name_pr = self._dataset_name_to_prod_name(name)
+        if name_pr in grp:
+            self.delete_dataset(grp, name_pr)
         return self.delete_dataset(grp, name)
 
     def push_ODEResult(
         self,
-        name: str,
+        identifier: SimIdentifier,
         result: ODEResult,
         keys: tp.Optional[tp.List[str]] = None,
         overwrite: bool = False,
+        production_rate: bool = False,
     ) -> None:
         """ """
+        name = identifier.to_string()
         with self:
             grp = self._keys_to_group(keys)
             if name in grp and overwrite:
@@ -343,9 +402,19 @@ class H5Manager(AbstractContextManager):
             ds.attrs["json_config"] = str(json_file)
             result.to_json_config(ds.attrs["json_config"], overwrite)
 
+            if production_rate:
+                name_pr = self._dataset_name_to_prod_name(name)
+                df_pr = result.reconstruct_reactions()
+                data = df_pr.reset_index()
+                ds = self.insert_dataset(grp, name_pr, data.values)
+                labels = [str(_) for _ in data.columns]
+                labels[0] = "time"
+                ds.attrs["columns"] = labels
+
     def read_ODEResult(
-        self, name: str, keys: tp.Optional[tp.List[str]] = None
+        self, identifier: SimIdentifier, keys: tp.Optional[tp.List[str]] = None
     ) -> ODEResult:
+        name = identifier.to_string()
         with self:
             grp = self._keys_to_group(keys)
 
@@ -357,6 +426,11 @@ class H5Manager(AbstractContextManager):
             if "json_config" not in grp[name].attrs:
                 raise KeyError(f"No json file recorded with stored ODE sol {name}")
             out.append_sol(dummy_result)
+
+            name_pr = self._dataset_name_to_prod_name(name)
+            if name_pr in grp:
+                data = self.read_dataset(name_pr, grp)
+                out.dydt = data.values.T
             return out
 
     def iter_dataset(
@@ -383,9 +457,10 @@ class H5Manager(AbstractContextManager):
 
     def iter_ODEResults(
         self,
+        identifier: SimIdentifier,
         keys: tp.Optional[tp.List[str]] = None,
         recursive: bool = False,
-    ) -> tp.Iterator[tp.Tuple[str, pd.DataFrame]]:
+    ) -> tp.Iterator[tp.Tuple[SimIdentifier, ODEResult]]:
         """ """
         if keys is None:
             keys = []
@@ -393,12 +468,17 @@ class H5Manager(AbstractContextManager):
             current_grp = self._keys_to_group(keys)
             for elt in current_grp:
                 if isinstance(current_grp[elt], h5py.Group) and recursive:
-                    for sub_elt in self.iter_dataset([*keys, elt], recursive):
+                    for sub_elt in self.iter_ODEResults(
+                        identifier, [*keys, elt], recursive
+                    ):
                         yield sub_elt
                 elif isinstance(current_grp[elt], h5py.Dataset):
+                    if str(current_grp[elt].name).endswith(".prod"):
+                        continue
+                    new_identifier = identifier.from_string(current_grp[elt].name)
                     yield (
-                        self._keys_to_path([*keys, elt]),
-                        self.read_dataset(elt, current_grp),
+                        new_identifier,
+                        self.read_ODEResult(new_identifier, [*keys]),
                     )
                 else:
                     continue

@@ -66,6 +66,7 @@ class SimParameters(tp.TypedDict, total=False):
     force_cst_pH: bool
     species_order: tp.Dict[str, tp.List[str]]
     temperature: float
+    timestamp: float
 
 
 class ConfigDict(tp.TypedDict, total=False):
