@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import datetime
 import json
+import logging
 import typing as tp
 from dataclasses import dataclass, field
 from itertools import chain
@@ -40,6 +41,7 @@ if tp.TYPE_CHECKING:
 __all__: tp.List = []
 
 # -------------------------------------- Logging ------------------------------------- #
+logger = logging.getLogger("radiopyo")
 
 # ------------------------------------------------------------------------------------ #
 #                                DECORATOR DEFINITIONS                                 #
@@ -291,6 +293,8 @@ class ODEResult(object):
 
     def reconstruct_reactions(self, recompute: bool = False) -> pd.DataFrame:
         """
+        returns:
+            dataframe [mol/l/s]
         Rem: to integrate df
             >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
         """
@@ -358,8 +362,8 @@ class ODEResult(object):
         return out
 
     def species_balance_evolution(self) -> pd.DataFrame:
-        if self.dydt.shape[-1] == self.y.shape[-1] > 0:
-            rr = self.reconstruct_reactions()
+        """ """
+        rr = self.reconstruct_reactions()  # if stored then no "heavy calculation"
         out = pd.DataFrame(
             index=self.t,
             columns=[elt.label for elt in self.env.species.iter_dyn_species()],
@@ -420,6 +424,9 @@ class ODEResult(object):
         let: tp.Optional[float],
         sol: tp.Optional[ScipyODEResult] = None,
         """
+        _prev_log_level = logger.level
+        logger.setLevel(logging.ERROR)
+
         file_path = Path(file_path)
         with file_path.open("r") as fp:
             config = json.load(fp)
@@ -434,6 +441,8 @@ class ODEResult(object):
         mat = env.build_all_matrices()
         out = cls(env, beam, mat, LET, temperature=T)
         out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
+
+        logger.setLevel(_prev_log_level)
         return out
 
 

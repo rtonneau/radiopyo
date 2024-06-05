@@ -21,6 +21,7 @@ from itertools import chain
 import numpy as np
 
 # --------------------------------- Internal imports --------------------------------- #
+from radiopyo.chemistry import exceptions as radiopyo_exceptions
 from radiopyo.chemistry.acid_base import AcidBase
 from radiopyo.chemistry.collections import ListSpecies
 from radiopyo.chemistry.e_reactions import EReaction
@@ -122,7 +123,10 @@ class ReactionsList:
     def iter_all_kreactions_and_kvalues(
         self, T: tp.Optional[Temperature | float] = None
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
-        """"""
+        """
+        Args:
+            T: Temperature in °C (optional, default:25)
+        """
         for bireaction in chain(self.ab_reaction, self.eq_reaction):
             for values in bireaction.iter_reactions_and_kvalues(T):
                 yield values
@@ -183,7 +187,10 @@ class SimEnv:
         return hasher.hexdigest()
 
     @classmethod
-    def from_dict(cls, config: ConfigDict) -> SimEnv:
+    def from_dict(cls, config: ConfigDict, log: bool = True) -> SimEnv:
+        _prev_log_lvl = logger.level
+        if not log:
+            logger.setLevel(logging.ERROR)
         logger.info("CONFIG::Configuring Simulation Environment")
         # Sanity check
         if "concentrations" not in config:
@@ -228,8 +235,10 @@ class SimEnv:
             list_sp.add_dyn_species(cls.PH_SPECIES, cc_init=10 ** (-parameters["pH"]))
             list_sp.add_dyn_species("OH_minus", cc_init=10 ** (-14 + parameters["pH"]))
         else:
-            list_sp.add_cst_species(cls.PH_SPECIES, 10 ** (-parameters["pH"]))
-            list_sp.add_cst_species("OH_minus", 10 ** (-14 + parameters["pH"]))
+            with suppress(radiopyo_exceptions.IsSimSpeciesError):
+                list_sp.add_cst_species(cls.PH_SPECIES, 10 ** (-parameters["pH"]))
+            with suppress(radiopyo_exceptions.IsSimSpeciesError):
+                list_sp.add_cst_species("OH_minus", 10 ** (-14 + parameters["pH"]))
 
         # Sanity check
         if "reactions" not in config:
@@ -333,6 +342,7 @@ class SimEnv:
             initial_cc=initial_cc,
         )
         out._config_dict = deepcopy(config)
+        logger.setLevel(_prev_log_lvl)  # restore log level
         return out
 
     def initial_values(
@@ -454,8 +464,6 @@ class SimEnv:
             # Loop over all reaction's reactants
             idx_reactant: int = 0
             for sp, stoi in reaction.iter_reactants():
-                if sp == "H2O":
-                    continue
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(sp):
                     Riy[sp.index, idx_r] -= stoi

@@ -118,6 +118,12 @@ class UnitCell(object):
     def beam(self) -> ParticleBeam:
         return self.beam_list.current
 
+    @property
+    def LET(self) -> float:
+        if self.beam_list.current_LET is None:
+            raise ValueError("No LET defined... o_O ?")
+        return self.beam_list.current_LET
+
     @classmethod
     def from_config_dict(cls, config: ConfigDict, init: bool = True) -> tp.Self:
         """Create a Simulation Environment from a the generic ConfigDict:

@@ -161,7 +161,7 @@ def derive(
         # Add the Time dependent Radiolytic term
         dydt += Gi_mat * beam.at(t).dose_rate()
 
-    # dydt[np.where((y < 0) & (dydt < 0))] = 0
+    dydt[np.where((y < 0) & (dydt < 0))] = 0
 
     # ==> dynamical species
     # ==> convert back to [µmol/l]

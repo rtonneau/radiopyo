@@ -372,7 +372,21 @@ class ParticleBeam:
         )
 
     def delivery(self, times: NDArray) -> NDArray:
-        """ """
+        """
+        Uses times array to compute the dose delivered between 22 consecutive time steps
+        i.e. time lapse in between 2 values of vector times.
+
+        Arguments:
+            times: np.array[np.float]
+                time vector of length N
+
+        Returns:
+            NX3 numpy array.
+            out[:,0] = initial time (t0) of an interval [s]
+            out[:,1] = time interval (duration [s])
+            out[:,2] = delivered dose [Gy]
+            /!\ out[-1,1] = np.nan, always!
+        """
         out = np.zeros([len(times), 3])
         for idx, _ in enumerate(times[:-1]):
             interval = times[idx + 1] - _
