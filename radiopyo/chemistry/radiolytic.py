@@ -78,6 +78,7 @@ class RadiolyticReaction(BasicReaction):
     """
 
     _reaction_cst: float
+    _OPE_STRING: str = "->"
 
     def __init__(self, reaction_cst: float):
         super().__init__()

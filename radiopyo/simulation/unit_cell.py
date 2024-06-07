@@ -460,6 +460,8 @@ class UnitCell(object):
                 max_step_size=chunks[idx, 1],
             )
             chunk_list.append(chunk)
+        logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
+        logger.info(f"From beam chunks ==> {len(chunks)}")
         logger.info(f"Simulation divided in {len(chunk_list)} chunks")
         return SimChunksIter(
             sim=self,
