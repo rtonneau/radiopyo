@@ -480,8 +480,8 @@ class ParticleBeam:
         # ==> Only need to grow time interval def by line 1 - line 0
         if out.shape[0] == 3:
             out[0, 1] = 1.0
-            # out[1, 0] = out[1, 0] + (out[1, 0]-out[0, 0])*self.GROWTH_FACTOR
-            out[1, 0] += 0.1
+            out[1, 0] = out[1, 0] + (out[1, 0] - out[0, 0]) * self.GROWTH_FACTOR
+            # out[1, 0] += 0.1
             if out[1, 0] >= out[2, 0]:
                 out = out[0:2, :]
             return out

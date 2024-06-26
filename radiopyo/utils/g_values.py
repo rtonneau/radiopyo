@@ -10,6 +10,7 @@ Author:
 import typing as tp
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d  # type: ignore[import]
 
@@ -107,3 +108,93 @@ class GValuesBoscolo:
             Iterable[str]: iterable over all species available.
         """
         return iter([str(elt) for elt in self.df.columns])
+
+
+class RawReader:
+    """
+    Data are interpolated (quadratic) so that any LET within the date range can be
+    accessed. It is up to the user to ensure data are provided with a good enough
+    resolution.
+
+    """
+
+    data: tp.Dict[str, pd.Series]
+    interpol: tp.Dict[str, interp1d]
+    file: Path
+
+    def __init__(self, file: str | Path) -> None:
+        self.file = Path(file)
+        if not self.file.exists():
+            raise FileNotFoundError(self.file)
+        self.data = {}
+        self.interpol = {}
+
+        self._read_csv()
+        self._interpol()
+
+    def _interpol(self) -> None:
+        """ """
+        for col in self.data:
+            try:
+                self.interpol[col] = interp1d(
+                    x=self.data[col].index,
+                    y=self.data[col].values,
+                    kind="quadratic",
+                    bounds_error=True,
+                )
+            except ValueError:
+                self.interpol[col] = interp1d(
+                    x=self.data[col].index,
+                    y=self.data[col].values,
+                    kind="linear",
+                    bounds_error=True,
+                )
+
+    def _read_csv(self) -> None:
+        """ """
+        df = pd.read_csv(self.file).drop(0, axis=0).astype(np.float64)
+        for idx, col in enumerate(df.columns[::2]):
+            self.data[str(col)] = pd.Series(
+                index=df.iloc[:, idx * 2].values,  # type: ignore[arg-type]
+                data=df.iloc[:, idx * 2 + 1].values,
+                name=col,
+            ).dropna()
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.interpol
+
+    def __getitem__(self, key: float | tp.Iterable) -> pd.DataFrame:
+        out = {}
+        if not hasattr(key, "__iter__"):
+            key = [
+                key,
+            ]
+
+        for label in self.columns():
+            out[label] = self(label, key)
+        return pd.DataFrame.from_dict(
+            out,
+        )
+
+    def __call__(self, label: str, let: float | tp.Iterable) -> float:
+        """
+        Method retrieving the G value from interpolated data.
+
+        Args:
+            species: str
+                label of the species to get G value from.
+            let: float
+                LET of the incident radiation in keV/µm
+
+        Returns:
+            float: G Value of species: 'species' with LET: 'let'
+        """
+        return self.interpol[label](let)
+
+    def columns(self) -> tp.Iterable[str]:
+        """Get all species whose GValues are available.
+
+        Returns:
+            Iterable[str]: iterable over all species available.
+        """
+        return iter(self.data)

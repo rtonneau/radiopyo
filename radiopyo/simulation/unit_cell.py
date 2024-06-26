@@ -204,6 +204,7 @@ class UnitCell(object):
         self,
         beam: ParticleBeam | str,
         LET: tp.Optional[float] = None,
+        update_LET: tp.Optional[bool] = True,
     ) -> tp.Self:
         """Define Radiation Source structure/parameters
 
@@ -233,7 +234,7 @@ class UnitCell(object):
                 f"{self.beam_list.current}, done!"
             )
 
-        if LET is not None and LET != _OLD_LET:
+        if update_LET and LET is not None and LET != _OLD_LET:
             self.change_LET(LET)
         return self
 
