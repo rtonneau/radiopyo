@@ -257,7 +257,7 @@ class ParticleBeam:
 
     def __post_init__(self) -> None:
         """Method called after ParticleBeam__init__() to finalize initialization"""
-        self.GROWTH_FACTOR = 0.1
+        self.GROWTH_TIME = 1e-6
         self.peak_dose_rate = self._compute_peak_dose_rate()
         self.dose_per_pulse = self.peak_dose_rate * self.timer.on_time
         self.time_at_max_dose = self.timer.start_time + self._compute_time_at_max_dose()
@@ -480,8 +480,10 @@ class ParticleBeam:
         # ==> Only need to grow time interval def by line 1 - line 0
         if out.shape[0] == 3:
             out[0, 1] = 1.0
-            out[1, 0] = out[1, 0] + (out[1, 0] - out[0, 0]) * self.GROWTH_FACTOR
-            # out[1, 0] += 0.1
+
+            if (out[2, 0] - out[1, 0]) > self.GROWTH_TIME:
+                out[1, 0] = out[1, 0] + self.GROWTH_TIME
+
             if out[1, 0] >= out[2, 0]:
                 out = out[0:2, :]
             return out
@@ -492,46 +494,25 @@ class ParticleBeam:
             return out
 
         # From now on, at least 2 ON times.
-        # Define the ideal growth factor of on_time (default is 10% -> 5% each sides)
-        delta = self.timer.on_time * self.GROWTH_FACTOR
-
         # Check whether it is no bigger than on period.
-        if delta >= (self.timer.period - self.timer.on_time):
-            # If so, refine the computed delta
-            # TO DO? OK? Or return a 2 lines matrix?
-            delta = (self.timer.period - self.timer.on_time) * self.GROWTH_FACTOR
+        GT = self.GROWTH_TIME
+        if (self.timer.period - self.timer.on_time) <= GT:
+            GT = 0.0
 
-        # 1) Shift the pulse start to "pulse start"  - (delta/2)
+        # 1) Shift the pulse end to "pulse end"  + (delta/2)
         # -------------------------------------------------------
         # select indices of the lines to modify (where dr > 0.0)
         # indexes must be a tuple of len 2 as matrix of 2 cols.
         # Want to modify time -> col 0
-        indexes = np.where(out[:, 1] > 0.0)[0], [0]
-
+        indexes = np.where(out[:, 1] == 0.0)[0], [0]
         # IF first item is index 0, remove it, it is the start point.
         if indexes[0][0] == 0:
             indexes = (indexes[0][1:], indexes[1])
         # If last item is corresponding to end time, do not modify it.
         if indexes[0][-1] == out.shape[0] - 1:
             indexes = (indexes[0][0:-1], indexes[1])
-        # Shift
-        out[indexes] = out[indexes] - (delta / 2)
 
-        # 2) Shift the pulse end to "pulse end"  + (delta/2)
-        # -------------------------------------------------------
-        indexes = np.where(out[:, 1] == 0.0)[0], [0]
-        if indexes[0][0] == 0:
-            indexes = (indexes[0][1:], indexes[1])
-        if indexes[0][-1] == out.shape[0] - 1:
-            indexes = (indexes[0][0:-1], indexes[1])
-        out[indexes] = out[indexes] + (delta / 2)
-
-        # Add 0.5 seconds for the last ON time to keep refined ODE resolution
-        if out[-2, 0] - out[-1, 0] > 0.5:
-            out[-2, 0] += 0.5
-        else:
-            out[-2, 0] = out[-1, 0]
-            out = out[:-1, :]
+        out[indexes] = out[indexes] + GT
 
         # Set all Dose rate values (-> col 1) > 0 to 1
         out[:, 1] /= self.peak_dose_rate
@@ -863,11 +844,15 @@ class PulsedBeam(ParticleBeam):
                 ]
             )
 
-        out = out[:-1, :]
-        out[-1, 0] = end
+        if out[-1, 0] > end:
+            out = out[:-1, :]
+            if out[-1, 0] > end:
+                out[-1, 0] = end
 
-        if end < stop:
+        if out[-1, 0] < stop:
             out = np.vstack([out, [stop, 0.0]])
+        else:
+            out[-1, 1] = 0
         return out
 
     def as_dict(self) -> tp.Dict[str, float]:

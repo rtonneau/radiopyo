@@ -275,6 +275,7 @@ class UnitCell(object):
         y0: tp.Optional[NDArray[np.float64]] = None,
         t_eval: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        beam_ON: bool = True,
     ) -> ScipyODEResult:
         if len(self.beam_list) <= 0:
             rp_excep.NoBeamDefinedError("Simulation aborted")
@@ -282,6 +283,7 @@ class UnitCell(object):
 
         if t_span[0] == t_span[1]:
             t_span = (t_span[0] / 1e2, t_span[1])
+
         # Building kwargs for solve_ivp:
         kwargs: tp.Dict[str, tp.Any] = {}
         kwargs["first_step"] = self.FIRST_STEP
@@ -305,6 +307,22 @@ class UnitCell(object):
             kwargs["first_step"] = (t_span[1] - t_span[0]) / 1e3
 
         beam = self.beam_list.current if use_beam else None
+
+        # Check if beam_on, then skip the next 1e-7 s of sim and compute evolution of cc's
+        # according to Gvalues
+        if beam_ON:  # assume beam is switched ON at t_span[0]
+            t_span = (t_span[0] + 1e-7, t_span[1])
+            for r in self.env.reactions.radiolytic:
+                sp = r.species()
+                kwargs["y0"][sp.index] += (
+                    r.kr() * self.beam.at(t_span[0]).dose_rate() * 1e-7 * 1e6
+                )
+        # print(
+        #    t_span,
+        #    f" is beam on? {beam_ON} || {self.beam.at(t_span[1] - 0.5e-6).dose_rate()}",
+        # )
+        # End
+
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(
             derive,
@@ -448,19 +466,36 @@ class UnitCell(object):
         chunks = self.beam_list.current.make_time_intervals(
             start=t_span[0], stop=t_span[1]
         )
-        chunks[np.where(chunks[:, 1] > 0)[0], 1] = max_step_size_on
-        chunks[np.where(chunks[:, 1] == 0)[0], 1] = max_step_size_off
-        if max_step_size_final is not None:
-            chunks[-2, 1] = max_step_size_final
+        # chunks[np.where(chunks[:, 1] > 0)[0], 1] = max_step_size_on
+        # chunks[np.where(chunks[:, 1] == 0)[0], 1] = max_step_size_off
+        # if max_step_size_final is not None:
+        #    chunks[-2, 1] = max_step_size_final
 
         chunk_list: tp.List[SimChunk] = []
-        for idx in range(len(chunks[0:-1, :])):
+        for idx in range(len(chunks[0:-2, :])):
             chunk = SimChunk(
                 start=chunks[idx, 0],
                 stop=chunks[idx + 1, 0],
-                max_step_size=chunks[idx, 1],
+                max_step_size=(
+                    max_step_size_on if chunks[idx, 1] > 0 else max_step_size_off
+                ),
+                beam_on=chunks[idx, 1] > 0,
             )
             chunk_list.append(chunk)
+
+        # Make final chunk
+        max_step = max_step_size_final
+        if max_step is None:
+            max_step = max_step_size_on if chunks[-2, 1] > 0 else max_step_size_off
+        chunk_list.append(
+            SimChunk(
+                start=chunks[-2, 0],
+                stop=chunks[-1, 0],
+                max_step_size=max_step,
+                beam_on=chunks[-2, 1] > 0,
+            )
+        )
+
         logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
         logger.info(f"From beam chunks ==> {len(chunks)}")
         logger.info(f"Simulation divided in {len(chunk_list)} chunks")
@@ -493,7 +528,8 @@ class SimChunk(tp.NamedTuple):
 
     start: float
     stop: float
-    max_step_size: float
+    max_step_size: float | None
+    beam_on: bool
 
 
 class SimChunksIter:
@@ -568,6 +604,7 @@ class SimChunksIter:
             chunk = self.chunks[self.current]
         except IndexError:
             raise StopIteration from None
+
         res = self.sim._raw_run(
             t_span=(chunk.start, chunk.stop),
             use_jac=self.use_jac,
@@ -577,6 +614,7 @@ class SimChunksIter:
             max_step=chunk.max_step_size,
             y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
             use_beam=self.use_beam,
+            beam_ON=chunk.beam_on,
         )
         self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
         return self.sol
