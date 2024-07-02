@@ -223,6 +223,43 @@ class Timer(tp.NamedTuple):
         return self.period - self.on_time
 
 
+class MacroTimer(tp.NamedTuple):
+    """ """
+
+    macro_period: float
+    macro_start_time: float
+    timer: Timer
+
+    @staticmethod
+    def _default_start_time() -> float:
+        return 0.0
+
+    @classmethod
+    def new_macropulsed(
+        cls,
+        macro_period: float,
+        period: float,
+        on_time: float,
+        macro_start_time: tp.Optional[float] = None,
+        start_time: tp.Optional[float] = None,
+    ) -> tp.Self:
+        """Class method to generate a macro pulsed timer
+        Args:
+            macro_period: float
+                Period (repetition) of the timer in seconds
+            period: float
+                Period (repetition) of the timer in seconds
+            on_time: float
+                Time during which timer is ON in seconds. on_time should be <= period.
+        """
+        stime = (
+            macro_start_time
+            if macro_start_time is not None
+            else cls._default_start_time()
+        )
+        return cls(macro_period, stime, Timer.new_pulsed(period, on_time, start_time))
+
+
 @dataclass
 class ParticleBeam:
     """
@@ -741,6 +778,9 @@ class PulsedBeam(ParticleBeam):
             max_dose if max_dose is not None else float("inf"),
         )
 
+    def dose_per_train(self) -> float:
+        return self.peak_dose_rate * self.on_time
+
     # @override waiting for this baby to show up (Python3.12 fall 2023!)
     # => https://peps.python.org/pep-0698/
     def update_beam_param(self, **kwargs: float) -> None:
@@ -991,6 +1031,39 @@ class PulsedBeam(ParticleBeam):
                 start_time=param.get("start_time", None),
             )
         raise NotImplementedError(f"Unknown Pulsed beam definition: {param}")
+
+
+class MacroPulsedBeam(PulsedBeam):
+    """ """
+
+    macro_period: float
+
+    def __init__(
+        self,
+        dose_rate: float,
+        period: float,
+        on_time: float,
+        macro_period: float,
+        max_dose: tp.Optional[float] = None,
+        start_time: tp.Optional[float] = None,
+    ):
+        self.macro_period = macro_period
+        super().__init__(dose_rate, period, on_time, max_dose, start_time)
+
+    def beam_type(self) -> str:
+        return "macro_pulsed"
+
+    def tot_pulse(self) -> float:
+        """Computes the total number of pulses.
+        Returns:
+            float
+                Number of pulses (.2 digits precision)
+        """
+        fp = self.time_at_max_dose // self.timer.period
+        out = fp + (
+            (self.time_at_max_dose - fp * self.timer.period) / self.timer.on_time
+        )
+        return round(out, 2)
 
 
 class BeamCollection(object):
