@@ -4,14 +4,16 @@ The beam submodule contains all class definitions related to radiation source
 structures.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
 import json
 import logging
 import typing as tp
+from abc import ABC, abstractmethod
 from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
@@ -74,68 +76,88 @@ class TimeMessage(tp.NamedTuple):
         return self.current_dose_rate
 
 
-class Timer(tp.NamedTuple):
-    """NamedTuple use as a binary timer for radiation source. Currently only two states
-    are possible for a radiation source, either ON or OFF i.e. 0.0% or 100%
-    This class holds the time structure of the radiation source, defined as pulses.
-    Pulses are repeated with a given 'period' (seconds) and the timer keeps its ON state
-    during 'on_time' seconds.
-    For example:
-        - period = 2 seconds
-        - on_time = 0.5 second
-    --> each 2 seconds, timer ON during 0.5 second (i.e. duty cycle of 25%)
-
-    Timer should not be constructed from scratch but from helper functions (classmethod)
-    => Either one of:
-        - Timer.new_constant()
-        - Timer.new_pulsed(period, on_time)
-
-    Rem:
-        NamedTuple is a convenient structure as it is immutable and lightweight.
-
-    Usage:
-        >>> timer = Timer.new_pulsed(period=2, on_time=0.5)
-        >>> timer.state_at(0.25)      # -> TimerState.isOn
-        >>> timer.state_at(0.50)      # -> TimerState.isOff
-        >>> timer.state_at(1.50)      # -> TimerState.isOff
-        >>> timer.state_at(2.00)      # -> TimerState.isOn
-        >>> print(timer.duty_cycle()) # -> 0.25
-
-        >>> timer = Timer.new_constant()
-        >>> timer.state_at(0.25)      # -> TimerState.isOn
-        >>> timer.state_at(0.50)      # -> TimerState.isOn
-        >>> timer.state_at(1.50)      # -> TimerState.isOn
-        >>> timer.state_at(2.00)      # -> TimerState.isOn
-        >>> print(timer.duty_cycle()) # -> 1.00
-    """
+class BaseTimer(ABC):
+    """ """
 
     period: float
     on_time: float
     start_time: float
 
+    def __init__(
+        self, period: float, on_time: float, start_time: tp.Optional[float] = None
+    ) -> None:
+        self.period = period
+        self.on_time = on_time
+        self.start_time = (
+            start_time if start_time is not None else self._default_start_time()
+        )
+
     @staticmethod
     def _default_start_time() -> float:
         return 0.0
 
-    @classmethod
-    def new_constant(cls, start_time: tp.Optional[float] = None) -> Timer:
-        """Class method to generate an always ON timer"""
-        stime = start_time if start_time is not None else cls._default_start_time()
-        return cls(float("inf"), float("inf"), stime)
-
-    @classmethod
-    def new_pulsed(
-        cls, period: float, on_time: float, start_time: tp.Optional[float] = None
-    ) -> Timer:
-        """Class method to generate a pulsed timer
-        Args:
-            period: float
-                Period (repetition) of the timer in seconds
-            on_time: float
-                Time during which timer is ON in seconds. on_time should be <= period.
+    @abstractmethod
+    def state_at(self, time: float) -> TimerState:
         """
-        stime = start_time if start_time is not None else cls._default_start_time()
-        return cls(period, on_time, stime)
+        Compute the state of the timer at a given time.
+        Args:
+            time: float
+                Time in seconds
+        Returns:
+            TimerState: Enum being either isOn or isOff
+        """
+
+    @abstractmethod
+    def time_till_next_ON(self, time: float) -> float:
+        """
+        Computes time remaining before next pulse.
+        """
+
+    @abstractmethod
+    def time_till_next_OFF(self, time: float) -> float:
+        """
+        Computes time remaining before beam is off. Returns 0 if beam already off.
+        """
+
+    @abstractmethod
+    def copy(self, start_time: tp.Optional[float] = None) -> tp.Self:
+        """Make a simple copy of the Timer"""
+
+    def time_till_next_period(self, time: float) -> float:
+        """
+        Computes how much time is remaining before next period starts.
+        """
+        time = time - self.start_time - self.period * self.period_index(time)
+        return self.period - time
+
+    def off_time(self) -> float:
+        """Computes the OFF time"""
+        return self.period - self.on_time
+
+    def period_index(self, time: float) -> int:
+        """
+        Get the 'position' of the period containing 'time'.
+        For example, for 3s period & start_time=0, t=8s then period_index = 2
+        """
+        time = time - self.start_time
+        return int(time // self.period)
+
+    def _relative_time_pulse(self, time: float) -> float:
+        """ """
+        if time > self.start_time + self.period:
+            time = time - self.start_time - self.period * self.period_index(time)
+        return time
+
+    def duty_cycle(self) -> float:
+        """Computes the duty cycle of the timer
+        Returns:
+            float
+        """
+        out = self.on_time / self.period
+        # In case of "inf"/"inf" => nan
+        if isnan(out) or isinf(out):
+            return 1.0
+        return out
 
     def is_continuous(self) -> bool:
         """Is timer continuous?
@@ -155,16 +177,58 @@ class Timer(tp.NamedTuple):
         """
         return self.period == float("inf") and 0 < self.on_time < float("inf")
 
-    def duty_cycle(self) -> float:
-        """Computes the duty cycle of the timer
-        Returns:
-            float
+
+class Timer(BaseTimer):
+    """Class used as a binary timer for radiation source. Currently only two states
+    are possible for a radiation source, either ON or OFF i.e. 0.0% or 100%
+    This class holds the time structure of the radiation source, defined as pulses.
+    Pulses are repeated with a given 'period' (seconds) and the timer keeps its ON state
+    during 'on_time' seconds.
+    For example:
+        - period = 2 seconds
+        - on_time = 0.5 second
+    --> each 2 seconds, timer ON during 0.5 second (i.e. duty cycle of 25%)
+
+    Timer should not be constructed from scratch but from helper functions (classmethod)
+    => Either one of:
+        - Timer.new_constant()
+        - Timer.new_pulsed(period, on_time)
+
+    Usage:
+        >>> timer = Timer.new_pulsed(period=2, on_time=0.5)
+        >>> timer.state_at(0.25)      # -> TimerState.isOn
+        >>> timer.state_at(0.50)      # -> TimerState.isOff
+        >>> timer.state_at(1.50)      # -> TimerState.isOff
+        >>> timer.state_at(2.00)      # -> TimerState.isOn
+        >>> print(timer.duty_cycle()) # -> 0.25
+
+        >>> timer = Timer.new_constant()
+        >>> timer.state_at(0.25)      # -> TimerState.isOn
+        >>> timer.state_at(0.50)      # -> TimerState.isOn
+        >>> timer.state_at(1.50)      # -> TimerState.isOn
+        >>> timer.state_at(2.00)      # -> TimerState.isOn
+        >>> print(timer.duty_cycle()) # -> 1.00
+    """
+
+    @classmethod
+    def new_constant(cls, start_time: tp.Optional[float] = None) -> tp.Self:
+        """Class method to generate an always ON timer"""
+        stime = start_time if start_time is not None else cls._default_start_time()
+        return cls(float("inf"), float("inf"), stime)
+
+    @classmethod
+    def new_pulsed(
+        cls, period: float, on_time: float, start_time: tp.Optional[float] = None
+    ) -> tp.Self:
+        """Class method to generate a pulsed timer
+        Args:
+            period: float
+                Period (repetition) of the timer in seconds
+            on_time: float
+                Time during which timer is ON in seconds. on_time should be <= period.
         """
-        out = self.on_time / self.period
-        # In case of "inf"/"inf" => nan
-        if isnan(out) or isinf(out):
-            return 1.0
-        return out
+        stime = start_time if start_time is not None else cls._default_start_time()
+        return cls(period, on_time, stime)
 
     def state_at(self, time: float) -> TimerState:
         """
@@ -180,14 +244,6 @@ class Timer(tp.NamedTuple):
         ) <= self.on_time:
             return TimerState.isOn
         return TimerState.isOff
-
-    def period_index(self, time: float) -> int:
-        """
-        Get the 'position' of the period containing 'time'.
-        For example, for 3s period & start_time=0, t=8s then period_index = 2
-        """
-        time = time - self.start_time
-        return int(time // self.period)
 
     def time_till_next_ON(self, time: float) -> float:
         """
@@ -218,28 +274,31 @@ class Timer(tp.NamedTuple):
         stime = start_time if start_time is not None else Timer._default_start_time()
         return Timer(self.period, self.on_time, stime)
 
-    def off_time(self) -> float:
-        """Computes the OFF time"""
-        return self.period - self.on_time
 
+class MacroTimer(BaseTimer):
+    """
+    Macro timer enabling Micro/Macro Pulse.
+    """
 
-class MacroTimer(tp.NamedTuple):
-    """ """
+    subtimer: Timer
 
-    macro_period: float
-    macro_start_time: float
-    timer: Timer
-
-    @staticmethod
-    def _default_start_time() -> float:
-        return 0.0
+    def __init__(
+        self,
+        period: float,
+        on_time: float,
+        subtimer: Timer,
+        start_time: tp.Optional[float] = None,
+    ) -> None:
+        self.subtimer = subtimer
+        super().__init__(period, on_time, start_time)
 
     @classmethod
-    def new_macropulsed(
+    def new_macropulse(
         cls,
         macro_period: float,
         period: float,
         on_time: float,
+        micro_time: float,
         macro_start_time: tp.Optional[float] = None,
         start_time: tp.Optional[float] = None,
     ) -> tp.Self:
@@ -252,12 +311,107 @@ class MacroTimer(tp.NamedTuple):
             on_time: float
                 Time during which timer is ON in seconds. on_time should be <= period.
         """
+        if macro_period <= period:
+            raise ValueError(
+                "Macro Period is <= than micro period. "
+                "Do you really need a macro timer?"
+            )
         stime = (
             macro_start_time
             if macro_start_time is not None
             else cls._default_start_time()
         )
-        return cls(macro_period, stime, Timer.new_pulsed(period, on_time, start_time))
+        return cls(
+            macro_period,
+            micro_time,
+            Timer.new_pulsed(period, on_time, start_time),
+            stime,
+        )
+
+    def state_at(self, time: float) -> TimerState:
+        """
+        Compute the state of the timer at a given time.
+        Args:
+            time: float
+                Time in seconds
+        Returns:
+            TimerState: Enum being either isOn or isOff
+        """
+        time = self._relative_time_pulse(time)
+        if time <= self.on_time:
+            return self.subtimer.state_at(time)
+        return TimerState.isOff
+
+    def period_index(self, time: float) -> int:
+        """
+        Get the 'position' of the period containing 'time'.
+        """
+        time = time - self.start_time
+        return int(time // self.period)
+
+    def micro_pulses_per_train(self) -> float:
+        """ """
+        n = self.on_time // self.subtimer.period
+        if r := self.on_time % self.subtimer.period > 0:
+            if r >= self.subtimer.on_time:
+                n += 1.0
+            else:
+                n += r / self.subtimer.on_time
+        return n
+
+    def micro_period_index(self, time: float) -> int:
+        """ """
+        time = self._relative_time_pulse(time)
+        if time > self.on_time:
+            return -1
+        return self.subtimer.period_index(time)
+
+    def micro_pulse_index(self, time: float) -> int:
+        """ """
+        time = self._relative_time_pulse(time)
+        if time > self.on_time:
+            return -1
+        if self.subtimer.state_at(time) is TimerState.isOff:
+            return -1
+        return self.subtimer.period_index(time)
+
+    def time_till_next_train(self, time: float) -> float:
+        """
+        Computes time remaining before next pulse.
+        """
+        return self.period - self._relative_time_pulse(time)
+
+    def time_till_next_ON(self, time: float) -> float:
+        """
+        Computes time remaining before next pulse.
+        """
+        time = self._relative_time_pulse(time)
+        if time >= self.on_time:
+            return self.time_till_next_train(time)
+        return self.subtimer.time_till_next_ON(time)
+
+    def time_till_next_OFF(self, time: float) -> float:
+        """
+        Computes time remaining before beam is off. Returns 0 if beam already off.
+        """
+        time = self._relative_time_pulse(time)
+        if time >= self.on_time:
+            return 0.0
+        return self.subtimer.time_till_next_OFF(time)
+
+    def duty_cycle(self) -> float:
+        """Computes the duty cycle of the MacroTimer
+        Returns:
+            float
+        """
+        # Duty cycle of macro pulse:
+        dc = self.on_time / self.period
+        return dc * self.subtimer.duty_cycle()
+
+    def copy(self, start_time: tp.Optional[float] = None) -> MacroTimer:
+        """Make a simple copy of the Timer"""
+        stime = start_time if start_time is not None else Timer._default_start_time()
+        return MacroTimer(self.period, self.on_time, self.subtimer.copy(), stime)
 
 
 @dataclass
@@ -284,7 +438,7 @@ class ParticleBeam:
     """
 
     dose_rate: float = field(init=True)
-    timer: Timer = field(init=True)
+    timer: BaseTimer = field(init=True)
     max_dose: float = field(default=float("inf"))
     label: str = field(default="default")
     time_at_max_dose: float = field(init=False)
@@ -331,13 +485,15 @@ class ParticleBeam:
             setattr(self, key, value)
         self.__post_init__()
 
-    def _compute_time_at_max_dose(self) -> float:
+    def _compute_time_at_max_dose(self, max_dose: tp.Optional[float] = None) -> float:
         """Helper method to compute the time at which max dose rate will be reached with
         the average dose rate and Timer defined.
 
         Returns:
             float: time in seconds.
         """
+        max_dose = self.max_dose if max_dose is None else max_dose
+
         # if max_dose == inf, max_dose is never reached
         if self.max_dose >= float("inf") or self.peak_dose_rate <= 0:
             return float("inf")
@@ -778,9 +934,6 @@ class PulsedBeam(ParticleBeam):
             max_dose if max_dose is not None else float("inf"),
         )
 
-    def dose_per_train(self) -> float:
-        return self.peak_dose_rate * self.on_time
-
     # @override waiting for this baby to show up (Python3.12 fall 2023!)
     # => https://peps.python.org/pep-0698/
     def update_beam_param(self, **kwargs: float) -> None:
@@ -1033,22 +1186,26 @@ class PulsedBeam(ParticleBeam):
         raise NotImplementedError(f"Unknown Pulsed beam definition: {param}")
 
 
-class MacroPulsedBeam(PulsedBeam):
+class MacroPulsedBeam(ParticleBeam):
     """ """
 
-    macro_period: float
+    macro_timer: MacroTimer
 
     def __init__(
         self,
         dose_rate: float,
         period: float,
         on_time: float,
-        macro_period: float,
+        micro_timer: Timer,
         max_dose: tp.Optional[float] = None,
         start_time: tp.Optional[float] = None,
     ):
-        self.macro_period = macro_period
-        super().__init__(dose_rate, period, on_time, max_dose, start_time)
+        super().__init__(
+            dose_rate,
+            micro_timer,
+            max_dose if max_dose is not None else float("inf"),
+        )
+        self.macro_timer = MacroTimer(period, on_time, micro_timer, start_time)
 
     def beam_type(self) -> str:
         return "macro_pulsed"
@@ -1064,6 +1221,33 @@ class MacroPulsedBeam(PulsedBeam):
             (self.time_at_max_dose - fp * self.timer.period) / self.timer.on_time
         )
         return round(out, 2)
+
+    def dose_per_train(self) -> float:
+        return (
+            self.peak_dose_rate
+            * self.macro_timer.subtimer.on_time
+            * self.macro_timer.micro_pulses_per_train()
+        )
+
+    def _compute_time_at_max_dose(self, max_dose: tp.Optional[float] = None) -> float:
+        """Helper method to compute the time at which max dose rate will be reached with
+        the average dose rate and Timer defined.
+
+        Returns:
+            float: time in seconds.
+        """
+        max_dose = self.max_dose if max_dose is None else max_dose
+
+        # if max_dose == inf, max_dose is never reached
+        if self.max_dose >= float("inf") or self.peak_dose_rate <= 0:
+            return float("inf")
+
+        # How many full pulse trains needed?
+        n = self.max_dose // self.dose_per_train()
+
+        return n * self.macro_timer.period + super()._compute_time_at_max_dose(
+            max_dose=max_dose - n * self.dose_per_train()
+        )
 
 
 class BeamCollection(object):
