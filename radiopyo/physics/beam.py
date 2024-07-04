@@ -10,7 +10,6 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
-import json
 import logging
 import typing as tp
 from abc import ABC, abstractmethod
@@ -886,8 +885,8 @@ class ConstantBeam(ParticleBeam):
 
         return ConstantBeam(
             dose_rate=dose_rate,
-            max_dose=param.get("max_dose", None),
-            start_time=param.get("start_time", None),
+            max_dose=param.get("max_dose"),
+            start_time=param.get("start_time"),
         )
 
 
@@ -953,20 +952,20 @@ class SinglePulseBeam(ConstantBeam):
         """
         if "dose_rate" not in param:
             raise ParameterError(
-                "SinglePulseBeam must be defined with a 'dose_rate' " "parameter"
+                "SinglePulseBeam must be defined with a 'dose_rate' parameter"
             )
 
         if "max_dose" in param:
             return SinglePulseBeam(
                 dose_rate=param["dose_rate"],
                 max_dose=param["max_dose"],
-                start_time=param.get("start_time", None),
+                start_time=param.get("start_time"),
             )
         if "on_time" in param:
             return SinglePulseBeam.from_on_time(
                 dose_rate=param["dose_rate"],
                 on_time=param["on_time"],
-                start_time=param.get("start_time", None),
+                start_time=param.get("start_time"),
             )
 
         raise ParameterError(
@@ -1211,15 +1210,17 @@ class PulsedBeam(ParticleBeam):
 
         if "frequency" in param:
             param["period"] = 1 / param["frequency"]
-
-        if "peak_dose_rate" not in param:
+        
+        if "pulse_dose" in param and "dose_rate_peak" in param:
+            param["on_time"] = param["pulse_dose"] / param["dose_rate_peak"]
+        elif "pulse_dose" in param and "on_time" in param:
+            param["dose_rate_peak"] = param["pulse_dose"] / param["on_time"]
+        elif "dose_rate_peak" in param and "on_time" in param:
+            param["pulse_dose"] = param["dose_rate_peak"] * param["on_time"]
+        else:
             raise ParameterError(
-                "PulsedBeam must be defined with a 'peak_dose_rate' parameter"
-            )
-
-        if "on_time" not in param:
-            raise ParameterError(
-                "PulsedBeam must be defined with an 'on_time' parameter"
+                "PulsedBeam must be defined with at least 2 parameters out of "
+                "'dose_rate_peak', 'on_time' or 'pulse_dose' "
             )
 
         if "dose_rate_peak" in param:
@@ -1227,18 +1228,18 @@ class PulsedBeam(ParticleBeam):
                 param["dose_rate_peak"],
                 period=param["period"],
                 on_time=param["on_time"],
-                n_pulse=param.get("n_pulse", None),
-                max_dose=param.get("max_dose", None),
-                start_time=param.get("start_time", None),
+                n_pulse=param.get("n_pulse"),
+                max_dose=param.get("max_dose"),
+                start_time=param.get("start_time"),
             )
         if "pulse_dose" in param:
             return PulsedBeam.from_dose_per_pulse(
                 param["pulse_dose"],
                 period=param["period"],
                 on_time=param["on_time"],
-                n_pulse=param.get("n_pulse", None),
-                max_dose=param.get("max_dose", None),
-                start_time=param.get("start_time", None),
+                n_pulse=param.get("n_pulse"),
+                max_dose=param.get("max_dose"),
+                start_time=param.get("start_time"),
             )
         raise NotImplementedError(f"Unknown Pulsed beam definition: {param}")
 
@@ -1356,7 +1357,7 @@ class MacroPulsedBeam(PulsedBeam):
     def as_dict(self) -> tp.Dict[str, float]:
         """ """
         return {
-            "dose_rate": self.dose_rate,
+            "peak_dose_rate": self.peak_dose_rate,
             "period": self.macro_timer.period,
             "on_time": self.macro_timer.on_time,
             "micro_period": self.timer.period,
@@ -1405,8 +1406,6 @@ class MacroPulsedBeam(PulsedBeam):
                 ]
             )[:-1, :]
             cur_time = start + self.macro_timer.time_till_next_train(start)
-            # out[-1, 0] = start + self.macro_timer.time_left_in_train(start)
-            # out[-1, 1] = self.peak_dose_rate
             trains_left -= 1.0
 
         while trains_left >= 1.0:
@@ -1442,6 +1441,54 @@ class MacroPulsedBeam(PulsedBeam):
         else:
             out[-1, 1] = 0
         return out
+
+    @classmethod
+    def from_dict(cls, param: tp.Dict[str, float]) -> MacroPulsedBeam:
+        """ """
+        # Check data for macro timer
+        if "period" not in param and "frequency" not in param:
+            raise ParameterError(
+                "MacroPulsedBeam must be defined with a 'period' or 'frequency' parameter"
+            )
+
+        if "frequency" in param:
+            param["period"] = 1 / param["frequency"]
+
+        if "on_time" not in param:
+            raise ParameterError(
+                "MacroPulsedBeam must be defined with an 'on_time' parameter"
+            )
+        ##
+        # Check data for micro timer
+        if "micro_period" not in param and "micro_frequency" not in param:
+            raise ParameterError(
+                "MacroPulsedBeam must be defined with an 'micro_period' or 'micro_frequency'"
+                " parameter"
+            )
+        if "micro_frequency" in param:
+            param["micro_period"] = 1 / param["micro_frequency"]
+
+        if "micro_on_time" not in param:
+            raise ParameterError(
+                "MacroPulsedBeam must be defined with an 'micro_on_time' parameter"
+            )
+        ##
+
+        if "dose_rate_peak" not in param:
+            raise ParameterError(
+                "MacroPulsedBeam must be defined with a 'dose_rate_peak' parameter"
+            )
+
+        return MacroPulsedBeam(
+            param["dose_rate_peak"],
+            period=param["period"],
+            on_time=param["on_time"],
+            micro_period=param["micro_period"],
+            micro_on_time=param["micro_on_time"],
+            max_dose=param.get("max_dose"),
+            start_time=param.get("start_time"),
+            micro_start_time=param.get("micro_start_time"),
+        )
 
 
 class BeamCollection(object):
@@ -1612,6 +1659,8 @@ class BeamCollection(object):
             beam = PulsedBeam.from_dict(config)
         elif beam_type.lower() == "singlepulse":
             beam = SinglePulseBeam.from_dict(config)
+        elif beam_type.lower() == "macro_pulsed":
+            beam = MacroPulsedBeam.from_dict(config)
         else:
             raise NotImplementedError(f"Unknown beam type: {beam_type}")
         return label, beam, LET
@@ -1745,39 +1794,39 @@ class BeamCollection(object):
         return out
 
 
-def beam_from_dict(
-    param: tp.Dict[str, tp.Dict[str, float]],
-) -> tp.Tuple[ParticleBeam, tp.Optional[float]]:
-    """
-    Construct beam from a dictionary.
+# def beam_from_dict(
+#     param: tp.Dict[str, tp.Dict[str, float]],
+# ) -> tp.Tuple[ParticleBeam, tp.Optional[float]]:
+#     """
+#     Construct beam from a dictionary.
 
-    Parameters:
-        param: Dict[str, Dict[str, float]]
-            Parameters defining the beam to construct. The first key define the beam
-            type.
+#     Parameters:
+#         param: Dict[str, Dict[str, float]]
+#             Parameters defining the beam to construct. The first key define the beam
+#             type.
 
-    Returns:
-        ParticleBeam:
-            Beam class.
-        float:
-            LET.
+#     Returns:
+#         ParticleBeam:
+#             Beam class.
+#         float:
+#             LET.
 
-    """
-    if len(param) > 1:
-        raise ParameterError(f"Found more than one beam definition ({param})")
-    beam_type, config = param.popitem()
+#     """
+#     if len(param) > 1:
+#         raise ParameterError(f"Found more than one beam definition ({param})")
+#     beam_type, config = param.popitem()
 
-    LET: tp.Optional[float] = None
-    with suppress(KeyError):
-        LET = config.pop("LET")
+#     LET: tp.Optional[float] = None
+#     with suppress(KeyError):
+#         LET = config.pop("LET")
 
-    if beam_type.lower() == "constant":
-        return ConstantBeam.from_dict(config), LET
+#     if beam_type.lower() == "constant":
+#         return ConstantBeam.from_dict(config), LET
 
-    if beam_type.lower() == "pulsed":
-        return PulsedBeam.from_dict(config), LET
+#     if beam_type.lower() == "pulsed":
+#         return PulsedBeam.from_dict(config), LET
 
-    if beam_type.lower() == "singlepulse":
-        return SinglePulseBeam.from_dict(config), LET
+#     if beam_type.lower() == "singlepulse":
+#         return SinglePulseBeam.from_dict(config), LET
 
-    raise NotImplementedError(f"Unknown beam type: {beam_type}")
+#     raise NotImplementedError(f"Unknown beam type: {beam_type}")
