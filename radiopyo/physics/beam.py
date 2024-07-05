@@ -91,6 +91,9 @@ class BaseTimer(ABC):
             start_time if start_time is not None else self._default_start_time()
         )
 
+    def __str__(self) -> str:
+        return f"BaseTimer({self.period}, {self.on_time}, {self.start_time})"
+
     @staticmethod
     def _default_start_time() -> float:
         return 0.0
@@ -470,25 +473,21 @@ class ParticleBeam:
             Timer state.
         time_at_max_dose: float
             Time at which the maximal dose will be reached.
-        dose_per_pulse: float
-            Dose delivered during the on_time of the Timer.
-        peak_dose_rate: float
+        dose_rate_peak: float
             Dose rate during on_time of the Timer.
     """
 
-    peak_dose_rate: float = field(init=True)
+    dose_rate_peak: float = field(init=True)
     timer: BaseTimer = field(init=True)
     max_dose: float = field(default=float("inf"))
     label: str = field(default="default")
     time_at_max_dose: float = field(init=False)
-    dose_per_pulse: float = field(init=False)
     dose_rate: float = field(init=False)
     GROWTH_FACTOR: float = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Method called after ParticleBeam__init__() to finalize initialization"""
         self.GROWTH_TIME = 1e-6
-        self.dose_per_pulse = self.peak_dose_rate * self.timer.on_time
         self.time_at_max_dose = self._compute_time_at_max_dose()
         self.dose_rate = self._compute_average_dose_rate()
 
@@ -519,7 +518,7 @@ class ParticleBeam:
                 if kwargs contains unknown key values.
         """
         for key, value in kwargs.items():
-            if key not in ["dose_rate", "max_dose", "label"]:
+            if key not in ["dose_rate_peak", "max_dose", "label"]:
                 raise AttributeError(f"ParticleBeam has not attribute: {key}")
             setattr(self, key, value)
         self.__post_init__()
@@ -534,7 +533,7 @@ class ParticleBeam:
         max_dose = self.max_dose if max_dose is None else max_dose
 
         # if max_dose == inf, max_dose is never reached
-        if max_dose >= float("inf") or self.peak_dose_rate <= 0:
+        if max_dose >= float("inf") or self.dose_rate_peak <= 0:
             return float("inf")
         if max_dose == 0:
             return 0.0
@@ -542,17 +541,17 @@ class ParticleBeam:
         # Continuous beam and mono_pulse beam will end up here.
         # In this case, (average) dose rate and peak dose rate are the same.
         if self.timer.period >= float("inf"):
-            return self.timer.start_time + (max_dose / self.peak_dose_rate)
+            return self.timer.start_time + (max_dose / self.dose_rate_peak)
 
         # From here, radiation source is pulsed with period < inf
         # How many pulses to reach max_dose?
         #   ==> (max dose) / (dose per pulse)
 
         # How many full pulses needed?
-        n = max_dose // self.dose_per_pulse
+        n = max_dose // self.dose_per_pulse()
 
         # Fraction of the last pulse needed to reached max_dose
-        last_frac = round((max_dose % self.dose_per_pulse) / self.dose_per_pulse, 6)
+        last_frac = round((max_dose % self.dose_per_pulse()) / self.dose_per_pulse(), 6)
 
         # if n == 0, max dose reached in less than a single pulse:
         if n <= 0.0:
@@ -575,14 +574,14 @@ class ParticleBeam:
     def _compute_average_dose_rate(self) -> float:
         """ """
         if isinf(self.timer.period):
-            return self.peak_dose_rate
-        return self.peak_dose_rate * (
+            return self.dose_rate_peak
+        return self.dose_rate_peak * (
             self.tot_pulses()
             * self.timer.on_time
             / (self.time_at_max_dose - self.timer.start_time)
         )
 
-    def _compute_peak_dose_rate(self) -> float:
+    def _compute_dose_rate_peak(self) -> float:
         """Compute the dose rate during ON_time
 
         Returns:
@@ -594,6 +593,10 @@ class ParticleBeam:
         return (
             self.dose_rate * time_ON / (self.time_at_max_dose - self.timer.start_time)
         )
+
+    def dose_per_pulse(self) -> float:
+        """ """
+        return self.dose_rate_peak * self.timer.on_time
 
     def average_dose_rate(self) -> float:
         """Method to make it clear we are dealing with average dose rate.
@@ -618,7 +621,7 @@ class ParticleBeam:
                 case TimerState.isOff:
                     dr = 0.0
                 case TimerState.isOn:
-                    dr = self.peak_dose_rate
+                    dr = self.dose_rate_peak
         return TimeMessage(
             time=time,
             current_dose_rate=dr,
@@ -677,7 +680,7 @@ class ParticleBeam:
                 and ((time - self.timer.start_time) % self.timer.period)
                 <= self.timer.on_time
             ):
-                return self.peak_dose_rate
+                return self.dose_rate_peak
             return 0.0
 
         return beam_func
@@ -781,7 +784,7 @@ class ParticleBeam:
         out[indexes] = out[indexes] + GT
 
         # Set all Dose rate values (-> col 1) > 0 to 1
-        out[:, 1] /= self.peak_dose_rate
+        out[:, 1] /= self.dose_rate_peak
         return out
 
     def as_dict(self) -> tp.Dict:
@@ -839,24 +842,24 @@ class ConstantBeam(ParticleBeam):
 
         # Always ON cases:
         if start >= self.timer.start_time and stop < self.time_at_max_dose:
-            dr = self.peak_dose_rate
+            dr = self.dose_rate_peak
             return np.array([[start, dr], [stop, dr]])
 
         # 2 possibilities for start:
         if start >= self.timer.start_time:
-            out = np.vstack([out, [start, self.peak_dose_rate]])
+            out = np.vstack([out, [start, self.dose_rate_peak]])
         else:
             out = np.vstack(
                 [
                     out,
                     [start, 0.0],
-                    [self.timer.start_time, self.peak_dose_rate],
+                    [self.timer.start_time, self.dose_rate_peak],
                 ]
             )
 
         # 2 possibilities for stop:
         if stop < self.time_at_max_dose:
-            return np.vstack([out, [stop, self.peak_dose_rate]])
+            return np.vstack([out, [stop, self.dose_rate_peak]])
 
         return np.vstack(
             [
@@ -977,7 +980,7 @@ class SinglePulseBeam(ConstantBeam):
 class PulsedBeam(ParticleBeam):
     """Class representing a Pulsed Radiation Source. Helper functions are also
     available to easily create specific Pulsed Radiation Sources:
-        - from_peak_dose_rate
+        - from_dose_rate_peak
         - from_dose_per_pulse
 
     Attributes:
@@ -995,14 +998,14 @@ class PulsedBeam(ParticleBeam):
 
     def __init__(
         self,
-        peak_dose_rate: float,
+        dose_rate_peak: float,
         period: float,
         on_time: float,
         max_dose: tp.Optional[float] = None,
         start_time: tp.Optional[float] = None,
     ):
         super().__init__(
-            peak_dose_rate,
+            dose_rate_peak,
             Timer.new_pulsed(period, on_time, start_time),
             max_dose if max_dose is not None else float("inf"),
         )
@@ -1010,33 +1013,25 @@ class PulsedBeam(ParticleBeam):
     # @override waiting for this baby to show up (Python3.12 fall 2023!)
     # => https://peps.python.org/pep-0698/
     def update_beam_param(self, **kwargs: float) -> None:
-        if "peak_dose_rate" in kwargs:
-            self = PulsedBeam.from_peak_dose_rate(
-                peak_dr=kwargs["peak_dose_rate"],
-                period=kwargs.pop("period", self.timer.period),
-                on_time=kwargs.pop("on_time", self.timer.on_time),
-                n_pulse=kwargs.pop("n_pulse", self.tot_pulses()),
-                max_dose=kwargs.pop("max_dose", self.max_dose),
-                start_time=kwargs.pop("start_time", self.timer.start_time),
-            )
-            return
-
-        if "dose_per_pulse" in kwargs:
-            self = PulsedBeam.from_dose_per_pulse(
-                pulse_dose=kwargs["dose_per_pulse"],
-                period=kwargs.pop("period", self.timer.period),
-                on_time=kwargs.pop("on_time", self.timer.on_time),
-                n_pulse=kwargs.pop("n_pulse", self.tot_pulses()),
-                max_dose=kwargs.pop("max_dose", self.max_dose),
-                start_time=kwargs.pop("start_time", self.timer.start_time),
-            )
-            return
-
-        if "start_time" in kwargs or "on_time" in kwargs or "period" in kwargs:
+        if (
+            "start_time" in kwargs
+            or "on_time" in kwargs
+            or "period" in kwargs
+            or "frequency" in kwargs
+        ):
             start_time = kwargs.pop("start_time", self.timer.start_time)
             on_time = kwargs.pop("on_time", self.timer.on_time)
-            period = kwargs.pop("period", self.timer.period)
+            if (freq := kwargs.pop("frequency")) is not None:
+                period = 1.0 / freq
+            else:
+                period = kwargs.pop("period", self.timer.period)
             self.timer = Timer.new_pulsed(period, on_time, start_time)
+
+        if "dose_per_pulse" in kwargs or "n_pulse" in kwargs:
+            dpp = kwargs.pop("dose_per_pulse", self.dose_per_pulse())
+            n_pulse = kwargs.pop("n_pulse", self.tot_pulses())
+            kwargs["max_dose"] = n_pulse * dpp
+            kwargs["dose_rate_peak"] = dpp / self.timer.on_time
 
         super().update_beam_param(**kwargs)
 
@@ -1060,7 +1055,7 @@ class PulsedBeam(ParticleBeam):
                         start,
                         0.0,
                     ],
-                    [self.timer.start_time, self.peak_dose_rate],
+                    [self.timer.start_time, self.dose_rate_peak],
                 ]
             )
         else:
@@ -1068,11 +1063,11 @@ class PulsedBeam(ParticleBeam):
                 out = np.vstack(
                     [
                         out,
-                        [start, self.peak_dose_rate],
+                        [start, self.dose_rate_peak],
                         [start + self.timer.time_till_next_OFF(start), 0.0],
                         [
                             start + self.timer.time_till_next_period(start),
-                            self.peak_dose_rate,
+                            self.dose_rate_peak,
                         ],
                     ]
                 )
@@ -1083,7 +1078,7 @@ class PulsedBeam(ParticleBeam):
                         [start, 0.0],
                         [
                             start + self.timer.time_till_next_period(start),
-                            self.peak_dose_rate,
+                            self.dose_rate_peak,
                         ],
                     ]
                 )
@@ -1094,7 +1089,7 @@ class PulsedBeam(ParticleBeam):
                 [
                     out,
                     [out[-1, 0] + self.timer.on_time, 0.0],
-                    [out[-1, 0] + self.timer.period, self.peak_dose_rate],
+                    [out[-1, 0] + self.timer.period, self.dose_rate_peak],
                 ]
             )
 
@@ -1120,7 +1115,7 @@ class PulsedBeam(ParticleBeam):
         }
 
     @classmethod
-    def from_peak_dose_rate(
+    def from_dose_rate_peak(
         cls,
         peak_dr: float,
         period: float,
@@ -1149,6 +1144,7 @@ class PulsedBeam(ParticleBeam):
         n_pulse = n_pulse if n_pulse is not None else float("inf")
         max_dose_n_pulse = on_time * n_pulse * peak_dr
         max_dose = max_dose if max_dose is not None else float("inf")
+
         if (
             not isinf(max_dose)
             and not isinf(max_dose_n_pulse)
@@ -1156,9 +1152,10 @@ class PulsedBeam(ParticleBeam):
         ):
             raise ValueError(
                 "Inconsistent max dose provided by both max dose and number of pulses"
+                f" (max dose: {max_dose} || DPP: {max_dose_n_pulse})"
             )
         return cls(
-            peak_dose_rate=peak_dr,
+            dose_rate_peak=peak_dr,
             period=period,
             on_time=on_time,
             max_dose=min(max_dose, max_dose_n_pulse),
@@ -1191,7 +1188,7 @@ class PulsedBeam(ParticleBeam):
         Returns:
             PulsedBeam
         """
-        return PulsedBeam.from_peak_dose_rate(
+        return PulsedBeam.from_dose_rate_peak(
             peak_dr=pulse_dose / on_time,
             period=period,
             on_time=on_time,
@@ -1210,7 +1207,7 @@ class PulsedBeam(ParticleBeam):
 
         if "frequency" in param:
             param["period"] = 1 / param["frequency"]
-        
+
         if "pulse_dose" in param and "dose_rate_peak" in param:
             param["on_time"] = param["pulse_dose"] / param["dose_rate_peak"]
         elif "pulse_dose" in param and "on_time" in param:
@@ -1224,7 +1221,7 @@ class PulsedBeam(ParticleBeam):
             )
 
         if "dose_rate_peak" in param:
-            return PulsedBeam.from_peak_dose_rate(
+            return PulsedBeam.from_dose_rate_peak(
                 param["dose_rate_peak"],
                 period=param["period"],
                 on_time=param["on_time"],
@@ -1251,7 +1248,7 @@ class MacroPulsedBeam(PulsedBeam):
 
     def __init__(
         self,
-        peak_dose_rate: float,
+        dose_rate_peak: float,
         period: float,
         on_time: float,
         micro_period: float,
@@ -1265,7 +1262,7 @@ class MacroPulsedBeam(PulsedBeam):
         )
 
         super().__init__(
-            peak_dose_rate,
+            dose_rate_peak,
             micro_period,
             micro_on_time,
             max_dose if max_dose is not None else float("inf"),
@@ -1285,10 +1282,10 @@ class MacroPulsedBeam(PulsedBeam):
             float
                 Number of pulses (.2 digits precision)
         """
-        return round(self.max_dose / self.dose_per_pulse, 2)
+        return round(self.max_dose / self.dose_per_pulse(), 2)
 
     def dose_per_train(self) -> float:
-        return self.dose_per_pulse * self.macro_timer.micro_pulses_per_train()
+        return self.dose_per_pulse() * self.macro_timer.micro_pulses_per_train()
 
     def _compute_time_at_max_dose(self, max_dose: tp.Optional[float] = None) -> float:
         """Helper method to compute the time at which max dose rate will be reached with
@@ -1303,7 +1300,7 @@ class MacroPulsedBeam(PulsedBeam):
             return 0
 
         # if max_dose == inf, max_dose is never reached
-        if max_dose >= float("inf") or self.peak_dose_rate <= 0:
+        if max_dose >= float("inf") or self.dose_rate_peak <= 0:
             return float("inf")
 
         # How many full pulse trains needed?
@@ -1324,13 +1321,13 @@ class MacroPulsedBeam(PulsedBeam):
             )
         )
 
-    def _compute_peak_dose_rate(self) -> float:
+    def _compute_dose_rate_peak(self) -> float:
         """Compute the dose rate during ON_time
 
         Returns:
             float: peek dose rate in Gy/s
         """
-        return self.peak_dose_rate
+        return self.dose_rate_peak
 
     def at(self, time: float) -> TimeMessage:
         """
@@ -1348,7 +1345,7 @@ class MacroPulsedBeam(PulsedBeam):
                 case TimerState.isOff:
                     dr = 0.0
                 case TimerState.isOn:
-                    dr = self.peak_dose_rate
+                    dr = self.dose_rate_peak
         return TimeMessage(
             time=time,
             current_dose_rate=dr,
@@ -1357,7 +1354,7 @@ class MacroPulsedBeam(PulsedBeam):
     def as_dict(self) -> tp.Dict[str, float]:
         """ """
         return {
-            "peak_dose_rate": self.peak_dose_rate,
+            "dose_rate_peak": self.dose_rate_peak,
             "period": self.macro_timer.period,
             "on_time": self.macro_timer.on_time,
             "micro_period": self.timer.period,
@@ -1390,7 +1387,7 @@ class MacroPulsedBeam(PulsedBeam):
                     ],
                     [
                         self.macro_timer.start_time + self.timer.start_time,
-                        self.peak_dose_rate,
+                        self.dose_rate_peak,
                     ],
                 ]
             )
