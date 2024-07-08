@@ -1107,7 +1107,7 @@ class PulsedBeam(ParticleBeam):
     def as_dict(self) -> tp.Dict[str, float]:
         """ """
         return {
-            "dose_rate": self.dose_rate,
+            "dose_rate_peak": self.dose_rate_peak,
             "period": self.timer.period,
             "on_time": self.timer.on_time,
             "max_dose": self.max_dose,
