@@ -241,9 +241,13 @@ class ODEResult(object):
 
     # --------------------------------- Utils methods -------------------------------- #
     def to_pandas(self, clip: bool = True) -> pd.DataFrame:
-        """ """
+        """ 
+        Provides simulation results in a nice pandas DataFrame.
+        Units are µM.
+        """
         labels = [elt.label for elt in self.env.species.sorted_iter_dyn_species()]
-        labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
+        labels_cst = [
+            elt.label for elt in self.env.species.sorted_iter_cst_species()]
 
         df_sp = pd.DataFrame(
             index=self.t,
@@ -300,7 +304,8 @@ class ODEResult(object):
         """
         # Compute column names and Pre compute slices to ease access in the dataframe
         # columns
-        cols_kr = [kr.as_label() for kr in self.env.reactions.iter_all_kreactions()]
+        cols_kr = [kr.as_label()
+                   for kr in self.env.reactions.iter_all_kreactions()]
         idx_kr = slice(0, len(cols_kr))
 
         cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
@@ -437,10 +442,12 @@ class ODEResult(object):
             else Temperature()
         )
         beam_type, beam_config = next(iter(config["beam"].items()))
-        label, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
+        label, beam, LET = BeamCollection.build_beam_from_dict(
+            beam_type, beam_config)
         mat = env.build_all_matrices()
         out = cls(env, beam, mat, LET, temperature=T)
-        out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
+        out.date = datetime.datetime.fromtimestamp(
+            config["parameters"]["timestamp"])
 
         logger.setLevel(_prev_log_level)
         return out
