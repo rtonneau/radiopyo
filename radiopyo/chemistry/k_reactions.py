@@ -26,6 +26,7 @@ from .utils.units import Temperature
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
+    from radiopyo.chemistry.species import ChemSpecies
     from radiopyo.parser.reaction_parser import GenericReaction
 
 # ------------------------------------------------------------------------------------ #
@@ -647,6 +648,10 @@ class BiReaction(KReactionCollection, ABC):
     _OPE_STRING: str = "<->"
     _k_backward: tp.Optional[np.polynomial.Polynomial]
     _k_forward: tp.Optional[np.polynomial.Polynomial]
+
+    def __contains__(self, species: object) -> bool:
+        """ """
+        return species in self.forward or species in self.backward
 
     @property
     def forward(self) -> KReaction:

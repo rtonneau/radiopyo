@@ -31,6 +31,7 @@ if tp.TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
+    from radiopyo.chemistry.species import ChemSpecies
     from radiopyo.physics.beam import ParticleBeam
     from radiopyo.simulation.utils import H5Manager
     from radiopyo.utils.sim_types import SimMatrices
@@ -241,13 +242,12 @@ class ODEResult(object):
 
     # --------------------------------- Utils methods -------------------------------- #
     def to_pandas(self, clip: bool = True) -> pd.DataFrame:
-        """ 
+        """
         Provides simulation results in a nice pandas DataFrame.
         Units are µM.
         """
         labels = [elt.label for elt in self.env.species.sorted_iter_dyn_species()]
-        labels_cst = [
-            elt.label for elt in self.env.species.sorted_iter_cst_species()]
+        labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
 
         df_sp = pd.DataFrame(
             index=self.t,
@@ -304,8 +304,7 @@ class ODEResult(object):
         """
         # Compute column names and Pre compute slices to ease access in the dataframe
         # columns
-        cols_kr = [kr.as_label()
-                   for kr in self.env.reactions.iter_all_kreactions()]
+        cols_kr = [kr.as_label() for kr in self.env.reactions.iter_all_kreactions()]
         idx_kr = slice(0, len(cols_kr))
 
         cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
@@ -345,9 +344,13 @@ class ODEResult(object):
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
             )
             Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
+
+            # Sometimes, some species are < 0.0 for a very short while. It has no
+            # physical meaning. But it is necessary to give the ODE solver such
+            # possibility to ensure good quality results.
+            # The next line is then added only here (not in ODE solver) to give a more
+            # suitable meaning.
             Rki[np.where(Rki < 0)] = 0.0
-            # Compute dydt, first only with k reactions term:
-            # dydt = np.matmul(self.mat["Ki_mat"][1], Rki.T)
 
             out.iloc[idx, idx_kr] = Rki
 
@@ -371,6 +374,20 @@ class ODEResult(object):
         self.dydt = out.values.T
         return out
 
+    def _eq_reactions_yield(
+        self,
+        species: str | ChemSpecies,
+    ) -> pd.DataFrame:
+        """ """
+        data: tp.Dict[str, pd.Series] = {}
+        dfr = self.reconstruct_reactions()
+        for bireaction in self.env.eq_reactions_involving(species):
+            fwd, bwd = bireaction.forward, bireaction.backward
+            if bireaction.backward.has_product(species):
+                fwd, bwd = bwd, fwd
+            data[fwd.as_label()] = dfr[fwd.as_label()] - dfr[bwd.as_label()]
+        return pd.DataFrame(data).set_index(dfr.index)
+
     def species_balance_evolution(self) -> pd.DataFrame:
         """ """
         rr = self.reconstruct_reactions()  # if stored then no "heavy calculation"
@@ -382,10 +399,10 @@ class ODEResult(object):
         out.iloc[:, :] = 0
 
         for species in self.env.species.iter_dyn_species():
-            for reaction in self.env.reactions_involving_product(species):
+            for reaction, k_val in self.env.reactions_involving_product(species):
                 stoi = reaction.stoi_products[species.label]
                 out.loc[:, species.label] += rr[reaction.as_label()] * stoi
-            for reaction in self.env.reactions_involving_reactant(species):
+            for reaction, k_val in self.env.reactions_involving_reactant(species):
                 stoi = reaction.stoi_reactants[species.label]
                 out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
         return out
@@ -447,12 +464,10 @@ class ODEResult(object):
             else Temperature()
         )
         beam_type, beam_config = next(iter(config["beam"].items()))
-        label, beam, LET = BeamCollection.build_beam_from_dict(
-            beam_type, beam_config)
+        label, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
         mat = env.build_all_matrices()
         out = cls(env, beam, mat, LET, temperature=T)
-        out.date = datetime.datetime.fromtimestamp(
-            config["parameters"]["timestamp"])
+        out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
 
         logger.setLevel(_prev_log_level)
         return out
