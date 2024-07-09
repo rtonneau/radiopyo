@@ -140,6 +140,7 @@ def derive(
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
     Rki = np.prod(Rki, axis=1) * Ki_mat[0]  # All reaction rates are here
+    # Rki[np.where(Rki < 0)] = 0.0
 
     # Compute dydt, first only with k reactions term:
     dydt = np.matmul(Ki_mat[1], Rki.T)

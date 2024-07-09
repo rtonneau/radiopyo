@@ -339,11 +339,16 @@ class ODEResult(object):
             y = y * 1.0e-6  # µmol/L => mol/l
 
             y = np.append(y, self.mat["cst_sp"])
+
             # K Reactions
             Rki = np.nan_to_num(
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
             )
             Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
+            Rki[np.where(Rki < 0)] = 0.0
+            # Compute dydt, first only with k reactions term:
+            # dydt = np.matmul(self.mat["Ki_mat"][1], Rki.T)
+
             out.iloc[idx, idx_kr] = Rki
 
             # Radiolytic Reactions

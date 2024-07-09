@@ -65,7 +65,8 @@ class EReaction(BiReaction):
         # Check whether enough information is provided to compute all K's.
         if constant is None:
             try:
-                self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
+                self._k_forward = polynomial_factory(
+                    reaction["constants"]["k_forward"])
                 self._k_backward = polynomial_factory(
                     reaction["constants"]["k_backward"]
                 )
@@ -83,14 +84,16 @@ class EReaction(BiReaction):
             "k_backward" in reaction["constants"]
             and reaction["constants"]["k_backward"] is not None
         ):
-            self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
+            self._k_backward = polynomial_factory(
+                reaction["constants"]["k_backward"])
             self._k_equilibrium = polynomial_factory(constant)
             self._k_forward = self._k_equilibrium + self._k_backward
         elif (
             "k_forward" in reaction["constants"]
             and reaction["constants"]["k_forward"] is not None
         ):
-            self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
+            self._k_forward = polynomial_factory(
+                reaction["constants"]["k_forward"])
             self._k_equilibrium = polynomial_factory(constant)
             self._k_backward = self._k_forward - self._k_equilibrium
         else:
@@ -120,7 +123,8 @@ class EReaction(BiReaction):
             list_sp = ListSpecies()
 
         try:
-            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
+            gen = RPARSER.parse_reaction(
+                kwargs["reaction"])  # type:ignore[arg-type]
         except KeyError as err:
             raise AttributeError(
                 "Need a reaction string to create an Equilibrium Reaction"
@@ -155,6 +159,8 @@ class EReaction(BiReaction):
         Args:
             T: temperature in °C.
         """
+        if self.forward.has_reactant("H2O"):
+            return self.forward.k_value(T)  # / 55.5
         return self.forward.k_value(T)
 
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
@@ -162,4 +168,6 @@ class EReaction(BiReaction):
         Args:
             T: temperature in °C.
         """
+        if self.backward.has_reactant("H2O"):
+            return self.backward.k_value(T)  # / 55.5
         return self.backward.k_value(T)

@@ -98,8 +98,10 @@ class AcidBase(BiReaction):
         if reaction["constants"].get("k_forward", None) is None:
             raise ValueError("For A/B reaction, k_forward must be defined")
 
-        self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
-        self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
+        self._k_backward = polynomial_factory(
+            reaction["constants"]["k_backward"])
+        self._k_forward = polynomial_factory(
+            reaction["constants"]["k_forward"])
 
         # Need to add forward and backward reactions via the superclass
         self.add_forward_reaction(reaction, list_sp=list_sp)
@@ -133,7 +135,8 @@ class AcidBase(BiReaction):
             list_sp = ListSpecies()
 
         try:
-            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
+            gen = RPARSER.parse_reaction(
+                kwargs["reaction"])  # type:ignore[arg-type]
             pKa = kwargs["pKa"]
         except KeyError as err:
             raise AttributeError(
@@ -178,6 +181,8 @@ class AcidBase(BiReaction):
             T: Temperature in °C (optional, default:25)
         """
         _T = Temperature(T) if T is not None else Temperature()
+        if self.forward.has_reactant("H2O"):
+            return 10 ** self._k_forward(1.0 / _T.kelvin)  # / 55.5
         return 10 ** self._k_forward(1.0 / _T.kelvin)
 
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
@@ -186,6 +191,8 @@ class AcidBase(BiReaction):
             T: Temperature in °C (optional, default:25)
         """
         _T = Temperature(T) if T is not None else Temperature()
+        if self.backward.has_reactant("H2O"):
+            return 10 ** self._k_backward(1.0 / _T.kelvin)  # / 55.5
         return 10 ** self._k_backward(1.0 / _T.kelvin)
 
     def is_acid(self) -> bool:
