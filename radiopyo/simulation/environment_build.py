@@ -115,9 +115,9 @@ class ReactionsList:
         )
 
     def iter_all_kreactions(self) -> tp.Iterator[KReaction]:
-        for reaction in self.k_reaction:
-            yield reaction
         for reaction, _ in self.iter_eq_reactions_as_kreactions():
+            yield reaction
+        for reaction in self.k_reaction:
             yield reaction
 
     def iter_kreactions(self) -> tp.Iterator[KReaction]:
