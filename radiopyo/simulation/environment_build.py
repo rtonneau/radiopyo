@@ -5,8 +5,9 @@ Physico-Chemico-Biological model. The start point should be some file parser. Cu
 only RON files are supported.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -100,6 +101,13 @@ class ReactionsList:
         self.eq_reaction = sorted(self.eq_reaction, key=lambda x: x.forward.get_index())
         self.enzymatic = sorted(self.enzymatic, key=lambda x: x.get_index())
         self.radiolytic = sorted(self.radiolytic, key=lambda x: x.get_index())
+
+    def get_kreaction(self, label: str) -> KReaction:
+        """ """
+        for _r in self.iter_all_kreactions():
+            if _r.as_label() == label:
+                return _r
+        raise KeyError(f"Reaction with label: {label} not found.")
 
     def total_kreactions(self) -> int:
         return (
@@ -607,7 +615,6 @@ class SimEnv:
         self,
         species: str | ChemSpecies | tp.List[str | ChemSpecies],
     ) -> tp.List[KReaction]:
-
         out: tp.List[KReaction] = []
         if isinstance(species, (str | ChemSpecies)):
             species = [species]
@@ -627,7 +634,6 @@ class SimEnv:
         self,
         species: str | ChemSpecies | tp.List[str | ChemSpecies],
     ) -> tp.List[BiReaction]:
-
         out: tp.List[BiReaction] = []
         if isinstance(species, (str | ChemSpecies)):
             species = [species]
