@@ -2,8 +2,9 @@
 """
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -28,7 +29,6 @@ from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 if tp.TYPE_CHECKING:
-
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.species import ChemSpecies
@@ -378,7 +378,24 @@ class ODEResult(object):
         self,
         species: str | ChemSpecies,
     ) -> pd.DataFrame:
-        """ """
+        """
+        Return a DataFrame containing the diff of the two reactions of a species
+        involved in an equilibrium. The point of view is always the production of the
+        species. For example:
+            A + B <-> C + D
+            forward reaction is  => A + B -> C + D
+            backward reaction is => C + D -> A + B
+
+        -> _eq_reactions_yield('A') will compute:
+            'Rate of backward' - 'Rate of forward'
+
+        -> _eq_reactions_yield('C') will compute:
+            'Rate of forward' - 'Rate of backward'
+
+        Therefore, the column names of the DataFrame will always be the label of the
+        reaction producing the species.
+        /!\ Negative values are allowed. The meaning is a net consumption.
+        """
         data: tp.Dict[str, pd.Series] = {}
         dfr = self.reconstruct_reactions()
         for bireaction in self.env.eq_reactions_involving(species):
