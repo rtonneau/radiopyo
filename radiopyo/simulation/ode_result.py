@@ -244,7 +244,7 @@ class ODEResult(object):
     def to_pandas(self, clip: bool = True) -> pd.DataFrame:
         """
         Provides simulation results in a nice pandas DataFrame.
-        Units are µM.
+        Units are µM :)
         """
         labels = [elt.label for elt in self.env.species.sorted_iter_dyn_species()]
         labels_cst = [elt.label for elt in self.env.species.sorted_iter_cst_species()]
