@@ -314,6 +314,9 @@ class UnitCell(object):
             t_span = (t_span[0] + 1e-7, t_span[1])
             for r in self.env.reactions.radiolytic:
                 sp = r.species()
+                # If the species must be forced constant, skip it.
+                if self.env.species.is_cst_species(sp):
+                    continue
                 kwargs["y0"][sp.index] += (
                     r.kr() * self.beam.at(t_span[0]).dose_rate() * 1e-7 * 1e6
                 )
