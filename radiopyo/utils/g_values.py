@@ -4,8 +4,9 @@ The g_values submodule contains class(es) interpolating G-values from:
     * GValuesBoscolo -> D. Boscolo - 2020 [https://doi.org/10.3390/ijms21020424]
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 import typing as tp
 from pathlib import Path
@@ -108,6 +109,26 @@ class GValuesBoscolo:
             Iterable[str]: iterable over all species available.
         """
         return iter([str(elt) for elt in self.df.columns])
+
+    @staticmethod
+    def _average_val_before_100ns(sp: str) -> float:
+        """
+        These values are time integral average from Boscolo between 1e-12 & 1e-7 sec.
+        """
+        data = {
+            "OH_r": 3.0,
+            "H3O_plus": 3.4,
+            "H_r": 0.63,
+            "e_aq": 2.9,
+            "H2": 0.31,
+            "H2O2": 0.59,
+        }
+        data["H3O_plus"] = data[
+            "e_aq"
+        ]  # to ensure charge balance while don't forget the diff.
+        if sp not in data:
+            raise KeyError(f"Unknown initial G_values for species: {sp}")
+        return data[sp]
 
 
 class RawReader:

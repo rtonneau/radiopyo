@@ -5,8 +5,9 @@ The sim_hand submodule contains class(es) to easily handle simulation. This one 
 be the entry point for lambda user.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from contextlib import suppress
 import numpy as np
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
+from radiopyo.chemistry.radiolytic import ge_to_kr
 from radiopyo.chemistry.utils.units import Temperature
 
 # --------------------------------- Internal imports --------------------------------- #
@@ -288,10 +290,8 @@ class UnitCell(object):
         kwargs: tp.Dict[str, tp.Any] = {}
         kwargs["first_step"] = self.FIRST_STEP
         kwargs["jac"] = jacobian if use_jac else None
-        if rtol is not None:
-            kwargs["rtol"] = rtol
-        if atol is not None:
-            kwargs["atol"] = atol
+        kwargs["rtol"] = rtol if rtol is not None else 1e-10
+        kwargs["atol"] = atol if atol is not None else 1e-12
 
         kwargs["y0"] = y0
         if y0 is None:
@@ -317,6 +317,13 @@ class UnitCell(object):
                 # If the species must be forced constant, skip it.
                 if self.env.species.is_cst_species(sp):
                     continue
+
+                # kwargs["y0"][sp.index] += (
+                #    ge_to_kr(GValuesBoscolo._average_val_before_100ns(sp.label))
+                #    * self.beam.at(t_span[0]).dose_rate()
+                #    * 1e-7
+                #    * 1e6
+                # )
                 kwargs["y0"][sp.index] += (
                     r.kr() * self.beam.at(t_span[0]).dose_rate() * 1e-7 * 1e6
                 )
