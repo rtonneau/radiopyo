@@ -4,8 +4,9 @@ The base_chemistry submodule contains all class definitions and protocols to bui
 more advanced chemistry ==> building blocks of basic chemistry.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -140,6 +141,26 @@ class BasicReaction(ABC):
         **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """ """
+
+    def get_stoi_of(self, species: ChemSpecies | str) -> float:
+        """
+        Method to extract the stoichiometric coefficient of a species regardless if the
+        species is a reactant or a product.
+
+        Arguments:
+            species: ChemSpecies | str
+
+        Raises:
+            KeyError:
+                If species not part of the reaction.
+        """
+        if isinstance(species, ChemSpecies):
+            species = species.label
+        if species in self.stoi_products:
+            return self.stoi_products[species]
+        if species in self.stoi_reactants:
+            return self.stoi_reactants[species]
+        raise KeyError(f"Species {species} not in reaction {self}")
 
     def tot_number_reactants(self) -> int:
         """

@@ -391,8 +391,13 @@ class ODEResult(object):
         if include_radiolytic:
             n_pulse = self.beam.tot_pulses()
             for _r in self.env.radiolytic_reaction_involving(species):
-                _ser.loc[_r.as_label()] += n_pulse * _r.compute_initial_cc_before(
-                    self.t_zero_pulse, self.beam.dose_rate_peak
+                _ser.loc[_r.as_label()] = (
+                    _ser.loc[_r.as_label()]
+                    + n_pulse
+                    * _r.compute_initial_cc_before(
+                        self.t_zero_pulse, self.beam.dose_rate_peak
+                    )
+                    * 1e6
                 )
 
         return _ser.sort_values(ascending=False)
@@ -405,10 +410,15 @@ class ODEResult(object):
     ) -> pd.DataFrame:
         """ """
         dfr = self.reconstruct_reactions()
-        prod_r = list(self.env.kreactions_involving_product(species))
-        label_r = {elt.as_label(): elt for elt in prod_r}
-        k_vals = {elt.as_label(): elt.k_value() for elt in prod_r}
-        rdf = dfr[label_r.keys()]
+        reactions = {
+            elt.as_label(): elt
+            for elt in self.env.kreactions_involving_product(species)
+        }
+        rdf = dfr.loc[:, list(reactions.keys())]
+        # Need to take into account the stoichiometric coefficient of the species in all
+        # the reactions.
+        for label, r in reactions.items():
+            rdf.loc[:, label] = rdf.loc[:, label] * r.get_stoi_of(species)
 
         if include_equilibrium:
             eq_r = self._eq_reactions_yield(species)
@@ -417,9 +427,6 @@ class ODEResult(object):
                 if simpson(_s.values, x=_s.index) < 0:
                     eq_r.drop(_k, axis=1, inplace=True)
                     continue
-                prod_r.append(self.env.reactions.get_kreaction(_k))  # type: ignore[arg-type]
-                label_r[_k] = prod_r[-1]  # type: ignore[index]
-                k_vals[_k] = float(self.mat["Ki_mat"][0][prod_r[-1].index])  # type: ignore[index]
             rdf = pd.concat([rdf, eq_r], axis=1)
         if include_radiolytic:
             _r = [
@@ -450,10 +457,18 @@ class ODEResult(object):
     ) -> pd.DataFrame:
         """ """
         dfr = self.reconstruct_reactions()
-        cons_r = list(self.env.kreactions_involving_reactant(species))
-        label_r = {elt.as_label(): elt for elt in cons_r}
-        k_vals = {elt.as_label(): elt.k_value() for elt in cons_r}
-        rdf = dfr[label_r.keys()]
+        reactions = {
+            elt.as_label(): elt
+            for elt in self.env.kreactions_involving_reactant(species)
+        }
+        rdf = dfr.loc[:, list(reactions.keys())]
+
+        # Need to take into account the stoichiometric coefficient of the species in all
+        # the reactions.
+        for label, r in reactions.items():
+            rdf.loc[rdf.index, label] = rdf.loc[rdf.index, label] * r.get_stoi_of(
+                species
+            )
 
         if include_equilibrium:
             eq_r = self._eq_reactions_yield(species)
@@ -462,11 +477,32 @@ class ODEResult(object):
                 if simpson(_s.values, x=_s.index) > 0:
                     eq_r.drop(_k, axis=1, inplace=True)
                     continue
-                cons_r.append(self.env.reactions.get_kreaction(_k))  # type: ignore[arg-type]
-                label_r[_k] = cons_r[-1]  # type: ignore[index]
-                k_vals[_k] = float(self.mat["Ki_mat"][0][cons_r[-1].index])  # type: ignore[index]
             rdf = pd.concat([rdf, eq_r], axis=1)
         return rdf
+
+    def detailed_integral_balance_of(
+        self,
+        species: str | ChemSpecies,
+    ) -> pd.DataFrame:
+        _data: tp.Dict[str, tp.List[float | str | bool]] = {
+            "reaction": [],
+            "yield": [],
+            "prod": [],
+            "cons": [],
+        }
+        _s = self.integrate_production_of(species)
+        for _r, _y in _s.items():
+            _data["reaction"].append(_r)  # type: ignore[arg-type]
+            _data["yield"].append(_y)
+            _data["prod"].append(True)
+            _data["cons"].append(False)
+        _s = self.integrate_consumption_of(species)
+        for _r, _y in _s.items():
+            _data["reaction"].append(_r)  # type: ignore[arg-type]
+            _data["yield"].append(-_y)
+            _data["prod"].append(False)
+            _data["cons"].append(True)
+        return pd.DataFrame(_data)
 
     def _eq_reactions_yield(
         self,
@@ -501,7 +537,9 @@ class ODEResult(object):
                 fwd, bwd = bwd, fwd
 
             # Compute net prod/cons from both forward and backward reactions
-            out[fwd.as_label()] = dfr[fwd.as_label()] - dfr[bwd.as_label()]
+            out[fwd.as_label()] = (fwd.get_stoi_of(species) * dfr[fwd.as_label()]) - (
+                bwd.get_stoi_of(species) * dfr[bwd.as_label()]
+            )
         return out if out.shape[1] > 0 else pd.DataFrame()
 
     def species_balance_evolution(self) -> pd.DataFrame:
