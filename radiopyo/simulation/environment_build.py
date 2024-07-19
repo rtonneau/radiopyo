@@ -145,6 +145,11 @@ class ReactionsList:
         for reaction in chain(self.ab_reaction, self.eq_reaction):
             yield reaction
 
+    def iter_radiolytic_reactions(self) -> tp.Iterator[RadiolyticReaction]:
+        """ """
+        for reaction in self.radiolytic:
+            yield reaction
+
     def iter_all_kreactions_and_kvalues(
         self, T: tp.Optional[Temperature | float] = None
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
@@ -604,6 +609,12 @@ class SimEnv:
         for sp in self.species.iter_cst_species():
             out[sp.index - len_dyn] = sp.initial_cc(T)
         return out
+
+    def radiolytic_reaction_involving(
+        self,
+        species: str | ChemSpecies,
+    ) -> tp.List[RadiolyticReaction]:
+        return [r for r in self.reactions.iter_radiolytic_reactions() if species in r]
 
     def kreactions_involving(
         self,

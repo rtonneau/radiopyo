@@ -136,6 +136,21 @@ class RadiolyticReaction(BasicReaction):
     def update_from_ge(self, value: float) -> None:
         self._reaction_cst = ge_to_kr(value)
 
+    def compute_initial_cc_before(self, t0: float, dose_rate: float) -> float:
+        """
+        Computes the production of the species by the beam for the first instants of beam
+        ON i.e. when time <= t0.
+
+        Arguments:
+            t0: float
+                Initial time of the Beam ON phase
+            dose_rate: float
+                Instantaneous dose rate of the related beam.
+        Returns:
+            float: initial concentration in mol/l
+        """
+        return self.kr() * dose_rate * t0
+
     @classmethod
     def from_dict(
         cls,

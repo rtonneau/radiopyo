@@ -77,10 +77,13 @@ class UnitCell(object):
             GValues from the literature to possibly update the LET
         FIRST_STEP: float
             Initial time step of all simulation (default=1e-12)
+        T_ZERO: float
+            Initial time after when switching to BEAM ON phase (default=1e-7)
 
     """
 
     FIRST_STEP: float = 1e-15
+    T_ZERO: float = 1e-7
 
     _T: Temperature
     env: SimEnv
@@ -311,27 +314,17 @@ class UnitCell(object):
         # Check if beam_on, then skip the next 1e-7 s of sim and compute evolution of cc's
         # according to Gvalues
         if beam_ON:  # assume beam is switched ON at t_span[0]
-            t_span = (t_span[0] + 1e-7, t_span[1])
+            t_span = (t_span[0] + self.T_ZERO, t_span[1])
             for r in self.env.reactions.radiolytic:
-                sp = r.species()
                 # If the species must be forced constant, skip it.
-                if self.env.species.is_cst_species(sp):
+                if self.env.species.is_cst_species(r.species()):
                     continue
 
-                # kwargs["y0"][sp.index] += (
-                #    ge_to_kr(GValuesBoscolo._average_val_before_100ns(sp.label))
-                #    * self.beam.at(t_span[0]).dose_rate()
-                #    * 1e-7
-                #    * 1e6
-                # )
-                kwargs["y0"][sp.index] += (
-                    r.kr() * self.beam.at(t_span[0]).dose_rate() * 1e-7 * 1e6
+                # Keep initial value and increment
+                kwargs["y0"][r.species().index] += r.compute_initial_cc_before(
+                    t0=t_span[0],
+                    dose_rate=self.beam.at(t_span[0]).dose_rate(),
                 )
-        # print(
-        #    t_span,
-        #    f" is beam on? {beam_ON} || {self.beam.at(t_span[1] - 0.5e-6).dose_rate()}",
-        # )
-        # End
 
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(
@@ -424,7 +417,12 @@ class UnitCell(object):
         )
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
         return ODEResult(
-            self.env, self.beam_list.current, self.mat, self.beam_list.current_LET, sol
+            self.env,
+            self.beam_list.current,
+            self.mat,
+            self.beam_list.current_LET,
+            self.T_ZERO,
+            sol,
         )
 
     def prepare_chunked_run(
@@ -596,6 +594,7 @@ class SimChunksIter:
             self.sim.beam_list.current,
             self.sim.mat,
             self.sim.beam_list.current_LET,
+            self.sim.T_ZERO,
         )
         self.atol = atol
         self.rtol = rtol

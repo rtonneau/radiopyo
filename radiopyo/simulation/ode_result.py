@@ -68,6 +68,7 @@ class ODEResult(object):
     beam: ParticleBeam
     mat: SimMatrices
     LET: tp.Optional[float]
+    t_zero_pulse: float
     date: datetime.datetime
     T: Temperature
 
@@ -95,6 +96,7 @@ class ODEResult(object):
         beam: ParticleBeam,
         mat: SimMatrices,
         let: tp.Optional[float],
+        t_zero_pulse: float,
         sol: tp.Optional[ScipyODEResult] = None,
         temperature: tp.Optional[Temperature] = None,
     ) -> None:
@@ -103,6 +105,7 @@ class ODEResult(object):
         self.beam = copy.deepcopy(beam)
         self.mat = copy.deepcopy(mat)
         self.LET = let
+        self.t_zero_pulse = t_zero_pulse
         self.T = temperature if temperature is not None else Temperature()
         self._default_init()
         if sol is not None:
@@ -374,6 +377,97 @@ class ODEResult(object):
         self.dydt = out.values.T
         return out
 
+    def integrate_production_of(
+        self,
+        species: str | ChemSpecies,
+        include_equilibrium: bool = True,
+        include_radiolytic: bool = True,
+    ) -> pd.Series:
+        df = self.detail_production_of(species, include_equilibrium, include_radiolytic)
+        _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
+        for _k, _s in df.items():
+            _ser[_k] = simpson(_s.to_numpy() * 1e6, x=_s.index)
+
+        if include_radiolytic:
+            n_pulse = self.beam.tot_pulses()
+            for _r in self.env.radiolytic_reaction_involving(species):
+                _ser.loc[_r.as_label()] += n_pulse * _r.compute_initial_cc_before(
+                    self.t_zero_pulse, self.beam.dose_rate_peak
+                )
+
+        return _ser.sort_values(ascending=False)
+
+    def detail_production_of(
+        self,
+        species: str | ChemSpecies,
+        include_equilibrium: bool = True,
+        include_radiolytic: bool = True,
+    ) -> pd.DataFrame:
+        """ """
+        dfr = self.reconstruct_reactions()
+        prod_r = list(self.env.kreactions_involving_product(species))
+        label_r = {elt.as_label(): elt for elt in prod_r}
+        k_vals = {elt.as_label(): elt.k_value() for elt in prod_r}
+        rdf = dfr[label_r.keys()]
+
+        if include_equilibrium:
+            eq_r = self._eq_reactions_yield(species)
+            for _k, _s in eq_r.items():
+                # If net value is consumption, remove it
+                if simpson(_s.values, x=_s.index) < 0:
+                    eq_r.drop(_k, axis=1, inplace=True)
+                    continue
+                prod_r.append(self.env.reactions.get_kreaction(_k))  # type: ignore[arg-type]
+                label_r[_k] = prod_r[-1]  # type: ignore[index]
+                k_vals[_k] = float(self.mat["Ki_mat"][0][prod_r[-1].index])  # type: ignore[index]
+            rdf = pd.concat([rdf, eq_r], axis=1)
+        if include_radiolytic:
+            _r = [
+                elt.as_label()
+                for elt in self.env.radiolytic_reaction_involving(species)
+            ]
+            rdf = pd.concat([rdf, dfr[_r]], axis=1)
+        return rdf
+
+    def integrate_consumption_of(
+        self,
+        species: str | ChemSpecies,
+        include_equilibrium: bool = True,
+    ) -> pd.Series:
+        df = self.detail_consumption_of(
+            species,
+            include_equilibrium,
+        )
+        _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
+        for _k, _s in df.items():
+            _ser[_k] = simpson(_s.to_numpy() * 1e6, x=_s.index)
+        return _ser.sort_values(ascending=False)
+
+    def detail_consumption_of(
+        self,
+        species: str | ChemSpecies,
+        include_equilibrium: bool = True,
+    ) -> pd.DataFrame:
+        """ """
+        dfr = self.reconstruct_reactions()
+        cons_r = list(self.env.kreactions_involving_reactant(species))
+        label_r = {elt.as_label(): elt for elt in cons_r}
+        k_vals = {elt.as_label(): elt.k_value() for elt in cons_r}
+        rdf = dfr[label_r.keys()]
+
+        if include_equilibrium:
+            eq_r = self._eq_reactions_yield(species)
+            for _k, _s in eq_r.items():
+                # If net value is production, remove it
+                if simpson(_s.values, x=_s.index) > 0:
+                    eq_r.drop(_k, axis=1, inplace=True)
+                    continue
+                cons_r.append(self.env.reactions.get_kreaction(_k))  # type: ignore[arg-type]
+                label_r[_k] = cons_r[-1]  # type: ignore[index]
+                k_vals[_k] = float(self.mat["Ki_mat"][0][cons_r[-1].index])  # type: ignore[index]
+            rdf = pd.concat([rdf, eq_r], axis=1)
+        return rdf
+
     def _eq_reactions_yield(
         self,
         species: str | ChemSpecies,
@@ -396,14 +490,19 @@ class ODEResult(object):
         reaction producing the species.
         /!\ Negative values are allowed. The meaning is a net consumption.
         """
-        data: tp.Dict[str, pd.Series] = {}
         dfr = self.reconstruct_reactions()
+        out = pd.DataFrame(index=dfr.index)
+
+        # Loop over all equilibrium reactions (i.e. couples of forward and backward)
         for bireaction in self.env.eq_reactions_involving(species):
+            # Always make forward reaction the one producing the species
             fwd, bwd = bireaction.forward, bireaction.backward
             if bireaction.backward.has_product(species):
                 fwd, bwd = bwd, fwd
-            data[fwd.as_label()] = dfr[fwd.as_label()] - dfr[bwd.as_label()]
-        return pd.DataFrame(data).set_index(dfr.index)
+
+            # Compute net prod/cons from both forward and backward reactions
+            out[fwd.as_label()] = dfr[fwd.as_label()] - dfr[bwd.as_label()]
+        return out if out.shape[1] > 0 else pd.DataFrame()
 
     def species_balance_evolution(self) -> pd.DataFrame:
         """ """
@@ -443,6 +542,7 @@ class ODEResult(object):
             raise FileExistsError(file_path)
         out = self.env.convert_to_config_dict()
         out["parameters"]["timestamp"] = self.date.timestamp()
+        out["parameters"]["t_zero_pulse"] = self.t_zero_pulse
         out["parameters"]["temperature"] = self.T.kelvin
         out["parameters"]["species_order"] = {
             "dynamical": [
@@ -483,7 +583,8 @@ class ODEResult(object):
         beam_type, beam_config = next(iter(config["beam"].items()))
         label, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
         mat = env.build_all_matrices()
-        out = cls(env, beam, mat, LET, temperature=T)
+        t_zero = config["parameters"].get("t_zero_pulse", 1e-7)
+        out = cls(env, beam, mat, LET, t_zero, temperature=T)
         out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
 
         logger.setLevel(_prev_log_level)

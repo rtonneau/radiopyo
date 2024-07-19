@@ -67,6 +67,7 @@ class SimParameters(tp.TypedDict, total=False):
     species_order: tp.Dict[str, tp.List[str]]
     temperature: float
     timestamp: float
+    t_zero_pulse: float
 
 
 class ConfigDict(tp.TypedDict, total=False):
