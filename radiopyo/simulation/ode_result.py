@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.integrate import simpson  # type: ignore[import]
+from scipy.integrate import simpson, trapezoid  # type: ignore[import]
 
 # --------------------------------- Internal imports --------------------------------- #
 from radiopyo.chemistry.utils.units import Temperature
@@ -303,7 +303,7 @@ class ODEResult(object):
         returns:
             dataframe [mol/l/s]
         Rem: to integrate df
-            >>> df.apply(lambda x: simpson(y=x.values, x=x.index))
+            >>> df.apply(lambda x: trapezoid(y=x.values, x=x.index))
         """
         # Compute column names and Pre compute slices to ease access in the dataframe
         # columns
@@ -386,7 +386,7 @@ class ODEResult(object):
         df = self.detail_production_of(species, include_equilibrium, include_radiolytic)
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
-            _ser[_k] = simpson(_s.to_numpy() * 1e6, x=_s.index)
+            _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
 
         if include_radiolytic:
             n_pulse = self.beam.tot_pulses()
@@ -409,7 +409,9 @@ class ODEResult(object):
         include_radiolytic: bool = True,
     ) -> pd.DataFrame:
         """ """
+        print("From detail_prod, get reconstuct_reactions")
         dfr = self.reconstruct_reactions()
+        print("Got it")
         reactions = {
             elt.as_label(): elt
             for elt in self.env.kreactions_involving_product(species)
@@ -424,7 +426,7 @@ class ODEResult(object):
             eq_r = self._eq_reactions_yield(species)
             for _k, _s in eq_r.items():
                 # If net value is consumption, remove it
-                if simpson(_s.values, x=_s.index) < 0:
+                if trapezoid(_s.values, x=_s.index) < 0:
                     eq_r.drop(_k, axis=1, inplace=True)
                     continue
             rdf = pd.concat([rdf, eq_r], axis=1)
@@ -447,7 +449,7 @@ class ODEResult(object):
         )
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
-            _ser[_k] = simpson(_s.to_numpy() * 1e6, x=_s.index)
+            _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
         return _ser.sort_values(ascending=False)
 
     def detail_consumption_of(
@@ -456,7 +458,9 @@ class ODEResult(object):
         include_equilibrium: bool = True,
     ) -> pd.DataFrame:
         """ """
+        print("From detail_cons, get reconstuct_reactions")
         dfr = self.reconstruct_reactions()
+        print("Got it")
         reactions = {
             elt.as_label(): elt
             for elt in self.env.kreactions_involving_reactant(species)
@@ -474,7 +478,7 @@ class ODEResult(object):
             eq_r = self._eq_reactions_yield(species)
             for _k, _s in eq_r.items():
                 # If net value is production, remove it
-                if simpson(_s.values, x=_s.index) > 0:
+                if trapezoid(_s.values, x=_s.index) > 0:
                     eq_r.drop(_k, axis=1, inplace=True)
                     continue
             rdf = pd.concat([rdf, eq_r], axis=1)
@@ -570,7 +574,7 @@ class ODEResult(object):
         out = {}
 
         for col, data in df.items():
-            out[col] = simpson(y=data.values, x=data.index)
+            out[col] = trapezoid(y=data.values, x=data.index)
         return pd.Series(out, dtype=np.float64)
 
     def to_json_config(self, file_path: Path | str, overwrite: bool = False) -> None:

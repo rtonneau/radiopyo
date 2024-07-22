@@ -322,7 +322,7 @@ class UnitCell(object):
 
                 # Keep initial value and increment
                 kwargs["y0"][r.species().index] += r.compute_initial_cc_before(
-                    t0=t_span[0],
+                    t0=self.T_ZERO,
                     dose_rate=self.beam.at(t_span[0]).dose_rate(),
                 )
 
