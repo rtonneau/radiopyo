@@ -30,6 +30,8 @@ if tp.TYPE_CHECKING:
 # ----------------------------- Expose importable stuffs ----------------------------- #
 __all__: tp.List = [
     "ResCollection",
+    "ConcentrationConvert",
+    "O2Convert",
 ]
 
 # -------------------------------------- Logging ------------------------------------- #
@@ -37,6 +39,26 @@ __all__: tp.List = [
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
 # ------------------------------------------------------------------------------------ #
+
+
+class ConcentrationConvert(object):
+    """ """
+
+    HENRY: float  # = 1.3e-3 # units are M/atm, for O2
+
+    def __init__(self, henry_cst: float) -> None:
+        self.HENRY = henry_cst
+
+    def molar_to_atm(self, value: float) -> float:
+        """ """
+        return value / self.HENRY * 100
+
+    def atm_to_molar(self, value: float) -> float:
+        """ """
+        return value * self.HENRY / 100
+
+
+O2Convert = ConcentrationConvert(1.3e-3)
 
 
 class ResCollection(object):
