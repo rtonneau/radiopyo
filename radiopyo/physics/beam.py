@@ -487,6 +487,8 @@ class ParticleBeam:
 
     def __post_init__(self) -> None:
         """Method called after ParticleBeam__init__() to finalize initialization"""
+        if self.dose_rate_peak <= 0:
+            raise ValueError(f"Null or Negative inst. dose rate for ConstantBeam {self}")
         self.GROWTH_TIME = 1e-6
         self.time_at_max_dose = self._compute_time_at_max_dose()
         self.dose_rate = self._compute_average_dose_rate()
@@ -880,11 +882,15 @@ class ConstantBeam(ParticleBeam):
     @classmethod
     def from_dict(cls, param: tp.Dict[str, float]) -> ConstantBeam:
         """Build a ConstantBeam out of a dictionary"""
-        dose_rate = 0.0
-        for key in ["dose_rate_peak", "dose_rate_avg", "dose_rate"]:
-            with suppress(KeyError):
-                dose_rate = param[key]
-                break
+
+        if "on_time" in param and "max_dose" in param:
+            dose_rate = param["max_dose"] / param["on_time"]
+        else:
+            dose_rate = 0.0
+            for key in ["dose_rate_peak", "dose_rate_avg", "dose_rate"]:
+                with suppress(KeyError):
+                    dose_rate = param[key]
+                    break
 
         return ConstantBeam(
             dose_rate=dose_rate,

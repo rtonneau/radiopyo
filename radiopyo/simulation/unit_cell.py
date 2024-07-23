@@ -315,16 +315,20 @@ class UnitCell(object):
         # according to Gvalues
         if beam_ON:  # assume beam is switched ON at t_span[0]
             t_span = (t_span[0] + self.T_ZERO, t_span[1])
+            if t_span[0] > t_span[1]:
+                raise ValueError(f"Too Short beam pulse {t_span}")
             for r in self.env.reactions.radiolytic:
                 # If the species must be forced constant, skip it.
                 if self.env.species.is_cst_species(r.species()):
                     continue
 
                 # Keep initial value and increment
-                kwargs["y0"][r.species().index] += r.compute_initial_cc_before(
-                    t0=self.T_ZERO,
-                    dose_rate=self.beam.at(t_span[0]).dose_rate(),
-                )
+                kwargs["y0"][r.species().index] += (
+                    r.compute_initial_cc_before(
+                        t0=self.T_ZERO, dose_rate=self.beam.at(t_span[0]).dose_rate()
+                    )
+                    * 1e6
+                )  # Units of initial cc are µM
 
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(

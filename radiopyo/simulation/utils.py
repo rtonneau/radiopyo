@@ -49,16 +49,88 @@ class ConcentrationConvert(object):
     def __init__(self, henry_cst: float) -> None:
         self.HENRY = henry_cst
 
-    def molar_to_atm(self, value: float) -> float:
+    def molar_to_atm(self, value: float | NDArray) -> float | NDArray:
         """ """
-        return value / self.HENRY * 100
+        return value / self.HENRY
 
-    def atm_to_molar(self, value: float) -> float:
+    def atm_to_molar(self, value: float | NDArray) -> float | NDArray:
         """ """
-        return value * self.HENRY / 100
+        return value * self.HENRY
+
+    def molar_to_partial(self, value: float | NDArray) -> float | NDArray:
+        """ """
+        return self.molar_to_atm(value) * 100
+
+    def partial_to_molar(self, value: float | NDArray) -> float | NDArray:
+        """ """
+        return self.atm_to_molar(value / 100)
+
+    def molar_to_mmHg(self, value: float | NDArray) -> float | NDArray:
+        """ """
+        return self.molar_to_atm(value) * 760
+
+    def mmHg_to_molar(self, value: float | NDArray) -> float | NDArray:
+        """ """
+        return self.atm_to_molar(value / 760)
 
 
-O2Convert = ConcentrationConvert(1.3e-3)
+class SpeciesConvert(object):
+    """ """
+
+    convertor: ConcentrationConvert
+    value: float | NDArray
+
+    def __init__(self, value: float | NDArray) -> None:
+        """value is a concentration in Molar unit"""
+        self.value = value
+
+    @classmethod
+    def from_atm(cls: tp.Type[tp.Self], value: float | NDArray) -> tp.Self:
+        try:
+            return cls(cls.convertor.atm_to_molar(value))
+        except AttributeError as err:
+            raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
+
+    @classmethod
+    def from_molar(cls: tp.Type[tp.Self], value: float | NDArray) -> tp.Self:
+        try:
+            return cls(value)
+        except AttributeError as err:
+            raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
+
+    @classmethod
+    def from_partial(cls: tp.Type[tp.Self], value: float | NDArray) -> tp.Self:
+        try:
+            return cls(cls.convertor.partial_to_molar(value))
+        except AttributeError as err:
+            raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
+
+    @classmethod
+    def from_mmHg(cls: tp.Type[tp.Self], value: float) -> tp.Self:
+        try:
+            return cls(cls.convertor.mmHg_to_molar(value))
+        except AttributeError as err:
+            raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
+
+    def to_atm(self) -> float | NDArray:
+        """ """
+        return self.convertor.molar_to_atm(self.value)
+
+    def to_mmHg(self) -> float | NDArray:
+        """ """
+        return self.convertor.molar_to_mmHg(self.value)
+
+    def to_partial(self) -> float | NDArray:
+        """ """
+        return self.convertor.molar_to_partial(self.value)
+
+    def to_molar(self) -> float | NDArray:
+        """ """
+        return self.value
+
+
+class O2Convert(SpeciesConvert):
+    convertor = ConcentrationConvert(1.3e-3)
 
 
 class ResCollection(object):
