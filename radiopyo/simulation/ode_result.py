@@ -409,9 +409,7 @@ class ODEResult(object):
         include_radiolytic: bool = True,
     ) -> pd.DataFrame:
         """ """
-        print("From detail_prod, get reconstuct_reactions")
         dfr = self.reconstruct_reactions()
-        print("Got it")
         reactions = {
             elt.as_label(): elt
             for elt in self.env.kreactions_involving_product(species)
@@ -458,9 +456,7 @@ class ODEResult(object):
         include_equilibrium: bool = True,
     ) -> pd.DataFrame:
         """ """
-        print("From detail_cons, get reconstuct_reactions")
         dfr = self.reconstruct_reactions()
-        print("Got it")
         reactions = {
             elt.as_label(): elt
             for elt in self.env.kreactions_involving_reactant(species)
@@ -470,8 +466,8 @@ class ODEResult(object):
         # Need to take into account the stoichiometric coefficient of the species in all
         # the reactions.
         for label, r in reactions.items():
-            rdf.loc[rdf.index, label] = rdf.loc[rdf.index, label] * r.get_stoi_of(
-                species
+            rdf.loc[rdf.index, label] = (
+                -1 * rdf.loc[rdf.index, label] * r.get_stoi_of(species)
             )
 
         if include_equilibrium:
@@ -503,7 +499,7 @@ class ODEResult(object):
         _s = self.integrate_consumption_of(species)
         for _r, _y in _s.items():
             _data["reaction"].append(_r)  # type: ignore[arg-type]
-            _data["yield"].append(-_y)
+            _data["yield"].append(_y)
             _data["prod"].append(False)
             _data["cons"].append(True)
         return pd.DataFrame(_data)
