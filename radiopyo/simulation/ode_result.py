@@ -48,9 +48,27 @@ logger = logging.getLogger("radiopyo")
 #                                DECORATOR DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
 
+
 # ------------------------------------------------------------------------------------ #
 #                                 FUNCTION DEFINITIONS                                 #
 # ------------------------------------------------------------------------------------ #
+def make_slice_from_time_boundaries(
+    start: tp.Optional[float | slice] = None,
+    stop: tp.Optional[float] = None,
+) -> slice:
+    """ """
+    if isinstance(start, slice):
+        return start
+    if start is None:
+        start = -np.inf
+    if stop is None:
+        stop = np.inf
+    if start >= stop:
+        raise ValueError(
+            f"Reversed boundaries. Trying to slice from {start} s to {stop} s"
+        )
+    return slice(start, stop)
+
 
 # ------------------------------------------------------------------------------------ #
 #                                  CLASS DEFINITIONS                                   #
@@ -380,10 +398,19 @@ class ODEResult(object):
     def integrate_production_of(
         self,
         species: str | ChemSpecies,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
         include_radiolytic: bool = True,
     ) -> pd.Series:
-        df = self.detail_production_of(species, include_equilibrium, include_radiolytic)
+
+        df = self.detail_production_of(
+            species,
+            start,
+            stop,
+            include_equilibrium,
+            include_radiolytic,
+        )
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
             _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
@@ -405,15 +432,20 @@ class ODEResult(object):
     def detail_production_of(
         self,
         species: str | ChemSpecies,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
         include_radiolytic: bool = True,
     ) -> pd.DataFrame:
         """ """
-        dfr = self.reconstruct_reactions()
+        _slice = make_slice_from_time_boundaries(start, stop)
+
+        dfr = self.reconstruct_reactions().loc[_slice, :]
         reactions = {
             elt.as_label(): elt
             for elt in self.env.kreactions_involving_product(species)
         }
+
         rdf = dfr.loc[:, list(reactions.keys())]
         # Need to take into account the stoichiometric coefficient of the species in all
         # the reactions.
@@ -421,7 +453,7 @@ class ODEResult(object):
             rdf.loc[:, label] = rdf.loc[:, label] * r.get_stoi_of(species)
 
         if include_equilibrium:
-            eq_r = self._eq_reactions_yield(species)
+            eq_r = self.compute_yields_of_eq_reactions(species, _slice)
             for _k, _s in eq_r.items():
                 # If net value is consumption, remove it
                 if trapezoid(_s.values, x=_s.index) < 0:
@@ -439,10 +471,15 @@ class ODEResult(object):
     def integrate_consumption_of(
         self,
         species: str | ChemSpecies,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
     ) -> pd.Series:
+
         df = self.detail_consumption_of(
             species,
+            start,
+            stop,
             include_equilibrium,
         )
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
@@ -453,10 +490,14 @@ class ODEResult(object):
     def detail_consumption_of(
         self,
         species: str | ChemSpecies,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
     ) -> pd.DataFrame:
         """ """
-        dfr = self.reconstruct_reactions()
+        _slice = make_slice_from_time_boundaries(start, stop)
+
+        dfr = self.reconstruct_reactions().loc[_slice, :]
         reactions = {
             elt.as_label(): elt
             for elt in self.env.kreactions_involving_reactant(species)
@@ -471,7 +512,7 @@ class ODEResult(object):
             )
 
         if include_equilibrium:
-            eq_r = self._eq_reactions_yield(species)
+            eq_r = self.compute_yields_of_eq_reactions(species, _slice)
             for _k, _s in eq_r.items():
                 # If net value is production, remove it
                 if trapezoid(_s.values, x=_s.index) > 0:
@@ -483,20 +524,23 @@ class ODEResult(object):
     def detailed_integral_balance_of(
         self,
         species: str | ChemSpecies,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
+
         _data: tp.Dict[str, tp.List[float | str | bool]] = {
             "reaction": [],
             "yield": [],
             "prod": [],
             "cons": [],
         }
-        _s = self.integrate_production_of(species)
+        _s = self.integrate_production_of(species, start=start, stop=stop)
         for _r, _y in _s.items():
             _data["reaction"].append(_r)  # type: ignore[arg-type]
             _data["yield"].append(_y)
             _data["prod"].append(True)
             _data["cons"].append(False)
-        _s = self.integrate_consumption_of(species)
+        _s = self.integrate_consumption_of(species, start=start, stop=stop)
         for _r, _y in _s.items():
             _data["reaction"].append(_r)  # type: ignore[arg-type]
             _data["yield"].append(_y)
@@ -504,9 +548,11 @@ class ODEResult(object):
             _data["cons"].append(True)
         return pd.DataFrame(_data)
 
-    def _eq_reactions_yield(
+    def compute_yields_of_eq_reactions(
         self,
         species: str | ChemSpecies,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
         """
         Return a DataFrame containing the diff of the two reactions of a species
@@ -526,7 +572,9 @@ class ODEResult(object):
         reaction producing the species.
         /!\ Negative values are allowed. The meaning is a net consumption.
         """
-        dfr = self.reconstruct_reactions()
+        _slice = make_slice_from_time_boundaries(start, stop)
+
+        dfr = self.reconstruct_reactions().loc[_slice, :]
         out = pd.DataFrame(index=dfr.index)
 
         # Loop over all equilibrium reactions (i.e. couples of forward and backward)
@@ -542,8 +590,14 @@ class ODEResult(object):
             )
         return out if out.shape[1] > 0 else pd.DataFrame()
 
-    def species_balance_evolution(self) -> pd.DataFrame:
+    def species_balance_evolution(
+        self,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
+    ) -> pd.DataFrame:
         """ """
+        _slice = make_slice_from_time_boundaries(start, stop)
+
         rr = self.reconstruct_reactions()  # if stored then no "heavy calculation"
         out = pd.DataFrame(
             index=self.t,
