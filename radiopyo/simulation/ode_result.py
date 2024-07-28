@@ -262,7 +262,7 @@ class ODEResult(object):
         self.exec_time.append(exec_time)
 
     # --------------------------------- Utils methods -------------------------------- #
-    def to_pandas(self, clip: bool = True) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
         Provides simulation results in a nice pandas DataFrame.
         Units are µM :)
@@ -275,7 +275,7 @@ class ODEResult(object):
             columns=labels,
             dtype=np.float64,
             data=self.y.T,
-        ).clip(0.0 if clip else None)
+        )
 
         df_cst = pd.DataFrame(
             index=self.t,
@@ -403,7 +403,6 @@ class ODEResult(object):
         include_equilibrium: bool = True,
         include_radiolytic: bool = True,
     ) -> pd.Series:
-
         df = self.detail_production_of(
             species,
             start,
@@ -475,7 +474,6 @@ class ODEResult(object):
         stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
     ) -> pd.Series:
-
         df = self.detail_consumption_of(
             species,
             start,
@@ -527,7 +525,6 @@ class ODEResult(object):
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
-
         _data: tp.Dict[str, tp.List[float | str | bool]] = {
             "reaction": [],
             "yield": [],
@@ -547,6 +544,30 @@ class ODEResult(object):
             _data["prod"].append(False)
             _data["cons"].append(True)
         return pd.DataFrame(_data)
+
+    def get_reaction_rate_of(self, reaction: str) -> pd.Series:
+        """ """
+        if self.env.reactions.is_eq_reaction(reaction):
+            bi_r = self.env.reactions.get_eq_reaction_from(reaction)
+            if reaction == bi_r.forward.as_label():
+                r1, r2 = bi_r.forward.as_label(), bi_r.backward.as_label()
+            else:
+                r2, r1 = bi_r.forward.as_label(), bi_r.backward.as_label()
+            _df = self.reconstruct_reactions().loc[:, (r1, r2)]  # type: ignore[index]
+            return _df[r1] - _df[r2]
+
+        return self.reconstruct_reactions().loc[:, reaction]
+
+    def integrate_single_reaction(
+        self,
+        reaction: str,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
+    ) -> float:
+        """ """
+        _slice = make_slice_from_time_boundaries(start, stop)
+        _ = self.get_reaction_rate_of(reaction).loc[_slice]
+        return trapezoid(_.values, x=_.index)
 
     def compute_yields_of_eq_reactions(
         self,

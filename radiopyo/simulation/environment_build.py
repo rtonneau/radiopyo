@@ -11,6 +11,7 @@ Author:
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import typing as tp
@@ -162,6 +163,33 @@ class ReactionsList:
                 yield values
         for values in self.k_reaction.iter_reactions_and_kvalues(T):
             yield values
+
+    @functools.cache  # noqa: B019
+    def is_kreaction(self, reaction: str) -> bool:
+        """ """
+        return any(reaction == elt.as_label() for elt in self.iter_kreactions())
+
+    @functools.cache  # noqa: B019
+    def is_eq_reaction(self, reaction: str) -> bool:
+        """ """
+        return any(
+            reaction == elt.as_label()
+            for elt, _ in self.iter_eq_reactions_as_kreactions()
+        )
+
+    @functools.cache  # noqa: B019
+    def is_radiolytic_reaction(self, reaction: str) -> bool:
+        """ """
+        return any(
+            reaction == elt.as_label() for elt in self.iter_radiolytic_reactions()
+        )
+
+    def get_eq_reaction_from(self, reaction: str) -> BiReaction:
+        """ """
+        for r in self.iter_eq_reactions():
+            if reaction == r.forward.as_label() or reaction == r.backward.as_label():
+                return r
+        raise ValueError(f"Reaction {reaction} not related to any equilibrium")
 
 
 @dataclass
