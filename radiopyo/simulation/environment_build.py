@@ -164,12 +164,10 @@ class ReactionsList:
         for values in self.k_reaction.iter_reactions_and_kvalues(T):
             yield values
 
-    @functools.cache  # noqa: B019
     def is_kreaction(self, reaction: str) -> bool:
         """ """
         return any(reaction == elt.as_label() for elt in self.iter_kreactions())
 
-    @functools.cache  # noqa: B019
     def is_eq_reaction(self, reaction: str) -> bool:
         """ """
         return any(
@@ -177,7 +175,6 @@ class ReactionsList:
             for elt, _ in self.iter_eq_reactions_as_kreactions()
         )
 
-    @functools.cache  # noqa: B019
     def is_radiolytic_reaction(self, reaction: str) -> bool:
         """ """
         return any(
