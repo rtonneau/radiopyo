@@ -5,10 +5,18 @@ reactions involving High Energy Particles with the background species => Product
 radicals and charged species. These reactions are defined using so called "G-values" ->
 radiolytic yields i.e.  [#radical / 100eV / incident particle].
 
-/!\ Here, the solvent density is assumed to be the same as Water ==> 1 kg/l
+/!\ Here, the solvent density is assumed to be the same as Water, thus a constant
+    concentration of 1 kg/l.
+
+Classes:
+    - RadiolyticReaction: defines a simple reaction involving a High Energy Particle
+
+Functions:
+    - ge_to_kr: converts a G-value to K-rate constant
+    - kr_to_ge: converts a K-rate constant to a G-value
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
@@ -47,15 +55,42 @@ __all__ = [
 
 
 def umol_per_joule_to_ge(value: float) -> float:
+    """
+    Converts a given value from umol/J to Ge units.
+
+    Args:
+        value (float): The value to be converted.
+
+    Returns:
+        float: The converted value in Ge units.
+    """
     return value * 1e-6 * Avogadro / elementary_charge * 100
 
 
 def ge_to_kr(ge: float) -> float:
+    """
+    Convert a G-value to a K-rate constant.
+
+    Parameters:
+        ge (float): The G-value to convert.
+
+    Returns:
+        float: The K-rate constant.
+    """
     d: float = 1.0  # Solvent density [kg/l]
     return ge * d / elementary_charge / 100.0 / Avogadro
 
 
 def kr_to_ge(kr: float) -> float:
+    """
+    Converts a given K-rate constant to a G-value.
+
+    Args:
+        kr (float): The K-rate constant to be converted.
+
+    Returns:
+        float: The converted G-value.
+    """
     d: float = 1.0  # Solvent density [kg/l]
     return kr / d * elementary_charge * 100.0 * Avogadro
 
@@ -67,12 +102,18 @@ def kr_to_ge(kr: float) -> float:
 
 class RadiolyticReaction(BasicReaction):
     """
+    This class represents a radiolytic reaction. It is a specific type of chemical reaction
+    where the production rate only depends on the nature and energy of the incident radiation.
+    The reaction constant (G value) uniquely defines the rate of the reaction.
+
+    The reaction consists of a list of products and a reaction constant (G value).
     A radiolytic reaction is constructed from the BaseChemicalReaction. Here no reactant
     should be involved. Moreover, the production rate only depends on the nature and
     energy of incident radiation ==> LET and whether or not beam is ON.
     ==> Only the list of products and the reaction cst (G value) are then relevant.
 
     Attributes:
+        _reaction_cst (float): The reaction constant (G value) in [mol/l/Gy].
         _reaction_cst: float
             The G value of the reaction in [mol/l/Gy]
     """
@@ -86,10 +127,21 @@ class RadiolyticReaction(BasicReaction):
 
     def make_hash(self, method: str = "sha256") -> str:
         """
-        The G value is not included in the hash. The aim is to have a single hash for
-        two radiolytic reactions of the same species even for different Gvalue. The LET
-        or actual Gvalue should be given sideway.
-        (Therefore it limits the number of entries in a database)
+        Generate a hash for the reaction. The G value is not included in the hash
+        because two radiolytic reactions of the same species can have different G values.
+        The hash is intended to be used to identify the reaction uniquely, without the need
+        to store the G value. When the reaction is to be used, the actual G value should be
+        provided.
+
+        The hash is computed from the reaction's index and the list of products.
+        Args:
+            method (str): The hashing algorithm to use. Defaults to "sha256".
+
+        Returns:
+            str: The hash of the instance as a hexadecimal string.
+
+        Raises:
+            ValueError: If the hashing algorithm is not supported.
         """
         hasher = hashlib.new(method, usedforsecurity=False)
         hasher.update(repr(self).encode())
@@ -97,17 +149,15 @@ class RadiolyticReaction(BasicReaction):
 
     def as_label(self) -> str:
         """
-        This method is used for the data mining. It should be implemented by child
-        classes in order to easily define short labels for each reactions based on the
-        reaction type and the index of reaction. For instance, it can be used as column
-        name in a pandas DataFrame.
+        Returns a string label for the reaction based on its index.
 
         Returns:
             str
+                A string label in the format "G_{index}" if index is valid.
 
         Raises:
             KeyError
-                If index is None.
+                If the index is None or invalid.
         """
         if self.index is not None and self.index >= 0:
             return f"G_{self.species().label}"
@@ -122,18 +172,55 @@ class RadiolyticReaction(BasicReaction):
         raise NotImplementedError
 
     def species(self) -> ChemSpecies:
+        """
+        Returns the ChemSpecies instance associated with this reaction.
+
+        Returns:
+            ChemSpecies
+                The ChemSpecies instance.
+        """
         return self.products[self.label()]
 
     def label(self) -> str:
+        """
+        Method to generate a string representation of the label of the reaction.
+
+        Returns:
+            str
+                A string label of the reaction.
+        """
         return next(iter(self.products.keys()))
 
     def kr(self) -> float:
+        """
+        Returns the reaction constant.
+
+        Returns:
+            float
+                The reaction constant.
+        """
         return self._reaction_cst
 
     def ge(self) -> float:
+        """
+        Returns the reaction constant in Ge units.
+
+        Returns:
+            float
+                The reaction constant in Ge units.
+        """
         return kr_to_ge(self._reaction_cst)
 
     def update_from_ge(self, value: float) -> None:
+        """
+        Updates the reaction constant from a given G-value.
+
+        Parameters:
+            value (float): The G-value to convert.
+
+        Returns:
+            None
+        """
         self._reaction_cst = ge_to_kr(value)
 
     def compute_initial_cc_before(self, t0: float, dose_rate: float) -> float:
@@ -146,6 +233,7 @@ class RadiolyticReaction(BasicReaction):
                 Initial time of the Beam ON phase
             dose_rate: float
                 Instantaneous dose rate of the related beam.
+
         Returns:
             float: initial concentration in mol/l
         """
@@ -185,9 +273,18 @@ class RadiolyticReaction(BasicReaction):
         NotImplementedError("Not implemented for Radiolytic Reactions")
 
     def __str__(self) -> str:
+        """
+        Returns a string representation of the RadiolyticReaction instance.
+        """
         return f"RadiolyticReaction('{self.label()}')"
 
     def __repr__(self) -> str:
+        """
+        Returns a string representation of the object.
+
+        Returns:
+            str: A string representation of the object.
+        """
         return self.__str__()
 
 

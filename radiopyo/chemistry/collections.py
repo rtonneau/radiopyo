@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """
+Module containing the ListSpecies class definition.
+
+The ListSpecies class is a collection (i.e. container) of species. Its main goal is to
+centralize species creation so that it is possible to easily attribute unique id
+and loops over species.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 24/08/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 24/08/2023
 """
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
@@ -75,26 +80,49 @@ class ListSpecies:
         self.sorted = False
 
     def __contains__(self, key: str | ChemSpecies) -> bool:
+        """
+        Checks if a given key is in the ListSpecies instance.
+
+        Args:
+            key (str | ChemSpecies): The key to be searched. It can be either a string or a ChemSpecies instance.
+
+        Returns:
+            bool: True if the key is found in the ListSpecies instance, False otherwise.
+        """
         label = key.label if isinstance(key, (ChemSpecies,)) else key
 
         return label in self.dyn_sp or label in self.cst_sp
 
     def __iter__(self) -> tp.Iterator[ChemSpecies]:
+        """
+        Returns an iterator over all the species (both Cst and Dyn) in the ListSpecies instance.
+
+        Returns:
+            Iterator(ChemSpecies)
+        """
         return chain(self.dyn_sp.values(), self.cst_sp.values())
 
     def __len__(self) -> int:
-        """Total number of species => Cst + Dyn"""
+        """
+        Returns the total number of species in the ListSpecies instance.
+
+        Returns:
+            int: The total number of species.
+        """
         return self.len_cst_species() + self.len_dyn_species()
 
     def __getitem__(self, item: str) -> ChemSpecies:
         """
-        First look in dyn, then cst.
+        Returns the ChemSpecies instance associated with the given item.
 
-        Raises:
-            KeyError
+        Args:
+            item (str): The label of the species to be retrieved.
 
         Returns:
-            ChemSpecies | ABCouple
+            ChemSpecies: The ChemSpecies instance associated with the given item.
+
+        Raises:
+            KeyError: If the given item is not found in the ListSpecies instance.
         """
         with suppress(KeyError):
             return self.dyn_sp[item]
@@ -104,19 +132,19 @@ class ListSpecies:
 
     def len_cst_species(self) -> int:
         """
-        Compute the number of CstSpecies defined.
+        Returns the number of constant species in the ListSpecies instance.
 
         Returns:
-            int
+            int: The number of constant species.
         """
         return len(self.cst_sp)
 
     def len_dyn_species(self) -> int:
         """
-        Compute the number of DynSpecies defined
+        Returns the number of dynamic species in the ListSpecies instance.
 
         Returns:
-            int
+            int: The number of dynamic species.
         """
         return len(self.dyn_sp)
 
@@ -129,37 +157,38 @@ class ListSpecies:
         Getter method emulating the dict one.
 
         Args:
-            label: str
-                species name
-            default: SimSpecies, optional:
-                default value to returns if the species does not exists
-                (default is None)
+            label (str): The label of the species to be retrieved.
+            default (ChemSpecies, optional): The default value to return if the species does not exist. Defaults to None.
 
+        Returns:
+            ChemSpecies: The ChemSpecies instance associated with the given label, or the default value if not found.
         """
         with suppress(KeyError):
             return self.__getitem__(label)
         return default
 
     def get_species_by_sim_index(self, index: int) -> ChemSpecies:
-        """ """
+        """
+        Retrieves a species by its simulation index.
+
+        Args:
+            index (int): The simulation index of the species.
+
+        Returns:
+            ChemSpecies: The species associated with the given simulation index.
+        """
         return list(self)[index]
 
-    def get_sim_index(self, label: str) -> int:
-        """ """
-        for idx, elt in enumerate(self.iter_dyn_species()):
-            if label == elt.label or label in elt:
-                return idx
-        raise KeyError(f"{label} is not a valid dynamic species")
-
-    def get_sim_species(self, label: str) -> tp.Tuple[ChemSpecies, int]:
-        """ """
-        for idx, elt in enumerate(self.iter_dyn_species()):
-            if label == elt.label or label in elt:
-                return elt, idx
-        raise KeyError(f"{label} is not a valid dynamic species")
-
     def remove_species(self, label: str) -> None:
-        """ """
+        """
+        Removes a species from the ListSpecies instance by its label.
+
+        Args:
+            label (str): The label of the species to be removed.
+
+        Returns:
+            None
+        """
         if label in self.dyn_sp:
             self.dyn_sp.pop(label)
             return
@@ -169,14 +198,12 @@ class ListSpecies:
             return
 
     def _convert_to_CstSpecies(self, item: str | ChemSpecies) -> None:
-        """Convert a CstSpecies into a DynSpecies.
+        """
+        Converts a dynamic species to a constant species.
 
         Args:
-            item (str | SimSpecies): species to convert
+            item (str | ChemSpecies): The species to be converted. If a string, it is used as a label to retrieve the species from the ListSpecies instance.
 
-        Raises:
-            KeyError: is item does not exists in CstSpecies dictionary
-            ChemistryError: item is an AB couple.
         Returns:
             None
         """
@@ -192,18 +219,11 @@ class ListSpecies:
         self, label: str, cc_init: tp.Optional[tp.List[float] | float] = None
     ) -> None:
         """
-        Method use to add a new DynSpecies. The nex_index attributes is assigned to the
-        species and increased.
-
-        TODO:
-            - Convert from CstSpecies to DynSpecies? Not sure it is a good idea though
+        Adds a dynamic species to the ListSpecies instance.
 
         Args:
-            label: str
-                name of the new species
-
-        Raises:
-            IsConstantSpeciesError: if species exists and is defined as constant.
+            label (str): The label of the dynamic species.
+            cc_init (tp.Optional[tp.List[float] | float], optional): The initial concentration coefficient of the dynamic species. Defaults to None.
 
         Returns:
             None
@@ -218,15 +238,11 @@ class ListSpecies:
 
     def add_cst_species(self, label: str, cc: float) -> None:
         """
-        Method use to add a new CstSpecies. The nex_index attributes is assigned to the
-        species and increased.
+        Adds a constant species to the ListSpecies instance.
 
         Args:
-            label: str
-                name of the new species
-
-        Raises:
-            IsSimSpeciesError: if species exists and is defined as constant.
+            label (str): The label of the constant species.
+            cc (float): The concentration coefficient of the constant species.
 
         Returns:
             None
@@ -244,16 +260,13 @@ class ListSpecies:
         label: str,
     ) -> ChemSpecies:
         """
-        Method use to retrieve a species. If it does not exist, the subsequent
-        DynSpecies is created via a call to ListSpecies.add_dyn_species. If the species
-        does exist, it is return no matter what kind it is (Cst or Dyn).
+        Retrieves or creates a dynamic species from the ListSpecies instance.
 
         Args:
-            label: str
-                name of the new species
+            label (str): The label of the dynamic species.
 
         Returns:
-            ChemSpecies
+            ChemSpecies: The retrieved or created dynamic species.
         """
         if (out := self.get(label)) is not None:
             return out
@@ -267,16 +280,13 @@ class ListSpecies:
         label: str,
     ) -> ChemSpecies:
         """
-        Method use to retrieve a species. If it does not exist, the subsequent
-        CstSpecies is created via a call to ListSpecies.add_cst_species. If the species
-        does exist, it is return no matter what kind it is (Cst or Dyn).
+        Retrieves or creates a constant species from the ListSpecies instance.
 
         Args:
-            label: str
-                name of the new species
+            label (str): The label of the constant species.
 
         Returns:
-            ChemSpecies
+            ChemSpecies: The retrieved or created constant species.
         """
         if (out := self.get(label)) is not None:
             return out
@@ -289,7 +299,7 @@ class ListSpecies:
         Get an iterator over all the CstSpecies (ordered).
 
         Returns:
-            Iterator(CstSpecies)
+            Iterator(ChemSpecies)
         """
         return map(
             op.itemgetter(1), sorted(self.cst_sp.items(), key=lambda x: x[1].index)
@@ -297,10 +307,10 @@ class ListSpecies:
 
     def sorted_iter_dyn_species(self) -> tp.Iterable[ChemSpecies]:
         """
-        Get an iterator over all the DynSpecies (ordered).
+        Get an iterator over all the dynamic species (ordered).
 
         Returns:
-            Iterator(DynSpecies)
+            Iterator(ChemSpecies)
         """
         return map(
             op.itemgetter(1), sorted(self.dyn_sp.items(), key=lambda x: x[1].index)
@@ -308,7 +318,7 @@ class ListSpecies:
 
     def iter_cst_species(self) -> tp.Iterable[ChemSpecies]:
         """
-        Get an iterator over all the CstSpecies (not ordered).
+        Get an iterator over all the constant species (not ordered).
 
         Returns:
             Iterator(ChemSpecies)
@@ -325,7 +335,16 @@ class ListSpecies:
         return iter(self.dyn_sp.values())
 
     def set_order(self, dyn_sp: tp.List, cst_sp: tp.List) -> None:
-        """ """
+        """
+        Set the order of the species in the ListSpecies.
+
+        Args:
+            dyn_sp (List): A list of dynamic species labels.
+            cst_sp (List): A list of constant species labels.
+
+        Returns:
+            None
+        """
         if len(dyn_sp) != len(self.dyn_sp) or len(cst_sp) != len(self.cst_sp):
 
             raise ValueError(
@@ -345,20 +364,18 @@ class ListSpecies:
         self, inplace: bool = True, starter: tp.Optional[tp.List[str]] = None
     ) -> tp.Optional[ListSpecies]:
         """
-        Sort all SimSpecies according to the following:
+        Sort the species in the ListSpecies.
         For n DynSpecies & m cstSpecies, indexes should be like:
             - DynSpecies: "O2"->0; "e_aq"->1; ... ;"H2O2"->n-1
             - CstSpecies: "H2O"->n; ... ; "catalase"->n+m-1
-
         Args:
-            inplace: bool, optional
-                Replace the existing index or return a deepcopy of the ListSpecies
-                instance (default is True)
+            inplace (bool, optional): Whether to sort the species in place. Defaults to True.
+            starter (List[str], optional): A list of dynamic species labels to start the sorting with. Defaults to None.
 
         Returns:
-            None if inplace = True
-            ListSpecies if inplace = False
+            ListSpecies: The sorted ListSpecies if inplace is False, otherwise None.
         """
+
         out = copy.deepcopy(self) if not inplace else self
         if starter is None:
             starter = []
@@ -385,13 +402,29 @@ class ListSpecies:
         return out if not inplace else None
 
     def is_cst_species(self, key: str | ChemSpecies) -> bool:
-        """ """
+        """
+        Checks if a given key is a constant species.
+
+        Args:
+            key (str | ChemSpecies): The key to be searched. It can be either a string or a ChemSpecies instance.
+
+        Returns:
+            bool: True if the key is found in the constant species, False otherwise.
+        """
         if isinstance(key, ChemSpecies):
             key = key.label
         return key in self.cst_sp
 
     def is_dyn_species(self, key: str | ChemSpecies) -> bool:
-        """ """
+        """
+        Checks if a given key is a dynamic species.
+
+        Args:
+            key (str | ChemSpecies): The key to be searched. It can be either a string or a ChemSpecies instance.
+
+        Returns:
+            bool: True if the key is found in the dynamic species, False otherwise.
+        """
         # If CstSpecies from another sim, should still be tested for this one.
         if isinstance(key, ChemSpecies):
             key = key.label

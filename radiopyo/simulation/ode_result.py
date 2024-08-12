@@ -135,17 +135,17 @@ class ODEResult(object):
 
     def __getitem__(self, key: str) -> pd.Series:
         """ """
-        if key not in self.env.species:
+        sp = self.env.species.get(key)
+        if sp is None:
             raise KeyError(f"'{key}' is not a valid species for this env.")
 
         # Is it a constant species?
-        if not self.env.species.is_dyn_species(key):
+        if not self.env.species.is_dyn_species(sp):
             return pd.Series(
                 data=self.env.species[key].initial_cc() * 1e6, index=self.t, name=key
             )
 
-        sp, idx = self.env.species.get_sim_species(key)
-        return pd.Series(data=self.y[idx, :], index=self.t, name=sp.label)
+        return pd.Series(data=self.y[sp.index, :], index=self.t, name=sp.label)
 
     def __add__(self, other: tp.Any) -> ODEResult:
         """ """

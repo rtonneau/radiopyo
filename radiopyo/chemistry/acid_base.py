@@ -3,7 +3,7 @@
 The acid_base submodule contains all class definitions related to acid-base equilibrium.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 14/12/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 14/12/2023
 """
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
@@ -42,15 +42,18 @@ __all__ = [
 
 class ABCouple(tp.NamedTuple):
     """
+    Represents an acid-base couple.
+
     Attributes:
-        species: ChemSpecies
-            Acid or Base
-        conjugate: ChemSpecies
-            Conjugate base from Acid or Conjugate acid from Base.
-        pKa: float
-        k_forward: float
-        k_backward: float
-        temperature: float | None
+        species (ChemSpecies): The acid or base species.
+        conjugate (ChemSpecies): The conjugate base of the acid or conjugate acid of the base.
+        pKa (float): The acid dissociation constant (pKa) of the couple.
+        k_forward (float): The forward reaction rate constant of the couple.
+        k_backward (float): The backward reaction rate constant of the couple.
+        temperature (float | None): The temperature at which the couple's properties are defined (in Kelvin). If None, the temperature is not specified.
+
+    Note:
+        This class is a NamedTuple, which means it is immutable and its attributes can be accessed by name or by index.
     """
 
     species: ChemSpecies
@@ -63,18 +66,32 @@ class ABCouple(tp.NamedTuple):
 
 class AcidBase(BiReaction):
     """
-    This one is more tricky about temperature management as various polynomial forms
-    are involved:
-        pKa = a0 + a1 T + a2 T**2 + ...
-        log(K) = a0 + a1 (1/T) + a2 (1/T)**2 + ...
-    => pKa uses T while log(K) uses (1/T)
-    Therefore, the calculation of reaction constants cannot be left to the respective
-    KReactions as these are not aware of it.
+    Represents an acid-base reaction.
 
-    Rem:
-    K_equilibrium = K_forward / K_backward
-    <=> log(K_e) = log(K_f) - log(K_b)
-    K_equilibrium = 10 ** (-pKa)
+    This class is a subclass of BiReaction and manages the temperature-dependent
+    reaction constants for acid-base reactions.
+
+    Attributes:
+        _pKa (np.polynomial.Polynomial): The polynomial form of the pKa.
+        _k_backward (np.polynomial.Polynomial): The polynomial form of the backward reaction rate constant.
+        _k_forward (np.polynomial.Polynomial): The polynomial form of the forward reaction rate constant.
+        _HA (ChemSpecies): The acid species.
+        _A (ChemSpecies): The conjugate base species.
+
+    Methods:
+        pKa(self, T: float) -> float: Returns the pKa value at the given temperature.
+        k_equilibrium(self, T: float) -> float: Returns the equilibrium constant at the given temperature.
+        k_forward(self, T: float) -> float: Returns the forward reaction rate constant at the given temperature.
+        k_backward(self, T: float) -> float: Returns the backward reaction rate constant at the given temperature.
+
+    Notes:
+        The reaction constants are calculated using the polynomial forms of the pKa and
+        reaction rate constants:
+            pKa = a0 + a1 T + a2 T**2 + ...
+            log(K) = a0 + a1 (1/T) + a2 (1/T)**2 + ...
+        Therefore, the calculation of reaction constants cannot be left to the respective
+        KReactions as these are not aware of it.
+        The temperature is assumed to be in Kelvin.
     """
 
     _k_backward: np.polynomial.Polynomial
@@ -98,10 +115,8 @@ class AcidBase(BiReaction):
         if reaction["constants"].get("k_forward", None) is None:
             raise ValueError("For A/B reaction, k_forward must be defined")
 
-        self._k_backward = polynomial_factory(
-            reaction["constants"]["k_backward"])
-        self._k_forward = polynomial_factory(
-            reaction["constants"]["k_forward"])
+        self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
+        self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
 
         # Need to add forward and backward reactions via the superclass
         self.add_forward_reaction(reaction, list_sp=list_sp)
@@ -113,10 +128,22 @@ class AcidBase(BiReaction):
 
     @property
     def acid(self) -> ChemSpecies:
+        """
+        A property to return the acid species.
+
+        Returns:
+            ChemSpecies: The acid species.
+        """
         return self._HA
 
     @property
     def base(self) -> ChemSpecies:
+        """
+        A property to return the base species.
+
+        Returns:
+            ChemSpecies: The base species.
+        """
         return self._A
 
     @classmethod
@@ -126,17 +153,26 @@ class AcidBase(BiReaction):
         **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """
+        A class method to create an AcidBase reaction from keyword arguments.
         This method combines the two possible definitions of a KReaction in a config
         file.
-        TODO: remove the dict approach to keep only the single string reaction.
+
+        Parameters:
+            list_sp (ListSpecies): A collection of species already involved in the simulation.
+            **kwargs: Keyword arguments containing the reaction string and pKa value.
+
+        Returns:
+            AcidBase: An instance of the AcidBase class.
+
+        Raises:
+            AttributeError: If the reaction string or pKa value is missing.
+            AttributeError: If 'k_value' is ambiguous for an AcidBase reaction.
         """
         # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
+        list_sp = list_sp if list_sp is not None else ListSpecies()
 
         try:
-            gen = RPARSER.parse_reaction(
-                kwargs["reaction"])  # type:ignore[arg-type]
+            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
             pKa = kwargs["pKa"]
         except KeyError as err:
             raise AttributeError(
@@ -161,24 +197,40 @@ class AcidBase(BiReaction):
         return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
     def pKa(self, T: tp.Optional[Temperature | float] = None) -> float:
-        """ """
+        """
+        Returns the acid dissociation constant (pKa) of the acid-base reaction at a given temperature.
+
+        Args:
+            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+
+        Returns:
+            float: The pKa value at the given temperature.
+        """
         _T = Temperature(T) if T is not None else Temperature()
         return self._pKa(_T.celsius)
 
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Args:
-            T: Temperature in °C (optional, default:25)
+        Returns the acid-base equilibrium constant at a given temperature.
 
-        For pKa, polynomial form depends on T in °C.
+        Args:
+            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+
+        Returns:
+            float: The equilibrium constant at the given temperature.
         """
         _T = Temperature(T) if T is not None else Temperature()
         return 10 ** (-self._pKa(_T.celsius))
 
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
+        Returns the forward reaction constant at a given temperature.
+
         Args:
-            T: Temperature in °C (optional, default:25)
+            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+
+        Returns:
+            float: The forward reaction constant at the given temperature.
         """
         _T = Temperature(T) if T is not None else Temperature()
         if self.forward.has_reactant("H2O"):
@@ -187,26 +239,52 @@ class AcidBase(BiReaction):
 
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
+        Returns the backward reaction constant at a given temperature.
+
         Args:
-            T: Temperature in °C (optional, default:25)
+            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+
+        Returns:
+            float: The backward reaction constant at the given temperature.
         """
+
         _T = Temperature(T) if T is not None else Temperature()
         if self.backward.has_reactant("H2O"):
             return 10 ** self._k_backward(1.0 / _T.kelvin)  # / 55.5
         return 10 ** self._k_backward(1.0 / _T.kelvin)
 
     def is_acid(self) -> bool:
-        if "H3O_plus" in self.forward or "H_plus" in self.forward:
-            return True
-        return False
+        """
+        Checks whether the reaction involved H3O+ or H+.
+
+        Returns:
+            bool: True if the reaction is an acid, False otherwise.
+        """
+        return bool("H3O_plus" in self.forward or "H_plus" in self.forward)
 
     def is_base(self) -> bool:
-        if "OH_minus" in self.forward:
-            return True
-        return False
+        """
+        Checks whether the reaction involved OH-.
+
+        Returns:
+            bool: True if the reaction is a base, False otherwise.
+        """
+        return "OH_minus" in self.forward
 
     def get_deprotonation_reaction(self) -> KReaction:
-        """ """
+        """
+        Returns the deprotonation reaction of the current reaction.
+
+        The deprotonation reaction is determined based on the nature of the reaction.
+        If the reaction involves H3O or H+, it returns the reaction that produces H3O+ or H+.
+        If the reaction involves OH-, it returns the reaction that has OH- as a reactant.
+
+        Returns:
+            KReaction: The deprotonation reaction.
+
+        Raises:
+            ValueError: If the reaction is neither an acid nor a base.
+        """
         if self.is_acid():
             if self.forward.has_product("H3O_plus") or self.forward.has_product(
                 "H_plus"
@@ -223,8 +301,23 @@ class AcidBase(BiReaction):
 
     def get_couple(self, T: tp.Optional[Temperature | float] = None) -> ABCouple:
         """
-        Ugly function but working function
-        ==> TODO: Refactor
+        Returns the acid/base couple of the current reaction.
+
+        The acid/base couple is determined based on the nature of the reaction.
+        If the reaction involves H3O or H+, it returns the reaction that produces H3O+ or H+.
+        If the reaction involves OH-, it returns the reaction that has OH- as a reactant.
+
+        Parameters:
+            T: The temperature in Celsius. If None, the temperature is not considered.
+
+        Returns:
+            ABCouple: The acid/base couple.
+
+        Raises:
+            ValueError: If the reaction is neither an acid nor a base.
+
+        Notes:
+            To refactor
         """
         r = self.get_deprotonation_reaction()
 

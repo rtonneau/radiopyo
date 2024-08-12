@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
 """
-The e_reactions submodule contains all class definitions related to chemical
-reactions with equilibrium.
+The `e_reactions` submodule contains classes that define chemical reactions
+with equilibrium. These reactions are defined using the equilibrium
+approach, also known as the "chemical equilibrium" or "thermodynamic
+equilibrium".
+
+This submodule provides the necessary classes to work with chemical reactions
+in which the concentrations of the reactants and products are in equilibrium.
+
+The classes defined here are:
+
+- `EReaction`: This class represents a chemical reaction with equilibrium.
+  It inherits from the `BasicReaction` class and provides additional methods
+  to work with these types of reactions.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 13/12/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 13/12/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -21,7 +33,6 @@ from radiopyo.parser.reaction_parser import revert_reaction
 from .collections import ListSpecies
 from .k_reactions import (
     BiReaction,
-    KReactionCollection,
     polynomial_factory,
 )
 from .utils.units import Temperature
@@ -44,8 +55,8 @@ __all__ = [
 
 class EReaction(BiReaction):
     """
-
-    The math for equilibrium constant are the following:
+    This class represents equilibrium reactions. It computes the equilibrium constant
+    by the following formula:
     K_equilibrium = K_forward / K_backward
     <=> log(K_e) = log(K_f) - log(K_b)
 
@@ -60,13 +71,25 @@ class EReaction(BiReaction):
         constant: tp.Optional[float | tp.List[float]] = None,
         list_sp: tp.Optional[ListSpecies] = None,
     ):
-        """ """
+        """
+        Initializes an EReaction instance.
+
+        This method is responsible for computing the equilibrium constant
+        (K_equilibrium) from the given reaction and constant.
+
+        Parameters:
+            reaction (GenericReaction): The reaction to be used for computing the equilibrium constant.
+            constant (Optional[float | List[float]], optional): The constant value for the reaction. Defaults to None.
+            list_sp (Optional[ListSpecies], optional): The list of species involved in the reaction. Defaults to None.
+
+        Returns:
+            None
+        """
         super().__init__()
         # Check whether enough information is provided to compute all K's.
         if constant is None:
             try:
-                self._k_forward = polynomial_factory(
-                    reaction["constants"]["k_forward"])
+                self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
                 self._k_backward = polynomial_factory(
                     reaction["constants"]["k_backward"]
                 )
@@ -84,16 +107,14 @@ class EReaction(BiReaction):
             "k_backward" in reaction["constants"]
             and reaction["constants"]["k_backward"] is not None
         ):
-            self._k_backward = polynomial_factory(
-                reaction["constants"]["k_backward"])
+            self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
             self._k_equilibrium = polynomial_factory(constant)
             self._k_forward = self._k_equilibrium + self._k_backward
         elif (
             "k_forward" in reaction["constants"]
             and reaction["constants"]["k_forward"] is not None
         ):
-            self._k_forward = polynomial_factory(
-                reaction["constants"]["k_forward"])
+            self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
             self._k_equilibrium = polynomial_factory(constant)
             self._k_backward = self._k_forward - self._k_equilibrium
         else:
@@ -115,16 +136,29 @@ class EReaction(BiReaction):
         **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """
-        This method combines the two possible definitions of a KReaction in a config
-        file.
+        Create an EquilibriumReaction from keyword arguments.
+
+        Parameters:
+            list_sp (ListSpecies, optional): Collection of species already involved in the simulation. Defaults to None.
+            **kwargs: Keyword arguments to create the instance.
+                - reaction (str): The reaction string.
+                - k_forward (float): The forward reaction rate constant.
+                - k_backward (float): The backward reaction rate constant.
+                - k_equilibrium (float): The equilibrium constant.
+
+        Returns:
+            EquilibriumReaction: An instance of EquilibriumReaction.
+
+        Raises:
+            AttributeError: If 'k_value' is provided, as it is ambiguous for an EquilibriumReaction.
+            AttributeError: If no reaction string is provided.
         """
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
             list_sp = ListSpecies()
 
         try:
-            gen = RPARSER.parse_reaction(
-                kwargs["reaction"])  # type:ignore[arg-type]
+            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
         except KeyError as err:
             raise AttributeError(
                 "Need a reaction string to create an Equilibrium Reaction"
@@ -137,37 +171,52 @@ class EReaction(BiReaction):
             )
 
         with suppress(KeyError):
-            gen["constants"]["k_forward"] = kwargs["k_forward"]
+            gen["constants"]["k_forward"] = kwargs[
+                "k_forward"
+            ]  # type:ignore[assignment]
         with suppress(KeyError):
-            gen["constants"]["k_backward"] = kwargs["k_backward"]
+            gen["constants"]["k_backward"] = kwargs[
+                "k_backward"
+            ]  # type:ignore[assignment]
 
         constant = kwargs.get("k_equilibrium", None)
 
         # type:ignore[arg-type]
-        return cls(gen, constant=constant, list_sp=list_sp)
+        return cls(gen, constant=constant, list_sp=list_sp)  # type:ignore[arg-type]
 
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Args:
-            T: temperature in °C.
+        Compute the equilibrium constant of the reaction at a given temperature.
+
+        Parameters:
+            T (Optional[Temperature | float]): The temperature in °C (optional, default:None)
+
+        Returns:
+            float: The equilibrium constant at the given temperature.
         """
         _T = Temperature(T) if T is not None else Temperature(unit="celsius")
         return 10 ** self._k_equilibrium(1 / _T.kelvin)
 
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
+        Compute the forward reaction constant of the reaction at a given temperature.
+
         Args:
-            T: temperature in °C.
+            T (Optional[Temperature | float]): The temperature in °C (optional, default:None)
+
+        Returns:
+            float: The forward reaction constant at the given temperature.
         """
-        if self.forward.has_reactant("H2O"):
-            return self.forward.k_value(T)  # / 55.5
         return self.forward.k_value(T)
 
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
+        Compute the backward reaction constant of the reaction at a given temperature.
+
         Args:
-            T: temperature in °C.
+            T (Optional[Temperature | float]): The temperature in °C (optional, default:None)
+
+        Returns:
+            float: The backward reaction constant at the given temperature.
         """
-        if self.backward.has_reactant("H2O"):
-            return self.backward.k_value(T)  # / 55.5
         return self.backward.k_value(T)

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
+The michaelis submodule:
 The michaelis submodule contains all class definitions related to enzymatic reactions
 treatment via the Michaelis-Menten kinetic.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
+
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
 
@@ -70,6 +72,9 @@ class MichaelisMenten(BasicReaction):
     def raw_k_value(self) -> float:
         """
         Produce the k_value as provided by config files.
+
+        Returns:
+            float: k_value as provided by config files.
         """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
@@ -80,6 +85,12 @@ class MichaelisMenten(BasicReaction):
     def make_hash(self, method: str = "sha256") -> str:
         """
         Produce a unique identifier (content based) for easy comparison.
+
+        Parameters:
+            method (str): Hash method to use (default: "sha256").
+
+        Returns:
+            str: A hash value representing the object.
         """
         hasher = hashlib.new(method, usedforsecurity=False)
         hasher.update(repr(self).encode())
@@ -94,10 +105,17 @@ class MichaelisMenten(BasicReaction):
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> tp.Self:
         """
-        Create a KReaction from a 'GenericReaction', Typed-Dict structure produced by
+        Create a MichaelisMenten from a 'GenericReaction', Typed-Dict structure produced by
         radiopyo module parser.
-        TODO: k_value & k_micha should probably be contained in the GenericReaction
-        instance.
+
+        Parameters:
+            generic (GenericReaction): Typed-Dict structure holding the reaction metadata.
+            k_value (float): k value of the reaction.
+            k_micha (float): Michaelis-Menten constant of the reaction.
+            list_sp (ListSpecies, optional): Collection of species already involved in the simulation. Defaults to None.
+
+        Returns:
+            MichaelisMenten: An instance of MichaelisMenten.
         """
         if generic["enzyme"] is None:
             raise ValueError(f"No enzyme found for enzymatic reaction: {generic}")
@@ -130,9 +148,17 @@ class MichaelisMenten(BasicReaction):
         **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """
-        This method combines the two possible definitions of a MichaelisMenten reaction
-        in a config file.
-        TODO: remove the dict approach to keep only the single string reaction.
+        Creates a MichaelisMenten reaction from keyword arguments.
+
+        Parameters:
+            list_sp (ListSpecies, optional): Collection of species already involved in the simulation. Defaults to None.
+            **kwargs: Keyword arguments to create the instance.
+
+        Returns:
+            MichaelisMenten: An instance of MichaelisMenten.
+
+        Raises:
+            ValueError: If the keyword arguments do not match the expected syntax.
         """
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
@@ -172,31 +198,19 @@ class MichaelisMenten(BasicReaction):
         k_micha: float,
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> tp.Self:
-        """Create a MichaelisMenten from a dictionary (via destructuring)
+        """
+        Creates a MichaelisMenten instance from a dictionary.
 
-        Args:
-            enzyme: str
-                Name of the species used as enzyme
-            substrate: List[str]
-                Name of the species used as substrate. For some reaction, more than one
-                molecule of substrate are required, therefore a list is expected. For
-                instance if 2 molecule of H2 are needed: ["H2", "H2"]
-            products: List[str]
-                List of products
-            k_value: float
-                k value of the reaction
-            k_micha: float
-                Michaelis-Menten constant of the reaction
-            list_sp: ListSpecies
-                Collection of species already involved in the simulation. This
-                collection will grow if some reactants and/or products do not exist yet.
+        Parameters:
+            enzyme (str): The enzyme name.
+            substrate (List[str] | str): The substrate name(s).
+            products (List[str]): The product name(s).
+            k_value (float): The k value of the reaction.
+            k_micha (float): The k_micha value of the reaction.
+            list_sp (ListSpecies, optional): The list of species. Defaults to None.
 
         Returns:
-            MichaelisMenten
-
-        Raises:
-            TypeError:
-                if more than one substrate "kind" if defined.
+            MichaelisMenten: A MichaelisMenten instance.
         """
         new = cls(k_value, k_micha)
         # Allow shallow creation (outside of a simulation env)
@@ -223,17 +237,17 @@ class MichaelisMenten(BasicReaction):
 
     def as_label(self) -> str:
         """
-        This method is used for the data mining. It should be implemented by child
-        classes in order to easily define short labels for each reactions based on the
-        reaction type and the index of reaction. For instance, it can be used as column
-        name in a pandas DataFrame.
+        Returns a string label for the reaction based on its index.
 
-        Returns:
-            str
+        The label is in the format "EZ_{index}" if the index is valid.
 
         Raises:
             KeyError
-                If index is None.
+                If the index is None or invalid.
+
+        Returns:
+            str
+                A string label for the reaction.
         """
         if self.index is not None and self.index >= 0:
             return f"EZ_{self.index}"
@@ -250,6 +264,9 @@ class MichaelisMenten(BasicReaction):
         return " ".join(out)
 
     def __repr__(self) -> str:
+        """
+        Returns a string representation of the MichaelisMenten instance.
+        """
         return (
             f"MichaelisMenten('{self.__str__()}', "
             f"k_value={round(self.k_value, 5)}, "
