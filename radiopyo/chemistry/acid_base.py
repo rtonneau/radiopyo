@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-The acid_base submodule contains all class definitions related to acid-base equilibrium.
+The acid_base submodule contains all class definitions related to
+acid-base equilibrium.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 14/12/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ---------------------------- External imports ----------------------------- #
 from __future__ import annotations
 
 import typing as tp
@@ -13,7 +14,7 @@ from contextlib import suppress
 
 import numpy as np
 
-# --------------------------------- Internal imports --------------------------------- #
+# ---------------------------- Internal imports ----------------------------- #
 from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
@@ -25,7 +26,7 @@ from .k_reactions import (
 )
 from .utils.units import Temperature
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from .species import ChemSpecies
 
@@ -35,9 +36,9 @@ __all__ = [
     "ABCouple",
 ]
 
-# ------------------------------------------------------------------------------------ #
-#                                   CLASS DEFINITIONS                                  #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class ABCouple(tp.NamedTuple):
@@ -46,14 +47,20 @@ class ABCouple(tp.NamedTuple):
 
     Attributes:
         species (ChemSpecies): The acid or base species.
-        conjugate (ChemSpecies): The conjugate base of the acid or conjugate acid of the base.
+        conjugate (ChemSpecies): The conjugate base of the acid or
+            conjugate acid of the base.
         pKa (float): The acid dissociation constant (pKa) of the couple.
-        k_forward (float): The forward reaction rate constant of the couple.
-        k_backward (float): The backward reaction rate constant of the couple.
-        temperature (float | None): The temperature at which the couple's properties are defined (in Kelvin). If None, the temperature is not specified.
+        k_forward (float): The forward reaction rate constant
+            of the couple.
+        k_backward (float): The backward reaction rate constant
+            of the couple.
+        temperature (float | None): The temperature at which the
+            couple's properties are defined (in Kelvin). If None, the
+            temperature is not specified.
 
     Note:
-        This class is a NamedTuple, which means it is immutable and its attributes can be accessed by name or by index.
+        This class is a NamedTuple, which means it is immutable and its
+        attributes can be accessed by name or by index.
     """
 
     species: ChemSpecies
@@ -68,29 +75,25 @@ class AcidBase(BiReaction):
     """
     Represents an acid-base reaction.
 
-    This class is a subclass of BiReaction and manages the temperature-dependent
-    reaction constants for acid-base reactions.
+    This class is a subclass of BiReaction and manages the
+    temperature-dependent reaction constants for acid-base reactions.
 
     Attributes:
         _pKa (np.polynomial.Polynomial): The polynomial form of the pKa.
-        _k_backward (np.polynomial.Polynomial): The polynomial form of the backward reaction rate constant.
-        _k_forward (np.polynomial.Polynomial): The polynomial form of the forward reaction rate constant.
+        _k_backward (np.polynomial.Polynomial): The polynomial form of
+            the backward reaction rate constant.
+        _k_forward (np.polynomial.Polynomial): The polynomial form of
+            the forward reaction rate constant.
         _HA (ChemSpecies): The acid species.
         _A (ChemSpecies): The conjugate base species.
 
-    Methods:
-        pKa(self, T: float) -> float: Returns the pKa value at the given temperature.
-        k_equilibrium(self, T: float) -> float: Returns the equilibrium constant at the given temperature.
-        k_forward(self, T: float) -> float: Returns the forward reaction rate constant at the given temperature.
-        k_backward(self, T: float) -> float: Returns the backward reaction rate constant at the given temperature.
-
     Notes:
-        The reaction constants are calculated using the polynomial forms of the pKa and
-        reaction rate constants:
+        The reaction constants are calculated using the polynomial forms
+        of the pKa and reaction rate constants:
             pKa = a0 + a1 T + a2 T**2 + ...
             log(K) = a0 + a1 (1/T) + a2 (1/T)**2 + ...
-        Therefore, the calculation of reaction constants cannot be left to the respective
-        KReactions as these are not aware of it.
+        Therefore, the calculation of reaction constants cannot be left
+        to the respective KReactions as these are not aware of it.
         The temperature is assumed to be in Kelvin.
     """
 
@@ -115,8 +118,12 @@ class AcidBase(BiReaction):
         if reaction["constants"].get("k_forward", None) is None:
             raise ValueError("For A/B reaction, k_forward must be defined")
 
-        self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
-        self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
+        self._k_backward = polynomial_factory(
+            reaction["constants"]["k_backward"],
+        )
+        self._k_forward = polynomial_factory(
+            reaction["constants"]["k_forward"],
+        )
 
         # Need to add forward and backward reactions via the superclass
         self.add_forward_reaction(reaction, list_sp=list_sp)
@@ -153,20 +160,24 @@ class AcidBase(BiReaction):
         **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """
-        A class method to create an AcidBase reaction from keyword arguments.
-        This method combines the two possible definitions of a KReaction in a config
-        file.
+        A class method to create an AcidBase reaction from keyword
+        arguments. This method combines the two possible definitions of
+        a KReaction in a config file.
 
-        Parameters:
-            list_sp (ListSpecies): A collection of species already involved in the simulation.
-            **kwargs: Keyword arguments containing the reaction string and pKa value.
+        Args:
+            list_sp (ListSpecies): A collection of species already
+                involved in the simulation.
+            **kwargs: Keyword arguments containing the reaction string
+                and pKa value.
 
         Returns:
             AcidBase: An instance of the AcidBase class.
 
         Raises:
-            AttributeError: If the reaction string or pKa value is missing.
-            AttributeError: If 'k_value' is ambiguous for an AcidBase reaction.
+            AttributeError: If the reaction string or pKa value is
+                missing.
+            AttributeError: If 'k_value' is ambiguous for an AcidBase
+                reaction.
         """
         # Allow shallow creation (outside of a simulation env)
         list_sp = list_sp if list_sp is not None else ListSpecies()
@@ -198,10 +209,12 @@ class AcidBase(BiReaction):
 
     def pKa(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Returns the acid dissociation constant (pKa) of the acid-base reaction at a given temperature.
+        Returns the acid dissociation constant (pKa) of the acid-base
+        reaction at a given temperature.
 
         Args:
-            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+            T (Temperature | float, optional): Temperature in °C.
+                Defaults to None.
 
         Returns:
             float: The pKa value at the given temperature.
@@ -209,12 +222,17 @@ class AcidBase(BiReaction):
         _T = Temperature(T) if T is not None else Temperature()
         return self._pKa(_T.celsius)
 
-    def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
+    def k_equilibrium(
+        self,
+        T: tp.Optional[Temperature | float] = None,
+    ) -> float:
         """
-        Returns the acid-base equilibrium constant at a given temperature.
+        Returns the acid-base equilibrium constant at a given
+        temperature.
 
         Args:
-            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+            T (Temperature | float, optional): Temperature in °C.
+                Defaults to None.
 
         Returns:
             float: The equilibrium constant at the given temperature.
@@ -227,10 +245,12 @@ class AcidBase(BiReaction):
         Returns the forward reaction constant at a given temperature.
 
         Args:
-            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+            T (Temperature | float, optional): Temperature in °C.
+                Defaults to None.
 
         Returns:
-            float: The forward reaction constant at the given temperature.
+            float: The forward reaction constant at the
+                given temperature.
         """
         _T = Temperature(T) if T is not None else Temperature()
         if self.forward.has_reactant("H2O"):
@@ -242,10 +262,12 @@ class AcidBase(BiReaction):
         Returns the backward reaction constant at a given temperature.
 
         Args:
-            T (Temperature | float, optional): Temperature in °C. Defaults to None.
+            T (Temperature | float, optional): Temperature in °C.
+                Defaults to None.
 
         Returns:
-            float: The backward reaction constant at the given temperature.
+            float: The backward reaction constant at the
+                given temperature.
         """
 
         _T = Temperature(T) if T is not None else Temperature()
@@ -275,9 +297,10 @@ class AcidBase(BiReaction):
         """
         Returns the deprotonation reaction of the current reaction.
 
-        The deprotonation reaction is determined based on the nature of the reaction.
-        If the reaction involves H3O or H+, it returns the reaction that produces H3O+ or H+.
-        If the reaction involves OH-, it returns the reaction that has OH- as a reactant.
+        The deprotonation reaction is determined based on the nature of
+        the reaction. If the reaction involves H3O+ or H+, it returns
+        the reaction that produces H3O+ or H+. If the reaction involves
+        OH-, it returns the reaction that has OH- as a reactant.
 
         Returns:
             KReaction: The deprotonation reaction.
@@ -303,12 +326,14 @@ class AcidBase(BiReaction):
         """
         Returns the acid/base couple of the current reaction.
 
-        The acid/base couple is determined based on the nature of the reaction.
-        If the reaction involves H3O or H+, it returns the reaction that produces H3O+ or H+.
-        If the reaction involves OH-, it returns the reaction that has OH- as a reactant.
+        The acid/base couple is determined based on the nature of the
+        reaction. If the reaction involves H3O or H+, it returns the
+        reaction that produces H3O+ or H+. If the reaction involves OH-,
+        it returns the reaction that has OH- as a reactant.
 
-        Parameters:
-            T: The temperature in Celsius. If None, the temperature is not considered.
+        Args:
+            T: The temperature in Celsius. If None, the temperature is
+                not considered.
 
         Returns:
             ABCouple: The acid/base couple.
@@ -325,12 +350,14 @@ class AcidBase(BiReaction):
             _l = len(r.reactants)
             if _l > 2:
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more "
                     f"than 2 different reactants ({_l} reactants)"
                 )
             if _l == 2 and not r.has_reactant("H2O"):
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more "
                     "than 1 reactant but none of them is H2O."
                 )
 
@@ -345,13 +372,17 @@ class AcidBase(BiReaction):
             _l = len(r.products)
             if _l > 2:
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more "
                     f"than 2 different products ({_l} products)"
                 )
-            if _l == 2 and not (r.has_product("H3O_plus") or r.has_product("H_plus")):
+            if (_l == 2) and (
+                not (r.has_product("H3O_plus") or r.has_product("H_plus"))
+            ):
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
-                    "than 1 product but none of them is H3O_plus or H_plus."
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more than 1 product but none "
+                    "of them is H3O_plus or H_plus."
                 )
 
             conjugate = None
@@ -365,12 +396,14 @@ class AcidBase(BiReaction):
             _l = len(r.products)
             if _l > 2:
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more "
                     f"than 2 different products ({_l} products)"
                 )
             if _l == 2 and not r.has_product("H2O"):
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more "
                     "than 1 product but none of them is H2O."
                 )
 
@@ -385,12 +418,14 @@ class AcidBase(BiReaction):
             _l = len(r.reactants)
             if _l > 2:
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more "
                     f"than 2 different reactants ({_l} reactants)"
                 )
             if _l == 2 and not r.has_reactant("OH_minus"):
                 raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. The reaction has more "
+                    f"Unable to identify acid/base couple of {r}. "
+                    "The reaction has more "
                     "than 1 reactant but none of them is OH_minus."
                 )
 

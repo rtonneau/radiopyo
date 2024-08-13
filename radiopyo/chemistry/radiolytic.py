@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-The radiolytic submodule contains all class and function definitions to include
-reactions involving High Energy Particles with the background species => Production of
-radicals and charged species. These reactions are defined using so called "G-values" ->
-radiolytic yields i.e.  [#radical / 100eV / incident particle].
+The radiolytic submodule contains all class and function definitions to
+include reactions involving High Energy Particles with the background
+species => Production of radicals and charged species. These reactions
+are defined using so called "G-values" -> radiolytic yields i.e.
+[#radical / 100eV / incident particle].
 
-/!\ Here, the solvent density is assumed to be the same as Water, thus a constant
-    concentration of 1 kg/l.
+/!\ Here, the solvent density is assumed to be the same as Water,
+thus a constant concentration of 1 kg/l.
 
 Classes:
-    - RadiolyticReaction: defines a simple reaction involving a High Energy Particle
+    - RadiolyticReaction: defines a simple reaction involving a High
+        Energy Particle
 
 Functions:
     - ge_to_kr: converts a G-value to K-rate constant
@@ -18,7 +20,7 @@ Functions:
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import hashlib
@@ -27,16 +29,16 @@ from typing import List
 
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.collections import ListSpecies
 
 from .basic_chemistry import BasicReaction
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from radiopyo.chemistry.species import ChemSpecies
 
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
 
 __all__ = [
     "ge_to_kr",
@@ -45,9 +47,9 @@ __all__ = [
     "RadiolyticReactionDict",
 ]
 
-# ------------------------------------------------------------------------------------ #
-#                                 FUNCTION DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
 # Ge units => radical / 100eV / incident particle
 # Kr units => mol/l/Gy
 
@@ -71,7 +73,7 @@ def ge_to_kr(ge: float) -> float:
     """
     Convert a G-value to a K-rate constant.
 
-    Parameters:
+    Args:
         ge (float): The G-value to convert.
 
     Returns:
@@ -95,27 +97,28 @@ def kr_to_ge(kr: float) -> float:
     return kr / d * elementary_charge * 100.0 * Avogadro
 
 
-# ------------------------------------------------------------------------------------ #
-#                                   CLASS DEFINITIONS                                  #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                               CLASS DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
 
 
 class RadiolyticReaction(BasicReaction):
     """
-    This class represents a radiolytic reaction. It is a specific type of chemical reaction
-    where the production rate only depends on the nature and energy of the incident radiation.
-    The reaction constant (G value) uniquely defines the rate of the reaction.
+    This class represents a radiolytic reaction. It is a specific type
+    of chemical reaction where the production rate only depends on the
+    nature and energy of the incident radiation. The reaction constant
+    (G value) uniquely defines the rate of the reaction.
 
-    The reaction consists of a list of products and a reaction constant (G value).
-    A radiolytic reaction is constructed from the BaseChemicalReaction. Here no reactant
-    should be involved. Moreover, the production rate only depends on the nature and
-    energy of incident radiation ==> LET and whether or not beam is ON.
-    ==> Only the list of products and the reaction cst (G value) are then relevant.
+    The reaction consists of a list of products and a reaction constant
+    (G value). A radiolytic reaction is constructed from the
+    BaseChemicalReaction. Here no reactant should be involved.
+    Moreover, the production rate only depends on the nature and energy
+    of incident radiation ==> LET and whether or not beam is ON.
+    ==> Only the list of products and the reaction cst (G value) are
+    then relevant.
 
     Attributes:
-        _reaction_cst (float): The reaction constant (G value) in [mol/l/Gy].
-        _reaction_cst: float
-            The G value of the reaction in [mol/l/Gy]
+        _reaction_cst (float): Reaction constant (G value)[mol/l/Gy].
     """
 
     _reaction_cst: float
@@ -127,15 +130,17 @@ class RadiolyticReaction(BasicReaction):
 
     def make_hash(self, method: str = "sha256") -> str:
         """
-        Generate a hash for the reaction. The G value is not included in the hash
-        because two radiolytic reactions of the same species can have different G values.
-        The hash is intended to be used to identify the reaction uniquely, without the need
-        to store the G value. When the reaction is to be used, the actual G value should be
-        provided.
+        Generate a hash for the reaction. The G value is not included
+        in the hash because two radiolytic reactions of the same species
+        can have different G values. The hash is intended to be used to
+        identify the reaction uniquely, without the need to store the
+        G value. When the reaction is to be used, the actual G value
+        should be provided. The hash is computed from the reaction's
+        index and the list of products.
 
-        The hash is computed from the reaction's index and the list of products.
         Args:
-            method (str): The hashing algorithm to use. Defaults to "sha256".
+            method (str): The hashing algorithm to use. Defaults to
+                "sha256".
 
         Returns:
             str: The hash of the instance as a hexadecimal string.
@@ -153,7 +158,8 @@ class RadiolyticReaction(BasicReaction):
 
         Returns:
             str
-                A string label in the format "G_{index}" if index is valid.
+                A string label in the format "G_{index}" if index is
+                valid.
 
         Raises:
             KeyError
@@ -183,7 +189,8 @@ class RadiolyticReaction(BasicReaction):
 
     def label(self) -> str:
         """
-        Method to generate a string representation of the label of the reaction.
+        Method to generate a string representation of the label of the
+        reaction.
 
         Returns:
             str
@@ -215,7 +222,7 @@ class RadiolyticReaction(BasicReaction):
         """
         Updates the reaction constant from a given G-value.
 
-        Parameters:
+        Args:
             value (float): The G-value to convert.
 
         Returns:
@@ -225,8 +232,8 @@ class RadiolyticReaction(BasicReaction):
 
     def compute_initial_cc_before(self, t0: float, dose_rate: float) -> float:
         """
-        Computes the production of the species by the beam for the first instants of beam
-        ON i.e. when time <= t0.
+        Computes the production of the species by the beam for the first
+        instants of beam ON i.e. when time <= t0.
 
         Arguments:
             t0: float
@@ -246,7 +253,9 @@ class RadiolyticReaction(BasicReaction):
         ge: float,
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> RadiolyticReaction:
-        """Create a RadiolyticReaction from a dictionary (via destructuring)
+        """
+        Create a RadiolyticReaction from a dictionary
+        (via destructuring)
 
         Args:
             product: str
@@ -254,8 +263,10 @@ class RadiolyticReaction(BasicReaction):
             ge: float
                 G Value in [radical / 100eV / incident particle]
             list_sp: ListSpecies
-                Collection of species already involved in the simulation. This
-                collection will grow if some products do not exist yet.
+                Collection of species already involved in the
+                simulation. This collection will grow if some products
+                do not exist yet.
+
         Returns:
             RadiolyticReaction
         """
@@ -266,7 +277,7 @@ class RadiolyticReaction(BasicReaction):
         new.add_as_product(list_sp.get_or_create_dyn_species(product.strip()))
         return new
 
-    # ------------------------------------------------------------------------ #
+    # ----------------------------------------------------------------------- #
 
     def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """No reactant should be involved"""
@@ -274,7 +285,8 @@ class RadiolyticReaction(BasicReaction):
 
     def __str__(self) -> str:
         """
-        Returns a string representation of the RadiolyticReaction instance.
+        Returns a string representation of the RadiolyticReaction
+        instance.
         """
         return f"RadiolyticReaction('{self.label()}')"
 

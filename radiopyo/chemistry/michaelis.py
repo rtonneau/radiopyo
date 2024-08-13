@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 The michaelis submodule:
-The michaelis submodule contains all class definitions related to enzymatic reactions
-treatment via the Michaelis-Menten kinetic.
+The michaelis submodule contains all class definitions related to
+enzymatic reactions treatment via the Michaelis-Menten kinetic.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ------------------------------ External imports --------------------------- #
 from __future__ import annotations
 
 import hashlib
@@ -17,32 +17,33 @@ import typing as tp
 from radiopyo.chemistry.basic_chemistry import BasicReaction
 from radiopyo.chemistry.collections import ListSpecies
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser import RPARSER
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from radiopyo.chemistry.species import ChemSpecies
     from radiopyo.parser.reaction_parser import GenericReaction
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
 
 __all__ = [
     "MichaelisMenten",
 ]
 
-# ------------------------------------------------------------------------------------ #
-#                                    CLASS DEFINITION                                  #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                                CLASS DEFINITION                             #
+# --------------------------------------------------------------------------- #
 
 
 class MichaelisMenten(BasicReaction):
     """
-    Class implementing the Michaelis-Menten kinetic. Child class of BaseChemicalReaction
-    with few additions. In the Michaelis-Menten kinetic the reaction rate is defined by:
+    Class implementing the Michaelis-Menten kinetic. Child class of
+    BaseChemicalReaction with few additions. In the Michaelis-Menten
+    kinetic the reaction rate is defined by:
         k_value * [enzyme] * [substrate] / (k_micha + [substrate])
 
-    This kinetic is really convenient as it ensures a positive denominator during
-    calculation (k_micha > 0).
+    This kinetic is really convenient as it ensures a positive
+    denominator during calculation (k_micha > 0).
 
     Attributes:
         k_value: float
@@ -86,7 +87,7 @@ class MichaelisMenten(BasicReaction):
         """
         Produce a unique identifier (content based) for easy comparison.
 
-        Parameters:
+        Args:
             method (str): Hash method to use (default: "sha256").
 
         Returns:
@@ -105,14 +106,16 @@ class MichaelisMenten(BasicReaction):
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> tp.Self:
         """
-        Create a MichaelisMenten from a 'GenericReaction', Typed-Dict structure produced by
-        radiopyo module parser.
+        Create a MichaelisMenten from a 'GenericReaction', Typed-Dict
+        structure produced by radiopyo module parser.
 
-        Parameters:
-            generic (GenericReaction): Typed-Dict structure holding the reaction metadata.
+        Args:
+            generic (GenericReaction): Typed-Dict structure holding the
+                reaction metadata.
             k_value (float): k value of the reaction.
             k_micha (float): Michaelis-Menten constant of the reaction.
-            list_sp (ListSpecies, optional): Collection of species already involved in the simulation. Defaults to None.
+            list_sp (ListSpecies, optional): Collection of species
+                already involved in the simulation. Defaults to None.
 
         Returns:
             MichaelisMenten: An instance of MichaelisMenten.
@@ -150,15 +153,17 @@ class MichaelisMenten(BasicReaction):
         """
         Creates a MichaelisMenten reaction from keyword arguments.
 
-        Parameters:
-            list_sp (ListSpecies, optional): Collection of species already involved in the simulation. Defaults to None.
+        Args:
+            list_sp (ListSpecies, optional): Collection of species
+                already involved in the simulation. Defaults to None.
             **kwargs: Keyword arguments to create the instance.
 
         Returns:
             MichaelisMenten: An instance of MichaelisMenten.
 
         Raises:
-            ValueError: If the keyword arguments do not match the expected syntax.
+            ValueError: If the keyword arguments do not match the
+                expected syntax.
         """
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
@@ -201,13 +206,14 @@ class MichaelisMenten(BasicReaction):
         """
         Creates a MichaelisMenten instance from a dictionary.
 
-        Parameters:
+        Args:
             enzyme (str): The enzyme name.
             substrate (List[str] | str): The substrate name(s).
             products (List[str]): The product name(s).
             k_value (float): The k value of the reaction.
             k_micha (float): The k_micha value of the reaction.
-            list_sp (ListSpecies, optional): The list of species. Defaults to None.
+            list_sp (ListSpecies, optional): The list of species.
+                Defaults to None.
 
         Returns:
             MichaelisMenten: A MichaelisMenten instance.

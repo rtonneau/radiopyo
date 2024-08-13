@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """
+This module contains the implementation of the abstract base class for file parsers
+used in radiopyo.
+
+The module provides the abstract base class :class:`FileParser` and the function
+:func:`list_available_parsers` to list the available parsers.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 23/06/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 23/06/2023
 """
 # --------------------------------- External imports --------------------------------- #
 from __future__ import annotations
@@ -40,11 +45,32 @@ logger = logging.getLogger("radiopyo")
 
 
 def list_available_parsers() -> tp.Dict[str, tp.Type[FileParser]]:
+    """
+    Returns a dictionary containing all available parsers and their corresponding extensions.
+
+    Args:
+        None
+
+    Returns:
+        Dict[str, Type[FileParser]]: A dictionary with parser extensions as keys and parser classes as values.
+    """
     return {cls.ext: cls for cls in FileParser.__subclasses__()}  # type: ignore [type-abstract]
 
 
 def resolve_includes(config: ConfigDict) -> ConfigDict:
-    """ """
+    """
+    Resolves the includes in the given configuration dictionary.
+
+    Args:
+        config (ConfigDict): The configuration dictionary.
+
+    Returns:
+        ConfigDict: The updated configuration dictionary.
+
+    Raises:
+        FileNotFoundError: If the included file does not exist.
+
+    """
     if len(config["includes"]) == 0:
         return config  # Do nothing
     available_parsers = list_available_parsers()
@@ -89,7 +115,32 @@ def resolve_includes(config: ConfigDict) -> ConfigDict:
 
 class FileParser(ABC):
     """
-    Generic Class parsing files.
+    FileParser is an abstract class designed to parse files into a dictionary.
+
+    This class is meant to be subclassed by specific parsers for different file types.
+    Each subclass should define `ext`, a class variable that specifies the file type
+    the parser can handle, and `parse`, a method that parses the file and returns
+    a dictionary.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        The path to the file to be parsed.
+
+    Attributes
+    ----------
+    path : str or pathlib.Path
+        The path to the file to be parsed.
+    ext : classvar str
+        The file extension that the parser can handle.
+
+    Methods
+    -------
+    parse() -> dict
+        Parse the file and return a dictionary.
+    file_type() -> None
+        Check that the file has the correct extension.
+
     """
 
     path: str | pathlib.Path

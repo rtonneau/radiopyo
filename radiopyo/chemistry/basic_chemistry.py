@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-The base_chemistry submodule contains all class definitions and protocols to build some
-more advanced chemistry ==> building blocks of basic chemistry.
+The base_chemistry submodule contains all class definitions and
+protocols to build some more advanced chemistry ==> building blocks of
+basic chemistry.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import typing as tp
@@ -16,32 +17,32 @@ from functools import reduce
 from itertools import chain
 from operator import add
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from .species import ChemSpecies, RawSpecies
 
 if tp.TYPE_CHECKING:
     from .collections import ListSpecies
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
-# ------------------------------------------------------------------------------------ #
+# ------------------------- Type checking ONLY imports----------------------- #
+# --------------------------------------------------------------------------- #
 __all__ = [
     "BasicReaction",
     "IsChemicalReaction",
 ]
 
-# ------------------------------------------------------------------------------------ #
-#                                   CLASS DEFINITIONS                                  #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class IsChemicalReaction(tp.Protocol):
     """
     Protocol for a chemical reaction.
 
-    A class implementing this protocol should provide the following attributes:
+    A class implementing this protocol should provide the following
+    attributes:
 
     Attributes:
-    ----------
     reactants: tp.Dict[str, ChemSpecies]
         A dictionary of reactants in the reaction.
     products: tp.Dict[str, ChemSpecies]
@@ -54,14 +55,13 @@ class IsChemicalReaction(tp.Protocol):
         An optional index for the reaction.
 
     Methods:
-    -------
     __contains__(other: object) -> bool
         Checks if a given object is in the reaction.
 
     Notes:
-    -----
-    This protocol is used to define the interface for a chemical reaction.
-    Any class implementing this protocol should provide the required attributes and methods.
+        This protocol is used to define the interface for a chemical
+        reaction. Any class implementing this protocol should provide
+        the required attributes and methods.
     """
 
     reactants: tp.Dict[str, ChemSpecies]
@@ -99,38 +99,41 @@ class BasicReaction(ABC):
     """
     Abstract base class for a basic chemical reaction.
 
-    This class provides a foundation for representing a chemical reaction, including
-    the reactants, products, stoichiometric coefficients, and reaction index.
-    Represents very basic chemical reaction. The most simple reaction is
-    2A + B -> C + D
-    where
+    This class provides a foundation for representing a chemical
+    reaction, including the reactants, products, stoichiometric
+    coefficients, and reaction index. Represents very basic chemical
+    reaction. The most simple reaction is 2A + B -> C + D where
         A and B are defined as reactants
         C and D are defined as products
-    It is important to also keep track of the stoichiometry of each species.
-    Chemical Reactions should have a unique index to easily refer to it.
+    It is important to also keep track of the stoichiometry of each
+    species. Chemical Reactions should have a unique index to easily
+    refer to it.
 
     Attributes:
-    ----------
     reactants : tp.Dict[str, ChemSpecies]
-        A dictionary of reactants in the reaction, where each key is a reactant name
-        and each value is a ChemSpecies object representing the reactant.
+        A dictionary of reactants in the reaction, where each key is a
+        reactant name and each value is a ChemSpecies object
+        representing the reactant.
     products : tp.Dict[str, ChemSpecies]
-        A dictionary of products in the reaction, where each key is a product name
-        and each value is a ChemSpecies object representing the product.
+        A dictionary of products in the reaction, where each key is a
+        product name and each value is a ChemSpecies object representing
+        the product.
     stoi_reactants : tp.Dict[str, int]
-        A dictionary of stoichiometric coefficients for reactants, where each key is
-        a reactant name and each value is the corresponding stoichiometric coefficient.
+        A dictionary of stoichiometric coefficients for reactants, where
+        each key is a reactant name and each value is the corresponding
+        stoichiometric coefficient.
     stoi_products : tp.Dict[str, int]
-        A dictionary of stoichiometric coefficients for products, where each key is
-        a product name and each value is the corresponding stoichiometric coefficient.
+        A dictionary of stoichiometric coefficients for products, where
+        each key is a product name and each value is the corresponding
+        stoichiometric coefficient.
     index : tp.Optional[int]
-        An optional index for the reaction, which can be used to identify the reaction
-        in a collection of reactions.
+        An optional index for the reaction, which can be used to
+        identify the reaction in a collection of reactions.
 
     Notes:
-    -----
-    This class is intended to be subclassed by more specific reaction classes,
-    such as elementary reactions or complex reactions.
+        This class is intended to be subclassed by more specific
+        reaction classes, such as elementary reactions or complex
+        reactions.
     """
 
     reactants: tp.Dict[str, ChemSpecies]
@@ -178,10 +181,11 @@ class BasicReaction(ABC):
     @abstractmethod
     def as_label(self) -> str:
         """
-        This method is used for the data mining. It should be implemented by child
-        classes in order to easily define short labels for each reactions based on the
-        reaction type and the index of reaction. For instance, it can be used as column
-        name in a pandas DataFrame.
+        This method is used for the data mining. It should be
+        implemented by child classes in order to easily define short
+        labels for each reactions based on the reaction type and the
+        index of reaction. For instance, it can be used as column name
+        in a pandas DataFrame.
 
         Returns:
             str
@@ -195,10 +199,12 @@ class BasicReaction(ABC):
         **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """
-        Abstract class method to create a new instance from keyword arguments.
+        Abstract class method to create a new instance from keyword
+        arguments.
 
         Args:
-            list_sp (ListSpecies): Optional list of species. Defaults to None.
+            list_sp (ListSpecies): Optional list of species.
+                Defaults to None.
             **kwargs: Keyword arguments to create the instance.
 
         Returns:
@@ -207,8 +213,8 @@ class BasicReaction(ABC):
 
     def get_stoi_of(self, species: ChemSpecies | str) -> float:
         """
-        Method to extract the stoichiometric coefficient of a species regardless if the
-        species is a reactant or a product.
+        Method to extract the stoichiometric coefficient of a species
+        regardless if the species is a reactant or a product.
 
         Arguments:
             species: ChemSpecies | str
@@ -231,8 +237,8 @@ class BasicReaction(ABC):
     def tot_number_reactants(self) -> int:
         """
         Count the total number of reactants involved in the reaction
-        => Stoichiometry dependent! In other words, it counts the number of
-        molecules/entities defined as reactants.
+        => Stoichiometry dependent! In other words, it counts the number
+        of molecules/entities defined as reactants.
 
         Returns:
             int
@@ -245,7 +251,8 @@ class BasicReaction(ABC):
         including both reactants and products.
 
         Returns:
-            Iterable[ChemSpecies]: An iterator over all the species involved in the reaction.
+            Iterable[ChemSpecies]: An iterator over all the species
+                involved in the reaction.
         """
         return chain(self.reactants.values(), self.products.values())
 
@@ -273,10 +280,12 @@ class BasicReaction(ABC):
 
     def get_index(self, default: int = -1) -> int:
         """
-        Returns the index of the reaction if it exists, otherwise returns the default value.
+        Returns the index of the reaction if it exists, otherwise
+        returns the default value.
 
         Args:
-            default (int): The default value to return if the index does not exist. Defaults to -1.
+            default (int): The default value to return if the index does
+            not exist. Defaults to -1.
 
         Returns:
             int: The index of the reaction or the default value.
@@ -319,10 +328,12 @@ class BasicReaction(ABC):
         Checks if the reaction involves a specific product.
 
         Args:
-            product (ChemSpecies | str): The product to be checked. Can be either a ChemSpecies object or a string.
+            product (ChemSpecies | str): The product to be checked. Can
+            be either a ChemSpecies object or a string.
 
         Returns:
-            bool: True if the reaction involves the product, False otherwise.
+            bool: True if the reaction involves the product,
+            False otherwise.
         """
         if isinstance(product, str):
             return self.stoi_products.get(product, 0) > 0
@@ -333,7 +344,8 @@ class BasicReaction(ABC):
         Checks if a given reactant is involved in the reaction.
 
         Args:
-            reactant (ChemSpecies | str): The reactant to be checked. Can be either a ChemSpecies object or a string.
+            reactant (ChemSpecies | str): The reactant to be checked.
+            Can be either a ChemSpecies object or a string.
 
         Returns:
             int: 1 if the reactant is part of the reaction, 0 otherwise.
@@ -344,14 +356,18 @@ class BasicReaction(ABC):
 
     def add_as_product(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """
-        Method to add a new product to the reaction by keeping the stoichiometry relevant.
-            -> If the species already exists as product, increment its stoichiometry
-            -> If the species does not already exists as product, add it to the dict of
-            products and set its stoichiometry to 1
+        Method to add a new product to the reaction by keeping the
+        stoichiometry relevant.
+            -> If the species already exists as product,
+            increment its stoichiometry.
+            -> If the species does not already exists as product,
+            add it to the dict of products and set its stoichiometry
+            to 1.
 
         Args:
             sp (ChemSpecies): The product to be added.
-            multiple (int, optional): The stoichiometric coefficient of the product. Defaults to 1.
+            multiple (int, optional): The stoichiometric coefficient of
+                the product. Defaults to 1.
 
         Returns:
             None
@@ -364,15 +380,18 @@ class BasicReaction(ABC):
 
     def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """
-        Method to conveniently add a new reactant to the reaction by keeping the
-        stoichiometry relevant:
-            -> If the species already exists as reactant, increment its stoichiometry
-            -> If the species does not already exists as reactant, add it to the dict of
-            reactants and set its stoichiometry to 1
+        Method to conveniently add a new reactant to the reaction by
+        keeping the stoichiometry relevant:
+            -> If the species already exists as reactant,
+            increment its stoichiometry
+            -> If the species does not already exists as reactant,
+            add it to the dict of reactants and set its stoichiometry
+            to 1
 
         Args:
             sp: SimSpecies
-            multiple (int, optional): The stoichiometric coefficient of the reactant. Defaults to 1.
+            multiple (int, optional): The stoichiometric coefficient of
+                the reactant. Defaults to 1.
 
         Returns:
             None
@@ -385,10 +404,13 @@ class BasicReaction(ABC):
 
     def reactants_as_string(self) -> str:
         """
-        Method to generate a string representation of the reactants in the reaction.
+        Method to generate a string representation of the reactants in
+        the reaction.
         Returns:
+
             str
-                A string representation of the reactants, with stoichiometry.
+                A string representation of the reactants,
+                with stoichiometry.
         """
         out = []
         for sp, stoi in self.iter_reactants():
@@ -399,10 +421,12 @@ class BasicReaction(ABC):
 
     def products_as_string(self) -> str:
         """
-        Method to generate a string representation of the products in the reaction.
+        Method to generate a string representation of the products
+        in the reaction.
         Returns:
             str
-                A string representation of the products, with stoichiometry.
+                A string representation of the products,
+                with stoichiometry.
         """
         out = []
         for sp, stoi in self.iter_products():

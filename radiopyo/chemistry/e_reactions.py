@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 """
-The `e_reactions` submodule contains classes that define chemical reactions
-with equilibrium. These reactions are defined using the equilibrium
-approach, also known as the "chemical equilibrium" or "thermodynamic
-equilibrium".
+The `e_reactions` submodule contains classes that define chemical
+reactions with equilibrium. These reactions are defined using the
+equilibrium approach, also known as the "chemical equilibrium" or
+"thermodynamic equilibrium".
 
-This submodule provides the necessary classes to work with chemical reactions
-in which the concentrations of the reactants and products are in equilibrium.
+This submodule provides the necessary classes to work with chemical
+reactions in which the concentrations of the reactants and products are
+in equilibrium.
 
 The classes defined here are:
 
-- `EReaction`: This class represents a chemical reaction with equilibrium.
-  It inherits from the `BasicReaction` class and provides additional methods
-  to work with these types of reactions.
+- `EReaction`: This class represents a chemical reaction with
+ equilibrium.It inherits from the `BasicReaction` class and provides
+ additional methods to work with these types of reactions.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 13/12/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ---------------------------- External imports ----------------------------- #
 from __future__ import annotations
 
 import typing as tp
@@ -26,7 +27,7 @@ from contextlib import suppress
 
 import numpy as np
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import revert_reaction
 
@@ -37,26 +38,26 @@ from .k_reactions import (
 )
 from .utils.units import Temperature
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------ Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
     from radiopyo.parser.reaction_parser import GenericReaction
 
 
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
 
 __all__ = [
     "EReaction",
 ]
 
-# ------------------------------------------------------------------------------------ #
-#                                   CLASS DEFINITIONS                                  #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                               CLASS DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
 
 
 class EReaction(BiReaction):
     """
-    This class represents equilibrium reactions. It computes the equilibrium constant
-    by the following formula:
+    This class represents equilibrium reactions. It computes the
+    equilibrium constant by the following formula:
     K_equilibrium = K_forward / K_backward
     <=> log(K_e) = log(K_f) - log(K_b)
 
@@ -74,13 +75,16 @@ class EReaction(BiReaction):
         """
         Initializes an EReaction instance.
 
-        This method is responsible for computing the equilibrium constant
-        (K_equilibrium) from the given reaction and constant.
+        This method is responsible for computing the equilibrium
+        constant (K_equilibrium) from the given reaction and constant.
 
-        Parameters:
-            reaction (GenericReaction): The reaction to be used for computing the equilibrium constant.
-            constant (Optional[float | List[float]], optional): The constant value for the reaction. Defaults to None.
-            list_sp (Optional[ListSpecies], optional): The list of species involved in the reaction. Defaults to None.
+        Args:
+            reaction (GenericReaction): The reaction to be used for
+                computing the equilibrium constant.
+            constant (Optional[float | List[float]], optional): The
+                constant value for the reaction. Defaults to None.
+            list_sp (Optional[ListSpecies], optional): The list of
+                species involved in the reaction. Defaults to None.
 
         Returns:
             None
@@ -138,19 +142,22 @@ class EReaction(BiReaction):
         """
         Create an EquilibriumReaction from keyword arguments.
 
-        Parameters:
-            list_sp (ListSpecies, optional): Collection of species already involved in the simulation. Defaults to None.
+        Args:
+            list_sp (ListSpecies, optional): Collection of species
+                already involved in the simulation. Defaults to None.
             **kwargs: Keyword arguments to create the instance.
                 - reaction (str): The reaction string.
                 - k_forward (float): The forward reaction rate constant.
-                - k_backward (float): The backward reaction rate constant.
+                - k_backward (float): The backward reaction rate
+                    constant.
                 - k_equilibrium (float): The equilibrium constant.
 
         Returns:
             EquilibriumReaction: An instance of EquilibriumReaction.
 
         Raises:
-            AttributeError: If 'k_value' is provided, as it is ambiguous for an EquilibriumReaction.
+            AttributeError: If 'k_value' is provided, as it is
+                ambiguous for an EquilibriumReaction.
             AttributeError: If no reaction string is provided.
         """
         # Allow shallow creation (outside of a simulation env)
@@ -186,10 +193,12 @@ class EReaction(BiReaction):
 
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Compute the equilibrium constant of the reaction at a given temperature.
+        Compute the equilibrium constant of the reaction at a given
+        temperature.
 
-        Parameters:
-            T (Optional[Temperature | float]): The temperature in °C (optional, default:None)
+        Args:
+            T (Optional[Temperature | float]): The temperature in °C
+                (optional, default:None)
 
         Returns:
             float: The equilibrium constant at the given temperature.
@@ -199,24 +208,30 @@ class EReaction(BiReaction):
 
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Compute the forward reaction constant of the reaction at a given temperature.
+        Compute the forward reaction constant of the reaction at a given
+        temperature.
 
         Args:
-            T (Optional[Temperature | float]): The temperature in °C (optional, default:None)
+            T (Optional[Temperature | float]): The temperature in
+                °C (optional, default:None)
 
         Returns:
-            float: The forward reaction constant at the given temperature.
+            float: The forward reaction constant at the given
+                temperature.
         """
         return self.forward.k_value(T)
 
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Compute the backward reaction constant of the reaction at a given temperature.
+        Compute the backward reaction constant of the reaction at a
+            given temperature.
 
         Args:
-            T (Optional[Temperature | float]): The temperature in °C (optional, default:None)
+            T (Optional[Temperature | float]): The temperature in
+                °C (optional, default:None)
 
         Returns:
-            float: The backward reaction constant at the given temperature.
+            float: The backward reaction constant at the
+                given temperature.
         """
         return self.backward.k_value(T)

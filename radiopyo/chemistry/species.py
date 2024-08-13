@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-The species submodule contains all class definitions related to species definitions.
+The species submodule contains all class definitions related to species
+definitions.
 It also provides a collection to ease their handling.
 
 Classes:
@@ -11,21 +12,21 @@ Classes:
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports -----------------------------#
 from __future__ import annotations
 
 import typing as tp
 
 import numpy as np
 
-# --------------------------------- Internal imports --------------------------------- #
+# ---------------------------- Internal imports ----------------------------- #
 from .utils.units import Temperature
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     pass
 
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
 __all__ = [
     "ChemSpecies",
     "RawSpecies",
@@ -33,23 +34,26 @@ __all__ = [
 ]
 
 
-# ------------------------------------------------------------------------------------ #
-#                                   CLASS DEFINITIONS                                  #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                               CLASS DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
 
 
 class RawSpecies:
     """
     Basic class for species.
 
-    This class provides a basic structure for species, including a label and methods for equality and string representation.
+    This class provides a basic structure for species, including a label
+    and methods for equality and string representation.
 
     Attributes:
         label (str): The label of the species.
 
     Methods:
-        __contains__(other): Checks if the given object is equal to the current species.
-        __eq__(other): Checks if the given object is equal to the current species.
+        __contains__(other): Checks if the given object is equal to the
+        current species.
+        __eq__(other): Checks if the given object is equal to the
+        current species.
         __str__(): Returns a string representation of the object.
     """
 
@@ -106,14 +110,17 @@ class ChemSpecies(RawSpecies):
     """
     Class used to define species from concentration coefficient (cc).
 
-    This class extends the RawSpecies class and adds attributes and methods related to the concentration coefficient.
+    This class extends the RawSpecies class and adds attributes and
+    methods related to the concentration coefficient.
 
     Attributes:
         label (str): The label of the species.
-        cc_init (Polynomial): The initial concentration coefficient of the species.
+            cc_init (Polynomial): The initial concentration coefficient
+            of the species.
 
     Methods:
-        set_initial_cc(value): Sets the initial concentration coefficient of the species.
+        set_initial_cc(value): Sets the initial concentration
+            coefficient of the species.
         ... (other methods specific to ChemSpecies)
     """
 
@@ -132,7 +139,8 @@ class ChemSpecies(RawSpecies):
         Args:
             label (str): The label of the species.
             index (int): The index of the species. Defaults to -1.
-            cc_init (float | list[float], optional): The initial concentration of the species. Defaults to None.
+            cc_init (float | list[float], optional): The initial
+                concentration of the species. Defaults to None.
 
         Returns:
             None
@@ -156,19 +164,23 @@ class ChemSpecies(RawSpecies):
         Creates a deep copy of the current ChemSpecies instance.
 
         Returns:
-            ChemSpecies: A new ChemSpecies instance with the same label, index, and initial concentration coefficients.
+            ChemSpecies: A new ChemSpecies instance with the same label,
+                index, and initial concentration coefficients.
         """
         return ChemSpecies(self.label, self.index, self.cc_init.coef)
 
     def initial_cc(self, T: tp.Optional[float | Temperature] = None) -> float:
         """
-        Returns the initial concentration of the species at a given temperature.
+        Returns the initial concentration of the species at a given
+            temperature.
 
-        Parameters:
-            T (float | Temperature): Temperature in Celsius. If None, default temperature is used.
+        Args:
+            T (float | Temperature): Temperature in Celsius. If None,
+                default temperature is used.
 
         Returns:
-            float: The initial concentration of the species at the given temperature.
+            float: The initial concentration of the species at the given
+                temperature.
         """
         T = Temperature() if T is None else Temperature(T)
         return self.cc_init(T.celsius) if self.cc_init(T.celsius) > 0 else 0
@@ -177,8 +189,9 @@ class ChemSpecies(RawSpecies):
         """
         Sets the initial concentration coefficient of the species.
 
-        Parameters:
-            value (float | list[float]): The initial concentration coefficient(s) of the species.
+        Args:
+            value (float | list[float]): The initial concentration
+                coefficient(s) of the species.
 
         Returns:
             None
@@ -194,8 +207,9 @@ def get_H2O_cc(T: tp.Optional[float | Temperature] = None) -> float:
     """
     Returns the initial concentration of H2O at a given temperature.
 
-    Parameters:
-        T (float | Temperature): Temperature in Celsius. If None, default temperature is used.
+    Args:
+        T (float | Temperature): Temperature in Celsius. If None,
+            default temperature is used.
 
     Returns:
         float: The initial concentration of H2O at the given temperature.
