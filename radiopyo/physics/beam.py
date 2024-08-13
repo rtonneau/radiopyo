@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-The beam submodule contains all class definitions related to radiation source
-structures.
+The beam submodule contains all class definitions related to radiation
+source structures.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import logging
@@ -20,17 +20,17 @@ from math import isinf, isnan
 
 import numpy as np
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from .exceptions import ParameterError
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
-# -------------------------------------- Logging ------------------------------------- #
+# ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# -------------------------- Expose importable stuffs ----------------------- #
 __all__ = [
     "TimeMessage",
     "TimerState",
@@ -41,13 +41,15 @@ __all__ = [
     "BeamCollection",
 ]
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class TimerState(Enum):
-    """Convenient Enum use to define radiation source states, ON or OFF."""
+    """
+    Convenient Enum use to define radiation source states, ON or OFF.
+    """
 
     isOff = 0
     isOn = 1
@@ -118,7 +120,8 @@ class BaseTimer(ABC):
     @abstractmethod
     def time_till_next_OFF(self, time: float) -> float:
         """
-        Computes time remaining before beam is off. Returns 0 if beam already off.
+        Computes time remaining before beam is off. Returns 0 if beam
+        already off.
         """
 
     @abstractmethod
@@ -139,7 +142,8 @@ class BaseTimer(ABC):
     def period_index(self, time: float) -> int:
         """
         Get the 'position' of the period containing 'time'.
-        For example, for 3s period & start_time=0, t=8s then period_index = 2
+        For example, for 3s period & start_time=0, t=8s then
+        period_index = 2
         """
         time = time - self.start_time
         return int(time // self.period)
@@ -183,17 +187,20 @@ class BaseTimer(ABC):
 
 
 class Timer(BaseTimer):
-    """Class used as a binary timer for radiation source. Currently only two states
-    are possible for a radiation source, either ON or OFF i.e. 0.0% or 100%
-    This class holds the time structure of the radiation source, defined as pulses.
-    Pulses are repeated with a given 'period' (seconds) and the timer keeps its ON state
-    during 'on_time' seconds.
+    """Class used as a binary timer for radiation source. Currently only
+    two states are possible for a radiation source, either ON or OFF
+    i.e. 0.0% or 100%.
+    his class holds the time structure of the radiation source,
+    defined as pulses. Pulses are repeated with a given 'period'
+    (seconds) and the timer keeps its ON state during 'on_time' seconds.
     For example:
         - period = 2 seconds
         - on_time = 0.5 second
-    --> each 2 seconds, timer ON during 0.5 second (i.e. duty cycle of 25%)
+    --> each 2 seconds, timer ON during 0.5 second
+    (i.e. duty cycle of 25%)
 
-    Timer should not be constructed from scratch but from helper functions (classmethod)
+    Timer should not be constructed from scratch but from helper
+    functions (classmethod)
     => Either one of:
         - Timer.new_constant()
         - Timer.new_pulsed(period, on_time)
@@ -224,12 +231,15 @@ class Timer(BaseTimer):
     def new_pulsed(
         cls, period: float, on_time: float, start_time: tp.Optional[float] = None
     ) -> tp.Self:
-        """Class method to generate a pulsed timer
+        """
+        Class method to generate a pulsed timer
+
         Args:
             period: float
                 Period (repetition) of the timer in seconds
             on_time: float
-                Time during which timer is ON in seconds. on_time should be <= period.
+                Time during which timer is ON in seconds.
+                on_time should be <= period.
         """
         stime = start_time if start_time is not None else cls._default_start_time()
         return cls(period, on_time, stime)
@@ -237,6 +247,7 @@ class Timer(BaseTimer):
     def state_at(self, time: float) -> TimerState:
         """
         Compute the state of the timer at a given time.
+
         Args:
             time: float
                 Time in seconds
@@ -259,7 +270,8 @@ class Timer(BaseTimer):
 
     def time_till_next_OFF(self, time: float) -> float:
         """
-        Computes time remaining before beam is off. Returns 0 if beam already off.
+        Computes time remaining before beam is off.
+        Returns 0 if beam already off.
         """
         if self.state_at(time) is TimerState.isOff:
             return 0.0
@@ -313,7 +325,8 @@ class MacroTimer(BaseTimer):
             period: float
                 Period (repetition) of the timer in seconds
             on_time: float
-                Time during which timer is ON in seconds. on_time should be <= period.
+                Time during which timer is ON in seconds.
+                on_time should be <= period.
         """
         if macro_period <= micro_period:
             raise ValueError(
@@ -425,7 +438,8 @@ class MacroTimer(BaseTimer):
 
     def time_till_next_OFF(self, time: float) -> float:
         """
-        Computes time remaining before beam is off. Returns 0 if beam already off.
+        Computes time remaining before beam is off. Returns 0 if
+        beam already off.
         """
         time = self._relative_time_pulse(time)
         if time >= self.on_time:
@@ -435,9 +449,9 @@ class MacroTimer(BaseTimer):
     def duty_cycle(self) -> float:
         """Computes the duty cycle of the MacroTimer.
         Rem:
-            To avoid confusion for cases where the ON time is not a multiple of sub-
-            periods, the duty cycle is computed by calculating the total time ON during
-            one macro pulse.
+            To avoid confusion for cases where the ON time is not a
+            multiple of subperiods, the duty cycle is computed by
+            calculating the total time ON during one macro pulse.
         Returns:
             float
         """
@@ -459,9 +473,9 @@ class MacroTimer(BaseTimer):
 @dataclass
 class ParticleBeam:
     """
-    Generic definition of a Radiation Source via an instance of Timer and dose rate/
-    dose max pieces of information. ParticleBeam should not be used as is but via class
-    heritage instead.
+    Generic definition of a Radiation Source via an instance of Timer
+    and dose rate/dose max pieces of information. ParticleBeam should
+    not be used as is but via class heritage instead.
 
     Attributes:
         dose_rate: float
@@ -469,8 +483,8 @@ class ParticleBeam:
         timer: Timer
             Instance of Timer NamedTuple
         max_dose: float
-            integrated dose from which dose rate will drop to 0.0 Gy/s regardless of the
-            Timer state.
+            integrated dose from which dose rate will drop to 0.0 Gy/s
+            regardless of the Timer state.
         time_at_max_dose: float
             Time at which the maximal dose will be reached.
         dose_rate_peak: float
@@ -486,9 +500,14 @@ class ParticleBeam:
     GROWTH_FACTOR: float = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        """Method called after ParticleBeam__init__() to finalize initialization"""
+        """
+        Method called after ParticleBeam__init__() to
+        finalize initialization
+        """
         if self.dose_rate_peak <= 0:
-            raise ValueError(f"Null or Negative inst. dose rate for ConstantBeam {self}")
+            raise ValueError(
+                f"Null or Negative inst. dose rate for ConstantBeam {self}"
+            )
         self.GROWTH_TIME = 1e-6
         self.time_at_max_dose = self._compute_time_at_max_dose()
         self.dose_rate = self._compute_average_dose_rate()
@@ -508,13 +527,15 @@ class ParticleBeam:
 
     def update_beam_param(self, **kwargs: float) -> None:
         """
-        Modify some beam parameter and recomputes what needs to be changed.
-        This method should be overridden for new ParticleBeam inherited class.
-        This one takes care of dose_rate, max_dose and label(name).
+        Modify some beam parameter and recomputes what needs to be
+        changed. This method should be overridden for new ParticleBeam
+        inherited class. This one takes care of dose_rate, max_dose and
+        label(name).
 
         Args:
             kwargs: float
-                key words argument containing float value (except for 'label').
+                key words argument containing float value
+                (except for 'label').
         Raises:
             AttributeError
                 if kwargs contains unknown key values.
@@ -526,8 +547,8 @@ class ParticleBeam:
         self.__post_init__()
 
     def _compute_time_at_max_dose(self, max_dose: tp.Optional[float] = None) -> float:
-        """Helper method to compute the time at which max dose rate will be reached with
-        the peak dose rate and Timer defined.
+        """Helper method to compute the time at which max dose rate will
+        be reached with the peak dose rate and Timer defined.
 
         Returns:
             float: time in seconds.
@@ -539,9 +560,10 @@ class ParticleBeam:
             return float("inf")
         if max_dose == 0:
             return 0.0
-        # if self.timer.period is inf -> no repetition: max_dose delivered in ONE pulse
-        # Continuous beam and mono_pulse beam will end up here.
-        # In this case, (average) dose rate and peak dose rate are the same.
+        # if self.timer.period is inf -> no repetition: max_dose
+        # delivered in ONE pulse. Continuous beam and mono_pulse beam
+        # will end up here.In this case, (average) dose rate and peak
+        # dose rate are the same.
         if self.timer.period >= float("inf"):
             return self.timer.start_time + (max_dose / self.dose_rate_peak)
 
@@ -559,8 +581,9 @@ class ParticleBeam:
         if n <= 0.0:
             return self.timer.start_time + (last_frac * self.timer.on_time)
 
-        # From now on n >= 1.0 i.e. max_dose delivered in more than one pulse.
-        # if max_dose delivered with entire periods then last one only last 'on_time'
+        # From now on n >= 1.0 i.e. max_dose delivered in more than one
+        #  pulse.If max_dose delivered with entire periods then last one
+        # only last 'on_time'
         if last_frac <= 0.0:
             return (
                 self.timer.start_time + (n - 1) * self.timer.period + self.timer.on_time
@@ -601,7 +624,9 @@ class ParticleBeam:
         return self.dose_rate_peak * self.timer.on_time
 
     def average_dose_rate(self) -> float:
-        """Method to make it clear we are dealing with average dose rate.
+        """
+        Method to make it clear we are dealing with average dose rate.
+
         Returns:
             float: average dose rate in Gy/s
         """
@@ -612,7 +637,8 @@ class ParticleBeam:
         Computes instant dose rate at a given time.
         Args:
             time: float
-                Time, in seconds, at which one want to know the dose rate in Gy/s
+                Time, in seconds, at which one want to know the dose
+                rate in Gy/s
 
         Returns:
             TimeMessage
@@ -630,7 +656,9 @@ class ParticleBeam:
         )
 
     def tot_pulses(self) -> float:
-        """Computes the total number of pulses.
+        """
+        Computes the total number of pulses.
+
         Returns:
             float
                 Number of pulses
@@ -644,8 +672,9 @@ class ParticleBeam:
 
     def delivery(self, times: NDArray) -> NDArray:
         """
-        Uses times array to compute the dose delivered between 2 consecutive time steps
-        i.e. time lapse in between 2 values of vector times.
+        Uses times array to compute the dose delivered between 2
+        consecutive time steps i.e. time lapse in between 2 values of
+        vector times.
 
         Arguments:
             times: np.array[np.float]
@@ -688,8 +717,10 @@ class ParticleBeam:
         return beam_func
 
     def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
-        """Method computing the radiation source time structure in the range [start,
-        stop] i.e. computes 2 columns matrix whose columns are:
+        """
+        Method computing the radiation source time structure in the
+        range [start, stop] i.e. computes 2 columns matrix whose
+        columns are:
             0) Time in seconds
             1) Related instant. dose rate
         For example:
@@ -711,15 +742,17 @@ class ParticleBeam:
             on_time: 0.5 s
             peek_dose_rate: 0.5 Gy/s (average dose rate: 0.166 Gy/s)
 
-        This matrix definition of the beam structure is useful to predefine integration
-        steps width (i.e. used by the "make_time_intervals" method).
-        No default implementation provided.
+        This matrix definition of the beam structure is useful to
+        predefine integration steps width (i.e. used by the
+        "make_time_intervals" method). No default implementation
+        provided.
 
         Args:
             stop: float
                 End time of the beam structure, in seconds
             start: float, optional
-                Start time of the beam structure, in seconds (default: 0.0)
+                Start time of the beam structure, in seconds
+                (default: 0.0)
 
         Returns:
             NDArray[np.float64]: 2 cols matrix
@@ -732,11 +765,13 @@ class ParticleBeam:
         start: float = 0.0,
     ) -> NDArray[np.float64]:
         """
-        Create a 2D matrix similar to the one produced by the make_matrix(stop, start)
-        method. The major differences are:
-            - takes into account max_dose in order to trim the matrix if needed.
-            - Symmetrically expand the 'on_time' so that it is possible to define a
-              refined ODE integration time step for beam OFF-ON & ON-OFF transitions.
+        Create a 2D matrix similar to the one produced by the
+        make_matrix(stop, start) method. The major differences are:
+            - takes into account max_dose in order to trim the matrix
+            if needed.
+            - Symmetrically expand the 'on_time' so that it is possible
+            to define a refined ODE integration time step for beam
+            OFF-ON & ON-OFF transitions.
             - The first column is still time but the second is:
                 * 0 for beam OFF
                 * 1 for beam ON
@@ -747,8 +782,9 @@ class ParticleBeam:
         # Retrieve Time Structure Matrix
         out = self.make_matrix(stop, start)
 
-        # If 3 lines ==> line 0 is for ON, line 1 is for OFF, line 2 is for END TIME
-        # ==> Only need to grow time interval def by line 1 - line 0
+        # If 3 lines ==> line 0 is for ON, line 1 is for OFF, line 2
+        # is for END TIME
+        # # ==> Only need to grow time interval def by line 1 - line 0
         if out.shape[0] == 3:
             out[0, 1] = 1.0
 
@@ -835,7 +871,11 @@ class ConstantBeam(ParticleBeam):
     def beam_type(self) -> str:
         return "Constant"
 
-    def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
+    def make_matrix(
+        self,
+        stop: float,
+        start: float = 0.0,
+    ) -> NDArray[np.float64]:
         out = np.empty([0, 2])
 
         # Always OFF cases:
@@ -909,8 +949,8 @@ class SinglePulseBeam(ConstantBeam):
         start_time: float, optional
             Time to start beam ON (default: 0.0)
 
-    TODO: remove this class as it just mimic ConstantBeam? /!\ useful constructor from
-          'on_time' though
+    TODO: remove this class as it just mimic ConstantBeam?
+    /!\ useful constructor from'on_time' though
     """
 
     def __init__(
@@ -942,7 +982,11 @@ class SinglePulseBeam(ConstantBeam):
         on_time: float,
         start_time: tp.Optional[float] = None,
     ) -> SinglePulseBeam:
-        return cls(dose_rate, max_dose=on_time * dose_rate, start_time=start_time)
+        return cls(
+            dose_rate,
+            max_dose=on_time * dose_rate,
+            start_time=start_time,
+        )
 
     @classmethod
     def from_dict(cls, param: tp.Dict[str, float]) -> SinglePulseBeam:
@@ -984,8 +1028,9 @@ class SinglePulseBeam(ConstantBeam):
 
 
 class PulsedBeam(ParticleBeam):
-    """Class representing a Pulsed Radiation Source. Helper functions are also
-    available to easily create specific Pulsed Radiation Sources:
+    """Class representing a Pulsed Radiation Source. Helper functions
+    are also available to easily create specific Pulsed Radiation
+    Sources:
         - from_dose_rate_peak
         - from_dose_per_pulse
 
@@ -1130,8 +1175,9 @@ class PulsedBeam(ParticleBeam):
         max_dose: tp.Optional[float] = None,
         start_time: tp.Optional[float] = None,
     ) -> PulsedBeam:
-        """Class method building a PulsedBeam based on peak dose rate => dose rate
-        during ON time.
+        """
+        Class method building a PulsedBeam based on peak dose rate
+          => dose rate during ON time.
         Args:
             peak_dr: float
                 peak dose rate, in Gy/s
@@ -1248,7 +1294,6 @@ class PulsedBeam(ParticleBeam):
 
 
 class MacroPulsedBeam(PulsedBeam):
-    """ """
 
     macro_timer: MacroTimer
 
@@ -1294,8 +1339,9 @@ class MacroPulsedBeam(PulsedBeam):
         return self.dose_per_pulse() * self.macro_timer.micro_pulses_per_train()
 
     def _compute_time_at_max_dose(self, max_dose: tp.Optional[float] = None) -> float:
-        """Helper method to compute the time at which max dose rate will be reached with
-        the average dose rate and Timer defined.
+        """
+        Helper method to compute the time at which max dose rate will be
+        reached with the average dose rate and Timer defined.
 
         Returns:
             float: time in seconds.
@@ -1340,7 +1386,8 @@ class MacroPulsedBeam(PulsedBeam):
         Computes instant dose rate at a given time.
         Args:
             time: float
-                Time, in seconds, at which one want to know the dose rate in Gy/s
+                Time, in seconds, at which one want to know the
+                dose rate in Gy/s
 
         Returns:
             TimeMessage
@@ -1496,8 +1543,8 @@ class MacroPulsedBeam(PulsedBeam):
 
 class BeamCollection(object):
     """
-    Container class for efficient beam storage so that multiple beams can be define
-    (even though only one at a time can be use).
+    Container class for efficient beam storage so that multiple beams
+    can be define (even though only one at a time can be use).
     """
 
     # Beam definitions are stored in this dict
@@ -1711,9 +1758,11 @@ class BeamCollection(object):
         verbose: bool = True,
     ) -> BeamCollection:
         """
-        Create a BeamCollection out of a Dict containing multiple beam definitions.
-        param dictionary keywords should be valid beam type names. Values can be either
-        be a single Dict-like beam or a list of it.
+        Create a BeamCollection out of a Dict containing multiple beam
+        definitions.Param dictionary keywords should be valid beam type
+        names. Values can be either be a single Dict-like beam or a
+        list of it.
+
         Args:
             param: Dict
                 Dict structure whose keywords are valid beam type names.
@@ -1737,8 +1786,8 @@ class BeamCollection(object):
 
     def as_dict(self) -> tp.Dict[str, tp.List[tp.Dict]]:
         """
-        Extract all the beam in a dictionary whose structure comply with the method
-        'from_config_dict'
+        Extract all the beam in a dictionary whose structure comply
+        with the method 'from_config_dict'
         """
         out: tp.Dict[str, tp.List[tp.Dict]] = {}
         for name, beam, LET in self:
@@ -1756,10 +1805,14 @@ class BeamCollection(object):
                 out[beam_type].append(x)
         return out
 
-    def merge(self, other: BeamCollection, verbose: bool = True) -> BeamCollection:
+    def merge(
+        self,
+        other: BeamCollection,
+        verbose: bool = True,
+    ) -> BeamCollection:
         """
-        Merge two BeamCollection. Do not modify the current definition but return a new
-        one.
+        Merge two BeamCollection. Do not modify the current definition
+        but return a new one.
 
         Args:
             other: BeamCollection
@@ -1795,41 +1848,3 @@ class BeamCollection(object):
             out.add_beam_from_dict(beam_type, beam, verbose=verbose)
 
         return out
-
-
-# def beam_from_dict(
-#     param: tp.Dict[str, tp.Dict[str, float]],
-# ) -> tp.Tuple[ParticleBeam, tp.Optional[float]]:
-#     """
-#     Construct beam from a dictionary.
-
-#     Parameters:
-#         param: Dict[str, Dict[str, float]]
-#             Parameters defining the beam to construct. The first key define the beam
-#             type.
-
-#     Returns:
-#         ParticleBeam:
-#             Beam class.
-#         float:
-#             LET.
-
-#     """
-#     if len(param) > 1:
-#         raise ParameterError(f"Found more than one beam definition ({param})")
-#     beam_type, config = param.popitem()
-
-#     LET: tp.Optional[float] = None
-#     with suppress(KeyError):
-#         LET = config.pop("LET")
-
-#     if beam_type.lower() == "constant":
-#         return ConstantBeam.from_dict(config), LET
-
-#     if beam_type.lower() == "pulsed":
-#         return PulsedBeam.from_dict(config), LET
-
-#     if beam_type.lower() == "singlepulse":
-#         return SinglePulseBeam.from_dict(config), LET
-
-#     raise NotImplementedError(f"Unknown beam type: {beam_type}")

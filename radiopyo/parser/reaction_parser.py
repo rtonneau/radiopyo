@@ -4,9 +4,9 @@ Small parser to be able to parse reaction def from strings like:
 xA + yB -> iC + kD
 xA + yB --enzyme>> iC + kD
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 29/06/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 29/06/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import copy
@@ -18,27 +18,27 @@ from pathlib import Path
 import lark
 import numpy as np
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.utils.atomic_weights import Atomix
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from collections.abc import Iterator
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = []
 
-# -------------------------------------- Logging ------------------------------------- #
+# ----------------------------------- Logging ------------------------------- #
 logger = logging.getLogger("radiopyo")
 
-# ------------------------------------------------------------------------------------ #
-#                                DECORATOR DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              DECORATOR DEFINITIONS                          #
+# --------------------------------------------------------------------------- #
 
 
-# ------------------------------------------------------------------------------------ #
-#                                 FUNCTION DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
 def revert_reaction(reaction: GenericReaction) -> GenericReaction:
     """ """
     return GenericReaction(
@@ -49,9 +49,9 @@ def revert_reaction(reaction: GenericReaction) -> GenericReaction:
     )
 
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                               CLASS DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
 
 
 class GenericReaction(tp.TypedDict):
@@ -69,7 +69,9 @@ class KwargsAtom(tp.TypedDict):
 
 
 class BasicSpecies(object):
-    """The most simple building block. Basically just a named 'thing'."""
+    """
+    The most simple building block. Basically just a named 'thing'.
+    """
 
     name: str
 
@@ -148,14 +150,18 @@ class ChemicalSpecies(BasicSpecies):
         return "".join(out) if len(out) > 2 else ""
 
     def to_latex(self) -> str:
-        """Produces string formatted for LateX rendering (e.g. by MatplotLib)"""
+        """
+        Produces string formatted for LateX rendering
+        (e.g. by MatplotLib)
+        """
         out = ["$", self.name, self._latex_radical_charge(), "$"]
         return "".join(out)
 
 
 class HydratedElectron(ChemicalSpecies):
     """
-    Hydrated electrons have their own class definition. No mass for them.
+    Hydrated electrons have their own class definition.
+    No mass for them.
     """
 
     def __init__(self) -> None:
@@ -172,14 +178,18 @@ class Atom(ChemicalSpecies):
     """Atom definition"""
 
     def raw_label(self) -> str:
-        """Just a getter for the name (does not include charge or radical)"""
+        """
+        Just a getter for the name (does not include charge or radical)
+        """
         return self.name
 
 
 class Molecule(ChemicalSpecies):
-    """Molecule definition -> Collection of Atoms.
-    To create a Molecule out of atoms, they cannot be ions nor radical. It is the
-    molecule which can be charged or radical"""
+    """
+    Molecule definition -> Collection of Atoms.
+    To create a Molecule out of atoms, they cannot be ions nor radical.
+    It is the molecule which can be charged or radical.
+    """
 
     atoms: tp.List[tp.Tuple[Atom, int]]
 
@@ -257,18 +267,27 @@ class TreeToReaction(lark.Transformer):
     For some doc and examples.
     """
 
-    def start(self, items: tp.List) -> GenericReaction | Atom | Molecule:
+    def start(
+        self,
+        items: tp.List,
+    ) -> GenericReaction | Atom | Molecule:
         return items[0]
 
     def constant_reaction(self, items: tp.List) -> GenericReaction:
         """ """
         return GenericReaction(
-            reactants={}, products=items[0], constants={}, enzyme=None
+            reactants={},
+            products=items[0],
+            constants={},
+            enzyme=None,
         )
 
     def equilibrium_reaction(self, items: tp.List) -> GenericReaction:
         return GenericReaction(
-            reactants=items[0], products=items[1], constants={}, enzyme=None
+            reactants=items[0],
+            products=items[1],
+            constants={},
+            enzyme=None,
         )
 
     def enzymatic_reaction(self, items: tp.List) -> GenericReaction:
@@ -281,7 +300,10 @@ class TreeToReaction(lark.Transformer):
 
     def k_reaction(self, items: tp.List) -> GenericReaction:
         return GenericReaction(
-            reactants=items[0], products=items[1], constants={}, enzyme=None
+            reactants=items[0],
+            products=items[1],
+            constants={},
+            enzyme=None,
         )
 
     def reactants(self, items: tp.List) -> tp.List:
@@ -290,8 +312,10 @@ class TreeToReaction(lark.Transformer):
     def products(self, items: tp.List) -> tp.List:
         return items[0]
 
-    def species_list(self, items: tp.List[tp.Tuple[ChemicalSpecies, int]]) -> tp.Dict:
-        """"""
+    def species_list(
+        self,
+        items: tp.List[tp.Tuple[ChemicalSpecies, int]],
+    ) -> tp.Dict:
         out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
         for species, stoi in items:
             label = species.label()
@@ -389,7 +413,8 @@ class ReactionParser(object):
         - K Reactions syntax: aA + bB -> cC + dD
         - Enzymatic reactions syntax: aA --ENZYME>> cC + dD
 
-        Rem: Capital letters stand for Species, lower letters for stoichiometry.
+        Rem: Capital letters stand for Species, lower letters for
+        stoichiometry.
 
         Raises:
             TypeError
@@ -454,7 +479,8 @@ class ReactionParser(object):
 
         Raises:
             KeyError
-                if unknown species (i.e. not in 'data/_data_atomic_weights.txt')
+                if unknown species
+                i.e. not in 'data/_data_atomic_weights.txt'
         """
         if isinstance(species, Atom):
             try:

@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-The sim_env submodule contains all classes related to the construction of the
-Physico-Chemico-Biological model. The start point should be some file parser. Currently
-only RON files are supported.
+The sim_env submodule contains all classes related to the construction
+of the Physico-Chemico-Biological model. The start point should be some
+file parser. Currently only TOML files are supported.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import functools
 import hashlib
 import logging
 import typing as tp
@@ -22,7 +21,7 @@ from itertools import chain
 
 import numpy as np
 
-# --------------------------------- Internal imports --------------------------------- #
+# ------------------------------ Internal imports --------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
 from radiopyo.chemistry.acid_base import AcidBase
 from radiopyo.chemistry.collections import ListSpecies
@@ -40,30 +39,31 @@ from radiopyo.chemistry.species import H2O, ChemSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.utils.sim_types import SimMatrices, default_ConfigDict
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.basic_chemistry import BasicReaction
     from radiopyo.utils.sim_types import ConfigDict, SimParameters
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
     "SimEnv",
 ]
 
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
 logger = logging.getLogger("radiopyo")
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 @dataclass
 class ReactionsList:
-    """Collection class to store all reactions and apply some changes on its
-    e.g. indexing. Also expose methods to ease iteration.
+    """
+    Collection class to store all reactions and apply some changes on
+    its e.g. indexing. Also expose methods to ease iteration.
     """
 
     ab_reaction: tp.List[AcidBase]
@@ -191,8 +191,8 @@ class ReactionsList:
 
 @dataclass
 class SimEnv:
-    """Environment class storing all pieces of information to build the matrices to
-    solve the ODE.
+    """Environment class storing all pieces of information to build the
+    matrices to solve the ODE.
 
     Attributes:
         reactions: ReactionsList
@@ -405,14 +405,18 @@ class SimEnv:
         T: tp.Optional[Temperature | float] = None,
         all: bool = False,
     ) -> NDArray[np.float64]:
-        """Construct the vector containing initial concentrations values of species
+        """
+        Construct the vector containing initial concentrations
+        values of species
 
         Args:
             all: bool, optional
-                if False, vector only contains initial cc of DynSpecies (default=False)
+                if False, vector only contains initial cc of DynSpecies
+                (default=False)
 
         Returns:
-            NDArray[np.float64]: vector with initial concentrations in [µmol/l]
+            NDArray[np.float64]: vector with initial concentrations
+            in [µmol/l]
         """
         out_dyn = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
         for species in self.species.iter_dyn_species():
@@ -452,8 +456,10 @@ class SimEnv:
         self,
         T: tp.Optional[Temperature | float] = None,
     ) -> tp.Tuple[NDArray[np.int8], NDArray[np.float64]]:
-        """Construct matrix necessary to compute to account for Acid/Base equilibrium
-        during the computation of the cc values variations.
+        """
+        Construct matrix necessary to compute to account for
+        Acid/Base equilibrium during the computation of the cc values
+        variations.
         """
         # First matrix
         couples = np.zeros(
@@ -478,8 +484,9 @@ class SimEnv:
         NDArray[np.float32],
         NDArray[np.float32],
     ]:
-        """Construct all matrices necessary to compute the variation of the species
-        concentrations due to all k reactions.
+        """
+        Construct all matrices necessary to compute the variation of
+        the species concentrations due to all k reactions.
         """
         # Step 1 -> Find the highest species's stoichio
         max_reactants = 0
@@ -560,8 +567,9 @@ class SimEnv:
         return (Ki, Riy, Rki, JRki)
 
     def make_radiolytic_vector(self) -> NDArray:
-        """Construct matrix necessary to compute the variation of the species
-        concentrations due irradiation via GValues.
+        """
+        Construct matrix necessary to compute the variation of the
+        species concentrations due irradiation via GValues.
         """
         Gi = np.zeros(
             [len(self.species), len(self.reactions.radiolytic)],
@@ -582,8 +590,9 @@ class SimEnv:
             NDArray[np.int8],
         ]
     ]:
-        """Construct all matrices necessary to compute the variation of the species
-        concentrations due enzymatic reactions.
+        """
+        Construct all matrices necessary to compute the variation of
+        the species concentrations due enzymatic reactions.
         Tricks to keep in mind:
             => Invert x. where x=0 -> result=0 as well
         """
@@ -725,9 +734,9 @@ class SimEnv:
         return out
 
 
-# ------------------------------------------------------------------------------------ #
-#                                 FUNCTION DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
 
 
 def acid_base_from_dict(

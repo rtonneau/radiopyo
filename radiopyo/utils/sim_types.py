@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
-The sim_types submodule contains class types hint (TypedDict) in order to help users to
-interface to the module.
+The sim_types submodule contains class types hint (TypedDict) in order
+to help users to interface to the module.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 08/05/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 08/05/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import typing as tp
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
     "KwargsRun",
     "ConfigDict",
@@ -28,11 +28,11 @@ __all__ = [
     "default_ConfigDict",
     "SimMatrices",
 ]
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class KwargsRun(tp.TypedDict):
@@ -79,8 +79,10 @@ class ConfigDict(tp.TypedDict, total=False):
 
 
 class SimMatrices(tp.TypedDict):
-    """Convenient TypedDict use to leverage type checking and store matrices used in ODE
-    solver."""
+    """
+    Convenient TypedDict use to leverage type checking and store
+    matrices used in ODE solver.
+    """
 
     Ki_mat: tp.Tuple[
         NDArray[np.float64],

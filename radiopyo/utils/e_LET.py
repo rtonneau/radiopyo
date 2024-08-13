@@ -2,17 +2,17 @@
 """
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from pathlib import Path
 
 import pandas as pd
 from scipy.interpolate import interp1d  # type: ignore[import]
 
-# --------------------------------- Internal imports --------------------------------- #
-# ----------------------------- Type checking ONLY imports---------------------------- #
-# ------------------------------------------------------------------------------------ #
+# ---------------------------- Internal imports ----------------------------- #
+# -------------------------- Type checking ONLY imports --------------------- #
+# --------------------------------------------------------------------------- #
 __all__ = [
     "EnergyLET",
 ]
@@ -33,7 +33,8 @@ class EnergyLET():
 
     Attributes:
         df: pandas.DataFrame
-            Contains raw data 1st col: energy [MeV], 2nd col LET [MeV.cm²/g]
+            Contains raw data 1st col: energy [MeV], 2nd col LET
+            [MeV.cm²/g]
         interpol: scipy.interpolate.interp1d
     """
     df: pd.Series
@@ -56,7 +57,7 @@ class EnergyLET():
                                  )
 
     def values_at(self, energy: float) -> float:
-        """ 
+        """
         Method retrieving the G value from interpolated data.
 
         Args:

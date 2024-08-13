@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-This module contains the implementation of the abstract base class for file parsers
-used in radiopyo.
+This module contains the implementation of the abstract base class for
+file parsers used in radiopyo.
 
-The module provides the abstract base class :class:`FileParser` and the function
+The module provides the abstract base class :class:`FileParser` and
+the function
 :func:`list_available_parsers` to list the available parsers.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 23/06/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports----------------------------- #
 from __future__ import annotations
 
 import logging
@@ -18,41 +19,43 @@ import pathlib
 import typing as tp
 from abc import ABC, abstractmethod
 
-# --------------------------------- Internal imports --------------------------------- #
+# ------------------------------ Internal imports --------------------------- #
 from radiopyo.parser.utils import combine_config
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# -------------------------- Type checking ONLY imports---------------------- #
 if tp.TYPE_CHECKING:
     from radiopyo.utils.sim_types import ConfigDict
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
     "FileParser",
     "list_available_parsers",
     "resolve_includes",
 ]
 
-# -------------------------------------- Logging ------------------------------------- #
+# ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
 
-# ------------------------------------------------------------------------------------ #
-#                                DECORATOR DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                           DECORATOR DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
 
-# ------------------------------------------------------------------------------------ #
-#                                 FUNCTION DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
 
 
 def list_available_parsers() -> tp.Dict[str, tp.Type[FileParser]]:
     """
-    Returns a dictionary containing all available parsers and their corresponding extensions.
+    Returns a dictionary containing all available parsers and their
+    corresponding extensions.
 
     Args:
         None
 
     Returns:
-        Dict[str, Type[FileParser]]: A dictionary with parser extensions as keys and parser classes as values.
+        Dict[str, Type[FileParser]]: A dictionary with parser extensions
+            as keys and parser classes as values.
     """
     return {cls.ext: cls for cls in FileParser.__subclasses__()}  # type: ignore [type-abstract]
 
@@ -108,19 +111,20 @@ def resolve_includes(config: ConfigDict) -> ConfigDict:
     return config
 
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                               CLASS DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
 
 
 class FileParser(ABC):
     """
-    FileParser is an abstract class designed to parse files into a dictionary.
+    FileParser is an abstract class designed to parse files into a
+    dictionary.
 
-    This class is meant to be subclassed by specific parsers for different file types.
-    Each subclass should define `ext`, a class variable that specifies the file type
-    the parser can handle, and `parse`, a method that parses the file and returns
-    a dictionary.
+    This class is meant to be subclassed by specific parsers for
+    different file types. Each subclass should define `ext`, a class
+    variable that specifies the file type the parser can handle, and
+    `parse`, a method that parses the file and returns a dictionary.
 
     Parameters
     ----------
@@ -158,13 +162,15 @@ class FileParser(ABC):
         Method parsing the file (self.path) and returning a ConfigDict.
 
         Returns:
-            ConfigDict: TypedDictionary use to build the simulation Environment.
+            ConfigDict: TypedDictionary use to build the simulation
+                Environment.
         """
 
     def file_type(self) -> str:
         """
         raises:
-            AttributeError: if ext class attribute is not defined by the user.
+            AttributeError: if ext class attribute is not defined by
+                the user.
 
         returns:
             str: file extension

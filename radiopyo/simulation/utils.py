@@ -2,9 +2,9 @@
 """
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 31/07/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 31/07/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import dataclasses as dc
@@ -15,10 +15,10 @@ from pathlib import Path
 import h5py  # type: ignore[import]
 import pandas as pd
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from types import TracebackType
 
@@ -27,18 +27,18 @@ if tp.TYPE_CHECKING:
 
     T = tp.TypeVar("T", bound="H5Manager")
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = [
     "ResCollection",
     "ConcentrationConvert",
     "O2Convert",
 ]
 
-# -------------------------------------- Logging ------------------------------------- #
+# ---------------------------------- Logging -------------------------------- #
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class ConcentrationConvert(object):
@@ -140,7 +140,8 @@ class ResCollection(object):
 
     # Dictionary storing ODEResult
     _results: tp.Dict[tp.Any, ODEResult]
-    # General label (variable) of the collection e.g. "dose_rate [Gy]" -> ideal for plot
+    # General label (variable) of the collection e.g. "dose_rate [Gy]"
+    # -> ideal for plot
     _key_label: str
     # Enable sorting and thus iteration over a specific order
     _order: tp.List[tp.Any]

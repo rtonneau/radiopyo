@@ -5,7 +5,7 @@ Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import copy
@@ -21,13 +21,13 @@ import numpy as np
 import pandas as pd
 from scipy.integrate import simpson, trapezoid  # type: ignore[import]
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# -------------------------- Type checking ONLY import----------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
@@ -38,20 +38,20 @@ if tp.TYPE_CHECKING:
 
     T = tp.TypeVar("T", bound="ODEResult")
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = []
 
-# -------------------------------------- Logging ------------------------------------- #
+# ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
 
-# ------------------------------------------------------------------------------------ #
-#                                DECORATOR DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                             DECORATOR DEFINITIONS                           #
+# --------------------------------------------------------------------------- #
 
 
-# ------------------------------------------------------------------------------------ #
-#                                 FUNCTION DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              FUNCTION DEFINITIONS                           #
+# --------------------------------------------------------------------------- #
 def make_slice_from_time_boundaries(
     start: tp.Optional[float | slice] = None,
     stop: tp.Optional[float] = None,
@@ -70,15 +70,16 @@ def make_slice_from_time_boundaries(
     return slice(start, stop)
 
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class ODEResult(object):
     """
-    Collection storing the results from scipy.integrate.solve_ivp in order to easily
-    append together the results from several integration steps.
+    Collection storing the results from scipy.integrate.solve_ivp in
+    order to easily append together the results from several integration
+    steps.
     """
 
     # Keep track of the original sim env
@@ -261,7 +262,7 @@ class ODEResult(object):
         self.n_points.append(len(sol.t))
         self.exec_time.append(exec_time)
 
-    # --------------------------------- Utils methods -------------------------------- #
+    # ---------------------------- Utils methods ---------------------------- #
     def to_pandas(self) -> pd.DataFrame:
         """
         Provides simulation results in a nice pandas DataFrame.
@@ -323,8 +324,8 @@ class ODEResult(object):
         Rem: to integrate df
             >>> df.apply(lambda x: trapezoid(y=x.values, x=x.index))
         """
-        # Compute column names and Pre compute slices to ease access in the dataframe
-        # columns
+        # Compute column names and Pre compute slices to ease access in
+        # the dataframe columns
         cols_kr = [kr.as_label() for kr in self.env.reactions.iter_all_kreactions()]
         idx_kr = slice(0, len(cols_kr))
 
@@ -366,11 +367,11 @@ class ODEResult(object):
             )
             Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
 
-            # Sometimes, some species are < 0.0 for a very short while. It has no
-            # physical meaning. But it is necessary to give the ODE solver such
-            # possibility to ensure good quality results.
-            # The next line is then added only here (not in ODE solver) to give a more
-            # suitable meaning.
+            # Sometimes, some species are < 0.0 for a very short while.
+            # It has no physical meaning. But it is necessary to give
+            # the ODE solver such possibility to ensure good quality
+            # results. The next line is then added only here
+            # (not in ODE solver) to give a more suitable meaning.
             Rki[np.where(Rki < 0)] = 0.0
 
             out.iloc[idx, idx_kr] = Rki
@@ -446,8 +447,8 @@ class ODEResult(object):
         }
 
         rdf = dfr.loc[:, list(reactions.keys())]
-        # Need to take into account the stoichiometric coefficient of the species in all
-        # the reactions.
+        # Need to take into account the stoichiometric coefficient of
+        # the species in all the reactions.
         for label, r in reactions.items():
             rdf.loc[:, label] = rdf.loc[:, label] * r.get_stoi_of(species)
 
@@ -502,8 +503,8 @@ class ODEResult(object):
         }
         rdf = dfr.loc[:, list(reactions.keys())]
 
-        # Need to take into account the stoichiometric coefficient of the species in all
-        # the reactions.
+        # Need to take into account the stoichiometric coefficient of
+        # the species in all the reactions.
         for label, r in reactions.items():
             rdf.loc[rdf.index, label] = (
                 -1 * rdf.loc[rdf.index, label] * r.get_stoi_of(species)
@@ -576,9 +577,9 @@ class ODEResult(object):
         stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
         """
-        Return a DataFrame containing the diff of the two reactions of a species
-        involved in an equilibrium. The point of view is always the production of the
-        species. For example:
+        Return a DataFrame containing the diff of the two reactions of
+        a species involved in an equilibrium. The point of view is
+        always the production of the species. For example:
             A + B <-> C + D
             forward reaction is  => A + B -> C + D
             backward reaction is => C + D -> A + B
@@ -589,8 +590,8 @@ class ODEResult(object):
         -> _eq_reactions_yield('C') will compute:
             'Rate of forward' - 'Rate of backward'
 
-        Therefore, the column names of the DataFrame will always be the label of the
-        reaction producing the species.
+        Therefore, the column names of the DataFrame will always be
+        the label of the reaction producing the species.
         /!\ Negative values are allowed. The meaning is a net consumption.
         """
         _slice = make_slice_from_time_boundaries(start, stop)
@@ -637,10 +638,11 @@ class ODEResult(object):
         return out
 
     def integrate_species(
-        self, start: float = 0, stop: float = float("inf"), compute_AB: bool = True
+        self,
+        start: float = 0,
+        stop: float = float("inf"),
     ) -> pd.Series:
-        """ """
-        df = self.to_pandas(compute_AB)
+        df = self.to_pandas()
         df = df[(df.index >= start) & (df.index < stop)]
         out = {}
 
@@ -648,7 +650,11 @@ class ODEResult(object):
             out[col] = trapezoid(y=data.values, x=data.index)
         return pd.Series(out, dtype=np.float64)
 
-    def to_json_config(self, file_path: Path | str, overwrite: bool = False) -> None:
+    def to_json_config(
+        self,
+        file_path: Path | str,
+        overwrite: bool = False,
+    ) -> None:
         """ """
         file_path = Path(file_path)
         if not overwrite and file_path.exists():
@@ -671,7 +677,10 @@ class ODEResult(object):
             json.dump(out, fp, indent=4)
 
     @classmethod
-    def from_json_config(cls: tp.Type[tp.Self], file_path: str | Path) -> tp.Self:
+    def from_json_config(
+        cls: tp.Type[tp.Self],
+        file_path: str | Path,
+    ) -> tp.Self:
         """
             def __init__(
         self,
@@ -706,7 +715,6 @@ class ODEResult(object):
 
 @dataclass
 class DummyScipyOdeResult:
-    """ """
 
     t: NDArray[np.float64]
     y: NDArray[np.float64]
@@ -727,7 +735,11 @@ class DummyScipyOdeResult:
     success: bool = field(repr=False, default=True)
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame, order: tp.List[str]) -> tp.Self:
+    def from_dataframe(
+        cls,
+        df: pd.DataFrame,
+        order: tp.List[str],
+    ) -> tp.Self:
         df = df.reindex(columns=order)
         return cls(
             t=df.index.values,

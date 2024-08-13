@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-The sim_hand submodule contains class(es) to easily handle simulation. This one should
-be the entry point for lambda user.
+The sim_hand submodule contains class(es) to easily handle simulation.
+This one should be the entry point for lambda user.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import collections
@@ -20,51 +20,55 @@ from contextlib import suppress
 import numpy as np
 from scipy.integrate import solve_ivp  # type: ignore[import]
 
-from radiopyo.chemistry.radiolytic import ge_to_kr
 from radiopyo.chemistry.utils.units import Temperature
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.ron import RonFileParser
 from radiopyo.parser.toml import TOMLFileParser
 from radiopyo.physics.beam import BeamCollection, ParticleBeam
 from radiopyo.simulation import exceptions as rp_excep
 from radiopyo.simulation.environment_build import SimEnv
-from radiopyo.simulation.ode_functions_solver import ScipyODEResult, derive, jacobian
+from radiopyo.simulation.ode_functions_solver import (
+    ScipyODEResult,
+    derive,
+    jacobian,
+)
 from radiopyo.simulation.ode_result import ODEResult
 from radiopyo.utils.g_values import GValuesBoscolo
-from radiopyo.utils.sim_types import SimMatrices
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
     from pathlib import Path
 
     from numpy.typing import NDArray
 
-    from radiopyo.utils.sim_types import ConfigDict, KwargsRun
+    from radiopyo.utils.sim_types import ConfigDict, KwargsRun, SimMatrices
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
     "UnitCell",
 ]
 
-# -------------------------------------- Logging ------------------------------------- #
+# ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class UnitCell(object):
     """
-    Class UnitCell represents the tiniest simulation volume. All concentrations are
-    assumed to be homogenous in it. It also defines method to solve ODE's in order to
-    compute the evolution of concentration over time.
+    Class UnitCell represents the tiniest simulation volume. All
+    concentrations are assumed to be homogenous in it. It also defines
+    method to solve ODE's in order to compute the evolution of
+    concentration over time.
 
     Attributes:
         T: Temperature
-            Sets the values of chemical reaction constants (default=25). Unit = °C.
+            Sets the values of chemical reaction constants (default=25).
+            Unit = °C.
         env: SimEnv
             SimEnv build from the input file
         mat: SimMatrices
@@ -78,7 +82,8 @@ class UnitCell(object):
         FIRST_STEP: float
             Initial time step of all simulation (default=1e-12)
         T_ZERO: float
-            Initial time after when switching to BEAM ON phase (default=1e-7)
+            Initial time after when switching to BEAM ON phase
+            (default=1e-7)
 
     """
 
@@ -130,12 +135,18 @@ class UnitCell(object):
         return self.beam_list.current_LET
 
     @classmethod
-    def from_config_dict(cls, config: ConfigDict, init: bool = True) -> tp.Self:
-        """Create a Simulation Environment from a the generic ConfigDict:
+    def from_config_dict(
+        cls,
+        config: ConfigDict,
+        init: bool = True,
+        ) -> tp.Self:
+        """
+        Create a Simulation Environment from a the generic ConfigDict:
 
         Args:
             config: ConfigDict
-                Dictionary (see radiopyo.sim_types.py) containing simulation parameters.
+                Dictionary (see radiopyo.sim_types.py) containing
+                simulation parameters.
 
         Returns:
             UnitCell
@@ -152,9 +163,13 @@ class UnitCell(object):
 
     @classmethod
     def from_parser(
-        cls, file: str | Path, Parser: tp.Type[FileParser], init: bool = True
+        cls,
+        file: str | Path,
+        Parser: tp.Type[FileParser],
+        init: bool = True,
     ) -> tp.Self:
-        """Create a Simulation Environment from a user defined FileParser.
+        """
+        Create a Simulation Environment from a user defined FileParser.
 
         Args:
             file: str | pathlib.Path
@@ -244,8 +259,9 @@ class UnitCell(object):
         return self
 
     def change_LET(self, let: float) -> None:
-        """Update the radiolytic yields from the simulation env according to literature
-        values.
+        """
+        Update the radiolytic yields from the simulation env according
+        to literature values.
 
         Args:
             let: float
@@ -311,8 +327,8 @@ class UnitCell(object):
 
         beam = self.beam_list.current if use_beam else None
 
-        # Check if beam_on, then skip the next 1e-7 s of sim and compute evolution of cc's
-        # according to Gvalues
+        # Check if beam_on, then skip the next 1e-7 s of sim and compute
+        # evolution of cc's according to Gvalues
         if beam_ON:  # assume beam is switched ON at t_span[0]
             t_span = (t_span[0] + self.T_ZERO, t_span[1])
             if t_span[0] > t_span[1]:
@@ -391,19 +407,22 @@ class UnitCell(object):
             use_jac: bool
                 Use the Jacobian ?
             method: str
-                Which ODE solver to use? Define in scipy.integrate.solve_ivp
+                Which ODE solver to use? Define in
+                scipy.integrate.solve_ivp
             atol: float, optional
                 Absolute Tolerance of the ODE Solver (default: 1e-8)
             max_step: float, optional
-                Larger authorized time step for the ODE solver (default: inf)
+                Larger authorized time step for the ODE solver
+                (default: inf)
             y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None). If None, calls
-                EnvSim.initial_values()
+                Initial concentration of DynSpecies (default: None).
+                If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
 
         Returns:
-            ScipyODEResult: integration result provided by scipy.integrate.solve_ivp
+            ScipyODEResult: integration result provided by
+            scipy.integrate.solve_ivp
         """
         logger.info(
             f"Starting simulation with t_span: {t_span} (jacobian use: {use_jac})"
@@ -448,29 +467,33 @@ class UnitCell(object):
                 t_span[0] -> start time, in seconds
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
-                Whether to use the jacobian along with the ODE solver (default:False)
+                Whether to use the jacobian along with the ODE solver
+                (default:False)
             method: str, optional
-                Which ODE solver to use? Define in scipy.integrate.solve_ivp
+                Which ODE solver to use? Define in
+                scipy.integrate.solve_ivp
             atol: float, optional
                 Absolute Tolerance of the ODE Solver (default: 1e-10)
             max_step_size_on: float, optional
-                Larger authorized time step for the ODE solver while beam is ON
-                (default: inf)
+                Larger authorized time step for the ODE solver while
+                beam is ON (default: inf)
             max_step_size_off: float, optional
-                Larger authorized time step for the ODE solver while beam is OFF
-                (default: inf)
+                Larger authorized time step for the ODE solver while
+                beam is OFF (default: inf)
             max_step_size_final: float, optional
-                Larger authorized time step for the ODE solver for the very last
-                integration step (can be the larger if long sim time and few pulses).
-                If None, 'max_step_size_off|on' is used instead (default: None).
+                Larger authorized time step for the ODE solver for the
+                very last integration step (can be the larger if long
+                sim time and few pulses). If None,
+                'max_step_size_off|on' is used instead (default: None).
             y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None). If None, calls
-                EnvSim.initial_values()
+                Initial concentration of DynSpecies (default: None).
+                If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
 
         Returns:
-            SimChunksIter: Iterable object performing the ODE integration
+            SimChunksIter: Iterable object performing the ODE
+            integration.
         """
         if len(self.beam_list) <= 0:
             logger.error("No beam is defined for the simulation")
@@ -523,11 +546,13 @@ class UnitCell(object):
         )
 
 
-# ------------------------------ Chunked Simulation Run ------------------------------ #
+# -------------------------- Chunked Simulation Run ------------------------- #
 
 
 class SimChunk(tp.NamedTuple):
-    """Convenient (immutable) container defining a chunk/ step of ODE integration.
+    """
+    Convenient (immutable) container defining a chunk/ step of
+    ODE integration.
 
     Attributes:
         start: float
@@ -563,8 +588,8 @@ class SimChunksIter:
         method: str
             Defines the ODE method used with scipy.integrate.solve_ivp
         y0: NDArray[np.float64], optional
-            Initial concentration of DynSpecies (default: None). If None, calls
-            EnvSim.initial_values()
+            Initial concentration of DynSpecies (default: None).
+            If None, calls EnvSim.initial_values()
     Usage:
         >>>
     """
@@ -637,11 +662,12 @@ class SimChunksIter:
 
     def run(self) -> ODEResult:
         """Run all simulation chunks
-        Tries to import tqdm to give a nice progressbar to the user. But it can safely
-        fail.
-        get_ipython().__class__.__name__ --> detect if python was started from a
-        Jupyter Notebook (=="ZMQInteractiveShell").
-        If ran from a regular python, the call to "get_ipython()" produces a NameError.
+        Tries to import tqdm to give a nice progressbar to the user.
+        But it can safely fail.
+        get_ipython().__class__.__name__ --> detect if python was
+        started from a Jupyter Notebook (=="ZMQInteractiveShell").
+        If ran from a regular python, the call to "get_ipython()"
+        produces a NameError.
         """
         logger.info("Running all simulation chunks")
         try:
@@ -656,7 +682,8 @@ class SimChunksIter:
         except ImportError:
             sim = self
 
-        # Efficient way to consume the iterator while returning the last element.
+        # Efficient way to consume the iterator while returning the
+        # last element.
         res = collections.deque(sim, maxlen=1).pop()
         logger.info("Simulation done!")
         return res

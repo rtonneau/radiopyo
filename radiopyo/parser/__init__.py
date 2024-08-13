@@ -16,16 +16,17 @@ Sub-Module containing all parsers used in the radiopyo module.
     - grammar:
         Folder containing .lark files (lark module grammar)
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023
 """
-# --------------------------------- External imports --------------------------------- #
-# --------------------------------- Internal imports --------------------------------- #
+# ------------------------------- External imports -------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser.reaction_parser import ReactionParser
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# -------------------------- Type checking ONLY imports---------------------- #
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__: list = ["RPARSER"]
 
-# Expose a instance (sharable) of ReactionParser (avoid unnecessary csv parsing)
+# Expose a instance (sharable) of ReactionParser
+# (avoid unnecessary csv parsing)
 RPARSER = ReactionParser()

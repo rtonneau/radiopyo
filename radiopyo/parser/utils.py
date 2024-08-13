@@ -2,14 +2,14 @@
 """
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import typing as tp
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import (
     acid_base_from_dict,
@@ -20,31 +20,31 @@ from radiopyo.simulation.environment_build import (
     michaelis_from_dict,
 )
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from radiopyo.utils.sim_types import ConfigDict
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = []
 
-# -------------------------------------- Logging ------------------------------------- #
+# ---------------------------------- Logging -------------------------------- #
 
-# ------------------------------------------------------------------------------------ #
-#                                DECORATOR DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                            DECORATOR DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
 
-# ------------------------------------------------------------------------------------ #
-#                                 FUNCTION DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
 
 
 def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     """ "
-    Function for config files assembly. It allows to define the environment in several
-    independent config file. Convenient for reuse.
-    General behavior:
-        Keep 'root', erase entries from 'root' when 'other' has it and add entries from
-        'other' not included in 'root'
+    Function for config files assembly. It allows to define the
+    environment in several independent config file. Convenient for
+    reuse. General behavior:
+        Keep 'root', erase entries from 'root' when 'other' has it
+        and add entries from 'other' not included in 'root'
     """
     # Easy part
     root["parameters"] |= other["parameters"]
@@ -64,21 +64,24 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     #  => Radiolytic
     root["reactions"]["radiolytic"] |= other["reactions"]["radiolytic"]
 
-    # For the following, Reactions are built from Dict and then their unique identifier
-    # (string version) are used to compare them. First, all reaction from 'root' are
-    # read and stored in a Dict whose keys are the strings. Then each entries of 'other'
-    # are parsed to extract their string. if it exists in the dict, their constants are
-    # compared and updated accordingly.
+    # For the following, Reactions are built from Dict and then their
+    # unique identifier (string version) are used to compare them.
+    # First, all reaction from 'root' are read and stored in a Dict
+    # whose keys are the strings. Then each entries of 'other' are
+    # parsed to extract their string. if it exists in the dict, their
+    # constants are compared and updated accordingly.
 
     ## => AcidBase Reactions ##
-    # First, let's make a set of the AB presents in root. Each one should have a
-    # unique ID ==> Make AcidBase and then use the str version of it!
+    # First, let's make a set of the AB presents in root. Each one
+    # should have a unique ID ==> Make AcidBase and then use the str
+    # version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["acid_base"]):
         _ = acid_base_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
-    # Loop over all KReaction in other and check whether it is also in root or not.
+    # Loop over all KReaction in other and check whether it is also
+    # in root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["acid_base"]:
         ab = acid_base_from_dict(_, sim_sp=None)[0][0]
@@ -95,25 +98,30 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
                     del root["reactions"]["acid_base"][idx]["k_forward"]
                 root["reactions"]["acid_base"][idx]["k_backward"] = _["backward"]
             continue
-        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
+        # KReaction from 'other' not in 'root'. Make a copy of the dict
+        # version.
         to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all new reactions
+    # All shared reactions are updated at this point. Now just add all
+    # new reactions
     # from 'other' --> stored in 'to_add'
     root["reactions"]["acid_base"] += to_add
 
     ## => Equilibrium Reactions ##
-    # First, let's make a set of the AB presents in root. Each one should have a
-    # unique ID ==> Make AcidBase and then use the str version of it!
+    # First, let's make a set of the AB presents in root. Each one
+    # should have a unique ID ==> Make AcidBase and then use the str
+    #  version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["equilibrium"]):
         _ = eq_reaction_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
-    # Loop over all KReaction in other and check whether it is also in root or not.
+    # Loop over all KReaction in other and check whether it is also in
+    # root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["equilibrium"]:
         eq = eq_reaction_from_dict(_, sim_sp=None)[0][0]
-        # Same reaction in root => just make sur the kvalue comes from 'other'
+        # Same reaction in root => just make sur the kvalue comes from
+        # 'other'
         if str(eq) in r_root:
             idx = r_root[str(eq)][1]
             for elt in ["k_forward", "k_backward", "k_value"]:
@@ -122,76 +130,89 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
                 if elt in _:
                     root["reactions"]["equilibrium"][idx][elt] = _[elt]
             continue
-        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
+        # KReaction from 'other' not in 'root'. Make a copy of the
+        # dict version.
         to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all new reactions
-    # from 'other' --> stored in 'to_add'
+    # All shared reactions are updated at this point. Now just add all
+    # new reactions from 'other' --> stored in 'to_add'
     root["reactions"]["equilibrium"] += to_add
 
     ## => k_reactions ##
-    # First, let's make a set of the kreaction presents in root. Each one should have a
-    # unique ID ==> Make kReaction and then use the str version of it!
+    # First, let's make a set of the kreaction presents in root.
+    # Each one should have a unique ID ==> Make kReaction and then use
+    # the str version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["k_reaction"]):
         _ = kreaction_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
-    # Loop over all KReaction in other and check whether it is also in root or not.
+    # Loop over all KReaction in other and check whether it is also in
+    # root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["k_reaction"]:
         kr = kreaction_from_dict(_, sim_sp=None)[0][0]
-        # Same reaction in root => just make sur the kvalue comes from 'other'
+        # Same reaction in root => just make sur the kvalue comes from
+        # 'other'
         if str(kr) in r_root:
             idx = r_root[str(kr)][1]
-            # raw_k_value is necessary to avoid multiple divide for reactions like
-            # xA -> B + C (in this case, xk should be provided)
+            # raw_k_value is necessary to avoid multiple divide for
+            # reactions like xA -> B + C
+            # (in this case, xk should be provided)
             root["reactions"]["k_reaction"][idx]["k_value"] = kr.raw_k_value()
             continue
-        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
+        # KReaction from 'other' not in 'root'. Make a copy of the dict
+        # version.
         to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all new reactions
-    # from 'other' --> stored in 'to_add'
+    # All shared reactions are updated at this point. Now just add all
+    # new reactions from 'other' --> stored in 'to_add'
     root["reactions"]["k_reaction"] += to_add
 
     ## => Loop over all Constant Reactions ##
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["constant"]:
         kr = cst_reaction_from_dict(_, sim_sp=None)[0][0]
-        # Same reaction in root => just make sur the kvalue comes from 'other'
+        # Same reaction in root => just make sur the kvalue comes from
+        # 'other'
         if str(kr) in r_root:
             idx = r_root[str(kr)][1]
-            # raw_k_value is necessary to avoid multiple divide for reactions like
+            # raw_k_value is necessary to avoid multiple divide for
+            # reactions like
             # xA -> B + C (in this case, xk should be provided)
             root["reactions"]["constant"][idx]["k_value"] = kr.raw_k_value()
             continue
-        # KReaction from 'other' not in 'root'. Make a copy of the dict version.
+        # KReaction from 'other' not in 'root'. Make a copy of the dict
+        # version.
         to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all new reactions
-    # from 'other' --> stored in 'to_add'
+    # All shared reactions are updated at this point. Now just add all
+    # new reactions from 'other' --> stored in 'to_add'
     root["reactions"]["constant"] += to_add
 
     ## => Arrhenius Reactions ##
-    # First, let's make a set of the Arrhenius presents in root. Each one should have a
-    # unique ID ==> Make kReaction and then use the str version of it!
+    # First, let's make a set of the Arrhenius presents in root.
+    # Each one should have a unique ID ==> Make kReaction and then use
+    # the str version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["arrhenius"]):
         _ = arrhenius_from_dict(_, sim_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
-    # Loop over all KReaction in other and check whether it is also in root or not.
+    # Loop over all KReaction in other and check whether it is also in
+    # root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["arrhenius"]:
         ar = arrhenius_from_dict(_, sim_sp=None)[0][0]
-        # Same reaction in root => just make sur the cst values comes from 'other'
+        # Same reaction in root => just make sur the cst values comes
+        # from 'other'
         if str(ar) in r_root:
             idx = r_root[str(ar)][1]
             root["reactions"]["arrhenius"][idx]["A"] = ar._pre_exp
             root["reactions"]["arrhenius"][idx]["Ea"] = ar._activation_energy
             continue
-        # arrhenius from 'other' not in 'root'. Make a copy of the dict version.
+        # arrhenius from 'other' not in 'root'. Make a copy of the
+        # dict version.
         to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all new reactions
-    # from 'other' --> stored in 'to_add'
+    # All shared reactions are updated at this point. Now just add all
+    # new reactions from 'other' --> stored in 'to_add'
     root["reactions"]["arrhenius"] += to_add
 
     ## => Enzymatic ##
@@ -229,6 +250,6 @@ def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Dict:
     return {"added": added, "removed": removed, "modified": modified, "same": same}
 
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                               CLASS DEFINITIONS                             #
+# --------------------------------------------------------------------------- #

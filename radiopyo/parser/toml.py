@@ -3,9 +3,9 @@
 The utils.toml_parser submodule aims to load simulation config from TOML files.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 09/05/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 09/05/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import logging
@@ -14,24 +14,24 @@ from contextlib import suppress
 
 import tomllib
 
-# --------------------------------- Internal imports --------------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser.file_parser import FileParser
 from radiopyo.utils.sim_types import ConfigDict, default_ConfigDict
 
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     pass
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__ = ["TOMLFileParser"]
 
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
 logger = logging.getLogger("radiopyo")
 
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 class TOMLFileParser(FileParser):
     """
     Class parsing TOML files.

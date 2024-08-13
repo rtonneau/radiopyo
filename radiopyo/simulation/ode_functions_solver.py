@@ -1,34 +1,35 @@
 #!/usr/bin/env python3
 """
-The ode_solver submodule contains all functions used to resolve ODE system.
+The ode_solver submodule contains all functions used to resolve ODE
+system.
 
 Author:
-    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023 
+    Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
 import typing as tp
 
 import numpy as np
 
-# --------------------------------- Internal imports --------------------------------- #
-# ----------------------------- Type checking ONLY imports---------------------------- #
+# ----------------------------- Internal imports ---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.physics.beam import ParticleBeam
 
-# ----------------------------- Expose importable stuffs ----------------------------- #
+# ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
     "jacobian",
     "derive",
     "ScipyODEResult",
 ]
 
-# ------------------------------------------------------------------------------------ #
-#                                 FUNCTION DEFINITIONS                                 #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
 
 global EPSILON
 EPSILON = 1e-25  # µmol/L
@@ -133,9 +134,9 @@ def derive(
     # ==> Add constant species
     y = np.append(y, cst_sp)
 
-    ####################################################################################
+    ###########################################################################
     # Compute evolution rate of the species (contained in vector y)
-    ####################################################################################
+    ###########################################################################
 
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
@@ -156,7 +157,7 @@ def derive(
         # Add this term to the total
         dydt += np.matmul(Ez_mat[3], MM.T)
 
-    ####################################################################################
+    ###########################################################################
     if beam is not None:
         # Add the Time dependent Radiolytic term
         dydt += Gi_mat * beam.at(t).dose_rate()
@@ -172,9 +173,9 @@ def derive(
     return dydt * 1e6  # mol/l => µmol/l
 
 
-# ------------------------------------------------------------------------------------ #
-#                                  CLASS DEFINITIONS                                   #
-# ------------------------------------------------------------------------------------ #
+# --------------------------------------------------------------------------- #
+#                              CLASS DEFINITIONS                              #
+# --------------------------------------------------------------------------- #
 
 
 class ScipyODEResult(tp.Protocol):

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 The g_values submodule contains class(es) interpolating G-values from:
-    * GValuesBoscolo -> D. Boscolo - 2020 [https://doi.org/10.3390/ijms21020424]
+    * GValuesBoscolo -> D. Boscolo - 2020
+    [https://doi.org/10.3390/ijms21020424]
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
 
-# --------------------------------- External imports --------------------------------- #
+# ----------------------------- External imports ---------------------------- #
 import typing as tp
 from pathlib import Path
 
@@ -15,9 +16,9 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d  # type: ignore[import]
 
-# --------------------------------- Internal imports --------------------------------- #
-# ----------------------------- Type checking ONLY imports---------------------------- #
-# ------------------------------------------------------------------------------------ #
+# ----------------------------- Internal imports ---------------------------- #
+# ------------------------- Type checking ONLY imports----------------------- #
+# --------------------------------------------------------------------------- #
 __all__ = [
     "GValuesBoscolo",
 ]
@@ -29,9 +30,9 @@ _data_dir = Path(__file__).parent.parent / "data/G_VALUES"
 class GValuesBoscolo:
     """
     Class providing G values.
-    Data are interpolated (quadratic) so that any LET within the date range can be
-    accessed. It is up to the user to ensure data are provided with a good enough
-    resolution.
+    Data are interpolated (quadratic) so that any LET within the date
+    range can be accessed. It is up to the user to ensure data are
+    provided with a good enough resolution.
 
     Usage:
         >>> from radiopyo.input.g_values import GValuesBoscolo
@@ -49,7 +50,8 @@ class GValuesBoscolo:
         interpol: Dict[str, scipy.interpolate.interp1d]
             Dictionary whose
                 keys -> species label
-                value -> Interpolation of GValues to handle any LET within valid range.
+                value -> Interpolation of GValues to handle any LET
+                within valid range.
     """
 
     df: pd.DataFrame
@@ -58,7 +60,11 @@ class GValuesBoscolo:
     DATA = Path("gvalues_from_Boscolo_2020.csv")
 
     def __init__(self) -> None:
-        self.df = pd.read_csv(_data_dir / GValuesBoscolo.DATA, index_col=0, header=0)
+        self.df = pd.read_csv(
+            _data_dir / GValuesBoscolo.DATA,
+            index_col=0,
+            header=0,
+        )
         self.interpol = {
             str(col): interp1d(
                 x=self.df.index,
@@ -113,7 +119,8 @@ class GValuesBoscolo:
     @staticmethod
     def _average_val_before_100ns(sp: str) -> float:
         """
-        These values are time integral average from Boscolo between 1e-12 & 1e-7 sec.
+        These values are time integral average from Boscolo between
+        1e-12 & 1e-7 sec.
         """
         data = {
             "OH_r": 3.0,
@@ -133,9 +140,9 @@ class GValuesBoscolo:
 
 class RawReader:
     """
-    Data are interpolated (quadratic) so that any LET within the date range can be
-    accessed. It is up to the user to ensure data are provided with a good enough
-    resolution.
+    Data are interpolated (quadratic) so that any LET within the date
+    range can be accessed. It is up to the user to ensure data are
+    provided with a good enough resolution.
 
     """
 
