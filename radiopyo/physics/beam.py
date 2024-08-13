@@ -56,19 +56,25 @@ class TimerState(Enum):
 
 
 class TimeMessage(tp.NamedTuple):
-    """NamedTuple containing the dose rate for a given time.
+    """
+    NamedTuple representing a dose rate at a specific time.
+
     Attributes:
-        time: float
-            Time expressed in second
-        current_dose_rate: float
-            Dose rate delivered at the given time
+        time (float): Time in seconds.
+        current_dose_rate (float): Dose rate in Gy/s at the given time.
+
+    This named tuple is used to encapsulate the dose rate and the time
+    at which it was measured. It is typically returned by methods of
+    radiation sources classes to provide dose rate information at a
+    specific time.
     """
 
     time: float
     current_dose_rate: float
 
     def dose_rate(self) -> float:
-        """Convenient method to shorten (+ encapsulate) the call to
+        """
+        Convenient method to shorten (+ encapsulate) the call to
         self.current_dose_rate.
 
         Returns:
@@ -78,7 +84,22 @@ class TimeMessage(tp.NamedTuple):
 
 
 class BaseTimer(ABC):
-    """ """
+    """
+    Abstract base class defining a radiation source timer.
+
+    This class is designed to be inherited by concrete radiation source
+    timer classes. It implements the basic logic to manage the state of
+    a radiation source and provides a method to get the dose rate at a
+    specific time.
+
+    Attributes:
+        period (float): The time (in seconds) between two consecutive
+            ON periods.
+        on_time (float): The duration (in seconds) of the ON period.
+        start_time (float): The time (in seconds) at which the radiation
+            source starts.
+
+    """
 
     period: float
     on_time: float
@@ -98,74 +119,212 @@ class BaseTimer(ABC):
 
     @staticmethod
     def _default_start_time() -> float:
+        """
+        Returns the default start time for a radiation source timer.
+
+        This static method returns the default start time for a
+        radiation source timer. The default start time is 0.0 seconds.
+
+        Returns:
+            float: The default start time in seconds.
+        """
         return 0.0
 
     @abstractmethod
     def state_at(self, time: float) -> TimerState:
         """
-        Compute the state of the timer at a given time.
-        Args:
-            time: float
-                Time in seconds
+        Computes the state of the timer at a given time.
+
+        Parameters:
+            time (float): The time in seconds.
+
         Returns:
-            TimerState: Enum being either isOn or isOff
+            TimerState: An enumeration representing the state of the
+            timer. Possible values are:
+                - isOn: The timer is on.
+                - isOff: The timer is off.
         """
 
     @abstractmethod
     def time_till_next_ON(self, time: float) -> float:
         """
-        Computes time remaining before next pulse.
+        Computes the time remaining before the next pulse of the timer.
+
+        This method calculates and returns the time remaining before the
+        next pulse of the timer. It takes a single parameter, `time`,
+        which represents the current time in seconds. The method returns
+        a float representing the time remaining in seconds.
+
+        Returns:
+            float: The time remaining before the next pulse in seconds.
         """
 
     @abstractmethod
     def time_till_next_OFF(self, time: float) -> float:
         """
-        Computes time remaining before beam is off. Returns 0 if beam
-        already off.
+        Computes the time remaining before the next pulse of the timer.
+
+        This method calculates and returns the time remaining before the
+        next pulse of the timer. If the timer is currently on, it returns
+        the time remaining in the current pulse. If the timer is off, it
+        returns 0.0. The method takes a single parameter, `time`, which
+        represents the current time in seconds. The method returns a float
+        representing the time remaining in seconds.
+
+        Returns:
+            float: Remaining time pulse in seconds. If the timer is off,
+            it returns 0.0.
         """
 
     @abstractmethod
     def copy(self, start_time: tp.Optional[float] = None) -> tp.Self:
-        """Make a simple copy of the Timer"""
+        """
+        Create a copy of the timer.
+
+        This method creates a copy of the timer and returns it. The copy
+        is a new instance of the same class as the original timer. The
+        start time of the copy can be optionally specified. If not
+        provided, the start time of the copy will be the same as the
+        original timer.
+
+        Parameters:
+            start_time (float, optional): The start time of the copy
+                in seconds. If not provided, the start time of the copy
+                will be the same as the original timer.
+
+        Returns:
+            Self: A new instance of the same class as the original timer.
+        """
 
     def time_till_next_period(self, time: float) -> float:
         """
         Computes how much time is remaining before next period starts.
+
+        This method takes a single parameter, `time`, which represents
+        the current time in seconds. The method then calculates and
+        returns the time remaining before the next period starts. This
+        is done by subtracting the start time of the timer and the
+        current time from the start time of the timer plus the period
+        multiplied by the period index of the current time. The result
+        is then subtracted from the period, which gives the remaining
+        time before the next period starts. The method returns a float
+        representing the remaining time in seconds.
+
+        Parameters:
+            time (float): The current time in seconds.
+
+        Returns:
+            float: The remaining time before the next period starts in
+                seconds.
         """
         time = time - self.start_time - self.period * self.period_index(time)
         return self.period - time
 
     def off_time(self) -> float:
-        """Computes the OFF time"""
+        """
+        Compute the length of the OFF time.
+
+        This method calculates and returns the length of the OFF time
+        of the timer. The OFF time is the duration of each period
+        between the ON times of the timer. The method takes no
+        parameters and returns a float representing the length of the
+        OFF time in seconds.
+
+        Returns:
+            float: The length of the OFF time in seconds.
+        """
         return self.period - self.on_time
 
     def period_index(self, time: float) -> int:
         """
-        Get the 'position' of the period containing 'time'.
-        For example, for 3s period & start_time=0, t=8s then
-        period_index = 2
+        Get the index of the period that contains a given time.
+
+        Parameters:
+            time (float): The time for which to find the period index.
+
+        Returns:
+            int: The index of the period that contains the given time.
+                The period index is calculated by subtracting the start
+                time from the given time and then dividing the result by
+                the period duration. The integer division is used to
+                determine the index.
+
+        Example:
+            For a period duration of 3 seconds and a start time of 0
+            seconds, the period index of a time of 8 seconds would be 2.
         """
-        time = time - self.start_time
-        return int(time // self.period)
+        # Calculate the time relative to the start time.
+        time_relative = time - self.start_time
+
+        # Calculate the period index by dividing the time relative to the
+        # start time by the period duration and taking the integer part.
+        period_index = int(time_relative // self.period)
+
+        return period_index
 
     def _relative_time_pulse(self, time: float) -> float:
-        """ """
+        """
+        Calculate the relative time within a single pulse.
+
+        This method calculates the relative time within a single pulse
+        of the timer. The relative time is the time within the ON time
+        of the timer. The method takes a time parameter and returns a
+        float representing the relative time in seconds.
+
+        Parameters:
+            time (float): The time for which to calculate the relative time.
+
+        Returns:
+            float: The relative time within a single pulse in seconds.
+
+        Raises:
+            ValueError: If the time is earlier than the start time of
+                the timer.
+
+        Example:
+            For a timer with a start time of 0 seconds, a period of 5
+            seconds, and an ON time of 2 seconds, the relative time at
+            time 4 seconds would be 2 seconds. The relative time at time
+            6 seconds would be 1 second.
+        """
         if time < self.start_time:
-            raise ValueError("Time < timer.start_time")
-        if time > self.start_time + self.period:
-            time = time - self.start_time - self.period * self.period_index(time)
-        return time
+            raise ValueError("Time is earlier than timer.start_time")
+        # Calculate the relative time within a single pulse by subtracting
+        # the start time of the timer and the start time of the current
+        # pulse from the given time.
+        relative_time = time - self.start_time - self.period * self.period_index(time)
+        return relative_time
+
+    # def _relative_time_pulse(self, time: float) -> float:
+    #     """ """
+    #     if time < self.start_time:
+    #         raise ValueError("Time < timer.start_time")
+    #     if time > self.start_time + self.period:
+    #         time = time - self.start_time - self.period * self.period_index(time)
+    #     return time
 
     def duty_cycle(self) -> float:
-        """Computes the duty cycle of the timer
-        Returns:
-            float
         """
-        out = self.on_time / self.period
-        # In case of "inf"/"inf" => nan
-        if isnan(out) or isinf(out):
+        Compute the duty cycle of the timer.
+
+        The duty cycle is the ratio of the ON time to the period.
+        If the timer is continuous, the duty cycle is 1.0.
+
+        Returns:
+            float: The duty cycle of the timer.
+
+        Example:
+            For a timer with a period of 5 seconds and an ON time of 2
+            seconds, the duty cycle would be 0.4 (2/5).
+
+            For a continuous timer, the duty cycle would be 1.0.
+        """
+        # If the timer is continuous, return 1.0.
+        if self.is_continuous():
             return 1.0
-        return out
+
+        # Calculate the duty cycle.
+        return self.on_time / self.period
 
     def is_continuous(self) -> bool:
         """Is timer continuous?

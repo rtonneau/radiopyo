@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-The utils.toml_parser submodule aims to load simulation config from TOML files.
+The utils.toml_parser submodule aims to load simulation config from
+TOML files.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 09/05/2023
