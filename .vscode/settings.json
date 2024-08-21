@@ -4,5 +4,6 @@
     "Boscolo",
     "deprotonation",
     "kreaction"
-  ]
+  ],
+  "mypy-type-checker.reportingScope": "workspace",
 }

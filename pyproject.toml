@@ -55,7 +55,7 @@ pretty = true
 show_column_numbers = true
 warn_no_return = true
 warn_unused_ignores = true
-exclude = "tests"
+exclude = ["tests/.*",]
 
 [tool.ruff]
 extend-exclude = ["tests/"]

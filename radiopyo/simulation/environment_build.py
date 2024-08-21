@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import typing as tp
+from abc import ABC, abstractmethod
 from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass, field

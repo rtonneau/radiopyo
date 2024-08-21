@@ -573,7 +573,7 @@ class MacroTimer(BaseTimer):
             return -1
         return self.subtimer.period_index(time)
 
-    def time_till_end_micro_pulses(self, time: float) -> float:
+    def time_till_end_micro_pulse(self, time: float) -> float:
         """ """
         time = self._relative_time_pulse(time)
         if time < self.on_time:
@@ -1610,7 +1610,7 @@ class MacroPulsedBeam(PulsedBeam):
                     out,
                     super().make_matrix(
                         start=start,
-                        stop=start + self.macro_timer.time_till_end_micro_pulses(start),
+                        stop=start + self.macro_timer.time_till_end_micro_pulse(start),
                     ),
                 ]
             )[:-1, :]
