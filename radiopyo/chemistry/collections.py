@@ -48,7 +48,7 @@ class ListSpecies:
     """
     Collection (i.e. container) of species. Main goal is to centralized
     species creation so that it is possible to easily attribute unique
-    id and loops over species.
+    id and loop over species.
 
     Attributes:
         dyn_sp: Dict[str, ChemSpecies]

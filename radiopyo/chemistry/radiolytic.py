@@ -20,6 +20,7 @@ Functions:
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
 """
+
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.collections import ListSpecies
+from radiopyo.chemistry.species import ChemSpecies
 
 from .basic_chemistry import BasicReaction
 
@@ -65,6 +67,9 @@ def umol_per_joule_to_ge(value: float) -> float:
 
     Returns:
         float: The converted value in Ge units.
+
+    Note:
+        Unused and probably wrong function.
     """
     return value * 1e-6 * Avogadro / elementary_charge * 100
 
@@ -165,9 +170,7 @@ class RadiolyticReaction(BasicReaction):
             KeyError
                 If the index is None or invalid.
         """
-        if self.index is not None and self.index >= 0:
-            return f"G_{self.species().label}"
-        raise KeyError("Unknown reaction index. Cannot make a label.")
+        return f"G_{self.species().label}"
 
     @classmethod
     def from_kwargs(
@@ -281,7 +284,7 @@ class RadiolyticReaction(BasicReaction):
 
     def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """No reactant should be involved"""
-        NotImplementedError("Not implemented for Radiolytic Reactions")
+        raise NotImplementedError("Not implemented for Radiolytic Reactions")
 
     def __str__(self) -> str:
         """

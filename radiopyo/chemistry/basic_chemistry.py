@@ -243,7 +243,26 @@ class BasicReaction(ABC):
         Returns:
             int
         """
-        return reduce(add, list(self.stoi_reactants.values()))
+        return (
+            0
+            if len(self.reactants) == 0
+            else reduce(add, list(self.stoi_reactants.values()))
+        )
+
+    def tot_number_products(self) -> int:
+        """
+        Count the total number of reactants involved in the reaction
+        => Stoichiometry dependent! In other words, it counts the number
+        of molecules/entities defined as reactants.
+
+        Returns:
+            int
+        """
+        return (
+            0
+            if len(self.products) == 0
+            else reduce(add, list(self.stoi_products.values()))
+        )
 
     def iter_species(self) -> tp.Iterable[ChemSpecies]:
         """

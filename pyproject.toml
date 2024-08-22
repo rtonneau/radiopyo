@@ -22,6 +22,7 @@ dependencies = [
   "mypy",
   "lark>=1.1.2",
   "more-itertools",
+  "pytest",
 ]
 
 [project.urls]
@@ -46,6 +47,15 @@ packages = ["radiopyo"]
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
 
+[tool.coverage.run]
+omit = ["tests/*", "radiopyo/data/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "raise NotImplementedError",
+  "if tp.TYPE_CHECKING:",
+  "def make_hash",
+]
 
 [tool.mypy]
 disallow_untyped_defs = true
@@ -55,7 +65,7 @@ pretty = true
 show_column_numbers = true
 warn_no_return = true
 warn_unused_ignores = true
-exclude = ["tests/.*",]
+exclude = ["tests/.*"]
 
 [tool.ruff]
 extend-exclude = ["tests/"]
