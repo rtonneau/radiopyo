@@ -160,7 +160,7 @@ class ListSpecies:
     def get(
         self,
         label: str,
-        default: tp.Optional[ChemSpecies] = None,
+        default: tp.Optional[str | ChemSpecies] = None,
     ) -> tp.Optional[ChemSpecies]:
         """
         Getter method emulating the dict one.
@@ -176,20 +176,9 @@ class ListSpecies:
         """
         with suppress(KeyError):
             return self.__getitem__(label)
+        if isinstance(default, str):
+            return ChemSpecies(default)
         return default
-
-    def get_species_by_sim_index(self, index: int) -> ChemSpecies:
-        """
-        Retrieves a species by its simulation index.
-
-        Args:
-            index (int): The simulation index of the species.
-
-        Returns:
-            ChemSpecies: The species associated with the given
-                simulation index.
-        """
-        return list(self)[index]
 
     def remove_species(self, label: str) -> None:
         """
@@ -209,26 +198,6 @@ class ListSpecies:
             self.cst_sp.pop(label)
             return
 
-    def _convert_to_CstSpecies(self, item: str | ChemSpecies) -> None:
-        """
-        Converts a dynamic species to a constant species.
-
-        Args:
-            item (str | ChemSpecies): The species to be converted.
-                If a string, it is used as a label to retrieve the
-                species from the ListSpecies instance.
-
-        Returns:
-            None
-        """
-        if isinstance(item, str):
-            item = self.__getitem__(item)
-        if self.is_dyn_species(item):
-            return
-        self.dyn_sp.pop(item.label)
-        self.add_cst_species(item.label, item.initial_cc())
-        self.sorted = False
-
     def add_dyn_species(
         self, label: str, cc_init: tp.Optional[tp.List[float] | float] = None
     ) -> None:
@@ -244,13 +213,11 @@ class ListSpecies:
         Returns:
             None
         """
-        if label in self.cst_sp:
-            raise radiopyo_exceptions.IsConstantSpeciesError(
-                f"{label} is already recorded as CstSpecies"
-            )
-        if label not in self:
-            self.dyn_sp[label] = ChemSpecies(label, self.next_index, cc_init)
-            self.next_index += 1
+        if label in self:
+            raise KeyError(f"{label} is already recorded")
+
+        self.dyn_sp[label] = ChemSpecies(label, self.next_index, cc_init)
+        self.next_index += 1
 
     def add_cst_species(self, label: str, cc: float) -> None:
         """
@@ -264,13 +231,10 @@ class ListSpecies:
         Returns:
             None
         """
-        if label in self.cst_sp:
-            raise radiopyo_exceptions.IsSimSpeciesError(
-                f"{label} is already recorded as CstSpecies"
-            )
-        if label not in self:
-            self.cst_sp[label] = ChemSpecies(label, self.next_index, cc)
-            self.next_index += 1
+        if label in self:
+            raise KeyError(f"{label} is already recorded")
+        self.cst_sp[label] = ChemSpecies(label, self.next_index, cc)
+        self.next_index += 1
 
     def get_or_create_dyn_species(
         self,

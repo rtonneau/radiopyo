@@ -1,9 +1,305 @@
 import pytest
 
+from random import shuffle
+
 from radiopyo.chemistry.species_collection import ListSpecies
+from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry import exceptions as radiopyo_exceptions
+from tests.chemistry.test_species import raw_species, species, H2O
+
+
+@pytest.fixture
+def empty_list_species():
+    """Provides an empty ListSpecies"""
+    return ListSpecies()
+
+
+@pytest.fixture
+def non_existing_species():
+    """Provides an empty ListSpecies"""
+    return ChemSpecies("non_existing")
+
+
+@pytest.fixture
+def dyn_species(species):
+    """Provides the list of dynamical species used as test"""
+    return species
+
+
+@pytest.fixture
+def cst_species(H2O):
+    """Provides the list of constant species used as test"""
+    return [H2O, ChemSpecies("cst_species")]
+
+
+@pytest.fixture
+def list_species(empty_list_species, dyn_species, cst_species):
+    """
+    Provides a ListSpecies populated with with 3 dyn species and 1 cst
+    species:
+        dyn species:
+            OH_minus, H3O_plus, H_plus
+
+        cst species:
+            H2O
+    """
+    for sp in dyn_species:
+        empty_list_species.add_dyn_species(sp.label)
+    for sp in cst_species:
+        empty_list_species.add_cst_species(sp.label, 0)
+    return empty_list_species
+
+
+@pytest.fixture
+def ordered_list_species(list_species):
+    """
+    Provides an ordered version of the ListSpecies.
+    """
+    for idx, label in enumerate(list_species.dyn_sp):
+        list_species[label].index = idx
+    for idx, label in enumerate(list_species.cst_sp, start=len(list_species.dyn_sp)):
+        list_species[label].index = idx
+    return list_species
+
+
+class TestListSpecies_empty:
+    def test_init(self, empty_list_species):
+        assert len(empty_list_species.dyn_sp) == 0
+        assert len(empty_list_species.cst_sp) == 0
+        assert empty_list_species.next_index == 0
+        assert empty_list_species.sorted is False
+
+    def test_add_dyn_species(self, empty_list_species):
+        # From empty list
+        empty_list_species.add_dyn_species("H2O2")
+        assert len(empty_list_species.dyn_sp) == 1
+        assert empty_list_species.next_index == 1
+        assert len(empty_list_species.cst_sp) == 0
+        assert empty_list_species.sorted is False
+
+    def test_add_dyn_species_twice(self, empty_list_species):
+        # From empty list
+        empty_list_species.add_dyn_species("H2O2")
+        # From non empty list
+        with pytest.raises(KeyError):
+            empty_list_species.add_dyn_species("H2O2")
+
+    def test_add_cst_species(self, empty_list_species):
+        empty_list_species.add_cst_species("H2O", 0)
+        assert len(empty_list_species.cst_sp) == 1
+        assert empty_list_species.next_index == 1
+        assert len(empty_list_species.dyn_sp) == 0
+        assert empty_list_species.sorted is False
+
+    def test_add_dyn_species_existing_cst_species(self, empty_list_species):
+        empty_list_species.add_cst_species("H2O", 0)
+        with pytest.raises(KeyError):
+            empty_list_species.add_dyn_species("H2O")
+
+    def test_add_cst_species_existing_dyn_species(self, empty_list_species):
+        empty_list_species.add_dyn_species("H2O")
+        with pytest.raises(KeyError):
+            empty_list_species.add_cst_species("H2O", 0)
 
 
 class TestListSpecies:
-    @pytest.fixture
-    def list_species(self):
-        return ListSpecies()
+
+    def test_contains(
+        self, list_species, dyn_species, cst_species, non_existing_species
+    ):
+        # test for dynamical species
+        for sp in dyn_species:
+            assert sp in list_species
+            assert sp.label in list_species
+        # test for constant species
+        for sp in cst_species:
+            assert sp in list_species
+            assert sp.label in list_species
+        # test for non existing species
+        assert non_existing_species not in list_species
+
+    def test_iter(self, list_species):
+        for elt in list_species:
+            assert isinstance(elt, ChemSpecies)
+            assert elt in list_species
+
+    def test_len(self, list_species, dyn_species, cst_species):
+        assert len(list_species) == len(dyn_species) + len(cst_species)
+
+    def test_getitem_with_existing_dyn(self, list_species, dyn_species):
+        # test for dynamical species
+        assert isinstance(list_species[dyn_species[0].label], ChemSpecies)
+
+    def test_getitem_with_existing_cst(self, list_species, cst_species):
+        # test for constant species
+        assert isinstance(list_species[cst_species[0].label], ChemSpecies)
+
+    def test_getitem_with_non_existing_species(
+        self, list_species, non_existing_species
+    ):
+        # test for non existing species
+        with pytest.raises(KeyError):
+            list_species[non_existing_species.label]
+
+    def test_len_cst_species(self, list_species, cst_species):
+        assert list_species.len_cst_species() == len(cst_species)
+
+    def test_len_dyn_species(self, list_species, dyn_species):
+        assert list_species.len_dyn_species() == len(dyn_species)
+
+    def test_get_with_existing_dyn(self, list_species, dyn_species):
+        assert list_species.get(dyn_species[0].label) == dyn_species[0]
+
+    def test_get_with_existing_cst(self, list_species, cst_species):
+        assert list_species.get(cst_species[0].label) == cst_species[0]
+
+    def test_get_non_existing_with_no_default(self, list_species, non_existing_species):
+        assert list_species.get(non_existing_species.label) is None
+
+    def test_get_non_existing_with_default_str(
+        self, list_species, non_existing_species
+    ):
+        assert (
+            list_species.get(non_existing_species.label, non_existing_species.label)
+            == non_existing_species
+        )
+
+    def test_get_non_existing_with_default_ChemSpecies(
+        self, list_species, non_existing_species
+    ):
+        assert (
+            list_species.get(non_existing_species.label, non_existing_species)
+            == non_existing_species
+        )
+
+    def test_remove_species_with_existing_dyn(self, list_species, dyn_species):
+        assert dyn_species[0].label in list_species, "Species not in initial list"
+        list_species.remove_species(dyn_species[0].label)
+        assert dyn_species[0].label not in list_species
+
+    def test_remove_species_with_existing_cst(self, list_species, cst_species):
+        assert cst_species[0].label in list_species, "Species not in initial list"
+        list_species.remove_species(cst_species[0].label)
+        assert cst_species[0].label not in list_species
+
+    def test_remove_species_with_non_existing_species(
+        self, list_species, non_existing_species
+    ):
+        assert non_existing_species.label not in list_species, "Species in initial list"
+        list_species.remove_species(non_existing_species.label)
+        assert non_existing_species.label not in list_species
+
+    def test_get_or_create_dyn_species_with_existing_dyn(
+        self, list_species, dyn_species
+    ):
+        assert (
+            list_species.get_or_create_dyn_species(dyn_species[0].label)
+            == dyn_species[0]
+        )
+
+    def test_get_or_create_dyn_species_with_existing_cst(
+        self, list_species, cst_species
+    ):
+        assert (
+            list_species.get_or_create_dyn_species(cst_species[0].label)
+            == cst_species[0]
+        )
+
+    def test_get_or_create_dyn_species_with_non_existing_species(
+        self, list_species, non_existing_species
+    ):
+        assert (
+            list_species.get_or_create_dyn_species(non_existing_species.label)
+            == non_existing_species
+        )
+
+    def test_get_or_create_cst_species_with_existing_dyn(
+        self, list_species, dyn_species
+    ):
+        assert (
+            list_species.get_or_create_cst_species(dyn_species[0].label)
+            == dyn_species[0]
+        )
+
+    def test_get_or_create_cst_species_with_existing_cst(
+        self, list_species, cst_species
+    ):
+        assert (
+            list_species.get_or_create_cst_species(cst_species[0].label)
+            == cst_species[0]
+        )
+
+    def test_get_or_create_cst_species_with_non_existing_species(
+        self, list_species, non_existing_species
+    ):
+        assert (
+            list_species.get_or_create_cst_species(non_existing_species.label)
+            == non_existing_species
+        )
+
+    def test_sorted_iter_cst_species(self, ordered_list_species):
+        _prev = len(ordered_list_species.dyn_sp) - 1
+        for elt in ordered_list_species.sorted_iter_cst_species():
+            assert elt.index > _prev
+            _prev = elt.index
+
+    def test_sorted_iter_dyn_species(self, ordered_list_species):
+        _prev = -1
+        for elt in ordered_list_species.sorted_iter_dyn_species():
+            assert elt.index > _prev
+            _prev = elt.index
+
+    def test_iter_cst_species(self, list_species):
+        for elt in list_species.iter_cst_species():
+            assert isinstance(elt, ChemSpecies)
+            assert elt.label in list_species.cst_sp
+
+    def test_iter_dyn_species(self, list_species):
+        for elt in list_species.iter_dyn_species():
+            assert isinstance(elt, ChemSpecies)
+            assert elt.label in list_species.dyn_sp
+
+    def test_is_dyn_species_with_existing_dyn(self, list_species, dyn_species):
+        assert list_species.is_dyn_species(dyn_species[0].label)
+        assert list_species.is_dyn_species(dyn_species[0])
+
+    def test_is_dyn_species_with_existing_cst(self, list_species, cst_species):
+        assert not list_species.is_dyn_species(cst_species[0].label)
+
+    def test_is_dyn_species_with_non_existing_species(
+        self, list_species, non_existing_species
+    ):
+        assert not list_species.is_dyn_species(non_existing_species.label)
+
+    def test_is_cst_species_with_existing_cst(self, list_species, cst_species):
+        assert list_species.is_cst_species(cst_species[0].label)
+        assert list_species.is_cst_species(cst_species[0])
+
+    def test_is_cst_species_with_existing_dyn(self, list_species, dyn_species):
+        assert not list_species.is_cst_species(dyn_species[0].label)
+
+    def test_is_cst_species_with_non_existing_species(
+        self, list_species, non_existing_species
+    ):
+        assert not list_species.is_cst_species(non_existing_species.label)
+
+    def test_set_order(self, list_species, dyn_species, cst_species):
+        shuffle(dyn_species)
+        shuffle(cst_species)
+        list_species.set_order(
+            [elt.label for elt in dyn_species],
+            [elt.label for elt in cst_species],
+        )
+        for from_ref, elt in zip(dyn_species, list_species.sorted_iter_dyn_species()):
+            assert elt == from_ref
+        for from_ref, elt in zip(cst_species, list_species.sorted_iter_cst_species()):
+            assert elt == from_ref
+        assert list_species.sorted is True
+
+    def test_set_order_wrong_arguments(self, list_species, dyn_species, cst_species):
+        with pytest.raises(ValueError):
+            list_species.set_order([elt.label for elt in dyn_species], [])
+        with pytest.raises(ValueError):
+            list_species.set_order([], [elt.label for elt in cst_species])
+
+    def test_sort(self, list_species):

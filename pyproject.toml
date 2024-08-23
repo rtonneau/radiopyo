@@ -46,6 +46,7 @@ packages = ["radiopyo"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
+filterwarnings = ["ignore:::.*lark*"]
 
 [tool.coverage.run]
 omit = ["tests/*", "radiopyo/data/*"]

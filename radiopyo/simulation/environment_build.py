@@ -25,7 +25,6 @@ import numpy as np
 # ------------------------------ Internal imports --------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
 from radiopyo.chemistry.acid_base import AcidBase
-from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.e_reactions import EReaction
 from radiopyo.chemistry.k_reactions import (
     Arrhenius,
@@ -37,6 +36,7 @@ from radiopyo.chemistry.k_reactions import (
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
 from radiopyo.chemistry.species import H2O, ChemSpecies
+from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.utils.sim_types import SimMatrices, default_ConfigDict
 
@@ -371,8 +371,9 @@ class SimEnv:
                     sp.set_initial_cc(value)
 
         # Convert the "trash" species, if presents, to Cst.
-        with suppress(KeyError):
-            list_sp._convert_to_CstSpecies("trash")
+        if "trash" in list_sp and list_sp.is_dyn_species("trash"):
+            list_sp.remove_species("trash")
+            list_sp.add_cst_species("trash", 0.0)
 
         # Sort species so that all constant species are at the end.
         if "species_order" in parameters:

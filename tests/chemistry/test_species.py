@@ -89,7 +89,7 @@ def species(raw_species):
     """
     Generate a list of ChemSpecies instances.
     """
-    return [sp.ChemSpecies(sp.label) for sp in raw_species]
+    return [sp.ChemSpecies(label=elt.label) for elt in raw_species]
 
 
 def test_chemspecies_init(H2O2, H2O, H2):
