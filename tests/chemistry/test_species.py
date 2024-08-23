@@ -84,6 +84,14 @@ def H2O():
     )
 
 
+@pytest.fixture
+def species(raw_species):
+    """
+    Generate a list of ChemSpecies instances.
+    """
+    return [sp.ChemSpecies(sp.label) for sp in raw_species]
+
+
 def test_chemspecies_init(H2O2, H2O, H2):
     assert H2.label == "H2"
     assert H2.index == -1

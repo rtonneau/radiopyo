@@ -25,7 +25,7 @@ import numpy as np
 # ------------------------------ Internal imports --------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
 from radiopyo.chemistry.acid_base import AcidBase
-from radiopyo.chemistry.collections import ListSpecies
+from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.e_reactions import EReaction
 from radiopyo.chemistry.k_reactions import (
     Arrhenius,
@@ -44,7 +44,7 @@ from radiopyo.utils.sim_types import SimMatrices, default_ConfigDict
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.chemistry.basic_chemistry import BasicReaction
+    from radiopyo.chemistry.basic_reaction import BasicReaction
     from radiopyo.utils.sim_types import ConfigDict, SimParameters
 
 # ------------------------- Expose importable stuffs ------------------------ #

@@ -20,8 +20,8 @@ import numpy as np
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser import RPARSER
 
-from .basic_chemistry import BasicReaction
-from .collections import ListSpecies
+from .basic_reaction import BasicReaction
+from .species_collection import ListSpecies
 from .utils.units import Temperature
 
 # ------------------------- Type checking ONLY imports----------------------- #

@@ -1,38 +1,38 @@
 from typing import List
 import pytest
 
-from radiopyo.chemistry import basic_chemistry
+from radiopyo.chemistry import basic_reaction
 from radiopyo.chemistry.species import ChemSpecies
 
-class DummyReaction(basic_chemistry.BasicReaction):
+class DummyReaction(basic_reaction.BasicReaction):
     def make_hash(self, method="sha256"):
         return ""
-    
+
     def as_label(self):
         return ""
-    
+
     @classmethod
     def from_kwargs(cls, list_sp=None, **kwargs):
         return cls()
-    
+
 
 class TestBasicReaction():
     @pytest.fixture
     def fake_species(self):
         return ChemSpecies("FakeSpecies")
-    
+
     @pytest.fixture
     def products(self):
         return [ChemSpecies("HO2"), ChemSpecies("H2O")]
-    
+
     @pytest.fixture
     def reactants(self):
         return [ChemSpecies("OH"), ChemSpecies("H2O2")]
-    
+
     @pytest.fixture
     def empty_reaction(self):
         return DummyReaction()
-    
+
     @pytest.fixture
     def reaction(self, empty_reaction, reactants, products):
         for reactant in reactants:
@@ -40,7 +40,7 @@ class TestBasicReaction():
         for product in products:
             empty_reaction.add_as_product(product)
         return empty_reaction
-    
+
     def test_init(self, empty_reaction):
         assert isinstance(empty_reaction.reactants, dict)
         assert len(empty_reaction.reactants) == 0
@@ -128,7 +128,7 @@ class TestBasicReaction():
         assert reaction.get_stoi_of(reactants[0].label) == 1
         reaction.add_as_reactant(reactants[0])
         assert reaction.get_stoi_of(reactants[0]) == 2
-        
+
         #test for a fake entry
         with pytest.raises(KeyError):
             reaction.get_stoi_of(fake_species.label)

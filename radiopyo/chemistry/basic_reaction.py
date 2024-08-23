@@ -21,7 +21,7 @@ from operator import add
 from .species import ChemSpecies, RawSpecies
 
 if tp.TYPE_CHECKING:
-    from .collections import ListSpecies
+    from .species_collection import ListSpecies
 
 # ------------------------- Type checking ONLY imports----------------------- #
 # --------------------------------------------------------------------------- #

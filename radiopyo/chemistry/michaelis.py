@@ -14,8 +14,8 @@ from __future__ import annotations
 import hashlib
 import typing as tp
 
-from radiopyo.chemistry.basic_chemistry import BasicReaction
-from radiopyo.chemistry.collections import ListSpecies
+from radiopyo.chemistry.basic_reaction import BasicReaction
+from radiopyo.chemistry.species_collection import ListSpecies
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser import RPARSER

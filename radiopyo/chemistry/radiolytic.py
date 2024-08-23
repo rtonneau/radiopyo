@@ -31,10 +31,10 @@ from typing import List
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.chemistry.collections import ListSpecies
+from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.species import ChemSpecies
 
-from .basic_chemistry import BasicReaction
+from .basic_reaction import BasicReaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:

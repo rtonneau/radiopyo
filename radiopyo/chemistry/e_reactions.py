@@ -31,7 +31,7 @@ import numpy as np
 from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import revert_reaction
 
-from .collections import ListSpecies
+from .species_collection import ListSpecies
 from .k_reactions import (
     BiReaction,
     polynomial_factory,
