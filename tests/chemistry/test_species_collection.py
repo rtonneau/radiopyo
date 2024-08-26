@@ -41,12 +41,13 @@ def list_species(empty_list_species, dyn_species, cst_species):
             OH_minus, H3O_plus, H_plus
 
         cst species:
-            H2O
+            H2O, cst_species
     """
-    for sp in dyn_species:
-        empty_list_species.add_dyn_species(sp.label)
+    # First add cst species so that it is unordered by default
     for sp in cst_species:
         empty_list_species.add_cst_species(sp.label, 0)
+    for sp in dyn_species:
+        empty_list_species.add_dyn_species(sp.label)
     return empty_list_species
 
 
@@ -59,6 +60,8 @@ def ordered_list_species(list_species):
         list_species[label].index = idx
     for idx, label in enumerate(list_species.cst_sp, start=len(list_species.dyn_sp)):
         list_species[label].index = idx
+    list_species.next_index = idx + 1
+    list_species.sorted = True
     return list_species
 
 
@@ -302,4 +305,32 @@ class TestListSpecies:
         with pytest.raises(ValueError):
             list_species.set_order([], [elt.label for elt in cst_species])
 
-    def test_sort(self, list_species):
+    def test_copy_with_no_change(self, list_species):
+        copy = list_species.copy()
+        assert copy is not list_species
+        # dict should be strictly equal as the ChemSpecies object have to be
+        # the same
+        assert copy.dyn_sp == list_species.dyn_sp
+        assert copy.cst_sp == list_species.cst_sp
+        assert copy.sorted == list_species.sorted
+        assert copy.next_index == list_species.next_index
+
+    def test_copy_with_changes(self, list_species, non_existing_species):
+        copy = list_species.copy()
+        assert copy is not list_species
+        copy.add_dyn_species(non_existing_species.label)
+        # dict should be strictly equal as the ChemSpecies object have to be
+        # the same
+        assert copy.dyn_sp != list_species.dyn_sp
+        assert copy.cst_sp == list_species.cst_sp
+        assert copy.sorted == list_species.sorted
+        assert copy.next_index != list_species.next_index
+
+    def test_sort_with_not_inplace_no_starter(self, list_species, ordered_list_species):
+        ls = list_species.copy()
+        # list_species.sort(inplace=False, starter=None)
+        for ref_sp, sp in zip(ordered_list_species, ls):
+            print(ref_sp, ref_sp.index, sp, sp.index)
+            assert ref_sp == sp
+            assert ref_sp.index == sp.index
+        assert False

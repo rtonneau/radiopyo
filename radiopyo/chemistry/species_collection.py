@@ -12,7 +12,6 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import copy
 import operator as op
 import typing as tp
 from contextlib import suppress
@@ -218,6 +217,7 @@ class ListSpecies:
 
         self.dyn_sp[label] = ChemSpecies(label, self.next_index, cc_init)
         self.next_index += 1
+        self.sorted = False
 
     def add_cst_species(self, label: str, cc: float) -> None:
         """
@@ -235,6 +235,7 @@ class ListSpecies:
             raise KeyError(f"{label} is already recorded")
         self.cst_sp[label] = ChemSpecies(label, self.next_index, cc)
         self.next_index += 1
+        self.sorted = False
 
     def get_or_create_dyn_species(
         self,
@@ -343,6 +344,21 @@ class ListSpecies:
         self.next_index = idx + 1
         self.sorted = True
 
+    def copy(self) -> ListSpecies:
+        """
+        Returns:
+            ListSpecies:
+                A copy of the ListSpecies instance.
+        """
+        new_ls = ListSpecies()
+        new_ls.next_index = self.next_index
+
+        # Make use of dict.copy() so that the species refs are the same
+        new_ls.dyn_sp = self.dyn_sp.copy()
+        new_ls.cst_sp = self.cst_sp.copy()
+        new_ls.sorted = self.sorted
+        return new_ls
+
     def sort(
         self, inplace: bool = True, starter: tp.Optional[tp.List[str]] = None
     ) -> tp.Optional[ListSpecies]:
@@ -362,7 +378,7 @@ class ListSpecies:
                 otherwise None.
         """
 
-        out = copy.deepcopy(self) if not inplace else self
+        out = self.copy() if not inplace else self
         if starter is None:
             starter = []
         all_dyn = {elt.label for elt in out.iter_dyn_species()}
