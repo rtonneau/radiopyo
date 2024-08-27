@@ -28,15 +28,14 @@ from contextlib import suppress
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.chemistry.k_reactions import (
+    BiReaction,
+)
+from radiopyo.chemistry.species_collection import ListSpecies
+from radiopyo.chemistry.utils.factories import polynomial_factory
+from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import revert_reaction
-
-from .species_collection import ListSpecies
-from .k_reactions import (
-    BiReaction,
-    polynomial_factory,
-)
-from .utils.units import Temperature
 
 # ------------------------ Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
@@ -93,9 +92,13 @@ class EReaction(BiReaction):
         # Check whether enough information is provided to compute all K's.
         if constant is None:
             try:
-                self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
+                self._k_forward = polynomial_factory(
+                    reaction["constants"]["k_forward"],
+                    log10=True,
+                )
                 self._k_backward = polynomial_factory(
-                    reaction["constants"]["k_backward"]
+                    reaction["constants"]["k_backward"],
+                    log10=True,
                 )
                 if not np.isinf(self._k_forward.coef[0]) and not np.isinf(
                     self._k_backward.coef[0]
@@ -111,15 +114,27 @@ class EReaction(BiReaction):
             "k_backward" in reaction["constants"]
             and reaction["constants"]["k_backward"] is not None
         ):
-            self._k_backward = polynomial_factory(reaction["constants"]["k_backward"])
-            self._k_equilibrium = polynomial_factory(constant)
+            self._k_backward = polynomial_factory(
+                reaction["constants"]["k_backward"],
+                log10=True,
+            )
+            self._k_equilibrium = polynomial_factory(
+                constant,
+                log10=True,
+            )
             self._k_forward = self._k_equilibrium + self._k_backward
         elif (
             "k_forward" in reaction["constants"]
             and reaction["constants"]["k_forward"] is not None
         ):
-            self._k_forward = polynomial_factory(reaction["constants"]["k_forward"])
-            self._k_equilibrium = polynomial_factory(constant)
+            self._k_forward = polynomial_factory(
+                reaction["constants"]["k_forward"],
+                log10=True,
+            )
+            self._k_equilibrium = polynomial_factory(
+                constant,
+                log10=True,
+            )
             self._k_backward = self._k_forward - self._k_equilibrium
         else:
             raise ValueError(

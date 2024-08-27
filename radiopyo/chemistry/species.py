@@ -17,14 +17,13 @@ from __future__ import annotations
 
 import typing as tp
 
-import numpy as np
-
 # ---------------------------- Internal imports ----------------------------- #
-from .utils.units import Temperature
+from radiopyo.chemistry.utils.factories import polynomial_factory
+from radiopyo.chemistry.utils.units import Temperature
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    import numpy as np
 
 # --------------------------------------------------------------------------- #
 __all__ = [
@@ -148,10 +147,7 @@ class ChemSpecies(RawSpecies):
         super().__init__(label)
         self.index = index
         cc_init = cc_init if cc_init is not None else -1
-        if isinstance(cc_init, np.polynomial.Polynomial):
-            self.cc_init = cc_init
-        else:
-            self.cc_init = np.polynomial.Polynomial(cc_init)
+        self.cc_init = polynomial_factory(cc_init)
 
     def __repr__(self) -> str:
         """
@@ -188,7 +184,9 @@ class ChemSpecies(RawSpecies):
         T = Temperature() if T is None else Temperature(T)
         return self.cc_init(T.celsius) if self.cc_init(T.celsius) > 0 else 0
 
-    def set_initial_cc(self, value: float | tp.List[float]) -> None:
+    def set_initial_cc(
+        self, value: float | tp.List[float] | np.polynomial.Polynomial
+    ) -> None:
         """
         Sets the initial concentration coefficient of the species.
 
@@ -199,7 +197,7 @@ class ChemSpecies(RawSpecies):
         Returns:
             None
         """
-        self.cc_init = np.polynomial.Polynomial(value)
+        self.cc_init = polynomial_factory(value)
 
 
 H2O = ChemSpecies("H2O", cc_init=[55.50, 6.075e-3, 4.110e-4, 1.496e-6, 2.619e-9])

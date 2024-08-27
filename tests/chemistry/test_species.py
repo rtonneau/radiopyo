@@ -67,7 +67,7 @@ def H2O2():
 def test_chemspecies_init(H2O2, H2O, H2):
     assert H2.label == "H2"
     assert H2.index == -1
-    assert H2.cc_init == np.polynomial.Polynomial(-1)
+    assert H2.cc_init == np.polynomial.Polynomial(-np.inf)
     assert H2O2.label == "H2O2"
     assert H2O2.index == 4
     assert H2O2.cc_init == np.polynomial.Polynomial(25.4)

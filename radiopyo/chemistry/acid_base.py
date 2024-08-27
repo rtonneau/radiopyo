@@ -15,20 +15,19 @@ from contextlib import suppress
 import numpy as np
 
 # ---------------------------- Internal imports ----------------------------- #
+from radiopyo.chemistry.k_reactions import (
+    BiReaction,
+    KReaction,
+)
+from radiopyo.chemistry.species_collection import ListSpecies
+from radiopyo.chemistry.utils.factories import polynomial_factory
+from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
 from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
-from .species_collection import ListSpecies
-from .k_reactions import (
-    BiReaction,
-    KReaction,
-    polynomial_factory,
-)
-from .utils.units import Temperature
-
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from .species import ChemSpecies
+    from radiopyo.chemistry.species import ChemSpecies
 
 
 __all__ = [
@@ -120,9 +119,11 @@ class AcidBase(BiReaction):
 
         self._k_backward = polynomial_factory(
             reaction["constants"]["k_backward"],
+            log10=True,
         )
         self._k_forward = polynomial_factory(
             reaction["constants"]["k_forward"],
+            log10=True,
         )
 
         # Need to add forward and backward reactions via the superclass

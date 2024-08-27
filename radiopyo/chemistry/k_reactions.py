@@ -18,11 +18,11 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.chemistry.basic_reaction import BasicReaction
+from radiopyo.chemistry.species_collection import ListSpecies
+from radiopyo.chemistry.utils.factories import polynomial_factory
+from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
-
-from .basic_reaction import BasicReaction
-from .species_collection import ListSpecies
-from .utils.units import Temperature
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -42,40 +42,6 @@ __all__ = [
 # --------------------------------------------------------------------------- #
 #                              FUNCTION DEFINITIONS                           #
 # --------------------------------------------------------------------------- #
-def polynomial_factory(
-    value: float | tp.List[float] | np.polynomial.Polynomial,
-) -> np.polynomial.Polynomial:
-    """
-    A factory function to create a numpy polynomial from a given value.
-
-    Args:
-        value (float | tp.List[float] | np.polynomial.Polynomial):
-            The value to be converted into a numpy polynomial. It can be
-            a float, a list of floats or a numpy polynomial.
-
-    Returns:
-        np.polynomial.Polynomial:
-            A numpy polynomial created from the given value.
-
-    Raises:
-        ValueError:
-            If the given value is not a valid input for creating a
-            numpy polynomial.
-    """
-    if isinstance(value, np.polynomial.Polynomial):
-        return value
-    if isinstance(value, (list, tuple, np.ndarray)):
-        if len(value) == 1:
-            _coef = [np.log10(value[0])]
-        elif len(value) > 1:
-            _coef = value
-        else:
-            raise ValueError("Cannot make a polynomial with no coeff!")
-    else:
-        _coef = [-np.inf] if value <= 0 else [np.log10(value)]
-
-    return np.polynomial.Polynomial(_coef)
-
 
 # --------------------------------------------------------------------------- #
 #                               CLASS DEFINITIONS                             #
@@ -112,7 +78,9 @@ class KReaction(BasicReaction):
     ):
         super().__init__()
         self.T = Temperature(T, unit="celsius")
-        self._k_value = polynomial_factory(k_value) if k_value is not None else None
+        self._k_value = (
+            polynomial_factory(k_value, log10=True) if k_value is not None else None
+        )
 
     def k_value(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
@@ -147,7 +115,7 @@ class KReaction(BasicReaction):
         Returns:
             None
         """
-        self._k_value = polynomial_factory(value)
+        self._k_value = polynomial_factory(value, log10=True)
 
     def set_T(self, value: float, unit: str = "celsius") -> None:
         """
