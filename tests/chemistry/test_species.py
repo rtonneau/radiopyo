@@ -26,7 +26,7 @@ def raw_species():
     """
     Generate a list of RawSpecies instances.
     """
-    species_list = ["OH_minus", "H3O_plus", "H_plus"]
+    species_list = ["OH_minus", "H3O_plus", "H_plus", "OH", "ROO", "dyn"]
     return [sp.RawSpecies(label) for label in species_list]
 
 

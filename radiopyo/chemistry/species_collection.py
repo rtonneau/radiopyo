@@ -23,7 +23,7 @@ from radiopyo.chemistry.species import ChemSpecies
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    import numpy as np
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = []
@@ -198,7 +198,9 @@ class ListSpecies:
             return
 
     def add_dyn_species(
-        self, label: str, cc_init: tp.Optional[tp.List[float] | float] = None
+        self,
+        label: str,
+        cc_init: tp.Optional[tp.List[float] | float | np.polynomial.Polynomial] = None,
     ) -> None:
         """
         Adds a dynamic species to the ListSpecies instance.
@@ -219,7 +221,9 @@ class ListSpecies:
         self.next_index += 1
         self.sorted = False
 
-    def add_cst_species(self, label: str, cc: float) -> None:
+    def add_cst_species(
+        self, label: str, cc: tp.List[float] | float | np.polynomial.Polynomial
+    ) -> None:
         """
         Adds a constant species to the ListSpecies instance.
 
@@ -351,12 +355,11 @@ class ListSpecies:
                 A copy of the ListSpecies instance.
         """
         new_ls = ListSpecies()
-        new_ls.next_index = self.next_index
 
-        # Make use of dict.copy() so that the species refs are the same
-        new_ls.dyn_sp = self.dyn_sp.copy()
-        new_ls.cst_sp = self.cst_sp.copy()
-        new_ls.sorted = self.sorted
+        for sp in self.iter_dyn_species():
+            new_ls.add_dyn_species(sp.label, sp.cc_init)
+        for sp in self.iter_cst_species():
+            new_ls.add_cst_species(sp.label, sp.cc_init)
         return new_ls
 
     def sort(

@@ -33,7 +33,7 @@ def cst_species(H2O):
 
 
 @pytest.fixture
-def list_species(empty_list_species, dyn_species, cst_species):
+def list_species(dyn_species, cst_species):
     """
     Provides a ListSpecies populated with with 3 dyn species and 1 cst
     species:
@@ -43,24 +43,25 @@ def list_species(empty_list_species, dyn_species, cst_species):
         cst species:
             H2O, cst_species
     """
+    list_species = ListSpecies()
     # First add cst species so that it is unordered by default
     for sp in cst_species:
-        empty_list_species.add_cst_species(sp.label, 0)
+        list_species.add_cst_species(sp.label, 0)
     for sp in dyn_species:
-        empty_list_species.add_dyn_species(sp.label)
-    return empty_list_species
+        list_species.add_dyn_species(sp.label)
+    return list_species
 
 
 @pytest.fixture
-def ordered_list_species(list_species):
+def ordered_list_species(dyn_species, cst_species):
     """
     Provides an ordered version of the ListSpecies.
     """
-    for idx, label in enumerate(list_species.dyn_sp):
-        list_species[label].index = idx
-    for idx, label in enumerate(list_species.cst_sp, start=len(list_species.dyn_sp)):
-        list_species[label].index = idx
-    list_species.next_index = idx + 1
+    list_species = ListSpecies()
+    for sp in dyn_species:
+        list_species.add_dyn_species(sp.label)
+    for sp in cst_species:
+        list_species.add_cst_species(sp.label, 0)
     list_species.sorted = True
     return list_species
 
@@ -326,11 +327,35 @@ class TestListSpecies:
         assert copy.sorted == list_species.sorted
         assert copy.next_index != list_species.next_index
 
-    def test_sort_with_not_inplace_no_starter(self, list_species, ordered_list_species):
-        ls = list_species.copy()
-        # list_species.sort(inplace=False, starter=None)
-        for ref_sp, sp in zip(ordered_list_species, ls):
-            print(ref_sp, ref_sp.index, sp, sp.index)
-            assert ref_sp == sp
-            assert ref_sp.index == sp.index
-        assert False
+    def test_sort_with_not_inplace_no_starter(self, list_species):
+        ls = list_species.sort(inplace=False, starter=None)
+        assert id(ls) != id(list_species)
+        for sp in ls.iter_dyn_species():
+            assert sp.index < ls.len_dyn_species()
+            assert ls.dyn_sp[sp.label] is not list_species.dyn_sp[sp.label]
+        for sp in ls.iter_cst_species():
+            assert sp.index >= ls.len_dyn_species()
+            assert ls.cst_sp[sp.label] is not list_species.cst_sp[sp.label]
+
+    def test_sort_with_inplace_no_starter(self, list_species):
+        list_species.sort(inplace=True, starter=None)
+        for sp in list_species.iter_dyn_species():
+            assert sp.index < list_species.len_dyn_species()
+        for sp in list_species.iter_cst_species():
+            assert sp.index >= list_species.len_dyn_species()
+
+    def test_sort_with_not_inplace_with_starter(self, list_species):
+        dyn_sp = [sp.label for sp in list_species.sorted_iter_dyn_species()]
+        ref = dyn_sp.copy()
+        while dyn_sp == ref:
+            shuffle(dyn_sp)
+
+        ls = list_species.sort(inplace=False, starter=dyn_sp[:2])
+        assert ls.dyn_sp[dyn_sp[0]].index == 0
+        assert ls.dyn_sp[dyn_sp[1]].index == 1
+
+    def test_sort_with_not_inplace_with_starter_error(self, list_species):
+        dyn_sp = [sp.label for sp in list_species.sorted_iter_dyn_species()]
+        dyn_sp[0] = next(iter(list_species.cst_sp))
+        with pytest.raises(TypeError):
+            list_species.sort(inplace=True, starter=dyn_sp[:2])

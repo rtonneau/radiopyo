@@ -131,7 +131,7 @@ class ChemSpecies(RawSpecies):
         self,
         label: str,
         index: int = -1,
-        cc_init: tp.Optional[float | tp.List[float]] = None,
+        cc_init: tp.Optional[tp.List[float] | float | np.polynomial.Polynomial] = None,
     ) -> None:
         """
         Initializes a new instance of the ChemSpecies class.
@@ -148,7 +148,10 @@ class ChemSpecies(RawSpecies):
         super().__init__(label)
         self.index = index
         cc_init = cc_init if cc_init is not None else -1
-        self.cc_init = np.polynomial.Polynomial(cc_init)
+        if isinstance(cc_init, np.polynomial.Polynomial):
+            self.cc_init = cc_init
+        else:
+            self.cc_init = np.polynomial.Polynomial(cc_init)
 
     def __repr__(self) -> str:
         """
