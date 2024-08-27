@@ -4,7 +4,12 @@ import pytest
 from radiopyo.chemistry import basic_reaction
 from radiopyo.chemistry.species import ChemSpecies
 
+
 class DummyReaction(basic_reaction.BasicReaction):
+    """
+    Dummy class to test the BasicReaction class which is abstract.
+    """
+
     def make_hash(self, method="sha256"):
         return ""
 
@@ -16,7 +21,7 @@ class DummyReaction(basic_reaction.BasicReaction):
         return cls()
 
 
-class TestBasicReaction():
+class TestBasicReaction:
     @pytest.fixture
     def fake_species(self):
         return ChemSpecies("FakeSpecies")
@@ -62,10 +67,16 @@ class TestBasicReaction():
         assert empty_reaction.products == {products[0].label: products[0]}
         assert empty_reaction.stoi_products == {products[0].label: 2}
 
-        #test multiple entries
+        # test multiple entries
         empty_reaction.add_as_product(products[1], multiple=2)
-        assert empty_reaction.products == {products[0].label: products[0], products[1].label: products[1]}
-        assert empty_reaction.stoi_products == {products[0].label: 2, products[1].label: 2}
+        assert empty_reaction.products == {
+            products[0].label: products[0],
+            products[1].label: products[1],
+        }
+        assert empty_reaction.stoi_products == {
+            products[0].label: 2,
+            products[1].label: 2,
+        }
 
     def test_add_as_reactant(self, empty_reaction):
         reactants = [ChemSpecies("OH"), ChemSpecies("H2O2")]
@@ -77,16 +88,26 @@ class TestBasicReaction():
         assert empty_reaction.reactants == {reactants[0].label: reactants[0]}
         assert empty_reaction.stoi_reactants == {reactants[0].label: 2}
 
-        #test multiple entries
+        # test multiple entries
         empty_reaction.add_as_reactant(reactants[1], multiple=2)
-        assert empty_reaction.reactants == {reactants[0].label: reactants[0], reactants[1].label: reactants[1]}
-        assert empty_reaction.stoi_reactants == {reactants[0].label: 2, reactants[1].label: 2}
+        assert empty_reaction.reactants == {
+            reactants[0].label: reactants[0],
+            reactants[1].label: reactants[1],
+        }
+        assert empty_reaction.stoi_reactants == {
+            reactants[0].label: 2,
+            reactants[1].label: 2,
+        }
 
     def test_reactants_as_string(self, reaction, reactants):
-        assert reaction.reactants_as_string() == " + ".join([sp.label for sp in reactants])
+        assert reaction.reactants_as_string() == " + ".join(
+            [sp.label for sp in reactants]
+        )
 
     def test_products_as_string(self, reaction, products):
-        assert reaction.products_as_string() == " + ".join([sp.label for sp in products])
+        assert reaction.products_as_string() == " + ".join(
+            [sp.label for sp in products]
+        )
 
     def test_has_reactant(self, reaction, reactants, fake_species):
         for sp in reactants:
@@ -129,17 +150,17 @@ class TestBasicReaction():
         reaction.add_as_reactant(reactants[0])
         assert reaction.get_stoi_of(reactants[0]) == 2
 
-        #test for a fake entry
+        # test for a fake entry
         with pytest.raises(KeyError):
             reaction.get_stoi_of(fake_species.label)
 
     def test_get_stoi_of_product(self, reaction, products, fake_species):
-        #test for the products
+        # test for the products
         assert reaction.get_stoi_of(products[0].label) == 1
         reaction.add_as_product(products[0])
         assert reaction.get_stoi_of(products[0]) == 2
 
-        #test for a fake entry
+        # test for a fake entry
         with pytest.raises(KeyError):
             reaction.get_stoi_of(fake_species.label)
 

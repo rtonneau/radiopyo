@@ -21,15 +21,6 @@ def raw_H2O2():
     return sp.RawSpecies("H2O2")
 
 
-@pytest.fixture
-def raw_species():
-    """
-    Generate a list of RawSpecies instances.
-    """
-    species_list = ["OH_minus", "H3O_plus", "H_plus", "OH", "ROO", "dyn"]
-    return [sp.RawSpecies(label) for label in species_list]
-
-
 def test_raw_species_label(raw_H2O2):
     assert raw_H2O2.label == "H2O2"
 
@@ -71,25 +62,6 @@ def H2O2():
     Generate a unique ChemSpecies instance.
     """
     return sp.ChemSpecies(label="H2O2", index=4, cc_init=25.4)
-
-
-@pytest.fixture
-def H2O():
-    """
-    Generate a unique ChemSpecies instance.
-    """
-    return sp.ChemSpecies(
-        label="H2O",
-        cc_init=[55.50, 6.075e-3, 4.110e-4, 1.496e-6, 2.619e-9],
-    )
-
-
-@pytest.fixture
-def species(raw_species):
-    """
-    Generate a list of ChemSpecies instances.
-    """
-    return [sp.ChemSpecies(label=elt.label) for elt in raw_species]
 
 
 def test_chemspecies_init(H2O2, H2O, H2):

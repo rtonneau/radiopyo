@@ -4,52 +4,6 @@ from random import shuffle
 
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.species import ChemSpecies
-from radiopyo.chemistry import exceptions as radiopyo_exceptions
-from tests.chemistry.test_species import raw_species, species, H2O
-
-
-@pytest.fixture
-def empty_list_species():
-    """Provides an empty ListSpecies"""
-    return ListSpecies()
-
-
-@pytest.fixture
-def non_existing_species():
-    """Provides an empty ListSpecies"""
-    return ChemSpecies("non_existing")
-
-
-@pytest.fixture
-def dyn_species(species):
-    """Provides the list of dynamical species used as test"""
-    return species
-
-
-@pytest.fixture
-def cst_species(H2O):
-    """Provides the list of constant species used as test"""
-    return [H2O, ChemSpecies("cst_species")]
-
-
-@pytest.fixture
-def list_species(dyn_species, cst_species):
-    """
-    Provides a ListSpecies populated with with 3 dyn species and 1 cst
-    species:
-        dyn species:
-            OH_minus, H3O_plus, H_plus
-
-        cst species:
-            H2O, cst_species
-    """
-    list_species = ListSpecies()
-    # First add cst species so that it is unordered by default
-    for sp in cst_species:
-        list_species.add_cst_species(sp.label, 0)
-    for sp in dyn_species:
-        list_species.add_dyn_species(sp.label)
-    return list_species
 
 
 @pytest.fixture
@@ -354,8 +308,9 @@ class TestListSpecies:
         assert ls.dyn_sp[dyn_sp[0]].index == 0
         assert ls.dyn_sp[dyn_sp[1]].index == 1
 
-    def test_sort_with_not_inplace_with_starter_error(self, list_species):
+    def test_sort_with_not_inplace_and_starter_error(self, list_species):
         dyn_sp = [sp.label for sp in list_species.sorted_iter_dyn_species()]
+        # Try to set a ConstantSpecies as starter
         dyn_sp[0] = next(iter(list_species.cst_sp))
         with pytest.raises(TypeError):
             list_species.sort(inplace=True, starter=dyn_sp[:2])
