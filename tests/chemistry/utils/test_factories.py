@@ -26,7 +26,7 @@ from radiopyo.chemistry.utils.factories import polynomial_factory
         (
             [1.0, 2.0, 2.5],
             True,
-            Polynomial([np.log10(1.0), np.log10(2.0), np.log10(2.5)]),
+            Polynomial([1.0, 2.0, 2.5]),
         ),
         (Polynomial([1.5]), False, Polynomial([1.5])),
         (Polynomial([1.5]), True, Polynomial([1.5])),

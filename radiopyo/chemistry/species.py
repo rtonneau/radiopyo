@@ -147,7 +147,7 @@ class ChemSpecies(RawSpecies):
         super().__init__(label)
         self.index = index
         cc_init = cc_init if cc_init is not None else -1
-        self.cc_init = polynomial_factory(cc_init)
+        self.cc_init = polynomial_factory(cc_init, log10=False)
 
     def __repr__(self) -> str:
         """
@@ -181,7 +181,7 @@ class ChemSpecies(RawSpecies):
             float: The initial concentration of the species at the given
                 temperature.
         """
-        T = Temperature() if T is None else Temperature(T)
+        T = Temperature(T)
         return self.cc_init(T.celsius) if self.cc_init(T.celsius) > 0 else 0
 
     def set_initial_cc(
@@ -197,7 +197,7 @@ class ChemSpecies(RawSpecies):
         Returns:
             None
         """
-        self.cc_init = polynomial_factory(value)
+        self.cc_init = polynomial_factory(value, log10=False)
 
 
 H2O = ChemSpecies("H2O", cc_init=[55.50, 6.075e-3, 4.110e-4, 1.496e-6, 2.619e-9])

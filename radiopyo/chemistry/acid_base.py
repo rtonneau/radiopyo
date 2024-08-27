@@ -220,7 +220,7 @@ class AcidBase(BiReaction):
         Returns:
             float: The pKa value at the given temperature.
         """
-        _T = Temperature(T) if T is not None else Temperature()
+        _T = Temperature(T)
         return self._pKa(_T.celsius)
 
     def k_equilibrium(
@@ -238,7 +238,7 @@ class AcidBase(BiReaction):
         Returns:
             float: The equilibrium constant at the given temperature.
         """
-        _T = Temperature(T) if T is not None else Temperature()
+        _T = Temperature(T)
         return 10 ** (-self._pKa(_T.celsius))
 
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
@@ -253,7 +253,7 @@ class AcidBase(BiReaction):
             float: The forward reaction constant at the
                 given temperature.
         """
-        _T = Temperature(T) if T is not None else Temperature()
+        _T = Temperature(T)
         if self.forward.has_reactant("H2O"):
             return 10 ** self._k_forward(1.0 / _T.kelvin)  # / 55.5
         return 10 ** self._k_forward(1.0 / _T.kelvin)
@@ -271,7 +271,7 @@ class AcidBase(BiReaction):
                 given temperature.
         """
 
-        _T = Temperature(T) if T is not None else Temperature()
+        _T = Temperature(T)
         if self.backward.has_reactant("H2O"):
             return 10 ** self._k_backward(1.0 / _T.kelvin)  # / 55.5
         return 10 ** self._k_backward(1.0 / _T.kelvin)

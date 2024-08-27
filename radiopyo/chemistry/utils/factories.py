@@ -56,15 +56,17 @@ def polynomial_factory(
     if isinstance(value, np.polynomial.Polynomial):
         return value
     if isinstance(value, (list, tuple, np.ndarray)):
-        if len(value) >= 1:
-            _coef = [np.log10(elt) if log10 else elt for elt in value]
+        if len(value) == 1:
+            _coef = [np.log10(value[0]) if log10 else value[0]]
+        elif len(value) > 1:
+            _coef = list(value)
         else:
             raise ValueError("Cannot make a polynomial with no coeff!")
     else:
-        if value <= 0:
-            _coef = [-np.inf]
+        if value >= 0:
+            _coef = [np.log10(value) if log10 else value]
         else:
-            _coef = [np.log10(value)] if log10 else [value]
+            _coef = [-np.inf]
 
     return np.polynomial.Polynomial(_coef)
 

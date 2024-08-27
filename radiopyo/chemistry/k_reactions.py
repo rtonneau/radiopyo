@@ -35,7 +35,6 @@ __all__ = [
     "KReactionDict",
     "KReactionCollection",
     "KValType",
-    "polynomial_factory",
 ]
 
 
@@ -62,22 +61,19 @@ class KReaction(BasicReaction):
     reaction rate.
 
     Attributes:
-        k_value: List[np.polynomial.Polynomial, ]
+        k_value: float | List[float] | np.polynomial.Polynomial
             Reaction rate
         T: Temperature in °C (optional, default:25).
     """
 
-    T: Temperature
     _k_value: tp.Optional[np.polynomial.Polynomial]
     _OPE_STRING: str = "->"
 
     def __init__(
         self,
         k_value: tp.Optional[KValType] = None,
-        T: tp.Optional[float] = None,
     ):
         super().__init__()
-        self.T = Temperature(T, unit="celsius")
         self._k_value = (
             polynomial_factory(k_value, log10=True) if k_value is not None else None
         )
@@ -102,7 +98,7 @@ class KReaction(BasicReaction):
                 "Unable to compute reaction constant. No data provided"
                 f" for reaction: {self}"
             )
-        _T = Temperature(T) if T is not None else Temperature()
+        _T = Temperature(T)
         return np.power(10, self._k_value(1.0 / _T.kelvin))
 
     def set_k_value(self, value: KValType) -> None:
@@ -116,34 +112,6 @@ class KReaction(BasicReaction):
             None
         """
         self._k_value = polynomial_factory(value, log10=True)
-
-    def set_T(self, value: float, unit: str = "celsius") -> None:
-        """
-        Sets the temperature value of the reaction.
-
-        Args:
-            value (float): The new temperature value.
-            unit (str, optional): The unit of the temperature value.
-                Defaults to "celsius".
-
-        Returns:
-            None
-        """
-        self.T = Temperature(value, unit)
-
-    def get_T(self, unit: str = "celsius") -> float:
-        """
-        Returns the temperature value of the reaction in the specified
-        unit.
-
-        Args:
-            unit (str, optional): The unit of the temperature value.
-                Defaults to "celsius".
-
-        Returns:
-            float: The temperature value in the specified unit.
-        """
-        return self.T.get(unit)
 
     def make_hash(self, method: str = "sha256") -> str:
         """
@@ -363,10 +331,9 @@ class Arrhenius(KReaction):
         self,
         A: float,
         Ea: float,
-        T: tp.Optional[float] = None,
     ):
         """ """
-        super().__init__(k_value=None, T=T)
+        super().__init__(k_value=None)
         self._pre_exp = A
         self._activation_energy = Ea
 

@@ -218,7 +218,7 @@ class EReaction(BiReaction):
         Returns:
             float: The equilibrium constant at the given temperature.
         """
-        _T = Temperature(T) if T is not None else Temperature(unit="celsius")
+        _T = Temperature(T)
         return 10 ** self._k_equilibrium(1 / _T.kelvin)
 
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
