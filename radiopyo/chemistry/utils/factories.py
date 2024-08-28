@@ -39,10 +39,22 @@ def polynomial_factory(
     """
     A factory function to create a numpy polynomial from a given value.
 
+    Rem:
+        For K values, literature contains polynomials of the form:
+        Log(k) = 13.339 - (2.220e3/T) + (7.333e5 /T2) - (1.065e8/T3)
+        Therefore, the KReaction class always handles log10 values. The
+        log10 argument ensure that in the case of a single, constant,
+        value the afterward computation will be good.
+        => 10^(log10(k)) = k
+
     Args:
         value (float | tp.List[float] | np.polynomial.Polynomial):
             The value to be converted into a numpy polynomial. It can be
             a float, a list of floats or a numpy polynomial.
+
+        log10 (bool, optional):
+            If True, the value will be converted to log10. Defaults to
+            False.
 
     Returns:
         np.polynomial.Polynomial:

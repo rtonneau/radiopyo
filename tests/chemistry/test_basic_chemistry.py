@@ -127,8 +127,8 @@ class TestBasicReaction:
     def test_number_of_reactants(self, reaction, reactants):
         assert reaction.number_of_reactants() == len(reactants)
 
-    def test_get_index(self, reaction):
-        assert reaction.get_index() == -1
+    def test_get_index(self, empty_reaction):
+        assert empty_reaction.get_index() == -1
 
     def test_set_index(self, reaction):
         reaction.set_index(4)
