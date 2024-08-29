@@ -238,6 +238,10 @@ class SimIdentifier:
         """ """
         return dc.replace(self, **kwargs)
 
+    def get(self, key: str, default: tp.Optional[tp.Any] = None) -> tp.Any:
+        """ """
+        return getattr(self, key, default)
+
     @classmethod
     def iter_fields(cls) -> tp.Iterator[dc.Field]:
         """ """
@@ -577,3 +581,43 @@ class H5Manager(AbstractContextManager):
                     )
                 else:
                     continue
+
+    def iter_identifiers(
+        self,
+        identifier: SimIdentifier,
+        keys: tp.Optional[tp.List[str]] = None,
+        recursive: bool = False,
+    ) -> tp.Iterator[SimIdentifier]:
+        """ """
+        if keys is None:
+            keys = []
+        with self:
+            current_grp = self._keys_to_group(keys)
+            for elt in current_grp:
+                if isinstance(current_grp[elt], h5py.Group) and recursive:
+                    for sub_elt in self.iter_identifiers(
+                        identifier, [*keys, elt], recursive
+                    ):
+                        yield sub_elt
+                elif isinstance(current_grp[elt], h5py.Dataset):
+                    if str(current_grp[elt].name).endswith(".prod"):
+                        continue
+                    new_identifier = identifier.from_string(current_grp[elt].name)
+                    yield new_identifier
+                else:
+                    continue
+
+    def list_identifiers(
+        self,
+        identifier: SimIdentifier,
+        keys: tp.Optional[tp.List[str]] = None,
+        recursive: bool = False,
+    ) -> pd.DataFrame:
+        """ """
+        fields = list(identifier.iter_fields())
+        data = []
+        for sim_id in self.iter_identifiers(identifier, keys, recursive):
+            data.append([sim_id.get(elt.name) for elt in fields] + [sim_id])
+        return pd.DataFrame(
+            data=data, columns=[elt.name for elt in fields] + ["sim_id"]
+        )
