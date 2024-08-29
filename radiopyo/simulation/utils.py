@@ -233,6 +233,7 @@ class GroupNotFound(HDFManagerException):
 class SimIdentifier:
     _FIELD_DELIMITER: str = dc.field(default="##", repr=False, init=False)
     _VALUE_DELIMITER: str = dc.field(default="#", repr=False, init=False)
+    _KEYS: tp.List[str] = dc.field(default_factory=list)
 
     def replace(self, **kwargs: tp.Any) -> tp.Self:
         """ """
@@ -242,11 +243,28 @@ class SimIdentifier:
         """ """
         return getattr(self, key, default)
 
+    def sim_keys(self) -> tp.List[str]:
+        return self._KEYS
+
+    def set_keys(self, keys: tp.Optional[tp.List[str]] = None) -> None:
+        if keys is not None:
+            self._KEYS = keys
+
+    def append_keys(
+        self,
+        keys: tp.Optional[str | tp.List[str]] = None,
+    ) -> None:
+        if keys is not None:
+            if isinstance(keys, str):
+                self._KEYS.append(keys)
+            else:
+                self._KEYS += list(keys)
+
     @classmethod
     def iter_fields(cls) -> tp.Iterator[dc.Field]:
         """ """
         for field in dc.fields(cls):
-            if field.name in ["_FIELD_DELIMITER", "_VALUE_DELIMITER"]:
+            if field.name in ["_FIELD_DELIMITER", "_VALUE_DELIMITER", "_KEYS"]:
                 continue
             yield field
 
@@ -513,6 +531,9 @@ class H5Manager(AbstractContextManager):
     def read_ODEResult(
         self, identifier: SimIdentifier, keys: tp.Optional[tp.List[str]] = None
     ) -> ODEResult:
+        if keys is None:
+            keys = identifier.sim_keys()
+
         name = identifier.to_string()
         with self:
             grp = self._keys_to_group(keys)
@@ -561,26 +582,11 @@ class H5Manager(AbstractContextManager):
         recursive: bool = False,
     ) -> tp.Iterator[tp.Tuple[SimIdentifier, ODEResult]]:
         """ """
-        if keys is None:
-            keys = []
-        with self:
-            current_grp = self._keys_to_group(keys)
-            for elt in current_grp:
-                if isinstance(current_grp[elt], h5py.Group) and recursive:
-                    for sub_elt in self.iter_ODEResults(
-                        identifier, [*keys, elt], recursive
-                    ):
-                        yield sub_elt
-                elif isinstance(current_grp[elt], h5py.Dataset):
-                    if str(current_grp[elt].name).endswith(".prod"):
-                        continue
-                    new_identifier = identifier.from_string(current_grp[elt].name)
-                    yield (
-                        new_identifier,
-                        self.read_ODEResult(new_identifier, [*keys]),
-                    )
-                else:
-                    continue
+        for sim_id in self.iter_identifiers(identifier, keys, recursive):
+            yield (
+                sim_id,
+                self.read_ODEResult(sim_id),
+            )
 
     def iter_identifiers(
         self,
@@ -590,7 +596,7 @@ class H5Manager(AbstractContextManager):
     ) -> tp.Iterator[SimIdentifier]:
         """ """
         if keys is None:
-            keys = []
+            keys = identifier.sim_keys()
         with self:
             current_grp = self._keys_to_group(keys)
             for elt in current_grp:
@@ -603,6 +609,7 @@ class H5Manager(AbstractContextManager):
                     if str(current_grp[elt].name).endswith(".prod"):
                         continue
                     new_identifier = identifier.from_string(current_grp[elt].name)
+                    new_identifier.set_keys(keys)
                     yield new_identifier
                 else:
                     continue
