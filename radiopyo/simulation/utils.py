@@ -99,6 +99,13 @@ class SpeciesConvert(object):
             raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
 
     @classmethod
+    def from_umolar(cls: tp.Type[tp.Self], value: float | NDArray) -> tp.Self:
+        try:
+            return cls(value*1e-6)
+        except AttributeError as err:
+            raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
+
+    @classmethod
     def from_partial(cls: tp.Type[tp.Self], value: float | NDArray) -> tp.Self:
         try:
             return cls(cls.convertor.partial_to_molar(value))

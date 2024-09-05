@@ -31,6 +31,7 @@ from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from radiopyo.chemistry.k_reactions import BiReaction
     from radiopyo.chemistry.species import ChemSpecies
     from radiopyo.physics.beam import ParticleBeam
     from radiopyo.simulation.utils import H5Manager
@@ -453,7 +454,7 @@ class ODEResult(object):
             rdf.loc[:, label] = rdf.loc[:, label] * r.get_stoi_of(species)
 
         if include_equilibrium:
-            eq_r = self.compute_yields_of_eq_reactions(species, _slice)
+            eq_r = self.compute_yields_of_eq_reactions_by_species(species, _slice)
             for _k, _s in eq_r.items():
                 # If net value is consumption, remove it
                 if trapezoid(_s.values, x=_s.index) < 0:
@@ -511,7 +512,7 @@ class ODEResult(object):
             )
 
         if include_equilibrium:
-            eq_r = self.compute_yields_of_eq_reactions(species, _slice)
+            eq_r = self.compute_yields_of_eq_reactions_by_species(species, _slice)
             for _k, _s in eq_r.items():
                 # If net value is production, remove it
                 if trapezoid(_s.values, x=_s.index) > 0:
@@ -520,7 +521,7 @@ class ODEResult(object):
             rdf = pd.concat([rdf, eq_r], axis=1)
         return rdf
 
-    def detailed_integral_balance_of(
+    def detailed_integral_balance_of_species(
         self,
         species: str | ChemSpecies,
         start: tp.Optional[float | slice] = None,
@@ -570,7 +571,19 @@ class ODEResult(object):
         _ = self.get_reaction_rate_of(reaction).loc[_slice]
         return trapezoid(_.values, x=_.index)
 
-    def compute_yields_of_eq_reactions(
+
+    def compute_yield_of_single_eq_reaction(
+        self,
+        reaction: BiReaction,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
+    ) -> pd.Series:
+        """ """
+        _slice = make_slice_from_time_boundaries(start, stop)
+        dfr = self.reconstruct_reactions().loc[_slice, :]
+        return dfr[reaction.forward.as_label()] - dfr[reaction.backward.as_label()]
+
+    def compute_yields_of_eq_reactions_by_species(
         self,
         species: str | ChemSpecies,
         start: tp.Optional[float | slice] = None,
