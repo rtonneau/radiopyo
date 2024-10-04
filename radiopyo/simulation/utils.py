@@ -101,7 +101,7 @@ class SpeciesConvert(object):
     @classmethod
     def from_umolar(cls: tp.Type[tp.Self], value: float | NDArray) -> tp.Self:
         try:
-            return cls(value*1e-6)
+            return cls(value * 1e-6)
         except AttributeError as err:
             raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
 
@@ -502,6 +502,17 @@ class H5Manager(AbstractContextManager):
         if name_pr in grp:
             self.delete_dataset(grp, name_pr)
         return self.delete_dataset(grp, name)
+
+    def contains_ODEResult(
+        self,
+        identifier: SimIdentifier,
+        keys: tp.Optional[tp.List[str]] = None,
+    ) -> bool:
+        """ """
+        name = identifier.to_string()
+        with self:
+            grp = self._keys_to_group(keys)
+            return name in grp
 
     def push_ODEResult(
         self,

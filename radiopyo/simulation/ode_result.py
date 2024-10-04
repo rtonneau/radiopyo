@@ -404,6 +404,7 @@ class ODEResult(object):
         stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
         include_radiolytic: bool = True,
+        reverse: bool = False,
     ) -> pd.Series:
         df = self.detail_production_of(
             species,
@@ -428,7 +429,7 @@ class ODEResult(object):
                     * 1e6
                 )
 
-        return _ser.sort_values(ascending=False)
+        return _ser.sort_values(ascending=reverse)
 
     def detail_production_of(
         self,
@@ -475,6 +476,7 @@ class ODEResult(object):
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
+        reverse: bool = False,
     ) -> pd.Series:
         df = self.detail_consumption_of(
             species,
@@ -485,7 +487,7 @@ class ODEResult(object):
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
             _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
-        return _ser.sort_values(ascending=False)
+        return _ser.sort_values(ascending=reverse)
 
     def detail_consumption_of(
         self,
@@ -570,7 +572,6 @@ class ODEResult(object):
         _slice = make_slice_from_time_boundaries(start, stop)
         _ = self.get_reaction_rate_of(reaction).loc[_slice]
         return trapezoid(_.values, x=_.index)
-
 
     def compute_yield_of_single_eq_reaction(
         self,
