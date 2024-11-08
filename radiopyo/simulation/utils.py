@@ -135,6 +135,10 @@ class SpeciesConvert(object):
         """ """
         return self.value
 
+    def to_umolar(self) -> float | NDArray:
+        """ """
+        return self.value * 1e6
+
 
 class O2Convert(SpeciesConvert):
     convertor = ConcentrationConvert(1.3e-3)
@@ -556,7 +560,11 @@ class H5Manager(AbstractContextManager):
         with self:
             grp = self._keys_to_group(keys)
 
-            out = ODEResult.from_json_config(grp[name].attrs["json_config"])
+            json_path = Path(grp[name].attrs["json_config"])
+            if not json_path.exists():
+                _ = self.hdf_path.parent / f".{self.hdf_path.stem}"
+                json_path = _ / json_path.name
+            out = ODEResult.from_json_config(json_path)
             dummy_result = DummyScipyOdeResult.from_dataframe(
                 self.read_dataset(name, grp),
                 order=out.env._config_dict["parameters"]["species_order"]["dynamical"],
