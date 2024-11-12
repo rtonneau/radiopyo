@@ -1,9 +1,3 @@
-[[beam.constant]]
-label = "mono-pulse"
-dose_rate = 1e4      # Mean dose rate [Gy/s]
-max_dose = 10        # Dose [Gy], optional
-LET = 0.3
-
 [parameters]
 pH = 7
 force_cst_pH = false
@@ -12,7 +6,7 @@ force_cst_pH = false
 O2 = 52e-6
 
 # ----------------------------------------------------------------------------------
-#                             DEFINE RADIOLYTIC REACTIONS                            
+#                             DEFINE RADIOLYTIC REACTIONS
 # ----------------------------------------------------------------------------------
 [reactions.radiolytic] # Unit is [radical / 100eV / incident particle]
 e_aq = 2.6     # 2.8
@@ -24,7 +18,7 @@ H3O_plus = 2.6 # 2.8 #3.24
 
 
 # ----------------------------------------------------------------------------------
-#                                    DEFINE REACTIONS                            
+#                                    DEFINE REACTIONS
 # ----------------------------------------------------------------------------------
 ######################################## Acid-Base Reactions
 [[reactions.acid_base]]
@@ -95,13 +89,17 @@ k_value = 1.10e10                           # 1.36e10
 reaction = "e_aq + O2_minus + H2O -> HO2_minus + OH_minus"
 k_value = 1.30e10
 
+#[[reactions.k_reaction]]
+#reaction = "e_aq + O2_minus + H2O -> 2 OH_minus + H2O2"
+#k_value = 1.30e10
+
 [[reactions.k_reaction]]
 reaction = "e_aq + HO2 -> HO2_minus"
 k_value = 1.30e10
 
 [[reactions.k_reaction]]
 reaction = "e_aq + O2 -> O2_minus"
-k_value = 2.29e10                  #Rudi: 1.9e10 
+k_value = 2.29e10                  #Rudi: 1.9e10
 
 [[reactions.k_reaction]]
 reaction = "2 e_aq -> H2 + 2 OH_minus"
