@@ -2,8 +2,8 @@
 pH = 7
 force_cst_pH = false
 
-[concentrations.initial]
-O2 = 52e-6
+#[concentrations.initial]
+#O2 = 52e-6
 
 # ----------------------------------------------------------------------------------
 #                             DEFINE RADIOLYTIC REACTIONS

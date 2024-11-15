@@ -159,8 +159,8 @@ class KReaction(BasicReaction):
 
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
-            sp = next(iter(self.reactants.keys()))
-            return self.k_value() * self.stoi_reactants[sp]
+            _, stoi = next(iter(self.reactants))
+            return self.k_value() * stoi
         return self.k_value()
 
     @classmethod
@@ -280,7 +280,7 @@ class KReaction(BasicReaction):
         # Case of n*A -> B, then n*k is measured/given
         if k_value is not None and len(new.reactants) == 1 and len(k_value) == 1:
             # Compute k: divide by reactant's stoichio
-            new.set_k_value(k_value[0] / new.stoi_reactants[sp])
+            new.set_k_value(k_value[0] / new.get_stoi_of(sp))
 
         for sp in products:
             sim_sp = list_sp.get_or_create_dyn_species(sp.strip())

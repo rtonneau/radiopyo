@@ -332,11 +332,11 @@ class TreeToReaction(lark.Transformer):
         items: tp.List[tp.Tuple[ChemicalSpecies, int]],
     ) -> tp.Dict:
         out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
-        print("in species list: ", items)
+        # print("in species list: ", items)
         for species, stoi in items:
             label = species.label()
             out[label] = (species, out.get(label, (0, 0))[1] + stoi)
-        print(f"Species List is: {out}")
+        # print(f"Species List is: {out}")
         return out
 
     def silent_species(
@@ -430,7 +430,7 @@ class ReactionParser(object):
         """ """
         # Parse and then transform the output.
         tree = self.parser.parse(value.strip())
-        print(value)
+        # print(value)
         return TreeToReaction().transform(tree)
 
     def parse_reaction(self, reaction: str) -> GenericReaction:

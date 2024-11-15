@@ -1425,10 +1425,17 @@ class PulsedBeam(ParticleBeam):
             param["dose_rate_peak"] = param["pulse_dose"] / param["on_time"]
         elif "dose_rate_peak" in param and "on_time" in param:
             param["pulse_dose"] = param["dose_rate_peak"] * param["on_time"]
+        elif "dose_rate" in param and "on_time" in param:
+            timer = Timer.new_pulsed(
+                period=param["period"],
+                on_time=param["on_time"],
+            )
+            param["dose_rate_peak"] = param["dose_rate"] / timer.duty_cycle()
         else:
             raise ParameterError(
                 "PulsedBeam must be defined with at least 2 parameters out of "
                 "'dose_rate_peak', 'on_time' or 'pulse_dose' "
+                f"Beam def was: {param['label']}"
             )
 
         if "dose_rate_peak" in param:

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import typing as tp
 from abc import ABC, abstractmethod
+from contextlib import suppress
+from dataclasses import dataclass, replace
 from functools import reduce
 from itertools import chain
 from operator import add
@@ -95,6 +97,85 @@ class IsChemicalReaction(tp.Protocol):
         """"""
 
 
+@dataclass(frozen=True)
+class ReactionSpecies:
+    """ """
+
+    label: str
+    species: ChemSpecies
+    stoi: int
+
+
+@dataclass(init=False)
+class ReactionSpeciesCollection:
+    """"""
+
+    species_col: tp.Dict[str, ReactionSpecies]
+    _order: tp.List[str]
+
+    def __init__(self) -> None:
+        self.species_col = {}
+        self._order = []
+
+    def __len__(self) -> int:
+        return len(self.species_col)
+
+    def __iter__(self) -> tp.Iterator[tp.Tuple[ChemSpecies, int]]:
+        """ """
+        return (
+            (self.species_col[sp].species, self.species_col[sp].stoi)
+            for sp in self._order
+        )
+
+    def __contains__(self, key: str | RawSpecies) -> bool:
+        if isinstance(key, RawSpecies):
+            key = key.label
+        return key in self.species_col
+
+    def __getitem__(self, key: str | RawSpecies) -> ChemSpecies:
+        if isinstance(key, RawSpecies):
+            key = key.label
+        return self.species_col[key].species
+
+    def iter_species(self) -> tp.Iterable[ChemSpecies]:
+        for sp, _ in self.__iter__():
+            yield sp
+
+    def add_species(self, species: ChemSpecies, stoi: int) -> None:
+        """ """
+        if species in self:
+            self.species_col[species.label] = replace(
+                self.species_col[species.label],
+                stoi=stoi + self.species_col[species.label].stoi,
+            )
+            return
+
+        self.species_col[species.label] = ReactionSpecies(
+            label=species.label,
+            species=species,
+            stoi=stoi,
+        )
+        self._order.append(species.label)
+
+    def stoichiometry_of(self, key: str | ChemSpecies) -> int:
+        if isinstance(key, ChemSpecies):
+            key = key.label
+        return self.species_col[key].stoi
+
+    def tot_number(self) -> int:
+        """
+        Count the total number of elements involved in the reaction
+        => Stoichiometry dependent! In other words, it counts the number
+        of molecules/entities.
+
+        Returns:
+            int
+        """
+        return (
+            0 if len(self) == 0 else reduce(add, [stoi for _, stoi in self.__iter__()])
+        )
+
+
 class BasicReaction(ABC):
     """
     Abstract base class for a basic chemical reaction.
@@ -136,18 +217,16 @@ class BasicReaction(ABC):
         reactions.
     """
 
-    reactants: tp.Dict[str, ChemSpecies]
-    products: tp.Dict[str, ChemSpecies]
-    stoi_reactants: tp.Dict[str, int]
-    stoi_products: tp.Dict[str, int]
+    reactants: ReactionSpeciesCollection
+    products: ReactionSpeciesCollection
+    reactants_ghost: ReactionSpeciesCollection
     index: tp.Optional[int]
 
     def __init__(self) -> None:
-        self.reactants = {}
-        self.products = {}
-        self.stoi_products = {}
-        self.stoi_reactants = {}
+        self.reactants = ReactionSpeciesCollection()
+        self.products = ReactionSpeciesCollection()
         self.index = None
+        self.reactants_ghost = ReactionSpeciesCollection()
 
     def __contains__(self, other: object) -> bool:
         """
@@ -163,7 +242,11 @@ class BasicReaction(ABC):
                 if 'other' have any other type
         """
         if isinstance(other, (str, RawSpecies)):
-            return len([elt for elt in self.iter_species() if elt == other]) > 0
+            return (
+                (other in self.reactants)
+                or (other in self.products)
+                or (other in self.reactants_ghost)
+            )
         raise NotImplementedError
 
     @abstractmethod
@@ -226,12 +309,11 @@ class BasicReaction(ABC):
             KeyError:
                 If species not part of the reaction.
         """
-        if isinstance(species, ChemSpecies):
-            species = species.label
-        if species in self.stoi_products:
-            return self.stoi_products[species]
-        if species in self.stoi_reactants:
-            return self.stoi_reactants[species]
+        with suppress(KeyError):
+            return self.reactants.stoichiometry_of(species)
+        with suppress(KeyError):
+            return self.products.stoichiometry_of(species)
+
         raise KeyError(f"Species {species} not in reaction {self}")
 
     def tot_number_reactants(self) -> int:
@@ -243,11 +325,7 @@ class BasicReaction(ABC):
         Returns:
             int
         """
-        return (
-            0
-            if len(self.reactants) == 0
-            else reduce(add, list(self.stoi_reactants.values()))
-        )
+        return self.reactants.tot_number()
 
     def tot_number_products(self) -> int:
         """
@@ -258,11 +336,7 @@ class BasicReaction(ABC):
         Returns:
             int
         """
-        return (
-            0
-            if len(self.products) == 0
-            else reduce(add, list(self.stoi_products.values()))
-        )
+        return self.products.tot_number()
 
     def iter_species(self) -> tp.Iterable[ChemSpecies]:
         """
@@ -273,7 +347,7 @@ class BasicReaction(ABC):
             Iterable[ChemSpecies]: An iterator over all the species
                 involved in the reaction.
         """
-        return chain(self.reactants.values(), self.products.values())
+        return chain(self.reactants.iter_species(), self.products.iter_species())
 
     def iter_reactants(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """
@@ -283,9 +357,7 @@ class BasicReaction(ABC):
             Iterator: Tuple[SimSpecies, int]
                 The second element is the stoichiometry of the reactant.
         """
-        return [
-            (sp, self.stoi_reactants[label]) for label, sp in self.reactants.items()
-        ]
+        return iter(self.reactants)
 
     def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """
@@ -295,7 +367,7 @@ class BasicReaction(ABC):
             Iterator: Tuple[ChemSpecies, int]
                 The second element is the stoichiometry of the product.
         """
-        return [(sp, self.stoi_products[label]) for label, sp in self.products.items()]
+        return iter(self.products)
 
     def get_index(self, default: int = -1) -> int:
         """
@@ -330,7 +402,7 @@ class BasicReaction(ABC):
         Returns:
             int
         """
-        return len(list(self.iter_reactants()))
+        return len(self.reactants)
 
     def number_of_products(self) -> int:
         """
@@ -340,7 +412,7 @@ class BasicReaction(ABC):
             int
                 The number of products.
         """
-        return len(list(self.iter_products()))
+        return len(self.products)
 
     def has_product(self, product: ChemSpecies | str) -> bool:
         """
@@ -354,9 +426,7 @@ class BasicReaction(ABC):
             bool: True if the reaction involves the product,
             False otherwise.
         """
-        if isinstance(product, str):
-            return self.stoi_products.get(product, 0) > 0
-        return self.stoi_products.get(product.label, 0) > 0
+        return product in self.products
 
     def has_reactant(self, reactant: ChemSpecies | str) -> int:
         """
@@ -369,9 +439,7 @@ class BasicReaction(ABC):
         Returns:
             int: 1 if the reactant is part of the reaction, 0 otherwise.
         """
-        if isinstance(reactant, str):
-            return self.stoi_reactants.get(reactant, 0) > 0
-        return self.stoi_reactants.get(reactant.label, 0) > 0
+        return reactant in self.reactants
 
     def add_as_product(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """
@@ -391,11 +459,7 @@ class BasicReaction(ABC):
         Returns:
             None
         """
-        if sp.label in self.products:
-            self.stoi_products[sp.label] += multiple
-        else:
-            self.products[sp.label] = sp
-            self.stoi_products[sp.label] = multiple
+        self.products.add_species(sp, multiple)
 
     def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
         """
@@ -415,11 +479,7 @@ class BasicReaction(ABC):
         Returns:
             None
         """
-        if sp.label in self.reactants:
-            self.stoi_reactants[sp.label] += multiple
-        else:
-            self.reactants[sp.label] = sp
-            self.stoi_reactants[sp.label] = multiple
+        self.reactants.add_species(sp, multiple)
 
     def reactants_as_string(self) -> str:
         """

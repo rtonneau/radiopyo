@@ -272,7 +272,7 @@ class SimEnv:
         # Read Constant species and create the species collection
         list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
 
-        # Read bio param
+        # Read parameters
         parameters = config.get("parameters", {})
         if "pH" not in parameters:
             logger.warning(
