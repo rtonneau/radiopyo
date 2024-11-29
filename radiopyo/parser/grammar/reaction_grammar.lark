@@ -5,13 +5,16 @@ start: k_reaction | enzymatic_reaction | species | equilibrium_reaction | consta
 constant_reaction: "->"~1 products
 equilibrium_reaction: reactants "<->"~1 products
 enzymatic_reaction: species~1 "--"~1 enzyme ">>"~1 products
-k_reaction: reactants "->"~1 products
+k_reaction: reactants_with_silent "->"~1 products
 
 reactants: species_list
 products: species_list
+reactants_with_silent: species_list_with_silent
+
 
 // Generic species list in a reaction
-species_list: species ("+"~1 species )* silent_species*
+species_list: species ("+"~1 species )*
+species_list_with_silent: species ("+"~1 species )* silent_species*
 
 // Species definitions
 silent_species: "("~1 "+"~1 species~1 ")"~1

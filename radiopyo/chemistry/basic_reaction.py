@@ -14,7 +14,7 @@ from __future__ import annotations
 import typing as tp
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import reduce
 from itertools import chain
 from operator import add
@@ -103,7 +103,11 @@ class ReactionSpecies:
 
     label: str
     species: ChemSpecies
-    stoi: int
+    stoi: int = field(default=1)
+    _silent: bool = field(repr=False, default=False)
+
+    def is_silent(self) -> bool:
+        return self._silent
 
 
 @dataclass(init=False)
@@ -137,9 +141,40 @@ class ReactionSpeciesCollection:
             key = key.label
         return self.species_col[key].species
 
-    def iter_species(self) -> tp.Iterable[ChemSpecies]:
+    def _is_silent(self, species: ChemSpecies) -> bool:
+        return self.species_col[species.label].is_silent()
+
+    def iter_stoi(
+        self, include_silent: bool = True
+    ) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
+        for sp, stoi in self.__iter__():
+            if not include_silent and self._is_silent(sp):
+                continue
+            yield sp, stoi
+
+    def iter_species(self, include_silent: bool = True) -> tp.Iterable[ChemSpecies]:
         for sp, _ in self.__iter__():
+            if not include_silent and self.species_col[sp.label].is_silent():
+                continue
             yield sp
+
+    def _add_species(
+        self, species: ChemSpecies, stoi: int, silent: bool = False
+    ) -> None:
+
+        if species.label in self._order:
+            raise KeyError(f"{species.label} is already recorded in {self}")
+        self.species_col[species.label] = ReactionSpecies(
+            label=species.label,
+            species=species,
+            stoi=stoi,
+            _silent=silent,
+        )
+        self._order.append(species.label)
+
+    def add_silent_species(self, species: ChemSpecies, stoi: int) -> None:
+        """ """
+        return self._add_species(species, stoi, silent=True)
 
     def add_species(self, species: ChemSpecies, stoi: int) -> None:
         """ """
@@ -150,12 +185,7 @@ class ReactionSpeciesCollection:
             )
             return
 
-        self.species_col[species.label] = ReactionSpecies(
-            label=species.label,
-            species=species,
-            stoi=stoi,
-        )
-        self._order.append(species.label)
+        self._add_species(species, stoi)
 
     def stoichiometry_of(self, key: str | ChemSpecies) -> int:
         if isinstance(key, ChemSpecies):
@@ -219,14 +249,12 @@ class BasicReaction(ABC):
 
     reactants: ReactionSpeciesCollection
     products: ReactionSpeciesCollection
-    reactants_ghost: ReactionSpeciesCollection
     index: tp.Optional[int]
 
     def __init__(self) -> None:
         self.reactants = ReactionSpeciesCollection()
         self.products = ReactionSpeciesCollection()
         self.index = None
-        self.reactants_ghost = ReactionSpeciesCollection()
 
     def __contains__(self, other: object) -> bool:
         """
@@ -242,11 +270,7 @@ class BasicReaction(ABC):
                 if 'other' have any other type
         """
         if isinstance(other, (str, RawSpecies)):
-            return (
-                (other in self.reactants)
-                or (other in self.products)
-                or (other in self.reactants_ghost)
-            )
+            return (other in self.reactants) or (other in self.products)
         raise NotImplementedError
 
     @abstractmethod
@@ -349,7 +373,9 @@ class BasicReaction(ABC):
         """
         return chain(self.reactants.iter_species(), self.products.iter_species())
 
-    def iter_reactants(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
+    def iter_reactants(
+        self, include_silent: bool = True
+    ) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """
         Iter over reactants only, including the stoichiometry.
 
@@ -357,7 +383,7 @@ class BasicReaction(ABC):
             Iterator: Tuple[SimSpecies, int]
                 The second element is the stoichiometry of the reactant.
         """
-        return iter(self.reactants)
+        return self.reactants.iter_stoi(include_silent=include_silent)
 
     def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
         """
@@ -480,6 +506,26 @@ class BasicReaction(ABC):
             None
         """
         self.reactants.add_species(sp, multiple)
+
+    def add_as_silent_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
+        """
+        Method to conveniently add a new reactant to the reaction by
+        keeping the stoichiometry relevant:
+            -> If the species already exists as reactant,
+            increment its stoichiometry
+            -> If the species does not already exists as reactant,
+            add it to the dict of reactants and set its stoichiometry
+            to 1
+
+        Args:
+            sp: SimSpecies
+            multiple (int, optional): The stoichiometric coefficient of
+                the reactant. Defaults to 1.
+
+        Returns:
+            None
+        """
+        self.reactants.add_silent_species(sp, multiple)
 
     def reactants_as_string(self) -> str:
         """

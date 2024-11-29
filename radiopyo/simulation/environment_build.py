@@ -818,6 +818,7 @@ def kreaction_from_dict(
 
     out = KReactionCollection()
     for r in reactions:
+        print(r)
         out.add_reaction(KReaction.from_kwargs(list_sp=sim_sp, **r))
     return (out, sim_sp)
 

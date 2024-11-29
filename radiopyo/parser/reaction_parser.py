@@ -55,10 +55,10 @@ def revert_reaction(reaction: GenericReaction) -> GenericReaction:
 
 
 class GenericReaction(tp.TypedDict):
-    products: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
-    reactants: tp.Dict[str, tp.Tuple[Atom | Molecule, int]]
+    products: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]]
+    reactants: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]]
     constants: tp.Dict[str, float | tp.List[float]]
-    enzyme: BasicSpecies | Atom | Molecule | None
+    enzyme: ChemicalSpecies | None
 
 
 class KwargsAtom(tp.TypedDict):
@@ -324,6 +324,9 @@ class TreeToReaction(lark.Transformer):
     def reactants(self, items: tp.List) -> tp.List:
         return items[0]
 
+    def reactants_with_silent(self, items: tp.List) -> tp.List:
+        return self.reactants(items)
+
     def products(self, items: tp.List) -> tp.List:
         return items[0]
 
@@ -332,19 +335,21 @@ class TreeToReaction(lark.Transformer):
         items: tp.List[tp.Tuple[ChemicalSpecies, int]],
     ) -> tp.Dict:
         out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
-        # print("in species list: ", items)
         for species, stoi in items:
             label = species.label()
             out[label] = (species, out.get(label, (0, 0))[1] + stoi)
-        # print(f"Species List is: {out}")
         return out
+
+    def species_list_with_silent(
+        self,
+        items: tp.List[tp.Tuple[ChemicalSpecies, int]],
+    ) -> tp.Dict:
+        return self.species_list(items)
 
     def silent_species(
         self, item: tp.List[tp.Tuple[ChemicalSpecies, int]]
     ) -> tp.Tuple[SilentSpecies, int]:
         """ """
-        print("In silent with args: ", item)
-        print(f"Silent species: ", (SilentSpecies(item[0][0]), item[0][1]))
         return (SilentSpecies(item[0][0]), item[0][1])
 
     def species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int]:

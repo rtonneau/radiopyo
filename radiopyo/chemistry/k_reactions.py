@@ -22,7 +22,7 @@ from radiopyo.chemistry.basic_reaction import BasicReaction
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
-from radiopyo.parser import RPARSER
+from radiopyo.parser import RPARSER, SilentSpecies
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -183,17 +183,22 @@ class KReaction(BasicReaction):
             KReaction: An instance of KReaction.
         """
         reactants: tp.List[str] = []
+        _reactants_silent: tp.List[str] = []
         products: tp.List[str] = []
-
-        for sp, (_, stoi) in generic["reactants"].items():
-            reactants += [sp] * stoi
+        for sp, (chemsp, stoi) in generic["reactants"].items():
+            if isinstance(chemsp, SilentSpecies):
+                _reactants_silent += [sp] * stoi
+            else:
+                reactants += [sp] * stoi
         for sp, (_, stoi) in generic["products"].items():
             products += [sp] * stoi
+
         return cls.from_dict(
             reactants,
             products,
             generic["constants"].get("k_value", None),
             list_sp,
+            _silent_reactants=_reactants_silent,
         )
 
     @classmethod
@@ -244,6 +249,7 @@ class KReaction(BasicReaction):
         products: tp.List[str],
         k_value: None | float | tp.List[float],
         list_sp: tp.Optional[ListSpecies] = None,
+        _silent_reactants: tp.Optional[tp.List[str]] = None,
     ) -> tp.Self:
         """
         Create a KReaction from a dictionary (via destructuring).
@@ -276,6 +282,12 @@ class KReaction(BasicReaction):
         for sp in reactants:
             sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
             new.add_as_reactant(sim_sp)
+
+        if _silent_reactants is None:
+            _silent_reactants = []
+        for sp in _silent_reactants:
+            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
+            new.add_as_silent_reactant(sim_sp)
 
         # Case of n*A -> B, then n*k is measured/given
         if k_value is not None and len(new.reactants) == 1 and len(k_value) == 1:
