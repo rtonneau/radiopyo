@@ -5,15 +5,19 @@ start: k_reaction | enzymatic_reaction | species | equilibrium_reaction | consta
 constant_reaction: "->"~1 products
 equilibrium_reaction: reactants "<->"~1 products
 enzymatic_reaction: species~1 "--"~1 enzyme ">>"~1 products
-k_reaction: reactants "->"~1 products
+k_reaction: reactants_with_silent "->"~1 products
 
 reactants: species_list
 products: species_list
+reactants_with_silent: species_list_with_silent
+
 
 // Generic species list in a reaction
-species_list: species ("+"~1 species)*
+species_list: species ("+"~1 species )*
+species_list_with_silent: species ("+"~1 species )* silent_species*
 
 // Species definitions
+silent_species: "("~1 "+"~1 species~1 ")"~1
 species: multiple? (atom | molecule | radical | ion) | element
 enzyme: multiple? (atom | molecule) | element
 element: /\w+/ // Some species like 'catalase' doesn't have a formula
@@ -26,9 +30,9 @@ anion: ELECTRON | ((atom | molecule | radical) MINUS+)
 //Radical species
 radical: (atom|molecule) RADICAL?
 
-//Molecular species 
+//Molecular species
 molecule: sub_mol (sub_mol)*
-sub_mol: atom stoi? 
+sub_mol: atom stoi?
 atom: CAPITAL_LETTER LOWER_LETTER?
 
 multiple: INT
@@ -43,8 +47,8 @@ PLUS: "+" | "_plus"
 MINUS: "-" | "_minus"
 RADICAL: "_r"
 
-%import common.WORD 
-%import common.WS 
+%import common.WORD
+%import common.WS
 %import common.INT
 %import common.DIGIT
 %import common.LETTER

@@ -30,9 +30,10 @@ from typing import List
 
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
+from radiopyo.chemistry.species import ChemSpecies
+
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.species_collection import ListSpecies
-from radiopyo.chemistry.species import ChemSpecies
 
 from .basic_reaction import BasicReaction
 
@@ -199,7 +200,8 @@ class RadiolyticReaction(BasicReaction):
             str
                 A string label of the reaction.
         """
-        return next(iter(self.products.keys()))
+        sp, _ = next(iter(self.products))
+        return sp.label
 
     def kr(self) -> float:
         """

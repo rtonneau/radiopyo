@@ -203,7 +203,6 @@ class EReaction(BiReaction):
 
         constant = kwargs.get("k_equilibrium", None)
 
-        # type:ignore[arg-type]
         return cls(gen, constant=constant, list_sp=list_sp)  # type:ignore[arg-type]
 
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:

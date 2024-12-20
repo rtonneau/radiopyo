@@ -272,7 +272,7 @@ class SimEnv:
         # Read Constant species and create the species collection
         list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
 
-        # Read bio param
+        # Read parameters
         parameters = config.get("parameters", {})
         if "pH" not in parameters:
             logger.warning(
@@ -818,6 +818,7 @@ def kreaction_from_dict(
 
     out = KReactionCollection()
     for r in reactions:
+        print(r)
         out.add_reaction(KReaction.from_kwargs(list_sp=sim_sp, **r))
     return (out, sim_sp)
 

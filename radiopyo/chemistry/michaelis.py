@@ -79,8 +79,8 @@ class MichaelisMenten(BasicReaction):
         """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
-            sp = next(iter(self.reactants.keys()))
-            return self.k_value * self.stoi_reactants[sp]
+            _, stoi = next(iter(self.reactants))
+            return self.k_value * stoi
         return self.k_value
 
     def make_hash(self, method: str = "sha256") -> str:

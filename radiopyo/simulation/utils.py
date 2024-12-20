@@ -13,7 +13,10 @@ from contextlib import AbstractContextManager, suppress
 from pathlib import Path
 
 import h5py  # type: ignore[import]
+import numpy as np
 import pandas as pd
+
+from radiopyo.simulation.environment_build import SimEnv
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult
@@ -671,3 +674,89 @@ class H5Manager(AbstractContextManager):
         return pd.DataFrame(
             data=data, columns=[elt.name for elt in fields] + ["sim_id"]
         )
+
+
+class SimCollection:
+    hdf: H5Manager
+    keys: tp.List[str]
+    _sim_id: SimIdentifier
+    _content: pd.DataFrame
+    _sims: tp.Dict[tp.Any, ODEResult]
+    _hdf_path: Path
+
+    def __init__(
+        self,
+        hdf_path: str | Path,
+        identifier: SimIdentifier,
+        keys: tp.Optional[tp.List[str]] = None,
+        new: bool = False,
+    ) -> None:
+        self.hdf_path = Path(hdf_path)
+        if not self.hdf_path.exists() and new is False:
+            raise FileNotFoundError(self.hdf_path)
+        self.hdf = H5Manager.from_path(self.hdf_path, force_new=new)
+        self._sim_id = identifier
+        self._content = pd.DataFrame()
+        self._sims: tp.Dict[tp.Any, ODEResult] = {}
+        self.keys = keys if keys is not None else []
+        self._read_content()
+
+    def __getitem__(self, key: tp.Any) -> ODEResult:
+        return self._sims[key]
+
+    def __len__(self) -> int:
+        return len(self._sims)
+
+    def __iter__(self) -> tp.Iterator[tp.Tuple[tp.Any, SimIdentifier, ODEResult]]:
+        for label, row in self._content.iterrows():
+            yield (label, row["sim_id"], self._sims[label])
+
+    def _read_content(self) -> None:
+        self._content = self.hdf.list_identifiers(
+            self._sim_id,
+            keys=self.keys,
+            recursive=False,
+        )
+        self._sims = {
+            key: self.hdf.read_ODEResult(elt["sim_id"])
+            for key, elt in self._content.iterrows()
+        }
+
+    def _copy_dataframe(self) -> pd.DataFrame:
+        return self._content.copy()
+
+    def select(self, keys: tp.List[str]) -> None:
+        self.keys = keys
+        self._read_content()
+
+    def get_SimID(self, label: tp.Any) -> SimIdentifier:
+        """ """
+        return self._content.loc[label]["sim_id"]
+
+    def get_SimEnv(self, label: tp.Any) -> SimEnv:
+        """ """
+        return self[label].env
+
+    def get_values_of(self, label: str) -> np.ndarray[tp.Any, tp.Any]:
+        return self._content[label].unique()
+
+    def reaction_integral(
+        self,
+        reaction: str,
+        start: tp.Optional[float | slice] = None,
+        stop: tp.Optional[float] = None,
+    ) -> pd.Series:
+        """ """
+        out = pd.Series(
+            index=self._content.index,
+            data=0.0,
+            dtype=np.float64,
+            name=reaction,
+        )
+        for label, _, res in self:
+            out.loc[label] = res.integrate_single_reaction(
+                reaction,
+                start,
+                stop,
+            )
+        return out
