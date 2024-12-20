@@ -45,9 +45,11 @@ class ConcentrationConvert(object):
     """ """
 
     HENRY: float  # = 1.3e-3 # units are M/atm, for O2
+    mass_per_mole: float  # e.g. O2: 32 g / mole
 
-    def __init__(self, henry_cst: float) -> None:
+    def __init__(self, henry_cst: float, mass: tp.Optional[float] = None) -> None:
         self.HENRY = henry_cst
+        self.mass_per_mole = mass if mass is not None else -1.0
 
     def molar_to_atm(self, value: float | NDArray) -> float | NDArray:
         """ """
@@ -73,12 +75,20 @@ class ConcentrationConvert(object):
         """ """
         return self.atm_to_molar(value / 760)
 
+    def mg_per_l_to_molar(self, value: float | NDArray) -> float | NDArray:
+        """ """
+        if self.mass_per_mole <= 0.0:
+            raise ValueError(
+                f"Molar mass of species not defined (value={self.mass_per_mole})"
+            )
+        return value * 1e-3 / self.mass_per_mole
+
 
 class SpeciesConvert(object):
     """ """
 
     convertor: ConcentrationConvert
-    value: float | NDArray
+    value: float | NDArray  # Concentration in Molar unit
 
     def __init__(self, value: float | NDArray) -> None:
         """value is a concentration in Molar unit"""
@@ -119,6 +129,13 @@ class SpeciesConvert(object):
         except AttributeError as err:
             raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
 
+    @classmethod
+    def from_mg_per_l(cls: tp.Type[tp.Self], value: float) -> tp.Self:
+        try:
+            return cls(cls.convertor.mg_per_l_to_molar(value))
+        except AttributeError as err:
+            raise TypeError(f"No convertor (with Henry cst) defined for {cls}") from err
+
     def to_atm(self) -> float | NDArray:
         """ """
         return self.convertor.molar_to_atm(self.value)
@@ -141,7 +158,7 @@ class SpeciesConvert(object):
 
 
 class O2Convert(SpeciesConvert):
-    convertor = ConcentrationConvert(1.3e-3)
+    convertor = ConcentrationConvert(henry_cst=1.3e-3, mass=32.0)
 
 
 class ResCollection(object):
