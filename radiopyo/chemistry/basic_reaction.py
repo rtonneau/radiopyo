@@ -11,6 +11,7 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import copy
 import typing as tp
 from abc import ABC, abstractmethod
 from contextlib import suppress
@@ -30,7 +31,25 @@ if tp.TYPE_CHECKING:
 # --------------------------------------------------------------------------- #
 __all__ = [
     "BasicReaction",
+    "GenericReaction",
+    "Operation",
+    "ReactionSpecies",
+    "ReactionSpeciesCollection",
+    "revert_reaction",
 ]
+
+
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
+def revert_reaction(reaction: GenericReaction) -> GenericReaction:
+    """ """
+    return GenericReaction(
+        products=reaction["reactants"].copy(),
+        reactants=reaction["products"].copy(),
+        constants=reaction["constants"].copy(),
+        enzyme=copy.copy(reaction["enzyme"]),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -39,6 +58,13 @@ __all__ = [
 class Operation(Enum):
     ADD = 1
     SUBTRACT = 2
+
+
+class GenericReaction(tp.TypedDict):
+    products: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]]
+    reactants: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]]
+    constants: tp.Dict[str, float | tp.List[float]]
+    enzyme: BasicSpecies | None
 
 
 @dataclass(frozen=True)

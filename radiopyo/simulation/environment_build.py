@@ -35,9 +35,10 @@ from radiopyo.chemistry.k_reactions import (
 )
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
-from radiopyo.chemistry.species import H2O, SimSpecies
+from radiopyo.chemistry.species import H2O, BasicSpecies, SimSpecies
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
+from radiopyo.parser import RPARSER
 from radiopyo.utils.sim_types import SimMatrices, default_ConfigDict
 
 # ------------------------- Type checking ONLY imports----------------------- #
@@ -282,19 +283,31 @@ class SimEnv:
 
         # Copy initial cc and strip species name on the fly.
         initial_cc = {}
-        list_sp.add_cst_species("H2O", cc=H2O.cc_init.coef)
+        list_sp.add_cst_species(RPARSER.parse_species("H2O"), cc=H2O.cc_init.coef)
         for key, cc in config["concentrations"].get("initial", {}).items():
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
         if "force_cst_pH" in parameters and not parameters["force_cst_pH"]:
-            list_sp.add_dyn_species(cls.PH_SPECIES, cc_init=10 ** (-parameters["pH"]))
-            list_sp.add_dyn_species("OH_minus", cc_init=10 ** (-14 + parameters["pH"]))
+            list_sp.add_dyn_species(
+                RPARSER.parse_species(cls.PH_SPECIES),
+                cc_init=10 ** (-parameters["pH"]),
+            )
+            list_sp.add_dyn_species(
+                RPARSER.parse_species("OH_minus"),
+                cc_init=10 ** (-14 + parameters["pH"]),
+            )
         else:
             with suppress(radiopyo_exceptions.IsSimSpeciesError):
-                list_sp.add_cst_species(cls.PH_SPECIES, 10 ** (-parameters["pH"]))
+                list_sp.add_cst_species(
+                    RPARSER.parse_species(cls.PH_SPECIES),
+                    10 ** (-parameters["pH"]),
+                )
             with suppress(radiopyo_exceptions.IsSimSpeciesError):
-                list_sp.add_cst_species("OH_minus", 10 ** (-14 + parameters["pH"]))
+                list_sp.add_cst_species(
+                    RPARSER.parse_species("OH_minus"),
+                    10 ** (-14 + parameters["pH"]),
+                )
 
         # Sanity check
         if "reactions" not in config:
@@ -373,7 +386,7 @@ class SimEnv:
         # Convert the "trash" species, if presents, to Cst.
         if "trash" in list_sp and list_sp.is_dyn_species("trash"):
             list_sp.remove_species("trash")
-            list_sp.add_cst_species("trash", 0.0)
+            list_sp.add_cst_species(BasicSpecies("trash"), 0.0)
 
         # Sort species so that all constant species are at the end.
         if "species_order" in parameters:

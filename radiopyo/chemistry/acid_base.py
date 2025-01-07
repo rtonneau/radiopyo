@@ -15,6 +15,7 @@ from contextlib import suppress
 import numpy as np
 
 # ---------------------------- Internal imports ----------------------------- #
+from radiopyo.chemistry.basic_reaction import GenericReaction, revert_reaction
 from radiopyo.chemistry.k_reactions import (
     BiReaction,
     KReaction,
@@ -23,7 +24,6 @@ from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
-from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:

@@ -22,8 +22,8 @@ from radiopyo.parser import RPARSER
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.species import ChemSpecies
-    from radiopyo.parser.reaction_parser import GenericReaction
+    from radiopyo.chemistry.basic_reaction import GenericReaction
+    from radiopyo.chemistry.species import SimSpecies
 # --------------------------------------------------------------------------- #
 
 __all__ = [
@@ -58,8 +58,8 @@ class MichaelisMenten(BasicReaction):
 
     k_value: float
     k_micha: float
-    substrate: ChemSpecies
-    enzyme: ChemSpecies
+    substrate: SimSpecies
+    enzyme: SimSpecies
 
     def __init__(
         self,
@@ -79,8 +79,8 @@ class MichaelisMenten(BasicReaction):
         """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
-            _, stoi = next(iter(self.reactants))
-            return self.k_value * stoi
+            sp = next(iter(self.reactants))
+            return self.k_value * sp.stoi
         return self.k_value
 
     def make_hash(self, method: str = "sha256") -> str:
@@ -126,7 +126,7 @@ class MichaelisMenten(BasicReaction):
         if isinstance(generic["enzyme"], str):
             enzyme: str = generic["enzyme"]
         else:
-            enzyme = generic["enzyme"].label()
+            enzyme = generic["enzyme"].label
 
         substrate: tp.List[str] = []
         products: tp.List[str] = []

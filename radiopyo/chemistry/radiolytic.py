@@ -30,7 +30,7 @@ from typing import List
 
 from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
 
-from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry.species import SimSpecies
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.species_collection import ListSpecies
@@ -39,8 +39,7 @@ from .basic_reaction import BasicReaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.species import ChemSpecies
-
+    pass
 # --------------------------------------------------------------------------- #
 
 __all__ = [
@@ -181,7 +180,7 @@ class RadiolyticReaction(BasicReaction):
     ) -> tp.Self:
         raise NotImplementedError
 
-    def species(self) -> ChemSpecies:
+    def species(self) -> SimSpecies:
         """
         Returns the ChemSpecies instance associated with this reaction.
 
@@ -189,7 +188,7 @@ class RadiolyticReaction(BasicReaction):
             ChemSpecies
                 The ChemSpecies instance.
         """
-        return self.products[self.label()]
+        return self.products[self.label()].species
 
     def label(self) -> str:
         """
@@ -200,7 +199,7 @@ class RadiolyticReaction(BasicReaction):
             str
                 A string label of the reaction.
         """
-        sp, _ = next(iter(self.products))
+        sp = next(iter(self.products))
         return sp.label
 
     def kr(self) -> float:
@@ -284,7 +283,7 @@ class RadiolyticReaction(BasicReaction):
 
     # ----------------------------------------------------------------------- #
 
-    def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
+    def add_as_reactant(self, sp: SimSpecies, multiple: int = 1) -> None:
         """No reactant should be involved"""
         raise NotImplementedError("Not implemented for Radiolytic Reactions")
 

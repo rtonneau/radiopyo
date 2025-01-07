@@ -45,13 +45,6 @@ __all__ = [
 # --------------------------------------------------------------------------- #
 
 
-class GenericReaction(tp.TypedDict):
-    products: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]]
-    reactants: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]]
-    constants: tp.Dict[str, float | tp.List[float]]
-    enzyme: ChemicalSpecies | None
-
-
 class KwargsAtom(tp.TypedDict):
     name: str
     charge: int
@@ -164,37 +157,6 @@ class ChemicalSpecies(BasicSpecies):
         """
         out = ["$", self.name, self._latex_radical_charge(), "$"]
         return "".join(out)
-
-    def initial_cc(self, T: tp.Optional[float | Temperature] = None) -> float:
-        """
-        Returns the initial concentration of the species at a given
-            temperature.
-
-        Args:
-            T (float | Temperature): Temperature in Celsius. If None,
-                default temperature is used.
-
-        Returns:
-            float: The initial concentration of the species at the given
-                temperature.
-        """
-        T = Temperature(T)
-        return self.cc_init(T.celsius) if self.cc_init(T.celsius) > 0 else 0
-
-    def set_initial_cc(
-        self, value: float | tp.List[float] | np.polynomial.Polynomial
-    ) -> None:
-        """
-        Sets the initial concentration coefficient of the species.
-
-        Args:
-            value (float | list[float]): The initial concentration
-                coefficient(s) of the species.
-
-        Returns:
-            None
-        """
-        self.cc_init = polynomial_factory(value, log10=False)
 
 
 class HydratedElectron(ChemicalSpecies):
@@ -325,13 +287,13 @@ class SimSpecies:
         ... (other methods specific to ChemSpecies)
     """
 
-    species: ChemicalSpecies
+    species: BasicSpecies | ChemicalSpecies
     cc_init: np.polynomial.Polynomial  # Store initial value as [mol/l]
     index: int
 
     def __init__(
         self,
-        raw_species: ChemicalSpecies,
+        raw_species: BasicSpecies | ChemicalSpecies,
         index: int = -1,
         cc_init: tp.Optional[tp.List[float] | float | np.polynomial.Polynomial] = None,
     ) -> None:

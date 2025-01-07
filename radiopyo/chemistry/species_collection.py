@@ -19,11 +19,17 @@ from itertools import chain
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
-from radiopyo.chemistry.species import ChemicalSpecies, SimSpecies
+from radiopyo.chemistry.species import (
+    BasicSpecies,
+    ChemicalSpecies,
+    SimSpecies,
+)
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     import numpy as np
+
+    AnySpecies = tp.Union[BasicSpecies, ChemicalSpecies, SimSpecies]
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = []
@@ -80,7 +86,7 @@ class ListSpecies:
         self.next_index = 0
         self.sorted = False
 
-    def __contains__(self, key: str | SimSpecies | ChemicalSpecies) -> bool:
+    def __contains__(self, key: str | AnySpecies) -> bool:
         """
         Checks if a given key is in the ListSpecies instance.
 
@@ -92,7 +98,7 @@ class ListSpecies:
             bool: True if the key is found in the ListSpecies instance,
             False otherwise.
         """
-        label = key.label if isinstance(key, (SimSpecies, ChemicalSpecies)) else key
+        label = key if isinstance(key, str) else key.label
 
         return label in self.dyn_sp or label in self.cst_sp
 
@@ -158,7 +164,7 @@ class ListSpecies:
 
     def get(
         self,
-        species: str | ChemicalSpecies,
+        species: str | ChemicalSpecies | BasicSpecies,
         default: tp.Optional[SimSpecies] = None,
     ) -> tp.Optional[SimSpecies]:
         """
@@ -199,7 +205,7 @@ class ListSpecies:
 
     def add_dyn_species(
         self,
-        species: ChemicalSpecies,
+        species: ChemicalSpecies | BasicSpecies,
         cc_init: tp.Optional[tp.List[float] | float | np.polynomial.Polynomial] = None,
     ) -> None:
         """
@@ -223,7 +229,7 @@ class ListSpecies:
 
     def add_cst_species(
         self,
-        species: ChemicalSpecies,
+        species: ChemicalSpecies | BasicSpecies,
         cc: tp.List[float] | float | np.polynomial.Polynomial,
     ) -> None:
         """
@@ -245,7 +251,7 @@ class ListSpecies:
 
     def get_or_create_dyn_species(
         self,
-        species: ChemicalSpecies,
+        species: ChemicalSpecies | BasicSpecies,
     ) -> SimSpecies:
         """
         Retrieves or creates a dynamic species from the ListSpecies
@@ -266,7 +272,7 @@ class ListSpecies:
 
     def get_or_create_cst_species(
         self,
-        species: ChemicalSpecies,
+        species: ChemicalSpecies | BasicSpecies,
     ) -> SimSpecies:
         """
         Retrieves or creates a constant species from the ListSpecies
@@ -408,7 +414,7 @@ class ListSpecies:
         out.sorted = True
         return out if not inplace else None
 
-    def is_cst_species(self, key: str | SimSpecies | ChemicalSpecies) -> bool:
+    def is_cst_species(self, key: str | AnySpecies) -> bool:
         """
         Checks if a given key is a constant species.
 
@@ -424,7 +430,7 @@ class ListSpecies:
             key = key.label
         return key in self.cst_sp
 
-    def is_dyn_species(self, key: str | SimSpecies | ChemicalSpecies) -> bool:
+    def is_dyn_species(self, key: str | AnySpecies) -> bool:
         """
         Checks if a given key is a dynamic species.
 

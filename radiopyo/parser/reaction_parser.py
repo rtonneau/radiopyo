@@ -18,12 +18,11 @@ import lark
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.chemistry.basic_reaction import Operation
+from radiopyo.chemistry.basic_reaction import GenericReaction, Operation
 from radiopyo.chemistry.species import (
     Atom,
     BasicSpecies,
     ChemicalSpecies,
-    GenericReaction,
     HydratedElectron,
     Molecule,
 )
@@ -47,14 +46,6 @@ logger = logging.getLogger("radiopyo")
 # --------------------------------------------------------------------------- #
 #                             FUNCTION DEFINITIONS                            #
 # --------------------------------------------------------------------------- #
-def revert_reaction(reaction: GenericReaction) -> GenericReaction:
-    """ """
-    return GenericReaction(
-        products=reaction["reactants"].copy(),
-        reactants=reaction["products"].copy(),
-        constants=reaction["constants"].copy(),
-        enzyme=copy.copy(reaction["enzyme"]),
-    )
 
 
 # --------------------------------------------------------------------------- #
@@ -93,7 +84,7 @@ class TreeToReaction(lark.Transformer):
 
     def enzymatic_reaction(self, items: tp.List) -> GenericReaction:
         return GenericReaction(
-            reactants={items[0][0].label(): items[0]},
+            reactants={items[0][0].label: items[0]},
             products=items[2],
             enzyme=items[1],
             constants={},
@@ -107,27 +98,32 @@ class TreeToReaction(lark.Transformer):
             enzyme=None,
         )
 
-    def reactants(self, items: tp.List) -> tp.List:
-        return items[0]
+    def reactants(self, items: tp.List) -> tp.Dict:
+        out: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]] = {}
+        for species, stoi, ope in items:
+            label = species.label
+            out[label] = (species, out.get(label, (0, 0))[1] + stoi, ope)
+        return out
 
-    def products(self, items: tp.List) -> tp.List:
-        return items[0]
+    def products(self, items: tp.List) -> tp.Dict:
+        out: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]] = {}
+        for species, stoi, ope in items:
+            label = species.label
+            sign = 1 if ope is Operation.ADD else -1
+            out[label] = (
+                species,
+                out.get(label, (0, 0))[1] + stoi * sign,  # Summing stoi
+                Operation.ADD,  # by default, change it later.
+            )
+        for key, value in out.items():
+            # if the sum of all stoichimetric coeff is < 0, then it is a subtraction.
+            if value[1] < 0:
+                out[key] = (value[0], abs(value[1]), Operation.SUBTRACT)
+        # Remove all species with stoichiometry = 0
+        return {key: value for key, value in out.items() if value[1] > 0}
 
-    # def species_list(
-    #     self,
-    #     items: tp.List[tp.Tuple[ChemicalSpecies, int]],
-    # ) -> tp.Dict:
-    #     out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
-    #     for species, stoi in items:
-    #         label = species.label()
-    #         out[label] = (species, out.get(label, (0, 0))[1] + stoi)
-    #     return out
-
-    def signed_species(
-        self, items: tp.List
-    ) -> tp.Tuple[ChemicalSpecies, int, Operation]:
-        print(items)
-        return items[1]
+    def signed_species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int, Operation]:
+        return (items[1][0], items[1][1], items[0])
 
     def species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int, Operation]:
         """
@@ -226,7 +222,6 @@ class ReactionParser(object):
         """ """
         # Parse and then transform the output.
         tree = self.parser.parse(value.strip())
-        # print(value)
         return TreeToReaction().transform(tree)
 
     def parse_reaction(self, reaction: str) -> GenericReaction:
@@ -249,7 +244,7 @@ class ReactionParser(object):
         r = self._parse(reaction)
         if not isinstance(r, dict):
             raise TypeError(f"Unable to parse: '{reaction}' as a chemical reaction")
-        for _, (species, _) in r["reactants"].items():
+        for _, (species, _, _) in r["reactants"].items():
             if isinstance(species, (Atom, Molecule)):
                 try:
                     self._set_mass(species)
@@ -259,7 +254,7 @@ class ReactionParser(object):
                         "Setting it to default mass, i.e. 0"
                     )
                     species.mass = 0
-        for _, (species, _) in r["products"].items():
+        for _, (species, _, _) in r["products"].items():
             if isinstance(species, (Atom, Molecule)):
                 try:
                     self._set_mass(species)
@@ -277,7 +272,7 @@ class ReactionParser(object):
                     f"Unable to compute mass of {species}. "
                     "Setting it to default mass, i.e. 0"
                 )
-                species.mass = 0
+                r["enzyme"].mass = 0
         return r
 
     def parse_species(self, species: str) -> BasicSpecies | Atom | Molecule:
@@ -288,11 +283,14 @@ class ReactionParser(object):
             BasicSpecies | Atom | Molecule
         """
         _ = self._parse(species)
-        if isinstance(_, (Atom, Molecule)):
-            self._set_mass(_)
-            return _
-        if isinstance(_, BasicSpecies):
-            return _
+        if not (isinstance(_, tuple) and len(_) == 3):
+            raise TypeError(f"Unable to parse: '{species}' as a chemical species")
+        sp = _[0]
+        if isinstance(sp, (Atom, Molecule)):
+            self._set_mass(sp)
+            return sp
+        if isinstance(sp, BasicSpecies):
+            return sp
         raise TypeError(f"Unable to parse: '{species}' as a chemical species")
 
     def _set_mass(self, species: Atom | Molecule) -> None:

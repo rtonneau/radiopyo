@@ -26,7 +26,7 @@ from radiopyo.parser import RPARSER
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.parser.reaction_parser import GenericReaction
+    from radiopyo.chemistry.basic_reaction import GenericReaction
 
 # --------------------------------------------------------------------------- #
 
