@@ -27,7 +27,7 @@ from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.species import ChemSpecies
+    from radiopyo.chemistry.species import SimSpecies
 
 
 __all__ = [
@@ -62,8 +62,8 @@ class ABCouple(tp.NamedTuple):
         attributes can be accessed by name or by index.
     """
 
-    species: ChemSpecies
-    conjugate: ChemSpecies
+    species: SimSpecies
+    conjugate: SimSpecies
     pKa: float
     k_forward: float
     k_backward: float
@@ -99,8 +99,8 @@ class AcidBase(BiReaction):
     _k_backward: np.polynomial.Polynomial
     _k_forward: np.polynomial.Polynomial
     _pKa: np.polynomial.Polynomial
-    _A: ChemSpecies
-    _HA: ChemSpecies
+    _A: SimSpecies
+    _HA: SimSpecies
 
     def __init__(
         self,
@@ -135,7 +135,7 @@ class AcidBase(BiReaction):
         self._A = _.conjugate
 
     @property
-    def acid(self) -> ChemSpecies:
+    def acid(self) -> SimSpecies:
         """
         A property to return the acid species.
 
@@ -145,7 +145,7 @@ class AcidBase(BiReaction):
         return self._HA
 
     @property
-    def base(self) -> ChemSpecies:
+    def base(self) -> SimSpecies:
         """
         A property to return the base species.
 
@@ -363,8 +363,8 @@ class AcidBase(BiReaction):
                 )
 
             species = None
-            for sp, _ in r.iter_reactants():
-                if sp == "H2O":
+            for sp in r.iter_reactants():
+                if sp.label == "H2O":
                     continue
                 species = sp
             else:
@@ -387,8 +387,8 @@ class AcidBase(BiReaction):
                 )
 
             conjugate = None
-            for sp, _ in r.iter_products():
-                if sp == "H3O_plus" or sp == "H_plus":
+            for sp in r.iter_products():
+                if sp.label == "H3O_plus" or sp.label == "H_plus":
                     continue
                 conjugate = sp
             else:
@@ -409,8 +409,8 @@ class AcidBase(BiReaction):
                 )
 
             conjugate = None
-            for sp, _ in r.iter_products():
-                if sp == "H2O":
+            for sp in r.iter_products():
+                if sp.label == "H2O":
                     continue
                 conjugate = sp
             else:
@@ -431,16 +431,16 @@ class AcidBase(BiReaction):
                 )
 
             species = None
-            for sp, _ in r.iter_reactants():
-                if sp == "OH_minus":
+            for sp in r.iter_reactants():
+                if sp.label == "OH_minus":
                     continue
                 species = sp
             else:
                 species = sp if species is None else species
 
         return ABCouple(
-            species=species,
-            conjugate=conjugate,
+            species=species.species,
+            conjugate=conjugate.species,
             pKa=self.pKa(T),
             k_forward=self.k_forward(T),
             k_backward=self.k_backward(T),

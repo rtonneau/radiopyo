@@ -159,8 +159,8 @@ class KReaction(BasicReaction):
 
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
-            _, stoi = next(iter(self.reactants))
-            return self.k_value() * stoi
+            sp = next(iter(self.reactants))
+            return self.k_value() * sp.stoi
         return self.k_value()
 
     @classmethod

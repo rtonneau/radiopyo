@@ -8,10 +8,10 @@ enzymatic_reaction: species~1 "--"~1 enzyme ">>"~1 products
 k_reaction: reactants "->"~1 products
 
 reactants: species ("+"~1 species)*
-products: (species|signed_species) (signed_species)*
+products: species? (signed_species)*
 
 // Species definitions
-signed_species: ("-"|"+")~1 species
+signed_species: SIGN species
 species: multiple? (atom | molecule | radical | ion) | element
 enzyme: multiple? (atom | molecule) | element
 element: /\w+/ // Some species like 'catalase' doesn't have a formula
@@ -33,7 +33,7 @@ multiple: INT
 stoi: INT
 
 ELECTRON: "e_aq"
-CHARGE: (PLUS | MINUS)
+SIGN: "+" | "-"
 
 CAPITAL_LETTER: /[A-Z]/
 LOWER_LETTER: /[a-z]/

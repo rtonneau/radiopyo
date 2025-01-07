@@ -35,7 +35,7 @@ from radiopyo.chemistry.k_reactions import (
 )
 from radiopyo.chemistry.michaelis import MichaelisMenten
 from radiopyo.chemistry.radiolytic import RadiolyticReaction
-from radiopyo.chemistry.species import H2O, ChemSpecies
+from radiopyo.chemistry.species import H2O, SimSpecies
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.utils.sim_types import SimMatrices, default_ConfigDict
@@ -367,7 +367,7 @@ class SimEnv:
         for label, value in initial_cc.items():
             with suppress(KeyError):
                 sp = list_sp[label]
-                if isinstance(sp, ChemSpecies):
+                if isinstance(sp, SimSpecies):
                     sp.set_initial_cc(value)
 
         # Convert the "trash" species, if presents, to Cst.
@@ -651,22 +651,22 @@ class SimEnv:
 
     def radiolytic_reaction_involving(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
     ) -> tp.List[RadiolyticReaction]:
         return [r for r in self.reactions.iter_radiolytic_reactions() if species in r]
 
     def kreactions_involving(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
     ) -> tp.List[KReaction]:
         return [r for r in self.reactions.iter_kreactions() if species in r]
 
     def kreactions_involving_reactant(
         self,
-        species: str | ChemSpecies | tp.List[str | ChemSpecies],
+        species: str | SimSpecies | tp.List[str | SimSpecies],
     ) -> tp.List[KReaction]:
         out: tp.List[KReaction] = []
-        if isinstance(species, (str | ChemSpecies)):
+        if isinstance(species, (str | SimSpecies)):
             species = [species]
 
         for r in self.reactions.iter_kreactions():
@@ -676,16 +676,16 @@ class SimEnv:
 
     def kreactions_involving_product(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
     ) -> tp.List[KReaction]:
         return [r for r in self.reactions.iter_kreactions() if r.has_product(species)]
 
     def eq_reactions_involving(
         self,
-        species: str | ChemSpecies | tp.List[str | ChemSpecies],
+        species: str | SimSpecies | tp.List[str | SimSpecies],
     ) -> tp.List[BiReaction]:
         out: tp.List[BiReaction] = []
-        if isinstance(species, (str | ChemSpecies)):
+        if isinstance(species, (str | SimSpecies)):
             species = [species]
 
         for r in self.reactions.iter_eq_reactions():
@@ -695,7 +695,7 @@ class SimEnv:
 
     def reactions_involving(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
     ) -> tp.List[tp.Tuple[BasicReaction, float]]:
         out: tp.List[tp.Tuple[BasicReaction, float]] = []
         for _, reaction, k_val in self.reactions.iter_all_kreactions_and_kvalues():
@@ -705,7 +705,7 @@ class SimEnv:
 
     def reactions_involving_reactant(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
     ) -> tp.List[tp.Tuple[BasicReaction, float]]:
         out: tp.List[tp.Tuple[BasicReaction, float]] = []
         for _, reaction, k_val in self.reactions.iter_all_kreactions_and_kvalues():
@@ -715,7 +715,7 @@ class SimEnv:
 
     def reactions_involving_product(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
     ) -> tp.List[tp.Tuple[BasicReaction, float]]:
         out: tp.List[tp.Tuple[BasicReaction, float]] = []
         for _, reaction, k_val in self.reactions.iter_all_kreactions_and_kvalues():
