@@ -20,14 +20,13 @@ Author:
 """
 # ------------------------------- External imports -------------------------- #
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.parser.reaction_parser import ReactionParser, SilentSpecies
+from radiopyo.parser.reaction_parser import ReactionParser
 
 # -------------------------- Type checking ONLY imports---------------------- #
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: list = [
     "RPARSER",
-    "SilentSpecies",
 ]
 
 # Expose a instance (sharable) of ReactionParser
