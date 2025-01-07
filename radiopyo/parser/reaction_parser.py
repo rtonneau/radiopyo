@@ -261,21 +261,6 @@ class Molecule(ChemicalSpecies):
         self._mass = value
 
 
-class SilentSpecies:
-    """ """
-
-    species: ChemicalSpecies
-
-    def __init__(self, species: ChemicalSpecies) -> None:
-        self.species = species
-
-    def __str__(self) -> str:
-        return self.species.__str__()
-
-    def label(self) -> str:
-        return self.species.label()
-
-
 class TreeToReaction(lark.Transformer):
     """Lark Class handling the conversion.
     See: https://lark-parser.readthedocs.io/en/latest/visitors.html
@@ -324,9 +309,6 @@ class TreeToReaction(lark.Transformer):
     def reactants(self, items: tp.List) -> tp.List:
         return items[0]
 
-    def reactants_with_silent(self, items: tp.List) -> tp.List:
-        return self.reactants(items)
-
     def products(self, items: tp.List) -> tp.List:
         return items[0]
 
@@ -339,18 +321,6 @@ class TreeToReaction(lark.Transformer):
             label = species.label()
             out[label] = (species, out.get(label, (0, 0))[1] + stoi)
         return out
-
-    def species_list_with_silent(
-        self,
-        items: tp.List[tp.Tuple[ChemicalSpecies, int]],
-    ) -> tp.Dict:
-        return self.species_list(items)
-
-    def silent_species(
-        self, item: tp.List[tp.Tuple[ChemicalSpecies, int]]
-    ) -> tp.Tuple[SilentSpecies, int]:
-        """ """
-        return (SilentSpecies(item[0][0]), item[0][1])
 
     def species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int]:
         if len(items) > 1:
