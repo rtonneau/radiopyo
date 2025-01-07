@@ -312,17 +312,30 @@ class TreeToReaction(lark.Transformer):
     def products(self, items: tp.List) -> tp.List:
         return items[0]
 
-    def species_list(
-        self,
-        items: tp.List[tp.Tuple[ChemicalSpecies, int]],
-    ) -> tp.Dict:
-        out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
-        for species, stoi in items:
-            label = species.label()
-            out[label] = (species, out.get(label, (0, 0))[1] + stoi)
-        return out
+    # def species_list(
+    #     self,
+    #     items: tp.List[tp.Tuple[ChemicalSpecies, int]],
+    # ) -> tp.Dict:
+    #     out: tp.Dict[str, tp.Tuple[ChemicalSpecies, int]] = {}
+    #     for species, stoi in items:
+    #         label = species.label()
+    #         out[label] = (species, out.get(label, (0, 0))[1] + stoi)
+    #     return out
+
+    def signed_species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int]:
+        print(items)
+        raise ValueError(f"Unknown species: {items}")
 
     def species(self, items: tp.List) -> tp.Tuple[BasicSpecies, int]:
+        """
+        Parse a species from the given items.
+
+        Args:
+            items (tp.List): List of items to parse.
+
+        Returns:
+            tp.Tuple[BasicSpecies, int]: Parsed species and its stoichiometry.
+        """
         if len(items) > 1:
             multiple = items[0]
             kwargs = items[1]

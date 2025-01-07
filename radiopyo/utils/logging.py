@@ -24,7 +24,7 @@ __all__ = [
     "InfoWarning",
     "InfoHandler",
     "disable_logging",
-    "enable_logging"
+    "enable_logging",
 ]
 # --------------------------------------------------------------------------- #
 
@@ -32,16 +32,19 @@ __all__ = [
 #                              CLASS DEFINITIONS                              #
 # --------------------------------------------------------------------------- #
 
+
 class InfoHandler(logging.StreamHandler):
-    def __init__(self, *args, **kwargs) -> None: # type: ignore[no-untyped-def]
+    def __init__(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
         logging.StreamHandler.__init__(self, *args, **kwargs)
         self.addFilter(InfoWarning())
 
+
 class InfoWarning(logging.Filter):
-    def filter(self, record:logging.LogRecord) -> bool:
+    def filter(self, record: logging.LogRecord) -> bool:
         return record.levelno in [logging.INFO, logging.WARNING]
 
-def logConfig_from_pyproject(file: str| Path) -> None:
+
+def logConfig_from_pyproject(file: str | Path) -> None:
     """
     Reads (same way as logging.config.ConfigFile) logging config
     from pyproject.toml file.
@@ -76,13 +79,16 @@ def logConfig_from_pyproject(file: str| Path) -> None:
 
     logging.config.dictConfig(tool_table_logging)
 
-def set_logging_level(level:str="WARNING") -> None:
+
+def set_logging_level(level: str = "WARNING") -> None:
     logger = logging.getLogger("radiopyo")
     logger.setLevel(level)
+
 
 def disable_logging() -> None:
     logger = logging.getLogger("radiopyo")
     logger.disabled = True
+
 
 def enable_logging() -> None:
     logger = logging.getLogger("radiopyo")
