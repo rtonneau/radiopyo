@@ -154,6 +154,9 @@ def derive(
         S = np.matmul(y, Ez_mat[0])
         # Compute the reaction rate of all enzymatic reactions.
         MM = Ez_mat[2][1, :] * E * S / (Ez_mat[2][0, :] + S)
+        if np.isnan(MM).any():
+            print("NaN found. E={E}; S={S}; MM={MM}")
+
         # Add this term to the total
         dydt += np.matmul(Ez_mat[3], MM.T)
 

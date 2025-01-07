@@ -139,7 +139,7 @@ class UnitCell(object):
         cls,
         config: ConfigDict,
         init: bool = True,
-        ) -> tp.Self:
+    ) -> tp.Self:
         """
         Create a Simulation Environment from a the generic ConfigDict:
 
@@ -533,6 +533,105 @@ class UnitCell(object):
 
         logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
         logger.info(f"From beam chunks ==> {len(chunks)}")
+        logger.info(f"Simulation divided in {len(chunk_list)} chunks")
+        return SimChunksIter(
+            sim=self,
+            chunks=chunk_list,
+            atol=atol,
+            rtol=rtol,
+            use_jac=use_jac,
+            method=method,
+            y0=y0,
+            use_beam=use_beam,
+        )
+
+    def prepare_single_pulse(
+        self,
+        t_span: tp.Tuple[float, float],
+        use_jac: bool = False,
+        method: str = "LSODA",
+        atol: tp.Optional[float] = None,
+        rtol: tp.Optional[float] = None,
+        max_step_size_on: tp.Optional[float] = None,
+        max_step_size_trans: tp.Optional[float] = None,
+        max_step_size_final: tp.Optional[float] = None,
+        trans_time: tp.Optional[float] = None,
+        y0: tp.Optional[NDArray[np.float64]] = None,
+        use_beam: bool = True,
+    ) -> SimChunksIter:
+        """Method used to prepare a multi step ODE integration
+        Args:
+            t_span: Tuple[float, float]
+                t_span[0] -> start time, in seconds
+                t_span[1] -> End time, in seconds
+            use_jac: bool, optional
+                Whether to use the jacobian along with the ODE solver
+                (default:False)
+            method: str, optional
+                Which ODE solver to use? Define in
+                scipy.integrate.solve_ivp
+            atol: float, optional
+                Absolute Tolerance of the ODE Solver (default: 1e-10)
+            max_step_size_on: float, optional
+                Larger authorized time step for the ODE solver while
+                beam is ON (default: inf)
+            max_step_size_off: float, optional
+                Larger authorized time step for the ODE solver while
+                beam is OFF (default: inf)
+            max_step_size_final: float, optional
+                Larger authorized time step for the ODE solver for the
+                very last integration step (can be the larger if long
+                sim time and few pulses). If None,
+                'max_step_size_off|on' is used instead (default: None).
+            y0: NDArray[np.float64], optional
+                Initial concentration of DynSpecies (default: None).
+                If None, calls EnvSim.initial_values()
+            use_beam: bool, optional
+                whether to use the beam or not (default: True).
+
+        Returns:
+            SimChunksIter: Iterable object performing the ODE
+            integration.
+        """
+        if len(self.beam_list) <= 0:
+            logger.error("No beam is defined for the simulation")
+            raise rp_excep.NoBeamDefinedError
+
+        chunk_list: tp.List[SimChunk] = []
+
+        trans_time = trans_time if trans_time is not None else 100e-6
+
+        # Beam ON
+        chunk_list.append(
+            SimChunk(
+                start=t_span[0],
+                stop=self.beam_list.current.time_at_max_dose,
+                max_step_size=max_step_size_on,
+                beam_on=True,
+            )
+        )
+
+        # Beam ON -> Beam OFF transition
+        chunk_list.append(
+            SimChunk(
+                start=self.beam_list.current.time_at_max_dose,
+                stop=self.beam_list.current.time_at_max_dose + trans_time,
+                max_step_size=max_step_size_trans,
+                beam_on=False,
+            )
+        )
+
+        # Make final chunk
+        chunk_list.append(
+            SimChunk(
+                start=self.beam_list.current.time_at_max_dose + trans_time,
+                stop=t_span[1],
+                max_step_size=max_step_size_final,
+                beam_on=False,
+            )
+        )
+
+        logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
         logger.info(f"Simulation divided in {len(chunk_list)} chunks")
         return SimChunksIter(
             sim=self,

@@ -620,7 +620,10 @@ class SimEnv:
         )
 
         for col, enzymatic in enumerate(self.reactions.enzymatic):
+            Ez_substrate[enzymatic.substrate.index, col] = 1
+            Ez_enzyme[enzymatic.enzyme.index, col] = 1
             Ez_kmki[0, col] = enzymatic.k_micha
+            Ez_kmki[1, col] = enzymatic.k_value
             for sp, stoi in enzymatic.iter_reactants():
                 if not self.species.is_cst_species(sp):
                     Ez_iy[sp.index, col] = -stoi
@@ -818,7 +821,6 @@ def kreaction_from_dict(
 
     out = KReactionCollection()
     for r in reactions:
-        print(r)
         out.add_reaction(KReaction.from_kwargs(list_sp=sim_sp, **r))
     return (out, sim_sp)
 

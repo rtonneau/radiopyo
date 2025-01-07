@@ -288,6 +288,8 @@ class SimIdentifier:
         for field in self.iter_fields():
             value = field.type(getattr(self, field.name))
             match value:
+                case bool():
+                    out.append(self._VALUE_DELIMITER.join([field.name, str(value)]))
                 case float():
                     out.append(
                         self._VALUE_DELIMITER.join([field.name, f"{round(value,3)}"])
@@ -307,7 +309,11 @@ class SimIdentifier:
             key, val = elt.split(cls._VALUE_DELIMITER)
             kwargs[key] = val
         for field in cls.iter_fields():
-            kwargs[field.name] = field.type(kwargs[field.name])
+            if field.type is bool:
+                _ = {"True": True, "False": False}
+                kwargs[field.name] = _.get(kwargs[field.name], None)
+            else:
+                kwargs[field.name] = field.type(kwargs[field.name])
         return cls(**kwargs)
 
 
