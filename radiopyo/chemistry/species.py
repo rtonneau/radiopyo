@@ -287,7 +287,7 @@ class SimSpecies:
         ... (other methods specific to ChemSpecies)
     """
 
-    species: BasicSpecies | ChemicalSpecies
+    raw_species: BasicSpecies | ChemicalSpecies
     cc_init: np.polynomial.Polynomial  # Store initial value as [mol/l]
     index: int
 
@@ -310,7 +310,7 @@ class SimSpecies:
         Returns:
             str: The representation of the object.
         """
-        return f"SimSpecies('{self.species}', {self.index}, {self.cc_init})"
+        return f"SimSpecies('{self.raw_species}', {self.index}, {self.cc_init})"
 
     def __copy__(self) -> SimSpecies:
         """
@@ -320,11 +320,11 @@ class SimSpecies:
             SimSpecies: A new SimSpecies instance with the same label,
                 index, and initial concentration coefficients.
         """
-        return SimSpecies(self.species, self.index, self.cc_init.coef)
+        return SimSpecies(self.raw_species, self.index, self.cc_init.coef)
 
     @property
     def label(self) -> str:
-        return self.species.label
+        return self.raw_species.label
 
     def initial_cc(self, T: tp.Optional[float | Temperature] = None) -> float:
         """
