@@ -9,7 +9,6 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import copy
 import logging
 import typing as tp
 from pathlib import Path
@@ -22,7 +21,6 @@ from radiopyo.chemistry.basic_reaction import GenericReaction, Operation
 from radiopyo.chemistry.species import (
     Atom,
     BasicSpecies,
-    ChemicalSpecies,
     HydratedElectron,
     Molecule,
 )

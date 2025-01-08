@@ -15,7 +15,7 @@ import copy
 import typing as tp
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
 from itertools import chain
@@ -44,6 +44,13 @@ __all__ = [
 # --------------------------------------------------------------------------- #
 def revert_reaction(reaction: GenericReaction) -> GenericReaction:
     """ """
+    # Revert the reaction only if all products are related to addition
+    # operation.
+    for _, (_, _, ope) in reaction["products"].items():
+        if ope != Operation.ADD:
+            raise TypeError(
+                f"Cannot revert reaction with subtraction operation: {reaction}"
+            )
     return GenericReaction(
         products=reaction["reactants"].copy(),
         reactants=reaction["products"].copy(),
@@ -59,6 +66,13 @@ class Operation(Enum):
     ADD = 1
     SUBTRACT = 2
 
+    def __str__(self) -> str:
+        match self:
+            case Operation.ADD:
+                return "+"
+            case Operation.SUBTRACT:
+                return "-"
+
 
 class GenericReaction(tp.TypedDict):
     products: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]]
@@ -72,8 +86,18 @@ class ReactionSpecies:
     """ """
 
     species: SimSpecies
-    stoi: int = field(default=1)
-    ope: Operation = field(default=Operation.ADD)
+    stoi: int
+    ope: Operation
+
+    def __init__(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ):
+        object.__setattr__(self, "species", species)
+        object.__setattr__(self, "stoi", stoi if stoi is not None else 1)
+        object.__setattr__(self, "ope", ope if ope is not None else Operation.ADD)
 
     @property
     def label(self) -> str:
@@ -114,25 +138,25 @@ class ReactionSpeciesCollection:
         for sp in self.__iter__():
             yield sp, sp.stoi
 
-    def _add_species(self, species: SimSpecies, stoi: int) -> None:
+    def _add_species(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         if species.label in self._order:
             raise KeyError(f"{species.label} is already recorded in {self}")
-        self.species_col[species.label] = ReactionSpecies(
-            species=species,
-            stoi=stoi,
-        )
+        self.species_col[species.label] = ReactionSpecies(species, stoi, ope)
         self._order.append(species.label)
 
-    def add_species(self, species: SimSpecies, stoi: int) -> None:
+    def add_species(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """ """
-        if species in self:
-            self.species_col[species.label] = replace(
-                self.species_col[species.label],
-                stoi=stoi + self.species_col[species.label].stoi,
-            )
-            return
-
-        self._add_species(species, stoi)
+        self._add_species(species, stoi, ope)
 
     def stoichiometry_of(self, key: str | BasicSpecies | SimSpecies) -> int:
         if not isinstance(key, str):
@@ -245,25 +269,26 @@ class BasicReaction(ABC):
 
     @classmethod
     @abstractmethod
-    def from_kwargs(
+    def from_generic(
         cls,
+        generic: GenericReaction,
         list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """
-        Abstract class method to create a new instance from keyword
-        arguments.
+        Create a Reaction from a 'GenericReaction', Typed-Dict
+        structure produced by radiopyo module parser.
 
         Args:
-            list_sp (ListSpecies): Optional list of species.
-                Defaults to None.
-            **kwargs: Keyword arguments to create the instance.
+            generic (GenericReaction): Typed-Dict structure holding the
+                reaction metadata.
+            list_sp (ListSpecies, optional): Collection of species
+                already involved in the simulation. Defaults to None.
 
         Returns:
-            tp.Self: A new instance of the class.
+            Self: An instance of Reaction.
         """
 
-    def get_stoi_of(self, species: SimSpecies | ChemicalSpecies | str) -> float:
+    def get_stoi_of(self, species: SimSpecies | ChemicalSpecies | str) -> int:
         """
         Method to extract the stoichiometric coefficient of a species
         regardless if the species is a reactant or a product.
@@ -410,7 +435,12 @@ class BasicReaction(ABC):
         """
         return reactant in self.reactants
 
-    def add_as_product(self, sp: SimSpecies, stoi: int = 1) -> None:
+    def add_as_product(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """
         Method to add a new product to the reaction by keeping the
         stoichiometry relevant.
@@ -421,16 +451,22 @@ class BasicReaction(ABC):
             to 1.
 
         Args:
-            sp (ChemSpecies): The product to be added.
+            species: SimSpecies
             stoi (int, optional): The stoichiometric coefficient of
-                the product. Defaults to 1.
+                the reactant.
+            ope (Operation, optional): The operation to apply.
 
         Returns:
             None
         """
-        self.products.add_species(sp, stoi)
+        self.products.add_species(species, stoi, ope)
 
-    def add_as_reactant(self, sp: SimSpecies, stoi: int = 1) -> None:
+    def add_as_reactant(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """
         Method to conveniently add a new reactant to the reaction by
         keeping the stoichiometry relevant:
@@ -441,14 +477,15 @@ class BasicReaction(ABC):
             to 1
 
         Args:
-            sp: SimSpecies
-            multiple (int, optional): The stoichiometric coefficient of
-                the reactant. Defaults to 1.
+            species: SimSpecies
+            stoi (int, optional): The stoichiometric coefficient of
+                the reactant.
+            ope (Operation, optional): The operation to apply.
 
         Returns:
             None
         """
-        self.reactants.add_species(sp, stoi)
+        self.reactants.add_species(species, stoi, ope)
 
     def reactants_as_string(self) -> str:
         """
@@ -460,11 +497,12 @@ class BasicReaction(ABC):
                 A string representation of the reactants,
                 with stoichiometry.
         """
-        out = []
+        out: tp.List[str] = []
         for sp in self.iter_reactants():
             _ = "" if sp.stoi <= 1 else f"{sp.stoi}"
             out.append(_ + f"{sp.label}")
             out.append("+")
+        # Remove the last '+' sign
         return " ".join(out[:-1])
 
     def products_as_string(self) -> str:
@@ -476,9 +514,10 @@ class BasicReaction(ABC):
                 A string representation of the products,
                 with stoichiometry.
         """
-        out = []
+        out: tp.List[str] = []
         for sp in self.iter_products():
             _ = "" if sp.stoi <= 1 else f"{sp.stoi}"
+            if len(out) > 0 or sp.ope is Operation.SUBTRACT:
+                out.append(str(sp.ope))
             out.append(_ + f"{sp.label}")
-            out.append("+")
-        return " ".join(out[:-1])
+        return " ".join(out)

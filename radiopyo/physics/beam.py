@@ -1755,7 +1755,7 @@ class BeamCollection(object):
     @property
     def current_LET(self) -> float | None:
         if self._let[self._current] is not None:
-            return self._let[self._current]  # type: ignore [return-value]
+            return self._let[self._current]
         return None
 
     def remove_beam(self, key: str) -> None:

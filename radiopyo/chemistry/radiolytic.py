@@ -26,11 +26,11 @@ from __future__ import annotations
 
 import hashlib
 import typing as tp
-from typing import List
 
-from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
-
-from radiopyo.chemistry.species import SimSpecies
+from scipy.constants import (  # type: ignore[import-untyped]
+    Avogadro,
+    elementary_charge,
+)
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.species_collection import ListSpecies
@@ -39,14 +39,16 @@ from .basic_reaction import BasicReaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    from radiopyo.chemistry.basic_reaction import Operation
+    from radiopyo.chemistry.species import BasicSpecies, SimSpecies
+
 # --------------------------------------------------------------------------- #
 
 __all__ = [
-    "ge_to_kr",
     "RadiolyticReaction",
-    "umol_per_joule_to_ge",
     "RadiolyticReactionDict",
+    "ge_to_kr",
+    "umol_per_joule_to_ge",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -172,14 +174,6 @@ class RadiolyticReaction(BasicReaction):
         """
         return f"G_{self.species().label}"
 
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: ListSpecies | None = None,
-        **kwargs: str | List[str] | float | List[float],
-    ) -> tp.Self:
-        raise NotImplementedError
-
     def species(self) -> SimSpecies:
         """
         Returns the ChemSpecies instance associated with this reaction.
@@ -251,9 +245,9 @@ class RadiolyticReaction(BasicReaction):
         return self.kr() * dose_rate * t0
 
     @classmethod
-    def from_dict(
+    def from_product(
         cls,
-        product: str,
+        product: BasicSpecies,
         ge: float,
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> RadiolyticReaction:
@@ -278,12 +272,17 @@ class RadiolyticReaction(BasicReaction):
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
             list_sp = ListSpecies()
-        new.add_as_product(list_sp.get_or_create_dyn_species(product.strip()))
+        new.add_as_product(list_sp.get_or_create_dyn_species(product))
         return new
 
     # ----------------------------------------------------------------------- #
 
-    def add_as_reactant(self, sp: SimSpecies, multiple: int = 1) -> None:
+    def add_as_reactant(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """No reactant should be involved"""
         raise NotImplementedError("Not implemented for Radiolytic Reactions")
 

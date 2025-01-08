@@ -14,11 +14,9 @@ from __future__ import annotations
 import hashlib
 import typing as tp
 
+# ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.basic_reaction import BasicReaction
 from radiopyo.chemistry.species_collection import ListSpecies
-
-# ----------------------------- Internal imports ---------------------------- #
-from radiopyo.parser import RPARSER
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -58,7 +56,6 @@ class MichaelisMenten(BasicReaction):
 
     k_value: float
     k_micha: float
-    substrate: SimSpecies
     enzyme: SimSpecies
 
     def __init__(
@@ -69,6 +66,10 @@ class MichaelisMenten(BasicReaction):
         super().__init__()
         self.k_value = k_value
         self.k_micha = k_micha
+
+    @property
+    def substrate(self) -> SimSpecies:
+        return next(iter(self.reactants)).species
 
     def raw_k_value(self) -> float:
         """
@@ -101,8 +102,6 @@ class MichaelisMenten(BasicReaction):
     def from_generic(
         cls,
         generic: GenericReaction,
-        k_value: float,
-        k_micha: float,
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> tp.Self:
         """
@@ -112,8 +111,6 @@ class MichaelisMenten(BasicReaction):
         Args:
             generic (GenericReaction): Typed-Dict structure holding the
                 reaction metadata.
-            k_value (float): k value of the reaction.
-            k_micha (float): Michaelis-Menten constant of the reaction.
             list_sp (ListSpecies, optional): Collection of species
                 already involved in the simulation. Defaults to None.
 
@@ -122,124 +119,29 @@ class MichaelisMenten(BasicReaction):
         """
         if generic["enzyme"] is None:
             raise ValueError(f"No enzyme found for enzymatic reaction: {generic}")
-
-        if isinstance(generic["enzyme"], str):
-            enzyme: str = generic["enzyme"]
-        else:
-            enzyme = generic["enzyme"].label
-
-        substrate: tp.List[str] = []
-        products: tp.List[str] = []
-
-        for sp, (_, stoi) in generic["reactants"].items():
-            substrate += [sp] * stoi
-        for sp, (_, stoi) in generic["products"].items():
-            products += [sp] * stoi
-        return cls.from_dict(
-            enzyme=enzyme,
-            substrate=substrate,
-            products=products,
-            k_value=k_value,
-            k_micha=k_micha,
-            list_sp=list_sp,
+        reaction = cls(
+            generic["constants"]["k_value"],  # type:ignore[arg-type]
+            generic["constants"]["k_micha"],  # type:ignore[arg-type]
         )
-
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
-    ) -> tp.Self:
-        """
-        Creates a MichaelisMenten reaction from keyword arguments.
-
-        Args:
-            list_sp (ListSpecies, optional): Collection of species
-                already involved in the simulation. Defaults to None.
-            **kwargs: Keyword arguments to create the instance.
-
-        Returns:
-            MichaelisMenten: An instance of MichaelisMenten.
-
-        Raises:
-            ValueError: If the keyword arguments do not match the
-                expected syntax.
-        """
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
             list_sp = ListSpecies()
 
-        match kwargs:
-            case {
-                "enzyme": _,
-                "substrate": _,
-                "products": _,
-                "k_value": _,
-                "k_micha": _,
-            } if len(kwargs) == 5:
-                return cls.from_dict(
-                    list_sp=list_sp,
-                    **kwargs,  # type:ignore[arg-type]
-                )
-            case {"reaction": r, "k_value": k_value, "k_micha": k_micha} if len(
-                kwargs
-            ) == 3:
-                gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
-                return cls.from_generic(
-                    generic=gen,
-                    k_value=k_value,  # type:ignore[arg-type]
-                    k_micha=k_micha,  # type:ignore[arg-type]
-                    list_sp=list_sp,
-                )
-        raise ValueError(f"Wrong KReaction syntax {kwargs}")
+        reaction.enzyme = list_sp.get_or_create_dyn_species(generic["enzyme"])
 
-    @classmethod
-    def from_dict(
-        cls,
-        enzyme: str,
-        substrate: tp.List[str] | str,
-        products: tp.List[str],
-        k_value: float,
-        k_micha: float,
-        list_sp: tp.Optional[ListSpecies] = None,
-    ) -> tp.Self:
-        """
-        Creates a MichaelisMenten instance from a dictionary.
-
-        Args:
-            enzyme (str): The enzyme name.
-            substrate (List[str] | str): The substrate name(s).
-            products (List[str]): The product name(s).
-            k_value (float): The k value of the reaction.
-            k_micha (float): The k_micha value of the reaction.
-            list_sp (ListSpecies, optional): The list of species.
-                Defaults to None.
-
-        Returns:
-            MichaelisMenten: A MichaelisMenten instance.
-        """
-        new = cls(k_value, k_micha)
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        new.enzyme = list_sp.get_or_create_cst_species(enzyme.strip())
-        if isinstance(substrate, str):
-            substrate = [substrate.strip()]
-        elif len(substrate) > 1 and len({elt.strip() for elt in substrate}) > 1:
-            raise TypeError(
-                f"Substrate in Michaelis Menten reaction"
-                f" must all be the same if provide as list. Found: {substrate}"
+        for _, (sp, stoi, ope) in generic["reactants"].items():
+            if reaction.tot_number_reactants() < 1:
+                substrate = list_sp.get_or_create_dyn_species(sp)
+                reaction.add_as_reactant(substrate, stoi, ope)
+                continue
+            raise ValueError(
+                f"MichaelisMenten reaction must have only one substrate. Found: {generic}"
             )
 
-        new.substrate = list_sp.get_or_create_dyn_species(substrate[0].strip())
-
-        for sp in substrate:
-            new.add_as_reactant(list_sp.get_or_create_dyn_species(sp.strip()))
-
-        for sp in products:
-            new.add_as_product(list_sp.get_or_create_dyn_species(sp.strip()))
-        return new
+        for _, (sp, stoi, ope) in generic["products"].items():
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            reaction.add_as_product(sim_sp, stoi, ope)
+        return reaction
 
     def as_label(self) -> str:
         """
@@ -278,11 +180,3 @@ class MichaelisMenten(BasicReaction):
             f"k_value={round(self.k_value, 5)}, "
             f"k_micha={round(self.k_micha, 5)}"
         )
-
-
-class MichaelisMentenDict(tp.TypedDict):
-    enzyme: str
-    substrate: tp.List[str] | str
-    products: tp.List[str]
-    k_value: float
-    k_micha: float

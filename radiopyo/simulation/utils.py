@@ -12,11 +12,12 @@ import typing as tp
 from contextlib import AbstractContextManager, suppress
 from pathlib import Path
 
-import h5py  # type: ignore[import]
+import h5py  # type: ignore[import-untyped]
 import numpy as np
 import pandas as pd
 
-from radiopyo.simulation.environment_build import SimEnv
+if tp.TYPE_CHECKING:
+    from radiopyo.simulation.environment_build import SimEnv
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult
@@ -32,9 +33,9 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = [
-    "ResCollection",
     "ConcentrationConvert",
     "O2Convert",
+    "ResCollection",
 ]
 
 # ---------------------------------- Logging -------------------------------- #
@@ -331,7 +332,7 @@ class SimIdentifier:
                 kwargs[field.name] = _.get(kwargs[field.name], None)
             else:
                 kwargs[field.name] = field.type(kwargs[field.name])
-        return cls(**kwargs)
+        return cls(**kwargs)  # type: ignore[arg-type]
 
 
 class H5Manager(AbstractContextManager):

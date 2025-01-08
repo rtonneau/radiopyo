@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import typing as tp
-from abc import ABC, abstractmethod
 from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -540,20 +539,20 @@ class SimEnv:
             Ki[idx_r] = k_value
             # Loop over all reaction's reactants
             idx_reactant: int = 0
-            for sp, stoi in reaction.iter_reactants():
+            for r_sp in reaction.iter_reactants():
                 # If declared as cst, keep it 0
-                if not self.species.is_cst_species(sp):
-                    Riy[sp.index, idx_r] -= stoi
-                for _ in range(stoi):
+                if not self.species.is_cst_species(r_sp.species):
+                    Riy[r_sp.species.index, idx_r] -= r_sp.stoi
+                for _ in range(r_sp.stoi):
                     Rki[:, idx_r, idx_reactant] = 0
-                    Rki[sp.index, idx_r, idx_reactant] = 1
+                    Rki[r_sp.species.index, idx_r, idx_reactant] = 1
                     idx_reactant += 1
 
             # Loop over all reaction's products
-            for sp, stoi in reaction.iter_products():
+            for r_sp in reaction.iter_products():
                 # If declared as cst, keep it 0
-                if not self.species.is_cst_species(sp):
-                    Riy[sp.index, idx_r] += stoi
+                if not self.species.is_cst_species(r_sp.species):
+                    Riy[r_sp.species.index, idx_r] += r_sp.stoi
 
             # Jacobian related loops:
             for sp in self.species:
@@ -563,20 +562,20 @@ class SimEnv:
                     continue
 
                 idx_reactant = 0
-                for reactant, stoi in reaction.iter_reactants():
-                    if reactant != sp:
-                        for _ in range(stoi):
+                for r_sp in reaction.iter_reactants():
+                    if r_sp.species != sp:
+                        for _ in range(r_sp.stoi):
                             JRki[:, idx_r, idx_reactant, sp.index] = 0
-                            JRki[reactant.index, idx_r, idx_reactant, sp.index] = 1
+                            JRki[r_sp.species.index, idx_r, idx_reactant, sp.index] = 1
                             idx_reactant += 1
                         continue
-                    derive = stoi - 1
+                    derive = r_sp.stoi - 1
                     for _ in range(derive):
                         JRki[:, idx_r, idx_reactant, sp.index] = 0
-                        index = (reactant.index, idx_r, idx_reactant, sp.index)
+                        index = (r_sp.species.index, idx_r, idx_reactant, sp.index)
                         JRki[index] = 1
                         if _ == 0:
-                            JRki[index] = stoi
+                            JRki[index] = r_sp.stoi
                         idx_reactant += 1
 
         return (Ki, Riy, Rki, JRki)
@@ -591,8 +590,8 @@ class SimEnv:
             dtype=np.float64,
         )
         for col, radiolytic in enumerate(self.reactions.radiolytic):
-            for sp, _ in radiolytic.iter_products():
-                Gi[sp.index, col] = radiolytic.kr()
+            for r_sp in radiolytic.iter_products():
+                Gi[r_sp.species.index, col] = radiolytic.kr()
         return Gi.sum(axis=1)
 
     def make_enzymatic_matrix(
@@ -637,12 +636,12 @@ class SimEnv:
             Ez_enzyme[enzymatic.enzyme.index, col] = 1
             Ez_kmki[0, col] = enzymatic.k_micha
             Ez_kmki[1, col] = enzymatic.k_value
-            for sp, stoi in enzymatic.iter_reactants():
-                if not self.species.is_cst_species(sp):
-                    Ez_iy[sp.index, col] = -stoi
-            for sp, stoi in enzymatic.iter_products():
-                if not self.species.is_cst_species(sp):
-                    Ez_iy[sp.index, col] = stoi
+            for r_sp in enzymatic.iter_reactants():
+                if not self.species.is_cst_species(r_sp.species):
+                    Ez_iy[r_sp.species.index, col] = -r_sp.stoi
+            for r_sp in enzymatic.iter_products():
+                if not self.species.is_cst_species(r_sp.species):
+                    Ez_iy[r_sp.species.index, col] = r_sp.stoi
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
 
     def make_cst_species_vector(
@@ -759,73 +758,106 @@ class SimEnv:
 
 def acid_base_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[AcidBase], ListSpecies]:
-    if sim_sp is None:
-        sim_sp = ListSpecies()
+
+    list_sp = ListSpecies() if list_sp is None else list_sp
 
     if len(reactions) == 0:  # -> Nothing to do
-        return ([], sim_sp)
+        return ([], list_sp)
 
     if isinstance(reactions, dict):  # -> i.e. only one reaction to add
         reactions = [
             reactions,
         ]  # Need a list to loop over
 
-    return (
-        [AcidBase.from_kwargs(list_sp=sim_sp, **reaction) for reaction in reactions],
-        sim_sp,
-    )
+    out = []
+    for r in reactions:
+        try:
+            gen = RPARSER.parse_reaction(r["reaction"])
+            pKa = r["pKa"]
+        except KeyError as err:
+            raise AttributeError(
+                "Need a reaction string AND a pKa to create an Acid Base rel."
+            ) from err
+        if "k_value" in r:
+            raise AttributeError(
+                "'k_value' is ambiguous for an AcidBase reaction. "
+                "Use k_forward or k_backward instead."
+            )
+        with suppress(KeyError):
+            gen["constants"]["k_forward"] = r["k_forward"]
+        with suppress(KeyError):
+            gen["constants"]["k_backward"] = r["k_backward"]
+        out.append(AcidBase(gen, pKa=pKa, list_sp=list_sp))
+
+    return out, list_sp
 
 
 def eq_reaction_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[EReaction], ListSpecies]:
-    if sim_sp is None:
-        sim_sp = ListSpecies()
+    list_sp = ListSpecies() if list_sp is None else list_sp
 
     if len(reactions) == 0:  # -> Nothing to do
-        return ([], sim_sp)
+        return ([], list_sp)
 
     if isinstance(reactions, dict):  # -> i.e. only one reaction to add
         reactions = [
             reactions,
         ]  # Need a list to loop over
 
-    return (
-        [EReaction.from_kwargs(list_sp=sim_sp, **reaction) for reaction in reactions],
-        sim_sp,
-    )
+    out = []
+    for r in reactions:
+        if "k_value" in r:
+            raise AttributeError(
+                "'k_value' is ambiguous for an Equilibrium Reaction. "
+                "Use k_forward or k_backward instead."
+            )
+        gen = RPARSER.parse_reaction(r["reaction"])
+        with suppress(KeyError):
+            gen["constants"]["k_forward"] = r["k_forward"]
+        with suppress(KeyError):
+            gen["constants"]["k_backward"] = r["k_backward"]
+
+        constant = r.get("k_equilibrium", None)
+        out.append(EReaction(gen, constant=constant, list_sp=list_sp))
+
+    return out, list_sp
 
 
 def arrhenius_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[Arrhenius], ListSpecies]:
-    if sim_sp is None:
-        sim_sp = ListSpecies()  # Species container related to reaction added
+    list_sp = ListSpecies() if list_sp is None else list_sp
 
     if len(reactions) == 0:  # -> Nothing to do
-        return ([], sim_sp)
+        return ([], list_sp)
 
     if isinstance(reactions, dict):  # -> i.e. only one reaction to add
         reactions = [
             reactions,
         ]  # Need a list to loop over
 
-    return ([Arrhenius.from_kwargs(list_sp=sim_sp, **elt) for elt in reactions], sim_sp)
+    out = []
+    for r in reactions:
+        gen = RPARSER.parse_reaction(r["reaction"])
+        gen["constants"]["k_value"] = r["k_value"]
+        out.append(Arrhenius.from_generic(gen, list_sp=list_sp))
+
+    return out, list_sp
 
 
 def kreaction_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[KReactionCollection, ListSpecies]:
-    if sim_sp is None:
-        sim_sp = ListSpecies()  # Species container related to reaction added
+    list_sp = ListSpecies() if list_sp is None else list_sp
 
     if len(reactions) == 0:  # -> Nothing to do
-        return (KReactionCollection(), sim_sp)
+        return (KReactionCollection(), list_sp)
 
     if isinstance(reactions, dict):  # -> i.e. only one reaction to add
         reactions = [
@@ -834,19 +866,20 @@ def kreaction_from_dict(
 
     out = KReactionCollection()
     for r in reactions:
-        out.add_reaction(KReaction.from_kwargs(list_sp=sim_sp, **r))
-    return (out, sim_sp)
+        gen = RPARSER.parse_reaction(r["reaction"])
+        gen["constants"]["k_value"] = r["k_value"]
+        out.add_reaction(KReaction.from_generic(gen, list_sp=list_sp))
+    return (out, list_sp)
 
 
 def cst_reaction_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[KReactionCollection, ListSpecies]:
-    if sim_sp is None:
-        sim_sp = ListSpecies()  # Species container related to reaction added
+    list_sp = ListSpecies() if list_sp is None else list_sp
 
     if len(reactions) == 0:  # -> Nothing to do
-        return (KReactionCollection(), sim_sp)
+        return (KReactionCollection(), list_sp)
 
     if isinstance(reactions, dict):  # -> i.e. only one reaction to add
         reactions = [
@@ -855,53 +888,57 @@ def cst_reaction_from_dict(
 
     out = KReactionCollection()
     for r in reactions:
-        out.add_reaction(CstReaction.from_kwargs(list_sp=sim_sp, **r))
-    return (out, sim_sp)
+        gen = RPARSER.parse_reaction(r["reaction"])
+        gen["constants"]["k_value"] = r["k_value"]
+        out.add_reaction(CstReaction.from_generic(gen, list_sp=list_sp))
+    return (out, list_sp)
 
 
 def michaelis_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[MichaelisMenten], ListSpecies]:
-    if sim_sp is None:
-        sim_sp = ListSpecies()
+    list_sp = ListSpecies() if list_sp is None else list_sp
 
     if isinstance(reactions, dict):
         reactions = [
             reactions,
         ]
 
-    return (
-        [
-            MichaelisMenten.from_kwargs(list_sp=sim_sp, **reaction)
-            for reaction in reactions
-        ],
-        sim_sp,
-    )
+    out = []
+    for r in reactions:
+        gen = RPARSER.parse_reaction(r["reaction"])
+        gen["constants"]["k_value"] = r["k_value"]
+        gen["constants"]["k_micha"] = r["k_micha"]
+        out.append(MichaelisMenten.from_generic(gen, list_sp=list_sp))
+
+    return out, list_sp
 
 
 def radiolytic_from_dict(
     reactions: tp.Dict,
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[RadiolyticReaction], ListSpecies]:
-    if sim_sp is None:
-        sim_sp = ListSpecies()
+    list_sp = ListSpecies() if list_sp is None else list_sp
 
     return (
         [
-            RadiolyticReaction.from_dict(product, ge, sim_sp)
+            RadiolyticReaction.from_product(
+                RPARSER.parse_species(product.strip()),
+                ge,
+                list_sp,
+            )
             for product, ge in reactions.items()
         ],
-        sim_sp,
+        list_sp,
     )
 
 
 def constant_species_from_dict(
     species: tp.Dict[str, float],
-    sim_sp: tp.Optional[ListSpecies] = None,
+    list_sp: tp.Optional[ListSpecies] = None,
 ) -> ListSpecies:
-    if sim_sp is None:
-        sim_sp = ListSpecies()
+    list_sp = ListSpecies() if list_sp is None else list_sp
     for sp, cc in species.items():
-        sim_sp.add_cst_species(sp.strip(), cc)
-    return sim_sp
+        list_sp.add_cst_species(RPARSER.parse_species(sp.strip()), cc)
+    return list_sp

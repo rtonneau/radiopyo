@@ -23,7 +23,6 @@ from radiopyo.chemistry.k_reactions import (
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
-from radiopyo.parser import RPARSER
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -153,60 +152,6 @@ class AcidBase(BiReaction):
             ChemSpecies: The base species.
         """
         return self._A
-
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
-    ) -> tp.Self:
-        """
-        A class method to create an AcidBase reaction from keyword
-        arguments. This method combines the two possible definitions of
-        a KReaction in a config file.
-
-        Args:
-            list_sp (ListSpecies): A collection of species already
-                involved in the simulation.
-            **kwargs: Keyword arguments containing the reaction string
-                and pKa value.
-
-        Returns:
-            AcidBase: An instance of the AcidBase class.
-
-        Raises:
-            AttributeError: If the reaction string or pKa value is
-                missing.
-            AttributeError: If 'k_value' is ambiguous for an AcidBase
-                reaction.
-        """
-        # Allow shallow creation (outside of a simulation env)
-        list_sp = list_sp if list_sp is not None else ListSpecies()
-
-        try:
-            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
-            pKa = kwargs["pKa"]
-        except KeyError as err:
-            raise AttributeError(
-                "Need a reaction string AND a pKa to create an Acid Base rel."
-            ) from err
-
-        if "k_value" in kwargs:
-            raise AttributeError(
-                "'k_value' is ambiguous for an AcidBase reaction. "
-                "Use k_forward or k_backward instead."
-            )
-
-        with suppress(KeyError):
-            gen["constants"]["k_forward"] = kwargs[
-                "k_forward"
-            ]  # type:ignore[assignment]
-        with suppress(KeyError):
-            gen["constants"]["k_backward"] = kwargs[
-                "k_backward"
-            ]  # type:ignore[assignment]
-
-        return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
     def pKa(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
