@@ -287,16 +287,7 @@ class SimEnv:
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        if "force_cst_pH" in parameters and not parameters["force_cst_pH"]:
-            list_sp.add_dyn_species(
-                RPARSER.parse_species(cls.PH_SPECIES),
-                cc_init=10 ** (-parameters["pH"]),
-            )
-            list_sp.add_dyn_species(
-                RPARSER.parse_species("OH_minus"),
-                cc_init=10 ** (-14 + parameters["pH"]),
-            )
-        else:
+        if parameters.get("force_cst_pH", False):
             with suppress(radiopyo_exceptions.IsSimSpeciesError):
                 list_sp.add_cst_species(
                     RPARSER.parse_species(cls.PH_SPECIES),
@@ -307,6 +298,15 @@ class SimEnv:
                     RPARSER.parse_species("OH_minus"),
                     10 ** (-14 + parameters["pH"]),
                 )
+        else:
+            list_sp.add_dyn_species(
+                RPARSER.parse_species(cls.PH_SPECIES),
+                cc_init=10 ** (-parameters["pH"]),
+            )
+            list_sp.add_dyn_species(
+                RPARSER.parse_species("OH_minus"),
+                cc_init=10 ** (-14 + parameters["pH"]),
+            )
 
         # Sanity check
         if "reactions" not in config:
