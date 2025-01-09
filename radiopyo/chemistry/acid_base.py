@@ -10,7 +10,6 @@ Author:
 from __future__ import annotations
 
 import typing as tp
-from contextlib import suppress
 
 import numpy as np
 
@@ -20,18 +19,18 @@ from radiopyo.chemistry.k_reactions import (
     BiReaction,
     KReaction,
 )
-from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from radiopyo.chemistry.species import SimSpecies
+    from radiopyo.chemistry.species_collection import ListSpecies
 
 
 __all__ = [
-    "AcidBase",
     "ABCouple",
+    "AcidBase",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -308,7 +307,7 @@ class AcidBase(BiReaction):
                 )
 
             species = None
-            for sp in r.iter_reactants():
+            for sp in r.reactants:
                 if sp.label == "H2O":
                     continue
                 species = sp
@@ -332,7 +331,7 @@ class AcidBase(BiReaction):
                 )
 
             conjugate = None
-            for sp in r.iter_products():
+            for sp in r.products:
                 if sp.label == "H3O_plus" or sp.label == "H_plus":
                     continue
                 conjugate = sp
@@ -354,7 +353,7 @@ class AcidBase(BiReaction):
                 )
 
             conjugate = None
-            for sp in r.iter_products():
+            for sp in r.products:
                 if sp.label == "H2O":
                     continue
                 conjugate = sp
@@ -376,7 +375,7 @@ class AcidBase(BiReaction):
                 )
 
             species = None
-            for sp in r.iter_reactants():
+            for sp in r.reactants:
                 if sp.label == "OH_minus":
                     continue
                 species = sp

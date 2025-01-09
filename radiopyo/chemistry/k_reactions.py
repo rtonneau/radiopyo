@@ -255,9 +255,9 @@ class KReaction(BasicReaction):
             str: A string representation of the reaction.
         """
         out = []
-        out.append(self.reactants_as_string())
+        out.append(self.reactants.as_string())
         out.append(self._OPE_STRING)
-        out.append(self.products_as_string())
+        out.append(self.products.as_string())
         return " ".join(out)
 
     def __repr__(self) -> str:
@@ -460,7 +460,7 @@ class CstReaction(KReaction):
         """
         out = []
         out.append(self._OPE_STRING)
-        out.append(self.products_as_string())
+        out.append(self.products.as_string())
         return " ".join(out)
 
     def __repr__(self) -> str:
@@ -848,9 +848,9 @@ class BiReaction(KReactionCollection, ABC):
             str: A string representation of the reaction.
         """
         out = []
-        out.append(self.forward.reactants_as_string())
+        out.append(self.forward.reactants.as_string())
         out.append(self._OPE_STRING)
-        out.append(self.forward.products_as_string())
+        out.append(self.forward.products.as_string())
         return " ".join(out)
 
     def add_forward_reaction(

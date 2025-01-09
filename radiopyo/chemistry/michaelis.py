@@ -164,11 +164,11 @@ class MichaelisMenten(BasicReaction):
 
     def __str__(self) -> str:
         out = []
-        out.append(self.reactants_as_string())
+        out.append(self.reactants.as_string())
         out.append("--")
         out.append(f"{self.enzyme.label}")
         out.append(">>")
-        out.append(self.products_as_string())
+        out.append(self.products.as_string())
         return " ".join(out)
 
     def __repr__(self) -> str:

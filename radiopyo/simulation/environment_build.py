@@ -24,6 +24,7 @@ import numpy as np
 # ------------------------------ Internal imports --------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
 from radiopyo.chemistry.acid_base import AcidBase
+from radiopyo.chemistry.basic_reaction import Operation
 from radiopyo.chemistry.e_reactions import EReaction
 from radiopyo.chemistry.k_reactions import (
     Arrhenius,
@@ -463,31 +464,7 @@ class SimEnv:
             Gi_mat=self.make_radiolytic_vector(),
             Ez_mat=self.make_enzymatic_matrix(),
             cst_sp=self.make_cst_species_vector(),
-            AB_mat=self.make_AB_matrix(T),
         )
-
-    def make_AB_matrix(
-        self,
-        T: tp.Optional[Temperature | float] = None,
-    ) -> tp.Tuple[NDArray[np.int8], NDArray[np.float64]]:
-        """
-        Construct matrix necessary to compute to account for
-        Acid/Base equilibrium during the computation of the cc values
-        variations.
-        """
-        # First matrix
-        couples = np.zeros(
-            [len(self.species), len(self.reactions.ab_reaction)],
-            dtype=np.int8,
-        )
-
-        pka = np.zeros(len(self.reactions.ab_reaction), dtype=np.float64)
-        for idx, r in enumerate(self.reactions.ab_reaction):
-            couples[r.acid.index, idx] = 1
-            couples[r.base.index, idx] = 1
-            pka[idx] = r.pKa(T)
-
-        return (couples, np.power(10, -pka))
 
     def make_kreaction_matrix(
         self,
@@ -539,7 +516,7 @@ class SimEnv:
             Ki[idx_r] = k_value
             # Loop over all reaction's reactants
             idx_reactant: int = 0
-            for r_sp in reaction.iter_reactants():
+            for r_sp in reaction.reactants:
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(r_sp.species):
                     Riy[r_sp.species.index, idx_r] -= r_sp.stoi
@@ -549,10 +526,13 @@ class SimEnv:
                     idx_reactant += 1
 
             # Loop over all reaction's products
-            for r_sp in reaction.iter_products():
+            for r_sp in reaction.products:
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(r_sp.species):
-                    Riy[r_sp.species.index, idx_r] += r_sp.stoi
+                    if r_sp.ope is Operation.ADD:
+                        Riy[r_sp.species.index, idx_r] += r_sp.stoi
+                    else:
+                        Riy[r_sp.species.index, idx_r] -= r_sp.stoi
 
             # Jacobian related loops:
             for sp in self.species:
@@ -562,7 +542,7 @@ class SimEnv:
                     continue
 
                 idx_reactant = 0
-                for r_sp in reaction.iter_reactants():
+                for r_sp in reaction.reactants:
                     if r_sp.species != sp:
                         for _ in range(r_sp.stoi):
                             JRki[:, idx_r, idx_reactant, sp.index] = 0
@@ -590,7 +570,7 @@ class SimEnv:
             dtype=np.float64,
         )
         for col, radiolytic in enumerate(self.reactions.radiolytic):
-            for r_sp in radiolytic.iter_products():
+            for r_sp in radiolytic.products:
                 Gi[r_sp.species.index, col] = radiolytic.kr()
         return Gi.sum(axis=1)
 
@@ -636,10 +616,10 @@ class SimEnv:
             Ez_enzyme[enzymatic.enzyme.index, col] = 1
             Ez_kmki[0, col] = enzymatic.k_micha
             Ez_kmki[1, col] = enzymatic.k_value
-            for r_sp in enzymatic.iter_reactants():
+            for r_sp in enzymatic.reactants:
                 if not self.species.is_cst_species(r_sp.species):
                     Ez_iy[r_sp.species.index, col] = -r_sp.stoi
-            for r_sp in enzymatic.iter_products():
+            for r_sp in enzymatic.products:
                 if not self.species.is_cst_species(r_sp.species):
                     Ez_iy[r_sp.species.index, col] = r_sp.stoi
         return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy

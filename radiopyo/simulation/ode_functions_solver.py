@@ -100,10 +100,6 @@ def derive(
     t: float,
     y: NDArray[np.float64],
     beam: tp.Optional[ParticleBeam],
-    H2O_index: int,
-    H3O_plus_index: int,
-    OH_minus_index: int,
-    k_water: float,
     cst_sp: NDArray[np.float64],
     Ki_mat: tp.Tuple[
         NDArray[np.float64],
@@ -112,7 +108,6 @@ def derive(
         NDArray[np.float32],
     ],
     Gi_mat: NDArray[np.float64],
-    AB_mat: tp.Tuple[NDArray[np.int8], NDArray[np.float64]],
     Ez_mat: tp.Optional[
         tp.Tuple[
             NDArray[np.float32],

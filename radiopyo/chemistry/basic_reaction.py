@@ -174,6 +174,24 @@ class ReactionSpeciesCollection:
         """
         return 0 if len(self) == 0 else reduce(add, [sp.stoi for sp in self.__iter__()])
 
+    def as_string(self) -> str:
+        """
+        Method to generate a string representation of the collection in
+        the reaction.
+
+        Returns:
+            str
+                A string representation of the species collection,
+                with stoichiometry.
+        """
+        out: tp.List[str] = []
+        for sp in self.__iter__():
+            _ = "" if sp.stoi <= 1 else f"{sp.stoi}"
+            if len(out) > 0 or sp.ope is Operation.SUBTRACT:
+                out.append(str(sp.ope))
+            out.append(_ + f"{sp.label}")
+        return " ".join(out)
+
 
 class BasicReaction(ABC):
     """
@@ -343,26 +361,6 @@ class BasicReaction(ABC):
         """
         return chain(iter(self.reactants), iter(self.products))
 
-    def iter_reactants(self) -> tp.Iterable[ReactionSpecies]:
-        """
-        Iter over reactants only.
-
-        Returns:
-            Iterator: Tuple[SimSpecies, int]
-                The second element is the stoichiometry of the reactant.
-        """
-        return iter(self.reactants)
-
-    def iter_products(self) -> tp.Iterable[ReactionSpecies]:
-        """
-        Iterator over products only, including the stoichiometry.
-
-        Returns:
-            Iterator: Tuple[ChemSpecies, int]
-                The second element is the stoichiometry of the product.
-        """
-        return iter(self.products)
-
     def get_index(self, default: int = -1) -> int:
         """
         Returns the index of the reaction if it exists, otherwise
@@ -486,38 +484,3 @@ class BasicReaction(ABC):
             None
         """
         self.reactants.add_species(species, stoi, ope)
-
-    def reactants_as_string(self) -> str:
-        """
-        Method to generate a string representation of the reactants in
-        the reaction.
-        Returns:
-
-            str
-                A string representation of the reactants,
-                with stoichiometry.
-        """
-        out: tp.List[str] = []
-        for sp in self.iter_reactants():
-            _ = "" if sp.stoi <= 1 else f"{sp.stoi}"
-            out.append(_ + f"{sp.label}")
-            out.append("+")
-        # Remove the last '+' sign
-        return " ".join(out[:-1])
-
-    def products_as_string(self) -> str:
-        """
-        Method to generate a string representation of the products
-        in the reaction.
-        Returns:
-            str
-                A string representation of the products,
-                with stoichiometry.
-        """
-        out: tp.List[str] = []
-        for sp in self.iter_products():
-            _ = "" if sp.stoi <= 1 else f"{sp.stoi}"
-            if len(out) > 0 or sp.ope is Operation.SUBTRACT:
-                out.append(str(sp.ope))
-            out.append(_ + f"{sp.label}")
-        return " ".join(out)

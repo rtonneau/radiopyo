@@ -39,7 +39,7 @@ from .basic_reaction import BasicReaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.basic_reaction import Operation
+    from radiopyo.chemistry.basic_reaction import GenericReaction, Operation
     from radiopyo.chemistry.species import BasicSpecies, SimSpecies
 
 # --------------------------------------------------------------------------- #
@@ -276,6 +276,13 @@ class RadiolyticReaction(BasicReaction):
         return new
 
     # ----------------------------------------------------------------------- #
+    @classmethod
+    def from_generic(
+        cls,
+        generic: GenericReaction,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> tp.Self:
+        raise NotImplementedError
 
     def add_as_reactant(
         self,
