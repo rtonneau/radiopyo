@@ -187,6 +187,17 @@ class KReaction(BasicReaction):
             sim_sp = list_sp.get_or_create_dyn_species(sp)
             reaction.add_as_reactant(sim_sp, stoi, ope)
 
+        # Case of n*A -> B, then n*k is measured/given
+        if (
+            reaction._k_value is not None
+            and len(reaction.reactants) == 1
+            and len(reaction._k_value) == 1
+        ):
+            # Compute k: divide by reactant's stoichio
+            reaction.set_k_value(
+                reaction.k_value() / reaction.reactants.stoichiometry_of(sp)
+            )
+
         for _, (sp, stoi, ope) in generic["products"].items():
             sim_sp = list_sp.get_or_create_dyn_species(sp)
             reaction.add_as_product(sim_sp, stoi, ope)
