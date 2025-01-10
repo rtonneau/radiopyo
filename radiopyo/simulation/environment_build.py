@@ -484,9 +484,11 @@ class SimEnv:
         for reaction in self.reactions.iter_all_kreactions():
             max_reactants = max(max_reactants, reaction.tot_number_reactants())
 
-        Ki = np.zeros(self.reactions.total_kreactions(), dtype=np.float64)
+        Ki = np.zeros([self.reactions.total_kreactions(), 2], dtype=np.float64)
+
+        # 0 for reactants, 1 for products
         Riy = np.zeros(
-            [len(self.species), self.reactions.total_kreactions()],
+            [len(self.species), self.reactions.total_kreactions(), 2],
             dtype=np.int8,
         )
 
@@ -513,13 +515,13 @@ class SimEnv:
 
         for _, reaction, k_value in self.reactions.iter_all_kreactions_and_kvalues(T):
             idx_r: int = reaction.get_index()
-            Ki[idx_r] = k_value
+            Ki[idx_r, 0] = k_value
             # Loop over all reaction's reactants
             idx_reactant: int = 0
             for r_sp in reaction.reactants:
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(r_sp.species):
-                    Riy[r_sp.species.index, idx_r] -= r_sp.stoi
+                    Riy[r_sp.species.index, idx_r, 0] -= r_sp.stoi
                 for _ in range(r_sp.stoi):
                     Rki[:, idx_r, idx_reactant] = 0
                     Rki[r_sp.species.index, idx_r, idx_reactant] = 1
@@ -530,9 +532,11 @@ class SimEnv:
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(r_sp.species):
                     if r_sp.ope is Operation.ADD:
-                        Riy[r_sp.species.index, idx_r] += r_sp.stoi
+                        Riy[r_sp.species.index, idx_r, 0] += r_sp.stoi
                     else:
-                        Riy[r_sp.species.index, idx_r] -= r_sp.stoi
+                        Riy[r_sp.species.index, idx_r, 0] -= r_sp.stoi
+                        Riy[r_sp.species.index, idx_r, 1] += r_sp.stoi
+                        Ki[idx_r, 1] += 1
 
             # Jacobian related loops:
             for sp in self.species:

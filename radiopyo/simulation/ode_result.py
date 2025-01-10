@@ -366,7 +366,7 @@ class ODEResult(object):
             Rki = np.nan_to_num(
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
             )
-            Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
+            Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0][:, 0]
 
             # Sometimes, some species are < 0.0 for a very short while.
             # It has no physical meaning. But it is necessary to give

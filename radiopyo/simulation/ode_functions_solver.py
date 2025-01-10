@@ -120,6 +120,7 @@ def derive(
     """Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
     """
+    LIMIT = 1e-12
 
     # Force negative cc values to 0 + convert to [mol/L]
     y = y * 1.0e-6  # µmol/L => mol/l
@@ -135,10 +136,17 @@ def derive(
 
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
-    Rki = np.prod(Rki, axis=1) * Ki_mat[0]  # All reaction rates are here
+    Rki = np.prod(Rki, axis=1) * Ki_mat[0][:, 0]  # All reaction rates are here
+
+    # Need to correct Rki for the negative products
+    # -> when defined, the corresponding species must have a positive
+    # concentration other the reaction should not occur.
+    _ = np.any((y <= LIMIT)[:, np.newaxis] * Ki_mat[1][:, :, 1], axis=0)
+    Rki[_] = 0.0
 
     # Compute dydt, first only with chemistry:
-    dydt = np.matmul(Ki_mat[1], Rki.T)
+    ## for regular reactions and products
+    dydt = np.matmul(Ki_mat[1][:, :, 0], Rki.T)
 
     # Add Enzymatic term
     if Ez_mat is not None:
@@ -160,7 +168,9 @@ def derive(
         # Add the Time dependent Radiolytic term
         dydt += Gi_mat * beam.at(t).dose_rate()
 
-    dydt[np.where((y < 0) & (dydt < 0))] = 0
+    # Handling of negative values
+    _mask = np.where((y < LIMIT) & (dydt < 0))
+    dydt[_mask] = -dydt[_mask] / 2.0
 
     # ==> dynamical species
     # ==> convert back to [µmol/l]
