@@ -366,7 +366,12 @@ class ODEResult(object):
             Rki = np.nan_to_num(
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
             )
-            Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0][:, 0]
+
+            Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
+            _ = np.any(
+                (y <= 1e-12)[:, np.newaxis] * self.mat["Ki_mat"][1][:, :, 1], axis=0
+            )
+            Rki[_] = 0.0
 
             # Sometimes, some species are < 0.0 for a very short while.
             # It has no physical meaning. But it is necessary to give
@@ -394,6 +399,7 @@ class ODEResult(object):
                     / (self.mat["Ez_mat"][2][0, :] + S)
                 )
                 out.iloc[idx, idx_ez] = MM
+
         self.dydt = out.values.T
         return out
 

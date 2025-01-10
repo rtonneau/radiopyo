@@ -484,7 +484,7 @@ class SimEnv:
         for reaction in self.reactions.iter_all_kreactions():
             max_reactants = max(max_reactants, reaction.tot_number_reactants())
 
-        Ki = np.zeros([self.reactions.total_kreactions(), 2], dtype=np.float64)
+        Ki = np.zeros(self.reactions.total_kreactions(), dtype=np.float64)
 
         # 0 for reactants, 1 for products
         Riy = np.zeros(
@@ -515,7 +515,7 @@ class SimEnv:
 
         for _, reaction, k_value in self.reactions.iter_all_kreactions_and_kvalues(T):
             idx_r: int = reaction.get_index()
-            Ki[idx_r, 0] = k_value
+            Ki[idx_r] = k_value
             # Loop over all reaction's reactants
             idx_reactant: int = 0
             for r_sp in reaction.reactants:
@@ -536,7 +536,6 @@ class SimEnv:
                     else:
                         Riy[r_sp.species.index, idx_r, 0] -= r_sp.stoi
                         Riy[r_sp.species.index, idx_r, 1] += r_sp.stoi
-                        Ki[idx_r, 1] += 1
 
             # Jacobian related loops:
             for sp in self.species:

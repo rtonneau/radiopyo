@@ -136,7 +136,7 @@ def derive(
 
     # Compute the reaction rate of all k_reactions
     Rki = np.nan_to_num(np.einsum("j, jik -> ik ", y, Ki_mat[2]), nan=1)
-    Rki = np.prod(Rki, axis=1) * Ki_mat[0][:, 0]  # All reaction rates are here
+    Rki = np.prod(Rki, axis=1) * Ki_mat[0]  # All reaction rates are here
 
     # Need to correct Rki for the negative products
     # -> when defined, the corresponding species must have a positive
