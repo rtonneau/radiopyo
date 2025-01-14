@@ -190,6 +190,13 @@ class ReactionsList:
                 return r
         raise ValueError(f"Reaction {reaction} not related to any equilibrium")
 
+    def get_radiolytic_reaction_from(self, species: str) -> RadiolyticReaction:
+        """ """
+        for r in self.iter_radiolytic_reactions():
+            if species in r:
+                return r
+        raise ValueError(f"Reaction {r} not related to any G values")
+
 
 @dataclass
 class SimEnv:
