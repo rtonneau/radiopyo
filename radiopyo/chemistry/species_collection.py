@@ -17,6 +17,8 @@ import typing as tp
 from contextlib import suppress
 from itertools import chain
 
+import pandas as pd
+
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
 from radiopyo.chemistry.species import (
@@ -161,6 +163,20 @@ class ListSpecies:
             int: The number of dynamic species.
         """
         return len(self.dyn_sp)
+
+    def to_pandas(self) -> pd.Series:
+        sp, idx = [], []
+        for _ in self:
+            sp.append(_.label)
+            idx.append(_.index)
+        return pd.Series(sp, idx).sort_index()
+
+    def get_by_index(self, index: int) -> SimSpecies:
+        """Returns the ChemSpecies instance associated with the given index."""
+        for sp in self:
+            if sp.index == index:
+                return sp
+        raise KeyError(index)
 
     def get(
         self,

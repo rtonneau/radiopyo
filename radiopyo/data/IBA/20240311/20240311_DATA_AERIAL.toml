@@ -1,0 +1,141 @@
+# Results for pH 6 experiment
+[pH6.param]
+Dose = [2000, 1000, 500, 250, 0]
+O2 = 1e-5  # mol/l Oxygen concentration
+current = 2.5  # mA
+BeltSpeed = 0.44  # m/min
+pH = 6
+
+# C4
+# https://en.wikipedia.org/wiki/Perfluorobutanoic_acid
+[pH6.PFAS.PFBA]
+units = "A.U."
+MM = 214.039
+values = [
+    [1.335184214, 0.605686254],
+    [1.145323541, 0.297790946],
+    [0.868874174, 0.029271268],
+    [0.567170525, 0.192781701],
+    [0, 0]
+]
+
+# C5
+# https://www.sigmaaldrich.com/BE/en/product/aldrich/396575
+[pH6.PFAS.PFPeA]
+units = "A.U."
+MM = 264.05
+values = [
+    [4.515637211, 0.86499247],
+    [3.231802927, 0.626529355],
+    [2.375495579, 0.35451281],
+    [1.457509165, 0.449004565],
+    [0, 0]
+]
+
+# C6
+# https://en.wikipedia.org/wiki/Perfluorohexanoic_acid
+[pH6.PFAS.PFHxA]
+units = "A.U."
+MM = 314.054
+values = [
+    [9.822339607, 1.968976251],
+    [7.108935461, 1.489703664],
+    [4.354341899, 0.569521939],
+    [2.821069332, 1.043642087],
+    [0, 0]
+]
+
+# C7
+# https://www.sigmaaldrich.com/BE/en/product/aldrich/342041
+[pH6.PFAS.PFHpA]
+units = "A.U."
+MM = 364.06
+values = [
+    [54.22240867, 13.54288655],
+    [44.2075661, 8.204184853],
+    [24.11417278, 4.865220114],
+    [15.95184671, 5.346599085],
+    [0, 0]
+]
+
+# C8 C8HF15O2
+# https://en.wikipedia.org/wiki/Perfluorooctanoic_acid
+[pH6.PFAS.PFOA]
+units = "A.U."
+MM = 414.07
+values = [
+    [5.766894411, 1.568863861],
+    [5.911434704, 0.107063571],
+    [3.373887374, 0.108447706],
+    [2.749375491, 0.73315141],
+    [0, 0]
+]
+
+# C8HF17O3S
+# https://en.wikipedia.org/wiki/Perfluorooctanesulfonic_acid
+[pH6.PFAS.PFOS]
+units = "ng/L"
+MM = 500.13
+values = [
+    [84.2, 12.2],
+    [155.6, 19.0],
+    [181.9, 22.2],
+    [211.4, 14.6],
+    [263.9, 0]
+]
+
+# Results for pH 13 experiment
+[pH12.param]
+Dose = [2000, 1000, 500, 250, 0]
+O2 = 1e-5  # mol/l
+current = 2.5  # mA
+BeltSpeed = 0.44  # m/min
+pH = 12
+
+# C4
+# https://en.wikipedia.org/wiki/Perfluorobutanoic_acid
+[pH12.PFAS.PFBA]
+units = "A.U."
+MM = 214.039
+values = []
+
+# C5
+# https://www.sigmaaldrich.com/BE/en/product/aldrich/396575
+[pH12.PFAS.PFPeA]
+units = "A.U."
+MM = 264.05
+values = []
+
+# C6
+# https://en.wikipedia.org/wiki/Perfluorohexanoic_acid
+[pH12.PFAS.PFHxA]
+units = "A.U."
+MM = 314.054
+values = []
+
+# C7
+# https://www.sigmaaldrich.com/BE/en/product/aldrich/342041
+[pH12.PFAS.PFHpA]
+units = "A.U."
+MM = 364.06
+values = []
+
+# C8 C8HF15O2
+# https://en.wikipedia.org/wiki/Perfluorooctanoic_acid
+[pH12.PFAS.PFOA]
+units = "A.U."
+MM = 414.07
+values = []
+
+# C8HF17O3S
+# https://en.wikipedia.org/wiki/Perfluorooctanesulfonic_acid
+[pH12.PFAS.PFOS]
+MM = 500.13
+units = "ng/L"
+values = [
+    [1.7, 4.0],
+    [74.4, 29.8],
+    [71.0, 20.1],
+    [74.2, 34.7],
+    [343.6, 0]
+]

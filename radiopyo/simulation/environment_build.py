@@ -197,6 +197,13 @@ class ReactionsList:
                 return r
         raise ValueError(f"Reaction {r} not related to any G values")
 
+    def get_reaction_by_index(self, index: int) -> BasicReaction:
+        """ """
+        for reaction in self.iter_all():
+            if reaction.get_index() == index:
+                return reaction
+        raise ValueError(f"Reaction with index {index} not found.")
+
 
 @dataclass
 class SimEnv:
