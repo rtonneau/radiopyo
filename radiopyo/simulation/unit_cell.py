@@ -18,7 +18,7 @@ import typing as tp
 from contextlib import suppress
 
 import numpy as np
-from scipy.integrate import solve_ivp  # type: ignore[import]
+from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 
 from radiopyo.chemistry.utils.units import Temperature
 
@@ -224,7 +224,6 @@ class UnitCell(object):
         self,
         beam: ParticleBeam | str,
         LET: tp.Optional[float] = None,
-        update_LET: tp.Optional[bool] = True,
     ) -> tp.Self:
         """Define Radiation Source structure/parameters
 
@@ -234,28 +233,20 @@ class UnitCell(object):
         Returns:
             None
         """
-        try:
-            _OLD_LET = self.beam_list.current_LET
-        except ValueError:
-            _OLD_LET = None
-
+        LET = LET if LET is not None else self.beam_list.current_LET
         if isinstance(beam, str):
             self.beam_list.use_beam(beam)
-            LET = LET or self.beam_list.current_LET
             logger.info(
                 f"Setting beam definition ({self.beam_list._current}): "
                 f"{self.beam_list.current}, done!"
             )
         else:
-            LET = LET or _OLD_LET
             self.beam_list.add_beam(beam, beam.label, let=LET, use=True)
             logger.info(
                 f"Setting new beam definition ({self.beam_list._current}): "
                 f"{self.beam_list.current}, done!"
             )
-
-        if update_LET and LET is not None and LET != _OLD_LET:
-            self.change_LET(LET)
+        self.change_LET(LET)  # Update GValues
         return self
 
     def change_LET(self, let: float) -> None:
@@ -271,17 +262,24 @@ class UnitCell(object):
             None
         """
         self.beam_list.update_let(let)
-        logger.info(f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm")
+        logger.info(
+            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm for {self.beam.dose_rate_peak} Gy/s"
+        )
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
             if sp.label not in self.g_val or (not self.env.species.is_dyn_species(sp)):
                 continue
-            reaction.update_from_ge(self.g_val.values_at(sp.label, let))
+            reaction.update_from_ge(
+                self.g_val.values_at(sp.label, let, self.beam.dose_rate_peak)
+            )
 
         # Recompute the Gi_mat accordingly
-        self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
+        # self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
+        self._update_matrices()
 
-        logger.debug("New G values [radical / 100eV / incident particle] are:")
+        logger.debug(
+            f"New G values [radical / 100eV / incident particle] at {self.beam.dose_rate_peak} Gy/s are:"
+        )
         for reaction in self.env.reactions.radiolytic:
             logger.debug(f"-> {reaction.label()}: {reaction.ge():.3f}")
 

@@ -91,7 +91,18 @@ class GValuesBoscolo:
             out,
         )
 
-    def values_at(self, species: str, let: float | tp.Iterable) -> float:
+    @staticmethod
+    def _scale_factor(dose_rate: tp.Optional[float]) -> float:
+        if dose_rate is None:
+            return 1.0
+        return 0.83337949 * np.power(dose_rate, -0.1)
+
+    def values_at(
+        self,
+        species: str,
+        let: float | tp.Iterable,
+        dose_rate: tp.Optional[float] = None,
+    ) -> float:
         """
         Method retrieving the G value from interpolated data.
 
@@ -106,7 +117,7 @@ class GValuesBoscolo:
         """
         if species == "H3O_plus":
             species = "e_aq"
-        return self.interpol[species](let)
+        return self.interpol[species](let) * GValuesBoscolo._scale_factor(dose_rate)
 
     def species(self) -> tp.Iterable[str]:
         """Get all species whose GValues are available.
@@ -117,7 +128,10 @@ class GValuesBoscolo:
         return iter([str(elt) for elt in self.df.columns])
 
     @staticmethod
-    def _average_val_before_100ns(sp: str) -> float:
+    def _average_val_before_100ns(
+        sp: str,
+        dose_rate: tp.Optional[float] = None,
+    ) -> float:
         """
         These values are time integral average from Boscolo between
         1e-12 & 1e-7 sec.
@@ -135,7 +149,7 @@ class GValuesBoscolo:
         ]  # to ensure charge balance while don't forget the diff.
         if sp not in data:
             raise KeyError(f"Unknown initial G_values for species: {sp}")
-        return data[sp]
+        return data[sp] * GValuesBoscolo._scale_factor(dose_rate)
 
 
 class RawReader:

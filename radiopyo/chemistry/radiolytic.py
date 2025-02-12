@@ -28,7 +28,10 @@ import hashlib
 import typing as tp
 from typing import List
 
-from scipy.constants import Avogadro, elementary_charge  # type: ignore[import]
+from scipy.constants import (  # type: ignore[import-untyped]
+    Avogadro,
+    elementary_charge,
+)
 
 from radiopyo.chemistry.species import ChemSpecies
 
@@ -44,10 +47,10 @@ if tp.TYPE_CHECKING:
 # --------------------------------------------------------------------------- #
 
 __all__ = [
-    "ge_to_kr",
     "RadiolyticReaction",
-    "umol_per_joule_to_ge",
     "RadiolyticReactionDict",
+    "ge_to_kr",
+    "umol_per_joule_to_ge",
 ]
 
 # --------------------------------------------------------------------------- #

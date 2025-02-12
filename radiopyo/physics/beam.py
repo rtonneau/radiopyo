@@ -1753,10 +1753,10 @@ class BeamCollection(object):
         return self._current
 
     @property
-    def current_LET(self) -> float | None:
+    def current_LET(self) -> float:
         if self._let[self._current] is not None:
             return self._let[self._current]  # type: ignore [return-value]
-        return None
+        raise ValueError("LET not defined for current beam")
 
     def remove_beam(self, key: str) -> None:
         """Remove a beam entry.

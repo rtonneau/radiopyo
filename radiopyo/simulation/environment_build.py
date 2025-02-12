@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import typing as tp
-from abc import ABC, abstractmethod
 from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -585,8 +584,7 @@ class SimEnv:
             dtype=np.float64,
         )
         for col, radiolytic in enumerate(self.reactions.radiolytic):
-            for sp, _ in radiolytic.iter_products():
-                Gi[sp.index, col] = radiolytic.kr()
+            Gi[radiolytic.species().index, col] = radiolytic.kr()
         return Gi.sum(axis=1)
 
     def make_enzymatic_matrix(
