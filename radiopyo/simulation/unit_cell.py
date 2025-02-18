@@ -263,7 +263,7 @@ class UnitCell(object):
         """
         self.beam_list.update_let(let)
         logger.info(
-            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm for {self.beam.dose_rate_peak} Gy/s"
+            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm for {self.beam.dose_rate_peak:.2g} Gy/s"
         )
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
@@ -278,7 +278,7 @@ class UnitCell(object):
         self._update_matrices()
 
         logger.debug(
-            f"New G values [radical / 100eV / incident particle] at {self.beam.dose_rate_peak} Gy/s are:"
+            f"New G values [radical / 100eV / incident particle] at {self.beam.dose_rate_peak:.2g} Gy/s are:"
         )
         for reaction in self.env.reactions.radiolytic:
             logger.debug(f"-> {reaction.label()}: {reaction.ge():.3f}")

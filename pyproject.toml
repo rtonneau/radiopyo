@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "radiopyo"
-version = "0.4.1"
+version = "0.5.0"
 authors = [{ name = "Romain Tonneau", email = "romain.tonneau@unamur.be" }]
 description = "A small module to perform FLASH simulations with resolution of ODE's"
 readme = "README.md"

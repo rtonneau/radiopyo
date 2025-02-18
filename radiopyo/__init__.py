@@ -44,7 +44,10 @@ __all__: tp.List = [
 
 
 # ---------------------------------- Logging -------------------------------- #
-logConfig_from_pyproject(Path(__file__).parent.parent / "pyproject.toml")
+file = Path(__file__).parent.parent / "pyproject.toml"
+if not file.exists():
+    file = Path(__file__).parent / "utils/default_log_config.toml"
+logConfig_from_pyproject(file)
 
 # --------------------------------------------------------------------------- #
 #                            DECORATOR DEFINITIONS                            #
