@@ -73,6 +73,7 @@ def umol_per_joule_to_ge(value: float) -> float:
     Note:
         Unused and probably wrong function.
     """
+    raise NotImplementedError
     return value * 1e-6 * Avogadro / elementary_charge * 100
 
 
@@ -84,7 +85,7 @@ def ge_to_kr(ge: float) -> float:
         ge (float): The G-value to convert.
 
     Returns:
-        float: The K-rate constant.
+        float: The K-rate constant [mol/l/Gy].
     """
     d: float = 1.0  # Solvent density [kg/l]
     return ge * d / elementary_charge / 100.0 / Avogadro
