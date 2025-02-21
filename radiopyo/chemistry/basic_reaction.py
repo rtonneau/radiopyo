@@ -274,6 +274,15 @@ class BasicReaction(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """
+        Convert the reaction to a dictionary.
+
+        Returns:
+            dict    A dictionary representation of the reaction.
+        """
+
+    @abstractmethod
     def make_hash(self, method: str = "sha256") -> str:
         """
         Produce a unique identifier (content based) for easy comparison.

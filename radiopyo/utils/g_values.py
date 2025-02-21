@@ -93,7 +93,7 @@ class GValuesBoscolo:
 
     @staticmethod
     def _scale_factor(dose_rate: tp.Optional[float]) -> float:
-        return 1.0
+        # return 1.0
         if dose_rate is None:
             return 1.0
         return 0.83337949 * np.power(dose_rate, -0.1)

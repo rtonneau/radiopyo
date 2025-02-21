@@ -730,17 +730,51 @@ class SimEnv:
 
     def convert_to_config_dict(self) -> ConfigDict:
         """ """
-        out = deepcopy(self._config_dict)
-        _T = out["parameters"].get("temperature", None)
+        out = deepcopy(self._config_dict)  # Copy the original config
 
+        # Now update the dictionary
+        # Update Reactions
+        out["reactions"] = {}
+        out["reactions"]["acid_base"] = [
+            r.to_dict() for r in self.reactions.ab_reaction
+        ]
+        out["reactions"]["equilibrium"] = [
+            r.to_dict() for r in self.reactions.eq_reaction
+        ]
+        out["reactions"]["enzymatic"] = [r.to_dict() for r in self.reactions.enzymatic]
+        out["reactions"]["radiolytic"] = {}
+        for r in self.reactions.radiolytic:
+            out["reactions"]["radiolytic"].update(r.to_dict())
+        out["reactions"]["k_reaction"] = []
+        out["reactions"]["constant"] = []
+        out["reactions"]["arrhenius"] = []
+        for r in self.reactions.k_reaction:
+            if isinstance(r, CstReaction):
+                out["reactions"]["constant"].append(r.to_dict())
+            elif isinstance(r, Arrhenius):
+                out["reactions"]["arrhenius"].append(r.to_dict())
+            else:
+                out["reactions"]["k_reaction"].append(r.to_dict())
+
+        # Update Species related
+        out["concentrations"]["initial"] = {}
+        out["concentrations"]["fixed"] = {}
         for elt in self.species.iter_dyn_species():
-            if elt.label in ["H3O_plus", "OH_minus"] or elt.initial_cc(_T) < 0:
+            if elt.label in ["H3O_plus", "OH_minus"]:
                 continue
-            out["concentrations"]["initial"][elt.label] = elt.initial_cc(_T)
+            if len(elt.cc_init) > 1:
+                out["concentrations"]["initial"][elt.label] = elt.cc_init.coef.tolist()
+            elif elt.initial_cc() <= 0:
+                continue
+            else:
+                out["concentrations"]["initial"][elt.label] = elt.initial_cc()
         for elt in self.species.iter_cst_species():
-            if elt.label in ["H2O"]:
+            if elt.label in ["H2O", "H3O_plus", "OH_minus"]:
                 continue
-            out["concentrations"]["fixed"][elt.label] = elt.initial_cc(_T)
+            if len(elt.cc_init) > 1:
+                out["concentrations"]["fixed"][elt.label] = elt.cc_init.coef.tolist()
+            else:
+                out["concentrations"]["fixed"][elt.label] = elt.initial_cc()
         return out
 
 

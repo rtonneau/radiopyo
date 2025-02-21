@@ -113,6 +113,19 @@ class KReaction(BasicReaction):
         """
         self._k_value = polynomial_factory(value, log10=True)
 
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """
+        Convert the KReaction to a dict structure
+        {
+            "reaction": str,
+            "k_value": float | List[float]
+        }
+        """
+        return {
+            "reaction": self.__str__(),
+            "k_value": self.raw_k_value(),
+        }
+
     def make_hash(self, method: str = "sha256") -> str:
         """
         Produce a unique identifier (content based) for easy comparison.
@@ -364,6 +377,20 @@ class Arrhenius(KReaction):
             and the activation energy.
         """
         return [self._pre_exp, self._activation_energy]
+
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """
+        Convert the KReaction to a dict structure
+        {
+            "reaction": str,
+            "k_value": float | List[float]
+        }
+        """
+        return {
+            "reaction": self.__str__(),
+            "A": self._pre_exp,
+            "Ea": self._activation_energy,
+        }
 
     @classmethod
     def from_generic(
@@ -1049,6 +1076,15 @@ class BiReaction(KReactionCollection, ABC):
         super().add_reaction(reaction, label="backward", list_sp=list_sp)
         self.backward._OPE_STRING = "<->"
         return self
+
+    @abstractmethod
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """
+        Convert the reaction to a dictionary.
+
+        Returns:
+            dict    A dictionary representation of the reaction.
+        """
 
     @abstractmethod
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:

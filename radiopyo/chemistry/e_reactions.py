@@ -249,3 +249,16 @@ class EReaction(BiReaction):
                 given temperature.
         """
         return self.backward.k_value(T)
+
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """
+        Convert the reaction to a dictionary.
+
+        Returns:
+            dict    A dictionary representation of the reaction.
+        """
+        return {
+            "reaction": self.__str__(),
+            "k_forward": self.forward.raw_k_value(),
+            "k_backward": self.backward.raw_k_value(),
+        }

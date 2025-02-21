@@ -75,12 +75,13 @@ def umol_per_joule_to_ge(value: float) -> float:
     Note:
         Unused and probably wrong function.
     """
+    raise NotImplementedError
     return value * 1e-6 * Avogadro / elementary_charge * 100
 
 
 def ge_to_kr(ge: float) -> float:
     """
-    Convert a G-value to a K-rate constant.
+    Convert a G-value [#/100eV] to a K-rate constant [mol/l/Gy].
 
     Args:
         ge (float): The G-value to convert.
@@ -94,7 +95,7 @@ def ge_to_kr(ge: float) -> float:
 
 def kr_to_ge(kr: float) -> float:
     """
-    Converts a given K-rate constant to a G-value.
+    Converts a given K-rate constant [mol/l/Gy] to a G-value [#/100eV].
 
     Args:
         kr (float): The K-rate constant to be converted.
@@ -307,5 +308,10 @@ class RadiolyticReaction(BasicReaction):
         """
         return self.__str__()
 
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """ """
+        return {self.species().label: self.ge()}
 
+
+# --------------------------------------------------------------------------- #
 RadiolyticReactionDict = tp.Dict[str, float]

@@ -279,6 +279,13 @@ class MichaelisMenten(BasicReaction):
             f"k_micha={round(self.k_micha, 5)}"
         )
 
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        return {
+            "reaction": self.__str__(),
+            "k_value": self.raw_k_value(),
+            "k_micha": self.k_micha,
+        }
+
 
 class MichaelisMentenDict(tp.TypedDict):
     enzyme: str

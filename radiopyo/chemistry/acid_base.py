@@ -446,3 +446,25 @@ class AcidBase(BiReaction):
             k_backward=self.k_backward(T),
             temperature=(Temperature(T).celsius if T is not None else None),
         )
+
+    def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """
+        Convert the reaction to a dictionary.
+
+        Returns:
+            dict    A dictionary representation of the reaction.
+        """
+        return {
+            "reaction": self.__str__(),
+            "pKa": self.pKa(),
+            "k_forward": (
+                self._k_forward.coef.tolist()
+                if len(self._k_forward) > 1
+                else self.k_forward()
+            ),
+            "k_backward": (
+                self._k_backward.coef.tolist()
+                if len(self._k_backward) > 1
+                else self.k_backward()
+            ),
+        }
