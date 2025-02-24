@@ -8,7 +8,7 @@ Author:
 from pathlib import Path
 
 import pandas as pd
-from scipy.interpolate import interp1d  # type: ignore[import]
+from scipy.interpolate import interp1d  # type: ignore[import-untyped]
 
 # ---------------------------- Internal imports ----------------------------- #
 # -------------------------- Type checking ONLY imports --------------------- #
@@ -18,10 +18,10 @@ __all__ = [
 ]
 
 # Path to the data file.
-_data_dir = Path(__file__).parent.parent/"data/energy_LET"
+_data_dir = Path(__file__).parent.parent / "data/energy_LET"
 
 
-class EnergyLET():
+class EnergyLET:
     """
     Class providing LET for electrons in water from energy (MeV) values
 
@@ -37,24 +37,24 @@ class EnergyLET():
             [MeV.cm²/g]
         interpol: scipy.interpolate.interp1d
     """
+
     df: pd.Series
     interpol: interp1d
 
     DATA = Path("electron_LET.csv")
 
     def __init__(self) -> None:
-        _ = pd.read_csv(_data_dir/EnergyLET.DATA,
-                        header=None,
-                        skiprows=8,
-                        delimiter=" ")
+        _ = pd.read_csv(
+            _data_dir / EnergyLET.DATA, header=None, skiprows=8, delimiter=" "
+        )
         _.iloc[:, 1] *= 0.1  # 1 MeV cm²/g = 0.1 keV/µm (for pure water)
-        self.df = pd.Series(index=_.iloc[:, 0],
-                            data=_.iloc[:, 1].values)
-        self.interpol = interp1d(x=self.df.index,
-                                 y=self.df.values,
-                                 kind="quadratic",
-                                 bounds_error=True,
-                                 )
+        self.df = pd.Series(index=_.iloc[:, 0], data=_.iloc[:, 1].values)
+        self.interpol = interp1d(
+            x=self.df.index,
+            y=self.df.values,
+            kind="quadratic",
+            bounds_error=True,
+        )
 
     def values_at(self, energy: float) -> float:
         """

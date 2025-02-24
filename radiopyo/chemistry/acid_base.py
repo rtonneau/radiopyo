@@ -10,29 +10,27 @@ Author:
 from __future__ import annotations
 
 import typing as tp
-from contextlib import suppress
 
 import numpy as np
 
 # ---------------------------- Internal imports ----------------------------- #
+from radiopyo.chemistry.basic_reaction import GenericReaction, revert_reaction
 from radiopyo.chemistry.k_reactions import (
     BiReaction,
     KReaction,
 )
-from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
-from radiopyo.parser import RPARSER
-from radiopyo.parser.reaction_parser import GenericReaction, revert_reaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.species import ChemSpecies
+    from radiopyo.chemistry.species import SimSpecies
+    from radiopyo.chemistry.species_collection import ListSpecies
 
 
 __all__ = [
-    "AcidBase",
     "ABCouple",
+    "AcidBase",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -62,8 +60,8 @@ class ABCouple(tp.NamedTuple):
         attributes can be accessed by name or by index.
     """
 
-    species: ChemSpecies
-    conjugate: ChemSpecies
+    species: SimSpecies
+    conjugate: SimSpecies
     pKa: float
     k_forward: float
     k_backward: float
@@ -99,8 +97,8 @@ class AcidBase(BiReaction):
     _k_backward: np.polynomial.Polynomial
     _k_forward: np.polynomial.Polynomial
     _pKa: np.polynomial.Polynomial
-    _A: ChemSpecies
-    _HA: ChemSpecies
+    _A: SimSpecies
+    _HA: SimSpecies
 
     def __init__(
         self,
@@ -135,7 +133,7 @@ class AcidBase(BiReaction):
         self._A = _.conjugate
 
     @property
-    def acid(self) -> ChemSpecies:
+    def acid(self) -> SimSpecies:
         """
         A property to return the acid species.
 
@@ -145,7 +143,7 @@ class AcidBase(BiReaction):
         return self._HA
 
     @property
-    def base(self) -> ChemSpecies:
+    def base(self) -> SimSpecies:
         """
         A property to return the base species.
 
@@ -153,60 +151,6 @@ class AcidBase(BiReaction):
             ChemSpecies: The base species.
         """
         return self._A
-
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
-    ) -> tp.Self:
-        """
-        A class method to create an AcidBase reaction from keyword
-        arguments. This method combines the two possible definitions of
-        a KReaction in a config file.
-
-        Args:
-            list_sp (ListSpecies): A collection of species already
-                involved in the simulation.
-            **kwargs: Keyword arguments containing the reaction string
-                and pKa value.
-
-        Returns:
-            AcidBase: An instance of the AcidBase class.
-
-        Raises:
-            AttributeError: If the reaction string or pKa value is
-                missing.
-            AttributeError: If 'k_value' is ambiguous for an AcidBase
-                reaction.
-        """
-        # Allow shallow creation (outside of a simulation env)
-        list_sp = list_sp if list_sp is not None else ListSpecies()
-
-        try:
-            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
-            pKa = kwargs["pKa"]
-        except KeyError as err:
-            raise AttributeError(
-                "Need a reaction string AND a pKa to create an Acid Base rel."
-            ) from err
-
-        if "k_value" in kwargs:
-            raise AttributeError(
-                "'k_value' is ambiguous for an AcidBase reaction. "
-                "Use k_forward or k_backward instead."
-            )
-
-        with suppress(KeyError):
-            gen["constants"]["k_forward"] = kwargs[
-                "k_forward"
-            ]  # type:ignore[assignment]
-        with suppress(KeyError):
-            gen["constants"]["k_backward"] = kwargs[
-                "k_backward"
-            ]  # type:ignore[assignment]
-
-        return cls(gen, pKa=pKa, list_sp=list_sp)  # type:ignore[arg-type]
 
     def pKa(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
@@ -363,8 +307,8 @@ class AcidBase(BiReaction):
                 )
 
             species = None
-            for sp, _ in r.iter_reactants():
-                if sp == "H2O":
+            for sp in r.reactants:
+                if sp.label == "H2O":
                     continue
                 species = sp
             else:
@@ -387,8 +331,8 @@ class AcidBase(BiReaction):
                 )
 
             conjugate = None
-            for sp, _ in r.iter_products():
-                if sp == "H3O_plus" or sp == "H_plus":
+            for sp in r.products:
+                if sp.label == "H3O_plus" or sp.label == "H_plus":
                     continue
                 conjugate = sp
             else:
@@ -409,8 +353,8 @@ class AcidBase(BiReaction):
                 )
 
             conjugate = None
-            for sp, _ in r.iter_products():
-                if sp == "H2O":
+            for sp in r.products:
+                if sp.label == "H2O":
                     continue
                 conjugate = sp
             else:
@@ -431,16 +375,16 @@ class AcidBase(BiReaction):
                 )
 
             species = None
-            for sp, _ in r.iter_reactants():
-                if sp == "OH_minus":
+            for sp in r.reactants:
+                if sp.label == "OH_minus":
                     continue
                 species = sp
             else:
                 species = sp if species is None else species
 
         return ABCouple(
-            species=species,
-            conjugate=conjugate,
+            species=species.species,
+            conjugate=conjugate.species,
             pKa=self.pKa(T),
             k_forward=self.k_forward(T),
             k_backward=self.k_backward(T),

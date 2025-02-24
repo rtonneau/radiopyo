@@ -22,17 +22,15 @@ from radiopyo.chemistry.basic_reaction import BasicReaction
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
-from radiopyo.parser import RPARSER
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.parser.reaction_parser import GenericReaction
+    from radiopyo.chemistry.basic_reaction import GenericReaction
 
 # --------------------------------------------------------------------------- #
 
 __all__ = [
     "KReaction",
-    "KReactionDict",
     "KReactionCollection",
     "KValType",
 ]
@@ -172,8 +170,8 @@ class KReaction(BasicReaction):
 
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
-            _, stoi = next(iter(self.reactants))
-            return self.k_value() * stoi
+            sp = next(iter(self.reactants))
+            return self.k_value() * sp.stoi
         return self.k_value()
 
     @classmethod
@@ -195,60 +193,29 @@ class KReaction(BasicReaction):
         Returns:
             KReaction: An instance of KReaction.
         """
-        reactants: tp.List[str] = []
-        products: tp.List[str] = []
-        for sp, (chemsp, stoi) in generic["reactants"].items():
-            reactants += [sp] * stoi
-        for sp, (_, stoi) in generic["products"].items():
-            products += [sp] * stoi
+        reaction = cls(generic["constants"].get("k_value", None))
+        list_sp = ListSpecies() if list_sp is None else list_sp
 
-        return cls.from_dict(
-            reactants,
-            products,
-            generic["constants"].get("k_value", None),
-            list_sp,
-        )
+        for _, (sp, stoi, ope) in generic["reactants"].items():
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            reaction.add_as_reactant(sim_sp, stoi, ope)
 
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
-    ) -> tp.Self:
-        """
-        Create a KReaction from keyword arguments.
+        # Case of n*A -> B, then n*k is measured/given
+        if (
+            reaction._k_value is not None
+            and len(reaction.reactants) == 1
+            and len(reaction._k_value) == 1
+        ):
+            # Compute k: divide by reactant's stoichio
+            reaction.set_k_value(
+                reaction.k_value() / reaction.reactants.stoichiometry_of(sp)
+            )
 
-        Args:
-            list_sp (ListSpecies, optional): Collection of species
-                already involved in the simulation. Defaults to None.
-            **kwargs: Keyword arguments to create the instance.
+        for _, (sp, stoi, ope) in generic["products"].items():
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            reaction.add_as_product(sim_sp, stoi, ope)
 
-        Returns:
-            KReaction: An instance of KReaction.
-
-        Raises:
-            ValueError: If the keyword arguments do not match the
-                expected syntax.
-        """
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        match kwargs:
-            case {"reactants": _, "products": _, "k_value": _} if len(kwargs) == 3:
-                return cls.from_dict(
-                    list_sp=list_sp,
-                    **kwargs,  # type:ignore[arg-type]
-                )
-            case {"reaction": r, "k_value": k} if len(kwargs) == 2:
-                gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
-                gen["constants"]["k_value"] = k  # type:ignore[assignment]
-                return cls.from_generic(
-                    gen,
-                    list_sp=list_sp,
-                )
-
-        raise ValueError(f"Wrong KReaction syntax {kwargs}")
+        return reaction
 
     @classmethod
     def from_dict(
@@ -278,6 +245,7 @@ class KReaction(BasicReaction):
             KReaction
                 An instance of KReaction.
         """
+        raise NotImplementedError
         if isinstance(k_value, (float, int)):
             k_value = [k_value]
 
@@ -311,9 +279,9 @@ class KReaction(BasicReaction):
             str: A string representation of the reaction.
         """
         out = []
-        out.append(self.reactants_as_string())
+        out.append(self.reactants.as_string())
         out.append(self._OPE_STRING)
-        out.append(self.products_as_string())
+        out.append(self.products.as_string())
         return " ".join(out)
 
     def __repr__(self) -> str:
@@ -411,68 +379,22 @@ class Arrhenius(KReaction):
         Returns:
             Arrhenius: An instance of Arrhenius.
         """
-        reactants: tp.List[str] = []
-        products: tp.List[str] = []
-
-        for sp, (_, stoi) in generic["reactants"].items():
-            reactants += [sp] * stoi
-        for sp, (_, stoi) in generic["products"].items():
-            products += [sp] * stoi
-        return cls.from_dict(
-            reactants,
-            products,
-            [
-                generic["constants"]["A"],  # type: ignore [list-item]
-                generic["constants"]["Ea"],  # type: ignore [list-item]
-            ],
-            list_sp,
+        reaction = cls(
+            generic["constants"]["A"],  # type: ignore[arg-type]
+            generic["constants"]["Ea"],  # type: ignore[arg-type]
         )
-
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
-    ) -> tp.Self:
-        """
-        This method combines the two possible definitions of an
-        Arrhenius in a config file.
-        Args:
-            list_sp (ListSpecies): Collection of species already
-                involved in the simulation. Defaults to None.
-            **kwargs: Keyword arguments to create the instance.
-                - reactants (ListSpecies): Collection of reactants in
-                    the reaction.
-                - products (ListSpecies): Collection of products in
-                    the reaction.
-                - A (float): Pre-exponential factor.
-                - Ea (float): Activation energy.
-                - reaction (str): Reaction string.
-
-        Returns:
-            Arrhenius: An instance of Arrhenius.
-        """
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
             list_sp = ListSpecies()
 
-        match kwargs:
-            case {"reactants": _, "products": _, "A": _, "Ea": _} if len(kwargs) == 4:
-                return cls.from_dict(
-                    list_sp=list_sp,
-                    **kwargs,  # type:ignore[arg-type]
-                )
-            case {"reaction": r, "A": _, "Ea": _} if len(kwargs) == 3:
-                gen = RPARSER.parse_reaction(r)  # type: ignore[arg-type]
-                gen["constants"]["A"] = kwargs["A"]  # type: ignore[assignment]
-                gen["constants"]["Ea"] = kwargs["Ea"]  # type: ignore[assignment]
+        for _, (sp, stoi, ope) in generic["reactants"].items():
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            reaction.add_as_reactant(sim_sp, stoi, ope)
 
-                return cls.from_generic(
-                    gen,
-                    list_sp=list_sp,
-                )
-
-        raise ValueError(f"Wrong Arrhenius Reaction syntax {kwargs}")
+        for _, (sp, stoi, ope) in generic["products"].items():
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            reaction.add_as_product(sim_sp, stoi, ope)
+        return reaction
 
     @classmethod
     def from_dict(
@@ -497,6 +419,7 @@ class Arrhenius(KReaction):
         Returns:
             Arrhenius: An instance of Arrhenius.
         """
+        raise NotImplementedError
         if k_value is None or isinstance(k_value, float):
             raise TypeError
         new = cls(k_value[0], k_value[1])
@@ -554,57 +477,14 @@ class CstReaction(KReaction):
         Returns:
             CstReaction: An instance of CstReaction.
         """
-        products: tp.List[str] = []
+        reaction = cls(generic["constants"].get("k_value", None))
+        list_sp = ListSpecies() if list_sp is None else list_sp
 
-        for sp, (_, stoi) in generic["products"].items():
-            products += [sp] * stoi
-        return cls.from_dict(
-            [],
-            products,
-            generic["constants"].get("k_value", None),
-            list_sp,
-        )
+        for _, (sp, stoi, ope) in generic["products"].items():
+            sim_sp = list_sp.get_or_create_dyn_species(sp)
+            reaction.add_as_product(sim_sp, stoi, ope)
 
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
-    ) -> tp.Self:
-        """
-        Create a CstReaction from keyword arguments.
-
-        Args:
-            list_sp (ListSpecies, optional): Collection of species
-                already involved in the simulation. Defaults to None.
-            **kwargs: Keyword arguments to create the instance.
-
-        Returns:
-            CstReaction: An instance of CstReaction.
-
-        Raises:
-            ValueError: If the keyword arguments do not match the
-                expected syntax.
-        """
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        match kwargs:
-            case {"reactants": _, "products": _, "k_value": _} if len(kwargs) == 3:
-                return cls.from_dict(
-                    list_sp=list_sp,
-                    **kwargs,  # type:ignore[arg-type]
-                )
-            case {"reaction": r, "k_value": k} if len(kwargs) == 2:
-                gen = RPARSER.parse_reaction(r)  # type:ignore[arg-type]
-                gen["constants"]["k_value"] = k  # type:ignore[assignment]
-                return cls.from_generic(
-                    gen,
-                    list_sp=list_sp,
-                )
-
-        raise ValueError(f"Wrong KReaction syntax {kwargs}")
+        return reaction
 
     def __str__(self) -> str:
         """
@@ -618,7 +498,7 @@ class CstReaction(KReaction):
         """
         out = []
         out.append(self._OPE_STRING)
-        out.append(self.products_as_string())
+        out.append(self.products.as_string())
         return " ".join(out)
 
     def __repr__(self) -> str:
@@ -646,30 +526,6 @@ class CstReaction(KReaction):
             For a CstReaction, there is no reactant needed!
         """
         return 0
-
-
-class KReactionDict(tp.TypedDict, total=False):
-    """
-    TypedDict structure holding the metadata of a KReaction like object.
-
-    Attributes:
-        reactants (tp.Optional[tp.List[str]]): List of reactants in
-            the reaction.
-        products (tp.Optional[tp.List[str]]): List of products in
-            the reaction.
-        reaction (tp.Optional[str]): String representation of
-            the reaction.
-        constants (tp.Optional[tp.Dict[str, float]]): Dictionary of
-            constants in the reaction.
-        k_value (float | tp.List[float]): Value of the reaction
-            rate constant.
-    """
-
-    reactants: tp.Optional[tp.List[str]]
-    products: tp.Optional[tp.List[str]]
-    reaction: tp.Optional[str]
-    constants: tp.Optional[tp.Dict[str, float]]
-    k_value: float | tp.List[float]
 
 
 class KReactionCollection:
@@ -1030,9 +886,9 @@ class BiReaction(KReactionCollection, ABC):
             str: A string representation of the reaction.
         """
         out = []
-        out.append(self.forward.reactants_as_string())
+        out.append(self.forward.reactants.as_string())
         out.append(self._OPE_STRING)
-        out.append(self.forward.products_as_string())
+        out.append(self.forward.products.as_string())
         return " ".join(out)
 
     def add_forward_reaction(

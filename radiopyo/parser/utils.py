@@ -77,14 +77,14 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["acid_base"]):
-        _ = acid_base_from_dict(_, sim_sp=None)[0][0]
+        _ = acid_base_from_dict(_, list_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
     # Loop over all KReaction in other and check whether it is also
     # in root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["acid_base"]:
-        ab = acid_base_from_dict(_, sim_sp=None)[0][0]
+        ab = acid_base_from_dict(_, list_sp=None)[0][0]
         # Same reaction in root => just make sur the kvalue comes from 'other'
         if str(ab) in r_root:
             idx = r_root[str(ab)][1]
@@ -112,14 +112,14 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     #  version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["equilibrium"]):
-        _ = eq_reaction_from_dict(_, sim_sp=None)[0][0]
+        _ = eq_reaction_from_dict(_, list_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
     # Loop over all KReaction in other and check whether it is also in
     # root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["equilibrium"]:
-        eq = eq_reaction_from_dict(_, sim_sp=None)[0][0]
+        eq = eq_reaction_from_dict(_, list_sp=None)[0][0]
         # Same reaction in root => just make sur the kvalue comes from
         # 'other'
         if str(eq) in r_root:
@@ -143,14 +143,14 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # the str version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["k_reaction"]):
-        _ = kreaction_from_dict(_, sim_sp=None)[0][0]
+        _ = kreaction_from_dict(_, list_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
     # Loop over all KReaction in other and check whether it is also in
     # root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["k_reaction"]:
-        kr = kreaction_from_dict(_, sim_sp=None)[0][0]
+        kr = kreaction_from_dict(_, list_sp=None)[0][0]
         # Same reaction in root => just make sur the kvalue comes from
         # 'other'
         if str(kr) in r_root:
@@ -170,7 +170,7 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     ## => Loop over all Constant Reactions ##
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["constant"]:
-        kr = cst_reaction_from_dict(_, sim_sp=None)[0][0]
+        kr = cst_reaction_from_dict(_, list_sp=None)[0][0]
         # Same reaction in root => just make sur the kvalue comes from
         # 'other'
         if str(kr) in r_root:
@@ -193,14 +193,14 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # the str version of it!
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["arrhenius"]):
-        _ = arrhenius_from_dict(_, sim_sp=None)[0][0]
+        _ = arrhenius_from_dict(_, list_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
 
     # Loop over all KReaction in other and check whether it is also in
     # root or not.
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["arrhenius"]:
-        ar = arrhenius_from_dict(_, sim_sp=None)[0][0]
+        ar = arrhenius_from_dict(_, list_sp=None)[0][0]
         # Same reaction in root => just make sur the cst values comes
         # from 'other'
         if str(ar) in r_root:
@@ -218,11 +218,11 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     ## => Enzymatic ##
     r_root = {}
     for idx, _ in enumerate(root["reactions"]["enzymatic"]):
-        _ = michaelis_from_dict(_, sim_sp=None)[0][0]
+        _ = michaelis_from_dict(_, list_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
     to_add = []  # List of all reaction to add to root afterward
     for _ in other["reactions"]["enzymatic"]:
-        er = michaelis_from_dict(_, sim_sp=None)[0][0]
+        er = michaelis_from_dict(_, list_sp=None)[0][0]
         if str(er) in r_root:
             idx = r_root[str(er)][1]
             root["reactions"]["enzymatic"][idx]["k_value"] = er.raw_k_value()

@@ -52,7 +52,7 @@ class TreeToRon(lark.Transformer):
         return False
 
     def start(self, items: tp.List) -> tp.Dict:
-        return {k: v for (k, v) in grouper(items, n=2)}
+        return dict(grouper(items, n=2))
 
     def CNAME(self, items: lark.Token) -> str:
         return str(items)
@@ -114,6 +114,8 @@ class RonFileParser(FileParser):
                 "k_reaction": items.get("k_reactions", []),
                 "radiolytic": items.get("radiolytic", {}),
                 "enzymatic": items.get("enzymatic_reactions", []),
+                "arrhenius": items.get("arrhenius", []),
+                "constant": items.get("constant", []),
             },
             "beam": items.get("beam", {}),
         }

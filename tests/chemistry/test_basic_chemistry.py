@@ -16,10 +16,6 @@ class DummyReaction(basic_reaction.BasicReaction):
     def as_label(self):
         return ""
 
-    @classmethod
-    def from_kwargs(cls, list_sp=None, **kwargs):
-        return cls()
-
 
 class TestBasicReaction:
     @pytest.fixture

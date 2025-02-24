@@ -17,13 +17,21 @@ import typing as tp
 from contextlib import suppress
 from itertools import chain
 
+import pandas as pd
+
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry import exceptions as radiopyo_exceptions
-from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry.species import (
+    BasicSpecies,
+    ChemicalSpecies,
+    SimSpecies,
+)
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     import numpy as np
+
+    AnySpecies = tp.Union[BasicSpecies, ChemicalSpecies, SimSpecies]
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = []
@@ -70,8 +78,8 @@ class ListSpecies:
         no index will be attributed twice!
     """
 
-    dyn_sp: tp.Dict[str, ChemSpecies]  # Dict like store for Chem species
-    cst_sp: tp.Dict[str, ChemSpecies]
+    dyn_sp: tp.Dict[str, SimSpecies]  # Dict like store for SimSpecies
+    cst_sp: tp.Dict[str, SimSpecies]
     next_index: int
     sorted: bool
 
@@ -80,7 +88,7 @@ class ListSpecies:
         self.next_index = 0
         self.sorted = False
 
-    def __contains__(self, key: str | ChemSpecies) -> bool:
+    def __contains__(self, key: str | AnySpecies) -> bool:
         """
         Checks if a given key is in the ListSpecies instance.
 
@@ -92,11 +100,11 @@ class ListSpecies:
             bool: True if the key is found in the ListSpecies instance,
             False otherwise.
         """
-        label = key.label if isinstance(key, (ChemSpecies,)) else key
+        label = key if isinstance(key, str) else key.label
 
         return label in self.dyn_sp or label in self.cst_sp
 
-    def __iter__(self) -> tp.Iterator[ChemSpecies]:
+    def __iter__(self) -> tp.Iterator[SimSpecies]:
         """
         Returns an iterator over all the species (both Cst and Dyn) in
         the ListSpecies instance.
@@ -115,7 +123,7 @@ class ListSpecies:
         """
         return self.len_cst_species() + self.len_dyn_species()
 
-    def __getitem__(self, item: str) -> ChemSpecies:
+    def __getitem__(self, item: str) -> SimSpecies:
         """
         Returns the ChemSpecies instance associated with the given item.
 
@@ -156,11 +164,25 @@ class ListSpecies:
         """
         return len(self.dyn_sp)
 
+    def to_pandas(self) -> pd.Series:
+        sp, idx = [], []
+        for _ in self:
+            sp.append(_.label)
+            idx.append(_.index)
+        return pd.Series(sp, idx).sort_index()
+
+    def get_by_index(self, index: int) -> SimSpecies:
+        """Returns the ChemSpecies instance associated with the given index."""
+        for sp in self:
+            if sp.index == index:
+                return sp
+        raise KeyError(index)
+
     def get(
         self,
-        label: str,
-        default: tp.Optional[str | ChemSpecies] = None,
-    ) -> tp.Optional[ChemSpecies]:
+        species: str | ChemicalSpecies | BasicSpecies,
+        default: tp.Optional[SimSpecies] = None,
+    ) -> tp.Optional[SimSpecies]:
         """
         Getter method emulating the dict one.
 
@@ -174,9 +196,9 @@ class ListSpecies:
                 given label, or the default value if not found.
         """
         with suppress(KeyError):
-            return self.__getitem__(label)
-        if isinstance(default, str):
-            return ChemSpecies(default)
+            return self.__getitem__(
+                species if isinstance(species, str) else species.label
+            )
         return default
 
     def remove_species(self, label: str) -> None:
@@ -199,7 +221,7 @@ class ListSpecies:
 
     def add_dyn_species(
         self,
-        label: str,
+        species: ChemicalSpecies | BasicSpecies,
         cc_init: tp.Optional[tp.List[float] | float | np.polynomial.Polynomial] = None,
     ) -> None:
         """
@@ -214,15 +236,17 @@ class ListSpecies:
         Returns:
             None
         """
-        if label in self:
-            raise KeyError(f"{label} is already recorded")
+        if species in self:
+            raise KeyError(f"{species} is already recorded")
 
-        self.dyn_sp[label] = ChemSpecies(label, self.next_index, cc_init)
+        self.dyn_sp[species.label] = SimSpecies(species, self.next_index, cc_init)
         self.next_index += 1
         self.sorted = False
 
     def add_cst_species(
-        self, label: str, cc: tp.List[float] | float | np.polynomial.Polynomial
+        self,
+        species: ChemicalSpecies | BasicSpecies,
+        cc: tp.List[float] | float | np.polynomial.Polynomial,
     ) -> None:
         """
         Adds a constant species to the ListSpecies instance.
@@ -235,16 +259,16 @@ class ListSpecies:
         Returns:
             None
         """
-        if label in self:
-            raise KeyError(f"{label} is already recorded")
-        self.cst_sp[label] = ChemSpecies(label, self.next_index, cc)
+        if species in self:
+            raise KeyError(f"{species} is already recorded")
+        self.cst_sp[species.label] = SimSpecies(species, self.next_index, cc)
         self.next_index += 1
         self.sorted = False
 
     def get_or_create_dyn_species(
         self,
-        label: str,
-    ) -> ChemSpecies:
+        species: ChemicalSpecies | BasicSpecies,
+    ) -> SimSpecies:
         """
         Retrieves or creates a dynamic species from the ListSpecies
         instance.
@@ -255,17 +279,17 @@ class ListSpecies:
         Returns:
             ChemSpecies: The retrieved or created dynamic species.
         """
-        if (out := self.get(label)) is not None:
+        if (out := self.get(species)) is not None:
             return out
 
         with suppress(radiopyo_exceptions.IsConstantSpeciesError):
-            self.add_dyn_species(label)
-        return self.__getitem__(label)
+            self.add_dyn_species(species)
+        return self.__getitem__(species.label)
 
     def get_or_create_cst_species(
         self,
-        label: str,
-    ) -> ChemSpecies:
+        species: ChemicalSpecies | BasicSpecies,
+    ) -> SimSpecies:
         """
         Retrieves or creates a constant species from the ListSpecies
         instance.
@@ -276,13 +300,13 @@ class ListSpecies:
         Returns:
             ChemSpecies: The retrieved or created constant species.
         """
-        if (out := self.get(label)) is not None:
+        if (out := self.get(species)) is not None:
             return out
         with suppress(radiopyo_exceptions.IsSimSpeciesError):
-            self.add_cst_species(label, 0.0)
-        return self.__getitem__(label)
+            self.add_cst_species(species, 0.0)
+        return self.__getitem__(species.label)
 
-    def sorted_iter_cst_species(self) -> tp.Iterable[ChemSpecies]:
+    def sorted_iter_cst_species(self) -> tp.Iterable[SimSpecies]:
         """
         Get an iterator over all the CstSpecies (ordered).
 
@@ -293,7 +317,7 @@ class ListSpecies:
             op.itemgetter(1), sorted(self.cst_sp.items(), key=lambda x: x[1].index)
         )
 
-    def sorted_iter_dyn_species(self) -> tp.Iterable[ChemSpecies]:
+    def sorted_iter_dyn_species(self) -> tp.Iterable[SimSpecies]:
         """
         Get an iterator over all the dynamic species (ordered).
 
@@ -304,7 +328,7 @@ class ListSpecies:
             op.itemgetter(1), sorted(self.dyn_sp.items(), key=lambda x: x[1].index)
         )
 
-    def iter_cst_species(self) -> tp.Iterable[ChemSpecies]:
+    def iter_cst_species(self) -> tp.Iterable[SimSpecies]:
         """
         Get an iterator over all the constant species (not ordered).
 
@@ -313,7 +337,7 @@ class ListSpecies:
         """
         return iter(self.cst_sp.values())
 
-    def iter_dyn_species(self) -> tp.Iterable[ChemSpecies]:
+    def iter_dyn_species(self) -> tp.Iterable[SimSpecies]:
         """
         Get an iterator over all the DynSpecies (not ordered).
 
@@ -357,9 +381,9 @@ class ListSpecies:
         new_ls = ListSpecies()
 
         for sp in self.iter_dyn_species():
-            new_ls.add_dyn_species(sp.label, sp.cc_init)
+            new_ls.add_dyn_species(sp.raw_species, sp.cc_init)
         for sp in self.iter_cst_species():
-            new_ls.add_cst_species(sp.label, sp.cc_init)
+            new_ls.add_cst_species(sp.raw_species, sp.cc_init)
         return new_ls
 
     def sort(
@@ -406,7 +430,7 @@ class ListSpecies:
         out.sorted = True
         return out if not inplace else None
 
-    def is_cst_species(self, key: str | ChemSpecies) -> bool:
+    def is_cst_species(self, key: str | AnySpecies) -> bool:
         """
         Checks if a given key is a constant species.
 
@@ -418,11 +442,11 @@ class ListSpecies:
             bool: True if the key is found in the constant species,
                 False otherwise.
         """
-        if isinstance(key, ChemSpecies):
+        if not isinstance(key, str):
             key = key.label
         return key in self.cst_sp
 
-    def is_dyn_species(self, key: str | ChemSpecies) -> bool:
+    def is_dyn_species(self, key: str | AnySpecies) -> bool:
         """
         Checks if a given key is a dynamic species.
 
@@ -435,6 +459,6 @@ class ListSpecies:
                 False otherwise.
         """
         # If CstSpecies from another sim, should still be tested for this one.
-        if isinstance(key, ChemSpecies):
+        if not isinstance(key, str):
             key = key.label
         return key in self.dyn_sp

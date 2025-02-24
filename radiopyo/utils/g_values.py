@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.interpolate import interp1d  # type: ignore[import]
+from scipy.interpolate import interp1d  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
 # ------------------------- Type checking ONLY imports----------------------- #

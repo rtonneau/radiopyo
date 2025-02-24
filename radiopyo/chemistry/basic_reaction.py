@@ -11,16 +11,18 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import copy
 import typing as tp
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
+from enum import Enum
 from functools import reduce
 from itertools import chain
 from operator import add
 
 # ----------------------------- Internal imports ---------------------------- #
-from .species import ChemSpecies, RawSpecies
+from .species import BasicSpecies, ChemicalSpecies, SimSpecies
 
 if tp.TYPE_CHECKING:
     from .species_collection import ListSpecies
@@ -29,85 +31,77 @@ if tp.TYPE_CHECKING:
 # --------------------------------------------------------------------------- #
 __all__ = [
     "BasicReaction",
-    "IsChemicalReaction",
+    "GenericReaction",
+    "Operation",
+    "ReactionSpecies",
+    "ReactionSpeciesCollection",
+    "revert_reaction",
 ]
+
+
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
+def revert_reaction(reaction: GenericReaction) -> GenericReaction:
+    """ """
+    # Revert the reaction only if all products are related to addition
+    # operation.
+    for _, (_, _, ope) in reaction["products"].items():
+        if ope != Operation.ADD:
+            raise TypeError(
+                f"Cannot revert reaction with subtraction operation: {reaction}"
+            )
+    return GenericReaction(
+        products=reaction["reactants"].copy(),
+        reactants=reaction["products"].copy(),
+        constants=reaction["constants"].copy(),
+        enzyme=copy.copy(reaction["enzyme"]),
+    )
+
 
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
 # --------------------------------------------------------------------------- #
+class Operation(Enum):
+    ADD = 1
+    SUBTRACT = 2
+
+    def __str__(self) -> str:
+        match self:
+            case Operation.ADD:
+                return "+"
+            case Operation.SUBTRACT:
+                return "-"
 
 
-class IsChemicalReaction(tp.Protocol):
-    """
-    Protocol for a chemical reaction.
-
-    A class implementing this protocol should provide the following
-    attributes:
-
-    Attributes:
-    reactants: tp.Dict[str, ChemSpecies]
-        A dictionary of reactants in the reaction.
-    products: tp.Dict[str, ChemSpecies]
-        A dictionary of products in the reaction.
-    stoi_reactants: tp.Dict[str, int]
-        A dictionary of stoichiometric coefficients for reactants.
-    stoi_products: tp.Dict[str, int]
-        A dictionary of stoichiometric coefficients for products.
-    index: tp.Optional[int]
-        An optional index for the reaction.
-
-    Methods:
-    __contains__(other: object) -> bool
-        Checks if a given object is in the reaction.
-
-    Notes:
-        This protocol is used to define the interface for a chemical
-        reaction. Any class implementing this protocol should provide
-        the required attributes and methods.
-    """
-
-    reactants: tp.Dict[str, ChemSpecies]
-    products: tp.Dict[str, ChemSpecies]
-    stoi_reactants: tp.Dict[str, int]
-    stoi_products: tp.Dict[str, int]
-    index: tp.Optional[int]
-
-    def __contains__(self, other: object) -> bool:
-        """"""
-
-    def iter_species(self) -> tp.Iterable[ChemSpecies]:
-        """Iter over species involved in the reaction"""
-
-    def iter_reactants(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
-        """Iter over reactants only"""
-
-    def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
-        """Iter over products only"""
-
-    def as_label(self) -> str:
-        """ """
-
-    def has_product(self, product: ChemSpecies | str) -> int:
-        """"""
-
-    def has_reactant(self, product: ChemSpecies | str) -> int:
-        """"""
-
-    def make_hash(self, method: str) -> str:
-        """"""
+class GenericReaction(tp.TypedDict):
+    products: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]]
+    reactants: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]]
+    constants: tp.Dict[str, float | tp.List[float]]
+    enzyme: BasicSpecies | None
 
 
 @dataclass(frozen=True)
 class ReactionSpecies:
     """ """
 
-    label: str
-    species: ChemSpecies
-    stoi: int = field(default=1)
-    _silent: bool = field(repr=False, default=False)
+    species: SimSpecies
+    stoi: int
+    ope: Operation
 
-    def is_silent(self) -> bool:
-        return self._silent
+    def __init__(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ):
+        object.__setattr__(self, "species", species)
+        object.__setattr__(self, "stoi", stoi if stoi is not None else 1)
+        object.__setattr__(self, "ope", ope if ope is not None else Operation.ADD)
+
+    @property
+    def label(self) -> str:
+        return self.species.label
 
 
 @dataclass(init=False)
@@ -124,71 +118,48 @@ class ReactionSpeciesCollection:
     def __len__(self) -> int:
         return len(self.species_col)
 
-    def __iter__(self) -> tp.Iterator[tp.Tuple[ChemSpecies, int]]:
+    def __iter__(self) -> tp.Iterator[ReactionSpecies]:
         """ """
-        return (
-            (self.species_col[sp].species, self.species_col[sp].stoi)
-            for sp in self._order
-        )
+        return iter((self.species_col[sp] for sp in self._order))
 
-    def __contains__(self, key: str | RawSpecies) -> bool:
-        if isinstance(key, RawSpecies):
+    def __contains__(
+        self, key: str | BasicSpecies | SimSpecies | ReactionSpecies
+    ) -> bool:
+        if not isinstance(key, str):
             key = key.label
         return key in self.species_col
 
-    def __getitem__(self, key: str | RawSpecies) -> ChemSpecies:
-        if isinstance(key, RawSpecies):
+    def __getitem__(self, key: str | BasicSpecies | SimSpecies) -> ReactionSpecies:
+        if not isinstance(key, str):
             key = key.label
-        return self.species_col[key].species
+        return self.species_col[key]
 
-    def _is_silent(self, species: ChemSpecies) -> bool:
-        return self.species_col[species.label].is_silent()
-
-    def iter_stoi(
-        self, include_silent: bool = True
-    ) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
-        for sp, stoi in self.__iter__():
-            if not include_silent and self._is_silent(sp):
-                continue
-            yield sp, stoi
-
-    def iter_species(self, include_silent: bool = True) -> tp.Iterable[ChemSpecies]:
-        for sp, _ in self.__iter__():
-            if not include_silent and self.species_col[sp.label].is_silent():
-                continue
-            yield sp
+    def iter_stoi(self) -> tp.Iterable[tp.Tuple[ReactionSpecies, int]]:
+        for sp in self.__iter__():
+            yield sp, sp.stoi
 
     def _add_species(
-        self, species: ChemSpecies, stoi: int, silent: bool = False
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
     ) -> None:
-
         if species.label in self._order:
             raise KeyError(f"{species.label} is already recorded in {self}")
-        self.species_col[species.label] = ReactionSpecies(
-            label=species.label,
-            species=species,
-            stoi=stoi,
-            _silent=silent,
-        )
+        self.species_col[species.label] = ReactionSpecies(species, stoi, ope)
         self._order.append(species.label)
 
-    def add_silent_species(self, species: ChemSpecies, stoi: int) -> None:
+    def add_species(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """ """
-        return self._add_species(species, stoi, silent=True)
+        self._add_species(species, stoi, ope)
 
-    def add_species(self, species: ChemSpecies, stoi: int) -> None:
-        """ """
-        if species in self:
-            self.species_col[species.label] = replace(
-                self.species_col[species.label],
-                stoi=stoi + self.species_col[species.label].stoi,
-            )
-            return
-
-        self._add_species(species, stoi)
-
-    def stoichiometry_of(self, key: str | ChemSpecies) -> int:
-        if isinstance(key, ChemSpecies):
+    def stoichiometry_of(self, key: str | BasicSpecies | SimSpecies) -> int:
+        if not isinstance(key, str):
             key = key.label
         return self.species_col[key].stoi
 
@@ -201,9 +172,25 @@ class ReactionSpeciesCollection:
         Returns:
             int
         """
-        return (
-            0 if len(self) == 0 else reduce(add, [stoi for _, stoi in self.__iter__()])
-        )
+        return 0 if len(self) == 0 else reduce(add, [sp.stoi for sp in self.__iter__()])
+
+    def as_string(self) -> str:
+        """
+        Method to generate a string representation of the collection in
+        the reaction.
+
+        Returns:
+            str
+                A string representation of the species collection,
+                with stoichiometry.
+        """
+        out: tp.List[str] = []
+        for sp in self.__iter__():
+            _ = "" if sp.stoi <= 1 else f"{sp.stoi}"
+            if len(out) > 0 or sp.ope is Operation.SUBTRACT:
+                out.append(str(sp.ope))
+            out.append(_ + f"{sp.label}")
+        return " ".join(out)
 
 
 class BasicReaction(ABC):
@@ -260,7 +247,7 @@ class BasicReaction(ABC):
         """
         Check where the reaction involves a specific species
         Args:
-            other: str | RawSpecies
+            other: str | BasicSpecies
 
         Returns:
             bool
@@ -269,7 +256,7 @@ class BasicReaction(ABC):
             NotImplementedError:
                 if 'other' have any other type
         """
-        if isinstance(other, (str, RawSpecies)):
+        if isinstance(other, (str, BasicSpecies)):
             return (other in self.reactants) or (other in self.products)
         raise NotImplementedError
 
@@ -309,25 +296,26 @@ class BasicReaction(ABC):
 
     @classmethod
     @abstractmethod
-    def from_kwargs(
+    def from_generic(
         cls,
+        generic: GenericReaction,
         list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
     ) -> tp.Self:
         """
-        Abstract class method to create a new instance from keyword
-        arguments.
+        Create a Reaction from a 'GenericReaction', Typed-Dict
+        structure produced by radiopyo module parser.
 
         Args:
-            list_sp (ListSpecies): Optional list of species.
-                Defaults to None.
-            **kwargs: Keyword arguments to create the instance.
+            generic (GenericReaction): Typed-Dict structure holding the
+                reaction metadata.
+            list_sp (ListSpecies, optional): Collection of species
+                already involved in the simulation. Defaults to None.
 
         Returns:
-            tp.Self: A new instance of the class.
+            Self: An instance of Reaction.
         """
 
-    def get_stoi_of(self, species: ChemSpecies | str) -> float:
+    def get_stoi_of(self, species: SimSpecies | ChemicalSpecies | str) -> int:
         """
         Method to extract the stoichiometric coefficient of a species
         regardless if the species is a reactant or a product.
@@ -371,7 +359,7 @@ class BasicReaction(ABC):
         """
         return self.products.tot_number()
 
-    def iter_species(self) -> tp.Iterable[ChemSpecies]:
+    def iter_species(self) -> tp.Iterable[ReactionSpecies]:
         """
         Iterator over all the species involved in the reaction,
         including both reactants and products.
@@ -380,29 +368,7 @@ class BasicReaction(ABC):
             Iterable[ChemSpecies]: An iterator over all the species
                 involved in the reaction.
         """
-        return chain(self.reactants.iter_species(), self.products.iter_species())
-
-    def iter_reactants(
-        self, include_silent: bool = True
-    ) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
-        """
-        Iter over reactants only, including the stoichiometry.
-
-        Returns:
-            Iterator: Tuple[SimSpecies, int]
-                The second element is the stoichiometry of the reactant.
-        """
-        return self.reactants.iter_stoi(include_silent=include_silent)
-
-    def iter_products(self) -> tp.Iterable[tp.Tuple[ChemSpecies, int]]:
-        """
-        Iterator over products only, including the stoichiometry.
-
-        Returns:
-            Iterator: Tuple[ChemSpecies, int]
-                The second element is the stoichiometry of the product.
-        """
-        return iter(self.products)
+        return chain(iter(self.reactants), iter(self.products))
 
     def get_index(self, default: int = -1) -> int:
         """
@@ -449,7 +415,7 @@ class BasicReaction(ABC):
         """
         return len(self.products)
 
-    def has_product(self, product: ChemSpecies | str) -> bool:
+    def has_product(self, product: SimSpecies | ChemicalSpecies | str) -> bool:
         """
         Checks if the reaction involves a specific product.
 
@@ -463,7 +429,7 @@ class BasicReaction(ABC):
         """
         return product in self.products
 
-    def has_reactant(self, reactant: ChemSpecies | str) -> int:
+    def has_reactant(self, reactant: SimSpecies | ChemicalSpecies | str) -> int:
         """
         Checks if a given reactant is involved in the reaction.
 
@@ -476,7 +442,12 @@ class BasicReaction(ABC):
         """
         return reactant in self.reactants
 
-    def add_as_product(self, sp: ChemSpecies, multiple: int = 1) -> None:
+    def add_as_product(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """
         Method to add a new product to the reaction by keeping the
         stoichiometry relevant.
@@ -487,16 +458,22 @@ class BasicReaction(ABC):
             to 1.
 
         Args:
-            sp (ChemSpecies): The product to be added.
-            multiple (int, optional): The stoichiometric coefficient of
-                the product. Defaults to 1.
+            species: SimSpecies
+            stoi (int, optional): The stoichiometric coefficient of
+                the reactant.
+            ope (Operation, optional): The operation to apply.
 
         Returns:
             None
         """
-        self.products.add_species(sp, multiple)
+        self.products.add_species(species, stoi, ope)
 
-    def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
+    def add_as_reactant(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """
         Method to conveniently add a new reactant to the reaction by
         keeping the stoichiometry relevant:
@@ -507,64 +484,12 @@ class BasicReaction(ABC):
             to 1
 
         Args:
-            sp: SimSpecies
-            multiple (int, optional): The stoichiometric coefficient of
-                the reactant. Defaults to 1.
+            species: SimSpecies
+            stoi (int, optional): The stoichiometric coefficient of
+                the reactant.
+            ope (Operation, optional): The operation to apply.
 
         Returns:
             None
         """
-        self.reactants.add_species(sp, multiple)
-
-    def add_as_silent_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
-        """
-        Method to conveniently add a new reactant to the reaction by
-        keeping the stoichiometry relevant:
-            -> If the species already exists as reactant,
-            increment its stoichiometry
-            -> If the species does not already exists as reactant,
-            add it to the dict of reactants and set its stoichiometry
-            to 1
-
-        Args:
-            sp: SimSpecies
-            multiple (int, optional): The stoichiometric coefficient of
-                the reactant. Defaults to 1.
-
-        Returns:
-            None
-        """
-        self.reactants.add_silent_species(sp, multiple)
-
-    def reactants_as_string(self) -> str:
-        """
-        Method to generate a string representation of the reactants in
-        the reaction.
-        Returns:
-
-            str
-                A string representation of the reactants,
-                with stoichiometry.
-        """
-        out = []
-        for sp, stoi in self.iter_reactants():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_ + f"{sp.label}")
-            out.append("+")
-        return " ".join(out[:-1])
-
-    def products_as_string(self) -> str:
-        """
-        Method to generate a string representation of the products
-        in the reaction.
-        Returns:
-            str
-                A string representation of the products,
-                with stoichiometry.
-        """
-        out = []
-        for sp, stoi in self.iter_products():
-            _ = "" if stoi <= 1 else f"{stoi}"
-            out.append(_ + f"{sp.label}")
-            out.append("+")
-        return " ".join(out[:-1])
+        self.reactants.add_species(species, stoi, ope)

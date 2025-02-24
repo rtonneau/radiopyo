@@ -26,14 +26,11 @@ from __future__ import annotations
 
 import hashlib
 import typing as tp
-from typing import List
 
 from scipy.constants import (  # type: ignore[import-untyped]
     Avogadro,
     elementary_charge,
 )
-
-from radiopyo.chemistry.species import ChemSpecies
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.species_collection import ListSpecies
@@ -42,7 +39,8 @@ from .basic_reaction import BasicReaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.species import ChemSpecies
+    from radiopyo.chemistry.basic_reaction import GenericReaction, Operation
+    from radiopyo.chemistry.species import BasicSpecies, SimSpecies
 
 # --------------------------------------------------------------------------- #
 
@@ -177,15 +175,7 @@ class RadiolyticReaction(BasicReaction):
         """
         return f"G_{self.species().label}"
 
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: ListSpecies | None = None,
-        **kwargs: str | List[str] | float | List[float],
-    ) -> tp.Self:
-        raise NotImplementedError
-
-    def species(self) -> ChemSpecies:
+    def species(self) -> SimSpecies:
         """
         Returns the ChemSpecies instance associated with this reaction.
 
@@ -193,7 +183,7 @@ class RadiolyticReaction(BasicReaction):
             ChemSpecies
                 The ChemSpecies instance.
         """
-        return self.products[self.label()]
+        return self.products[self.label()].species
 
     def label(self) -> str:
         """
@@ -204,7 +194,7 @@ class RadiolyticReaction(BasicReaction):
             str
                 A string label of the reaction.
         """
-        sp, _ = next(iter(self.products))
+        sp = next(iter(self.products))
         return sp.label
 
     def kr(self) -> float:
@@ -256,9 +246,9 @@ class RadiolyticReaction(BasicReaction):
         return self.kr() * dose_rate * t0
 
     @classmethod
-    def from_dict(
+    def from_product(
         cls,
-        product: str,
+        product: BasicSpecies,
         ge: float,
         list_sp: tp.Optional[ListSpecies] = None,
     ) -> RadiolyticReaction:
@@ -283,12 +273,24 @@ class RadiolyticReaction(BasicReaction):
         # Allow shallow creation (outside of a simulation env)
         if list_sp is None:
             list_sp = ListSpecies()
-        new.add_as_product(list_sp.get_or_create_dyn_species(product.strip()))
+        new.add_as_product(list_sp.get_or_create_dyn_species(product))
         return new
 
     # ----------------------------------------------------------------------- #
+    @classmethod
+    def from_generic(
+        cls,
+        generic: GenericReaction,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> tp.Self:
+        raise NotImplementedError
 
-    def add_as_reactant(self, sp: ChemSpecies, multiple: int = 1) -> None:
+    def add_as_reactant(
+        self,
+        species: SimSpecies,
+        stoi: tp.Optional[int] = None,
+        ope: tp.Optional[Operation] = None,
+    ) -> None:
         """No reactant should be involved"""
         raise NotImplementedError("Not implemented for Radiolytic Reactions")
 

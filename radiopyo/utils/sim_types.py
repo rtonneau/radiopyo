@@ -21,12 +21,12 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
-    "KwargsRun",
-    "ConfigDict",
-    "ReactionsDict",
     "ConcentrationDict",
-    "default_ConfigDict",
+    "ConfigDict",
+    "KwargsRun",
+    "ReactionsDict",
     "SimMatrices",
+    "default_ConfigDict",
 ]
 # --------------------------------------------------------------------------- #
 
@@ -89,10 +89,6 @@ class SimMatrices(tp.TypedDict):
         NDArray[np.int8],
         NDArray[np.float32],
         NDArray[np.float32],
-    ]
-    AB_mat: tp.Tuple[
-        NDArray[np.int8],
-        NDArray[np.float64],  # Need the Pka's
     ]
     Gi_mat: NDArray[np.float64]
     Ez_mat: tp.Optional[

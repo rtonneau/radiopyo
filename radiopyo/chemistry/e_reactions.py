@@ -23,23 +23,21 @@ Author:
 from __future__ import annotations
 
 import typing as tp
-from contextlib import suppress
 
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.chemistry.basic_reaction import revert_reaction
 from radiopyo.chemistry.k_reactions import (
     BiReaction,
 )
-from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
-from radiopyo.parser import RPARSER
-from radiopyo.parser.reaction_parser import revert_reaction
 
 # ------------------------ Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
-    from radiopyo.parser.reaction_parser import GenericReaction
+    from radiopyo.chemistry.basic_reaction import GenericReaction
+    from radiopyo.chemistry.species_collection import ListSpecies
 
 
 # --------------------------------------------------------------------------- #
@@ -147,63 +145,6 @@ class EReaction(BiReaction):
 
         self.add_backward_reaction(revert_reaction(reaction), list_sp)
         self.backward.set_k_value(self._k_backward)  # type: ignore [arg-type]
-
-    @classmethod
-    def from_kwargs(
-        cls,
-        list_sp: tp.Optional[ListSpecies] = None,
-        **kwargs: str | tp.List[str] | float | tp.List[float],
-    ) -> tp.Self:
-        """
-        Create an EquilibriumReaction from keyword arguments.
-
-        Args:
-            list_sp (ListSpecies, optional): Collection of species
-                already involved in the simulation. Defaults to None.
-            **kwargs: Keyword arguments to create the instance.
-                - reaction (str): The reaction string.
-                - k_forward (float): The forward reaction rate constant.
-                - k_backward (float): The backward reaction rate
-                    constant.
-                - k_equilibrium (float): The equilibrium constant.
-
-        Returns:
-            EquilibriumReaction: An instance of EquilibriumReaction.
-
-        Raises:
-            AttributeError: If 'k_value' is provided, as it is
-                ambiguous for an EquilibriumReaction.
-            AttributeError: If no reaction string is provided.
-        """
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        try:
-            gen = RPARSER.parse_reaction(kwargs["reaction"])  # type:ignore[arg-type]
-        except KeyError as err:
-            raise AttributeError(
-                "Need a reaction string to create an Equilibrium Reaction"
-            ) from err
-
-        if "k_value" in kwargs:
-            raise AttributeError(
-                "'k_value' is ambiguous for an Equilibrium Reaction. "
-                "Use k_forward or k_backward instead."
-            )
-
-        with suppress(KeyError):
-            gen["constants"]["k_forward"] = kwargs[
-                "k_forward"
-            ]  # type:ignore[assignment]
-        with suppress(KeyError):
-            gen["constants"]["k_backward"] = kwargs[
-                "k_backward"
-            ]  # type:ignore[assignment]
-
-        constant = kwargs.get("k_equilibrium", None)
-
-        return cls(gen, constant=constant, list_sp=list_sp)  # type:ignore[arg-type]
 
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """

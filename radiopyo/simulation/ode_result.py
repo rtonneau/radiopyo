@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.integrate import simpson, trapezoid  # type: ignore[import]
+from scipy.integrate import trapezoid  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.utils.units import Temperature
@@ -32,7 +32,7 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.k_reactions import BiReaction
-    from radiopyo.chemistry.species import ChemSpecies
+    from radiopyo.chemistry.species import SimSpecies
     from radiopyo.physics.beam import ParticleBeam
     from radiopyo.simulation.utils import H5Manager
     from radiopyo.utils.sim_types import SimMatrices
@@ -366,7 +366,12 @@ class ODEResult(object):
             Rki = np.nan_to_num(
                 np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
             )
+
             Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
+            _ = np.any(
+                (y <= 1e-12)[:, np.newaxis] * self.mat["Ki_mat"][1][:, :, 1], axis=0
+            )
+            Rki[_] = 0.0
 
             # Sometimes, some species are < 0.0 for a very short while.
             # It has no physical meaning. But it is necessary to give
@@ -394,12 +399,13 @@ class ODEResult(object):
                     / (self.mat["Ez_mat"][2][0, :] + S)
                 )
                 out.iloc[idx, idx_ez] = MM
+
         self.dydt = out.values.T
         return out
 
     def integrate_production_of(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
@@ -433,7 +439,7 @@ class ODEResult(object):
 
     def detail_production_of(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
@@ -472,7 +478,7 @@ class ODEResult(object):
 
     def integrate_consumption_of(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
@@ -491,7 +497,7 @@ class ODEResult(object):
 
     def detail_consumption_of(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
         include_equilibrium: bool = True,
@@ -525,7 +531,7 @@ class ODEResult(object):
 
     def detailed_integral_balance_of_species(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
@@ -586,7 +592,7 @@ class ODEResult(object):
 
     def compute_yields_of_eq_reactions_by_species(
         self,
-        species: str | ChemSpecies,
+        species: str | SimSpecies,
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
@@ -643,11 +649,11 @@ class ODEResult(object):
         out.iloc[:, :] = 0
 
         for species in self.env.species.iter_dyn_species():
-            for reaction, k_val in self.env.reactions_involving_product(species):
-                stoi = reaction.stoi_products[species.label]
+            for reaction, _ in self.env.reactions_involving_product(species):
+                stoi = reaction.products.stoichiometry_of(species)
                 out.loc[:, species.label] += rr[reaction.as_label()] * stoi
-            for reaction, k_val in self.env.reactions_involving_reactant(species):
-                stoi = reaction.stoi_reactants[species.label]
+            for reaction, _ in self.env.reactions_involving_reactant(species):
+                stoi = reaction.reactants.stoichiometry_of(species)
                 out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
         return out
 

@@ -350,14 +350,9 @@ class UnitCell(object):
             t_span,
             args=(
                 beam,
-                self.env.species["H2O"].index,
-                self.env.species["H3O_plus"].index,
-                self.env.species["OH_minus"].index,
-                10 ** -self.env.pKw(self._T),
                 self.mat["cst_sp"],
                 self.mat["Ki_mat"],
                 self.mat["Gi_mat"],
-                self.mat["AB_mat"],
                 self.mat["Ez_mat"],
             ),
             t_eval=t_eval,
@@ -371,7 +366,7 @@ class UnitCell(object):
     def run_till_max_dose(
         self,
         time_start: float = 1e-9,
-        **kwargs: tp.Unpack[KwargsRun],  # type: ignore [misc]
+        **kwargs: tp.Unpack[KwargsRun],
     ) -> ODEResult:
         """ """
         if self.beam_list.current.time_at_max_dose >= np.inf:
@@ -379,9 +374,8 @@ class UnitCell(object):
                 "Unable to use 'run_till_max_dose', time at max dose "
                 f"is inf (-> {self.beam_list.current.time_at_max_dose})"
             )
-        return self.run(
-            t_span=(time_start, self.beam_list.current.time_at_max_dose), **kwargs
-        )
+        kwargs["t_span"] = (time_start, self.beam_list.current.time_at_max_dose)
+        return self.run(**kwargs)
 
     def run(
         self,
@@ -768,12 +762,14 @@ class SimChunksIter:
         """
         logger.info("Running all simulation chunks")
         try:
-            from tqdm import tqdm  # type: ignore[import]
+            from tqdm import tqdm  # type: ignore[import-untyped]
 
             with suppress(NameError):
                 gip = get_ipython()  # type: ignore[name-defined] # noqa: F821
                 if gip.__class__.__name__ == "ZMQInteractiveShell":
-                    from tqdm.notebook import tqdm  # type: ignore[import]
+                    from tqdm.notebook import (  # type: ignore[import-untyped]
+                        tqdm,
+                    )
             # Perform Simulation with TQDM.
             sim = tqdm(self)
         except ImportError:
@@ -785,31 +781,31 @@ class SimChunksIter:
         logger.info("Simulation done!")
         return res
 
-    def subdivide_last_chunk(
-        self,
-        n: int,
-        max_step_size: tp.Optional[float] = None,
-        scale: str = "log",
-    ) -> SimChunksIter:
-        last = self.chunks.pop()
-        if max_step_size is None or max_step_size < last.max_step_size:
-            max_step_size = last.max_step_size
+    # def subdivide_last_chunk(
+    #     self,
+    #     n: int,
+    #     max_step_size: tp.Optional[float] = None,
+    #     scale: str = "log",
+    # ) -> SimChunksIter:
+    #     last = self.chunks.pop()
+    #     if max_step_size is None or max_step_size < last.max_step_size:
+    #         max_step_size = last.max_step_size
 
-        if scale == "linear":
-            chunks = np.linspace(last.start, last.stop, num=n + 1)
-            steps = np.linspace(last.max_step_size, max_step_size, num=n)
-        elif scale == "log":
-            chunks = np.logspace(np.log10(last.start), np.log10(last.stop), num=n + 1)
-            steps = np.logspace(
-                np.log10(last.max_step_size), np.log10(max_step_size), num=n
-            )
+    #     if scale == "linear":
+    #         chunks = np.linspace(last.start, last.stop, num=n + 1)
+    #         steps = np.linspace(last.max_step_size, max_step_size, num=n)
+    #     elif scale == "log":
+    #         chunks = np.logspace(np.log10(last.start), np.log10(last.stop), num=n + 1)
+    #         steps = np.logspace(
+    #             np.log10(last.max_step_size), np.log10(max_step_size), num=n
+    #         )
 
-        for idx in range(n):
-            self.chunks.append(
-                SimChunk(
-                    chunks[idx],
-                    chunks[idx + 1],
-                    steps[idx],
-                )
-            )
-        return self
+    #     for idx in range(n):
+    #         self.chunks.append(
+    #             SimChunk(
+    #                 chunks[idx],
+    #                 chunks[idx + 1],
+    #                 steps[idx],
+    #             )
+    #         )
+    #     return self
