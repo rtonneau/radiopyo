@@ -345,8 +345,6 @@ class UnitCell(object):
                     * 1e6
                 )  # Units of initial cc are µM
 
-        kwargs["force_positive"] = force_positive
-
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(
             derive,
@@ -357,6 +355,7 @@ class UnitCell(object):
                 self.mat["Ki_mat"],
                 self.mat["Gi_mat"],
                 self.mat["Ez_mat"],
+                force_positive,
             ),
             t_eval=t_eval,
             method=method,
