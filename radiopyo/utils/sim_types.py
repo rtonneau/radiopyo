@@ -68,6 +68,7 @@ class SimParameters(tp.TypedDict, total=False):
     temperature: float
     timestamp: float
     t_zero_pulse: float
+    force_positive: bool
 
 
 class ConfigDict(tp.TypedDict, total=False):

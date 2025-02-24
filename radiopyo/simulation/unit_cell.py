@@ -295,6 +295,7 @@ class UnitCell(object):
         t_eval: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
         beam_ON: bool = True,
+        force_positive: bool = False,
     ) -> ScipyODEResult:
         if len(self.beam_list) <= 0:
             rp_excep.NoBeamDefinedError("Simulation aborted")
@@ -344,6 +345,8 @@ class UnitCell(object):
                     * 1e6
                 )  # Units of initial cc are µM
 
+        kwargs["force_positive"] = force_positive
+
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(
             derive,
@@ -388,6 +391,7 @@ class UnitCell(object):
         max_step: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        force_positive: bool = False,
     ) -> ODEResult:
         """Solve ODE over t_span
         Args:
@@ -429,6 +433,7 @@ class UnitCell(object):
             y0,
             t_eval,
             use_beam,
+            force_positive,
         )
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
         return ODEResult(
@@ -438,6 +443,7 @@ class UnitCell(object):
             self.beam_list.current_LET,
             self.T_ZERO,
             sol,
+            force_positive=force_positive,
         )
 
     def prepare_chunked_run(

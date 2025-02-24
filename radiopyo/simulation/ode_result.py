@@ -91,6 +91,7 @@ class ODEResult(object):
     t_zero_pulse: float
     date: datetime.datetime
     T: Temperature
+    force_positive: bool
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -119,6 +120,7 @@ class ODEResult(object):
         t_zero_pulse: float,
         sol: tp.Optional[ScipyODEResult] = None,
         temperature: tp.Optional[Temperature] = None,
+        force_positive: bool = False,
     ) -> None:
         self.date = datetime.datetime.now()
         self.env = copy.deepcopy(env)
@@ -127,6 +129,7 @@ class ODEResult(object):
         self.LET = let
         self.t_zero_pulse = t_zero_pulse
         self.T = temperature if temperature is not None else Temperature()
+        self.force_positive = force_positive
         self._default_init()
         if sol is not None:
             self.append_sol(sol)
@@ -378,7 +381,7 @@ class ODEResult(object):
             # the ODE solver such possibility to ensure good quality
             # results. The next line is then added only here
             # (not in ODE solver) to give a more suitable meaning.
-            Rki[np.where(Rki < 0)] = 0.0
+            # Rki[np.where(Rki < 0)] = 0.0
 
             out.iloc[idx, idx_kr] = Rki
 
@@ -683,6 +686,7 @@ class ODEResult(object):
         out["parameters"]["timestamp"] = self.date.timestamp()
         out["parameters"]["t_zero_pulse"] = self.t_zero_pulse
         out["parameters"]["temperature"] = self.T.kelvin
+        out["parameters"]["force_positive"] = self.force_positive
         out["parameters"]["species_order"] = {
             "dynamical": [
                 sp.label for sp in self.env.species.sorted_iter_dyn_species()
@@ -726,7 +730,15 @@ class ODEResult(object):
         label, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
         mat = env.build_all_matrices()
         t_zero = config["parameters"].get("t_zero_pulse", 1e-7)
-        out = cls(env, beam, mat, LET, t_zero, temperature=T)
+        out = cls(
+            env,
+            beam,
+            mat,
+            LET,
+            t_zero,
+            temperature=T,
+            force_positive=config["parameters"].get("force_positive", False),
+        )
         out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
 
         logger.setLevel(_prev_log_level)

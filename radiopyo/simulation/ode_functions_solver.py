@@ -116,6 +116,7 @@ def derive(
             NDArray[np.int8],
         ]
     ] = None,
+    force_positive: bool = False,
 ) -> NDArray[np.float64]:
     """Compute the time derivative of species concentration
     See the RPM_extended_doc.pdf file for a more detailed explanation.
@@ -169,8 +170,10 @@ def derive(
         dydt += Gi_mat * beam.at(t).dose_rate()
 
     # Handling of negative values
-    _mask = np.where((y < LIMIT) & (dydt < 0))
-    dydt[_mask] = -dydt[_mask] / 2.0
+    if force_positive:
+        _mask = np.where((y < LIMIT) & (dydt < 0))
+        dydt[_mask] = 0.0
+        # dydt[_mask] = -dydt[_mask] / 2.0
 
     # ==> dynamical species
     # ==> convert back to [µmol/l]
