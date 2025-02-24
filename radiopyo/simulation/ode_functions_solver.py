@@ -22,9 +22,9 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
-    "jacobian",
-    "derive",
     "ScipyODEResult",
+    "derive",
+    "jacobian",
 ]
 
 # --------------------------------------------------------------------------- #

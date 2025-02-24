@@ -737,7 +737,7 @@ class SimEnv:
 
         # Now update the dictionary
         # Update Reactions
-        out["reactions"] = {}
+        out["reactions"] = default_ConfigDict()["reactions"]
         out["reactions"]["acid_base"] = [
             r.to_dict() for r in self.reactions.ab_reaction
         ]
@@ -746,18 +746,18 @@ class SimEnv:
         ]
         out["reactions"]["enzymatic"] = [r.to_dict() for r in self.reactions.enzymatic]
         out["reactions"]["radiolytic"] = {}
-        for r in self.reactions.radiolytic:
-            out["reactions"]["radiolytic"].update(r.to_dict())
+        for _r in self.reactions.radiolytic:
+            out["reactions"]["radiolytic"].update(_r.to_dict())
         out["reactions"]["k_reaction"] = []
         out["reactions"]["constant"] = []
         out["reactions"]["arrhenius"] = []
-        for r in self.reactions.k_reaction:
-            if isinstance(r, CstReaction):
-                out["reactions"]["constant"].append(r.to_dict())
-            elif isinstance(r, Arrhenius):
-                out["reactions"]["arrhenius"].append(r.to_dict())
+        for _r in self.reactions.k_reaction:  # type: ignore[assignment]
+            if isinstance(_r, CstReaction):
+                out["reactions"]["constant"].append(_r.to_dict())
+            elif isinstance(_r, Arrhenius):
+                out["reactions"]["arrhenius"].append(_r.to_dict())
             else:
-                out["reactions"]["k_reaction"].append(r.to_dict())
+                out["reactions"]["k_reaction"].append(_r.to_dict())
 
         # Update Species related
         out["concentrations"]["initial"] = {}

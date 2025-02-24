@@ -304,7 +304,7 @@ class SimIdentifier:
         """ """
         out: tp.List[str] = []
         for field in self.iter_fields():
-            value = field.type(getattr(self, field.name))
+            value = field.type(getattr(self, field.name))  # type: ignore[operator]
             match value:
                 case bool():
                     out.append(self._VALUE_DELIMITER.join([field.name, str(value)]))
@@ -331,7 +331,7 @@ class SimIdentifier:
                 _ = {"True": True, "False": False}
                 kwargs[field.name] = _.get(kwargs[field.name], None)
             else:
-                kwargs[field.name] = field.type(kwargs[field.name])
+                kwargs[field.name] = field.type(kwargs[field.name])  # type: ignore[operator]
         return cls(**kwargs)  # type: ignore[arg-type]
 
 

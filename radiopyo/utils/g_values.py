@@ -199,7 +199,7 @@ class RawReader:
         for idx, col in enumerate(df.columns[::2]):
             self.data[str(col)] = pd.Series(
                 index=df.iloc[:, idx * 2].values,  # type: ignore[arg-type]
-                data=df.iloc[:, idx * 2 + 1].values,
+                data=df.iloc[:, idx * 2 + 1].to_numpy(),
                 name=col,
             ).dropna()
 
