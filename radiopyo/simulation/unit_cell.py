@@ -701,6 +701,7 @@ class SimChunksIter:
     method: str
     y0: tp.Optional[NDArray[np.float64]]
     use_beam: bool
+    force_positive: bool
 
     def __init__(
         self,
@@ -712,6 +713,7 @@ class SimChunksIter:
         method: str = "LSODA",
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        force_positive: bool = False,
     ):
         self.sim = sim
         self.chunks = chunks
@@ -721,6 +723,7 @@ class SimChunksIter:
             self.sim.mat,
             self.sim.beam_list.current_LET,
             self.sim.T_ZERO,
+            force_positive=force_positive,
         )
         self.atol = atol
         self.rtol = rtol
@@ -729,6 +732,7 @@ class SimChunksIter:
         self.current = -1
         self.y0 = y0
         self.use_beam = use_beam
+        self.force_positive = force_positive
 
     def __iter__(self) -> SimChunksIter:
         return self
@@ -750,6 +754,7 @@ class SimChunksIter:
             y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
             use_beam=self.use_beam,
             beam_ON=chunk.beam_on,
+            force_positive=self.force_positive,
         )
         self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
         return self.sol
