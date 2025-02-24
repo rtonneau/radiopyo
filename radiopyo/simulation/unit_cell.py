@@ -458,6 +458,7 @@ class UnitCell(object):
         max_step_size_final: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        force_positive: bool = False,
     ) -> SimChunksIter:
         """Method used to prepare a multi step ODE integration
         Args:
@@ -488,6 +489,9 @@ class UnitCell(object):
                 If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
+            force_positive: bool, optional
+                Whether to force the concentration to be positive
+                (default: False).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE
@@ -541,6 +545,7 @@ class UnitCell(object):
             method=method,
             y0=y0,
             use_beam=use_beam,
+            force_positive=force_positive,
         )
 
     def prepare_single_pulse(
@@ -556,6 +561,7 @@ class UnitCell(object):
         trans_time: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        force_positive: bool = False,
     ) -> SimChunksIter:
         """Method used to prepare a multi step ODE integration
         Args:
@@ -586,6 +592,9 @@ class UnitCell(object):
                 If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
+            force_positive: bool, optional
+                Whether to force the concentration to be positive
+                (default: False).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE
@@ -640,6 +649,7 @@ class UnitCell(object):
             method=method,
             y0=y0,
             use_beam=use_beam,
+            force_positive=force_positive,
         )
 
 
