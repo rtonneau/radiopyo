@@ -442,7 +442,6 @@ class UnitCell(object):
             self.beam_list.current_LET,
             self.T_ZERO,
             sol,
-            force_positive=force_positive,
         )
 
     def prepare_chunked_run(
@@ -732,7 +731,6 @@ class SimChunksIter:
             self.sim.mat,
             self.sim.beam_list.current_LET,
             self.sim.T_ZERO,
-            force_positive=force_positive,
         )
         self.atol = atol
         self.rtol = rtol

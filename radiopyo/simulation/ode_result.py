@@ -26,6 +26,7 @@ from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
+from radiopyo.utils.sim_types import ConfigDict
 
 # -------------------------- Type checking ONLY import----------------------- #
 if tp.TYPE_CHECKING:
@@ -117,8 +118,6 @@ class ODEResult(object):
         let: tp.Optional[float],
         t_zero_pulse: float,
         sol: tp.Optional[ScipyODEResult] = None,
-        temperature: tp.Optional[Temperature] = None,
-        force_positive: bool = False,
     ) -> None:
         self.date = datetime.datetime.now()
         self.env = copy.deepcopy(env)
@@ -669,6 +668,17 @@ class ODEResult(object):
             out[col] = trapezoid(y=data.values, x=data.index)
         return pd.Series(out, dtype=np.float64)
 
+    def convert_to_config_dict(self) -> ConfigDict:
+        """ """
+        out = self.env.convert_to_config_dict()
+        out["parameters"]["timestamp"] = self.date.timestamp()
+        out["parameters"]["t_zero_pulse"] = self.t_zero_pulse
+        kwargs = {}
+        if self.LET is not None:
+            kwargs["LET"] = self.LET
+        out["beam"] = self.beam.serialize(**kwargs)
+        return out
+
     def to_json_config(
         self,
         file_path: Path | str,
@@ -678,21 +688,11 @@ class ODEResult(object):
         file_path = Path(file_path)
         if not overwrite and file_path.exists():
             raise FileExistsError(file_path)
-        out = self.env.convert_to_config_dict()
-        out["parameters"]["timestamp"] = self.date.timestamp()
-        out["parameters"]["t_zero_pulse"] = self.t_zero_pulse
-        out["parameters"]["species_order"] = {
-            "dynamical": [
-                sp.label for sp in self.env.species.sorted_iter_dyn_species()
-            ],
-            "constant": [sp.label for sp in self.env.species.sorted_iter_cst_species()],
-        }
-        kwargs = {}
-        if self.LET is not None:
-            kwargs["LET"] = self.LET
-        out["beam"] = self.beam.serialize(**kwargs)
+
+        config = self.convert_to_config_dict()
+
         with file_path.open("w") as fp:
-            json.dump(out, fp, indent=4)
+            json.dump(config, fp, indent=4)
 
     @classmethod
     def from_json_config(
@@ -708,20 +708,13 @@ class ODEResult(object):
         let: tp.Optional[float],
         sol: tp.Optional[ScipyODEResult] = None,
         """
-        _prev_log_level = logger.level
-        logger.setLevel(logging.ERROR)
-
         file_path = Path(file_path)
         with file_path.open("r") as fp:
             config = json.load(fp)
-        env = SimEnv.from_dict(config)
-        T = (
-            Temperature(config["parameters"]["temperature"], unit="kelvin")
-            if "temperature" in config["parameters"]
-            else Temperature()
-        )
+        env = SimEnv(*SimEnv._chemistry_builder(config))
+
         beam_type, beam_config = next(iter(config["beam"].items()))
-        label, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
+        _, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
         mat = env.build_all_matrices()
         t_zero = config["parameters"].get("t_zero_pulse", 1e-7)
         out = cls(
@@ -730,12 +723,9 @@ class ODEResult(object):
             mat,
             LET,
             t_zero,
-            temperature=T,
-            force_positive=config["parameters"].get("force_positive", False),
         )
         out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
 
-        logger.setLevel(_prev_log_level)
         return out
 
 

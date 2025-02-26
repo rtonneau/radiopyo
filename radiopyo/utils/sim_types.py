@@ -36,14 +36,21 @@ __all__ = [
 #                            FUNCTION DEFINITIONS                             #
 # --------------------------------------------------------------------------- #
 
+T = tp.TypeVar("T", bound=tp.MutableMapping[str, tp.Any])
+
 
 def deep_update(
-    original: tp.Dict[str, tp.Any],
-    updates: tp.Dict[str, tp.Any],
-) -> tp.Dict[str, tp.Any]:
+    original: T,
+    updates: T,
+) -> T:
     """Recursively updates a nested dictionary with another dictionary."""
+
     for key, value in updates.items():
-        if isinstance(value, dict) and isinstance(original.get(key), dict):
+        if (
+            key in original  # Ensures TypedDict keys exist when total=True
+            and isinstance(original[key], dict)
+            and isinstance(value, dict)
+        ):
             deep_update(original[key], value)  # Recursive update
         else:
             original[key] = value  # Replace value

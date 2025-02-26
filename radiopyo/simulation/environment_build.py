@@ -15,7 +15,6 @@ import hashlib
 import logging
 import typing as tp
 from contextlib import suppress
-from copy import deepcopy
 from dataclasses import dataclass, field
 from itertools import chain
 
@@ -311,7 +310,7 @@ class SimEnv:
                 "CONFIG::No 'reactions' section in the provided configuration"
             )
 
-        _config = deep_update(default_ConfigDict(), config)
+        _config = deep_update(default_ConfigDict(), config)  # type: ignore[type-var]
         out = SimEnv(*SimEnv._chemistry_builder(_config))
 
         ### FeedBack
@@ -432,7 +431,10 @@ class SimEnv:
             list_sp.add_cst_species(BasicSpecies("trash"), 0.0)
 
         # Sort species so that all constant species are at the end.
-        if "species_order" in config["parameters"]:
+        if (
+            "species_order" in config["parameters"]
+            and len(config["parameters"]["species_order"]) > 0
+        ):
             list_sp.set_order(
                 dyn_sp=config["parameters"]["species_order"]["dynamical"],
                 cst_sp=config["parameters"]["species_order"]["constant"],
@@ -476,8 +478,10 @@ class SimEnv:
         """ """
         if self.parameters["force_cst_pH"] != force_cst_pH:
             _config = self.convert_to_config_dict()
-            self.parameters["force_cst_pH"] = force_cst_pH
-
+            _config["parameters"]["force_cst_pH"] = force_cst_pH
+            self.reactions, self.species, self.parameters, self.initial_cc = (
+                SimEnv._chemistry_builder(_config)
+            )
         if pH is not None:
             self.update_pH(pH)
 
@@ -844,6 +848,8 @@ class SimEnv:
                 ],
                 "constant": [sp.label for sp in self.species.sorted_iter_cst_species()],
             }
+        else:
+            out["parameters"]["species_order"] = {}
 
         return out
 
