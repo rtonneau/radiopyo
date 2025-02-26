@@ -39,7 +39,12 @@ from radiopyo.chemistry.species import H2O, BasicSpecies, SimSpecies
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
-from radiopyo.utils.sim_types import SimMatrices, default_ConfigDict
+from radiopyo.utils.sim_types import (
+    SimMatrices,
+    deep_update,
+    default_ConfigDict,
+    default_SimParameters,
+)
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -104,6 +109,11 @@ class ReactionsList:
         self.eq_reaction = sorted(self.eq_reaction, key=lambda x: x.forward.get_index())
         self.enzymatic = sorted(self.enzymatic, key=lambda x: x.get_index())
         self.radiolytic = sorted(self.radiolytic, key=lambda x: x.get_index())
+
+    @classmethod
+    def empty_ReactionList(cls) -> ReactionsList:
+        """ """
+        return cls([], [], KReactionCollection(), [], [])
 
     def get_kreaction(self, label: str) -> KReaction:
         """ """
@@ -226,9 +236,6 @@ class SimEnv:
     parameters: SimParameters
     initial_cc: tp.Dict[str, float]
     PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
-    _config_dict: ConfigDict = field(
-        init=False, repr=False, default_factory=default_ConfigDict
-    )
 
     def pKw(self, T: tp.Optional[Temperature | float] = None) -> float:
         """ """
@@ -258,21 +265,31 @@ class SimEnv:
         return hasher.hexdigest()
 
     @classmethod
+    def empty_SimEnv(cls) -> SimEnv:
+        """ """
+        return cls(
+            reactions=ReactionsList.empty_ReactionList(),
+            species=ListSpecies(),
+            parameters=default_SimParameters(),
+            initial_cc={},
+        )
+
+    @classmethod
     def from_dict(cls, config: ConfigDict, log: bool = True) -> SimEnv:
         _prev_log_lvl = logger.level
         if not log:
             logger.setLevel(logging.ERROR)
+        parameters: SimParameters = default_SimParameters()
+
         logger.info("CONFIG::Configuring Simulation Environment")
-        # Sanity check
+        # Sanity checks
         if "concentrations" not in config:
             logger.warning(
                 "CONFIG::No concentration section found in config."
                 " It means, no species with constant concentration and all"
                 " initial set to 0."
             )
-            config["concentrations"] = {"fixed": {}, "initial": {}}
 
-        # Sanity check
         if len(config["concentrations"]) > 2:
             extra = [
                 elt
@@ -284,17 +301,57 @@ class SimEnv:
                 f"section: {extra}. These will not be used."
             )
 
+        if "pH" not in config["parameters"]:
+            logger.warning(
+                f"CONFIG::pH is not defined in Sim parameters! Assuming pH={parameters['pH']}",
+            )
+
+        if "reactions" not in config:
+            logger.warning(
+                "CONFIG::No 'reactions' section in the provided configuration"
+            )
+
+        _config = deep_update(default_ConfigDict(), config)
+        out = SimEnv(*SimEnv._chemistry_builder(_config))
+
+        ### FeedBack
+        logger.info(
+            f"CONFIG::{len(out.reactions.ab_reaction)} Acid/Base reactions added"
+        )
+        logger.info(
+            f"CONFIG::{len(out.reactions.eq_reaction)} Equilibrium reactions added"
+        )
+        logger.info(f"CONFIG::{len(out.reactions.k_reaction)} K-reactions added")
+        logger.info(f"CONFIG::{len(out.reactions.enzymatic)} Enzymatic reactions added")
+        logger.info(
+            f"CONFIG::{len(out.reactions.radiolytic)} Radiolytic reactions added"
+        )
+        if len(_config["parameters"]["species_order"]) > 0:
+            logger.info("CONFIG::Reading previous species order.")
+
+        logger.info(f"CONFIG::{out.species.len_dyn_species()} Dynamical Species added.")
+        logger.info(f"CONFIG::{out.species.len_cst_species()} Constant Species added.")
+        logger.info("CONFIG::Simulation Configuration done!")
+
+        logger.setLevel(_prev_log_lvl)  # restore log level
+        return out
+
+    @staticmethod
+    def _chemistry_builder(
+        config: ConfigDict,
+    ) -> tp.Tuple[ReactionsList, ListSpecies, SimParameters, tp.Dict[str, float]]:
+        """
+        Build the ReactionsList, ListSpecies, SimParameters and initial_cc
+        based on config dict.
+
+        Return:
+            ReactionsList
+            ListSpecies
+            SimParameters
+            Dict[str, float]
+        """
         # Read Constant species and create the species collection
         list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
-
-        # Read parameters
-        parameters = config.get("parameters", {})
-        if "pH" not in parameters:
-            logger.warning(
-                "CONFIG::pH is not defined in Sim parameters! Assuming pH=7",
-            )
-            parameters["pH"] = 7
-
         # Copy initial cc and strip species name on the fly.
         initial_cc = {}
         list_sp.add_cst_species(RPARSER.parse_species("H2O"), cc=H2O.cc_init.coef)
@@ -302,76 +359,50 @@ class SimEnv:
             initial_cc[key.strip()] = cc
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        if parameters.get("force_cst_pH", False):
+        if config["parameters"].get("force_cst_pH", False):
             with suppress(radiopyo_exceptions.IsSimSpeciesError):
                 list_sp.add_cst_species(
-                    RPARSER.parse_species(cls.PH_SPECIES),
-                    10 ** (-parameters["pH"]),
+                    RPARSER.parse_species(SimEnv.PH_SPECIES),
+                    10 ** (-config["parameters"]["pH"]),
                 )
             with suppress(radiopyo_exceptions.IsSimSpeciesError):
                 list_sp.add_cst_species(
                     RPARSER.parse_species("OH_minus"),
-                    10 ** (-14 + parameters["pH"]),
+                    10 ** (-14 + config["parameters"]["pH"]),
                 )
         else:
             list_sp.add_dyn_species(
-                RPARSER.parse_species(cls.PH_SPECIES),
-                cc_init=10 ** (-parameters["pH"]),
+                RPARSER.parse_species(SimEnv.PH_SPECIES),
+                cc_init=10 ** (-config["parameters"]["pH"]),
             )
             list_sp.add_dyn_species(
                 RPARSER.parse_species("OH_minus"),
-                cc_init=10 ** (-14 + parameters["pH"]),
+                cc_init=10 ** (-14 + config["parameters"]["pH"]),
             )
-
-        # Sanity check
-        if "reactions" not in config:
-            logger.warning(
-                "CONFIG::No 'reactions' section in the provided configuration"
-            )
-            config["reactions"] = {
-                "acid_base": [],
-                "k_reaction": [],
-                "enzymatic": [],
-                "radiolytic": {},
-                "equilibrium": [],
-                "arrhenius": [],
-                "constant": [],
-            }
 
         # Read Acid/Base Reactions
         ab, list_sp = acid_base_from_dict(
             config["reactions"].get("acid_base", []), list_sp
         )
-        logger.info(f"CONFIG::{len(ab)} Acid/Base reactions added")
 
         # Read Equilibrium Reactions
         er, list_sp = eq_reaction_from_dict(
             config["reactions"].get("equilibrium", []), list_sp
         )
-        logger.info(f"CONFIG::{len(er)} Equilibrium reactions added")
 
         # Read K-Reactions
         kr, list_sp = kreaction_from_dict(
             config["reactions"].get("k_reaction", []), list_sp
         )
-        logger.info(f"CONFIG::{len(kr)} K-reactions added")
 
         # Read ConstantReactions
         cr, list_sp = cst_reaction_from_dict(
             config["reactions"].get("constant", []), list_sp
         )
-        logger.info(f"CONFIG::{len(cr)} Constant reactions added")
 
         # Read Arrhenius reactions
         ar, list_sp = arrhenius_from_dict(
             config["reactions"].get("arrhenius", []), list_sp
-        )
-        logger.info(f"CONFIG::{len(ar)} Arrhenius reactions added")
-
-        logger.info(
-            f"CONFIG::A total of ({len(ab)} + {len(er)})*2 + {len(kr)} + {len(ar)} "
-            f"+ {len(cr)} = {(len(ab)+len(er))*2+len(kr)+len(ar)+len(cr)}"
-            f" k-reactions have been added"
         )
 
         # Merge Arrhenius & Constant with KReaction Collection
@@ -382,13 +413,11 @@ class SimEnv:
         enz, list_sp = michaelis_from_dict(
             config["reactions"].get("enzymatic", []), list_sp
         )
-        logger.info(f"CONFIG::{len(enz)} Enzymatic reactions added")
 
         # Read Radiolytic Reactions
         rad, list_sp = radiolytic_from_dict(
             config["reactions"].get("radiolytic", {}), list_sp
         )
-        logger.info(f"CONFIG::{len(rad)} Radiolytic reactions added")
 
         # Read and set initial concentrations
         for label, value in initial_cc.items():
@@ -403,11 +432,10 @@ class SimEnv:
             list_sp.add_cst_species(BasicSpecies("trash"), 0.0)
 
         # Sort species so that all constant species are at the end.
-        if "species_order" in parameters:
-            logger.info("CONFIG::Reading previous species order.")
+        if "species_order" in config["parameters"]:
             list_sp.set_order(
-                dyn_sp=parameters["species_order"]["dynamical"],
-                cst_sp=parameters["species_order"]["constant"],
+                dyn_sp=config["parameters"]["species_order"]["dynamical"],
+                cst_sp=config["parameters"]["species_order"]["constant"],
             )
         else:
             starter = []
@@ -416,18 +444,48 @@ class SimEnv:
                 starter.append(r.base.label)
             list_sp.sort(inplace=True, starter=starter)
 
-        logger.info(f"CONFIG::{list_sp.len_dyn_species()} Dynamical Species added.")
-        logger.info(f"CONFIG::{list_sp.len_cst_species()} Constant Species added.")
-        logger.info("CONFIG::Simulation Configuration done!")
-        out = cls(
-            reactions=ReactionsList(ab, er, kr, enz, rad),
-            species=list_sp,
-            parameters=parameters,
-            initial_cc=initial_cc,
+        return (
+            ReactionsList(ab, er, kr, enz, rad),
+            list_sp,
+            config["parameters"],
+            initial_cc,
         )
-        out._config_dict = deepcopy(config)
-        logger.setLevel(_prev_log_lvl)  # restore log level
-        return out
+
+    def update_temperature(self, T: Temperature | float) -> None:
+        """ """
+        if isinstance(T, (int, float)):
+            self.parameters["temperature"] = T
+        elif isinstance(T, Temperature):
+            self.parameters["temperature"] = T.celsius
+        else:
+            raise TypeError(f"Unknown type for temperature: {type(T)}")
+
+    def update_flag_positive(self, force_positive: bool) -> None:
+        """ """
+        self.parameters["force_positive"] = force_positive
+
+    def update_flag_GValues(self, variable_GValues: bool) -> None:
+        """ """
+        self.parameters["variable_GValues"] = variable_GValues
+
+    def update_flag_pH(
+        self,
+        force_cst_pH: bool,
+        pH: tp.Optional[float] = None,
+    ) -> None:
+        """ """
+        if self.parameters["force_cst_pH"] != force_cst_pH:
+            _config = self.convert_to_config_dict()
+            self.parameters["force_cst_pH"] = force_cst_pH
+
+        if pH is not None:
+            self.update_pH(pH)
+
+    def update_pH(self, pH: float) -> None:
+        """ """
+        self.parameters["pH"] = pH
+        self.species[self.PH_SPECIES].set_initial_cc(10 ** (-pH))
+        self.species["OH_minus"].set_initial_cc(10 ** (-14 + pH))
 
     def initial_values(
         self,
@@ -731,13 +789,13 @@ class SimEnv:
                 out.append((reaction, k_val))
         return out
 
-    def convert_to_config_dict(self) -> ConfigDict:
+    def convert_to_config_dict(self, include_species_order: bool = False) -> ConfigDict:
         """ """
-        out = deepcopy(self._config_dict)  # Copy the original config
+        out = default_ConfigDict()
+        out["parameters"] = self.parameters.copy()
 
         # Now update the dictionary
         # Update Reactions
-        out["reactions"] = default_ConfigDict()["reactions"]
         out["reactions"]["acid_base"] = [
             r.to_dict() for r in self.reactions.ab_reaction
         ]
@@ -778,6 +836,15 @@ class SimEnv:
                 out["concentrations"]["fixed"][elt.label] = elt.cc_init.coef.tolist()
             else:
                 out["concentrations"]["fixed"][elt.label] = elt.initial_cc()
+
+        if include_species_order:
+            out["parameters"]["species_order"] = {
+                "dynamical": [
+                    sp.label for sp in self.species.sorted_iter_dyn_species()
+                ],
+                "constant": [sp.label for sp in self.species.sorted_iter_cst_species()],
+            }
+
         return out
 
 

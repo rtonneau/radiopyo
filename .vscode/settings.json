@@ -3,7 +3,8 @@
   "cSpell.words": [
     "Boscolo",
     "deprotonation",
-    "kreaction"
+    "kreaction",
+    "RPARSER"
   ],
   "mypy-type-checker.reportingScope": "workspace",
 }

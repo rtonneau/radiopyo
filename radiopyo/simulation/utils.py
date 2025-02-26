@@ -594,7 +594,9 @@ class H5Manager(AbstractContextManager):
             out = ODEResult.from_json_config(json_path)
             dummy_result = DummyScipyOdeResult.from_dataframe(
                 self.read_dataset(name, grp),
-                order=out.env._config_dict["parameters"]["species_order"]["dynamical"],
+                order=out.env.convert_to_config_dict(include_species_order=True)[
+                    "parameters"
+                ]["species_order"]["dynamical"],
             )
             if "json_config" not in grp[name].attrs:
                 raise KeyError(f"No json file recorded with stored ODE sol {name}")

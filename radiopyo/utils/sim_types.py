@@ -12,7 +12,7 @@ from __future__ import annotations
 import typing as tp
 
 # ----------------------------- Internal imports ---------------------------- #
-
+from radiopyo.chemistry.utils.units import Temperature
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -26,9 +26,29 @@ __all__ = [
     "KwargsRun",
     "ReactionsDict",
     "SimMatrices",
+    "deep_update",
     "default_ConfigDict",
 ]
 # --------------------------------------------------------------------------- #
+
+
+# --------------------------------------------------------------------------- #
+#                            FUNCTION DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
+
+
+def deep_update(
+    original: tp.Dict[str, tp.Any],
+    updates: tp.Dict[str, tp.Any],
+) -> tp.Dict[str, tp.Any]:
+    """Recursively updates a nested dictionary with another dictionary."""
+    for key, value in updates.items():
+        if isinstance(value, dict) and isinstance(original.get(key), dict):
+            deep_update(original[key], value)  # Recursive update
+        else:
+            original[key] = value  # Replace value
+    return original
+
 
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
@@ -69,6 +89,7 @@ class SimParameters(tp.TypedDict, total=False):
     timestamp: float
     t_zero_pulse: float
     force_positive: bool
+    variable_GValues: bool
 
 
 class ConfigDict(tp.TypedDict, total=False):
@@ -103,11 +124,24 @@ class SimMatrices(tp.TypedDict):
     cst_sp: NDArray[np.float64]
 
 
+def default_SimParameters() -> SimParameters:
+    return SimParameters(
+        pH=7.0,
+        force_cst_pH=False,
+        species_order={},
+        temperature=Temperature._DEFAULT,
+        timestamp=0.0,
+        t_zero_pulse=1e-7,
+        force_positive=True,
+        variable_GValues=False,
+    )
+
+
 def default_ConfigDict() -> ConfigDict:
     """ """
     return {
         "includes": {},
-        "parameters": {},
+        "parameters": default_SimParameters(),
         "concentrations": {
             "fixed": {},
             "initial": {},
