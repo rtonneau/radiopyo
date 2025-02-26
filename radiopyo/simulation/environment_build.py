@@ -478,10 +478,13 @@ class SimEnv:
         """ """
         if self.parameters["force_cst_pH"] != force_cst_pH:
             _config = self.convert_to_config_dict()
+            _config["parameters"]["pH"] = pH or self.parameters["pH"]
             _config["parameters"]["force_cst_pH"] = force_cst_pH
             self.reactions, self.species, self.parameters, self.initial_cc = (
                 SimEnv._chemistry_builder(_config)
             )
+            return
+
         if pH is not None:
             self.update_pH(pH)
 

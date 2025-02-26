@@ -262,24 +262,28 @@ class UnitCell(object):
             None
         """
         self.beam_list.update_let(let)
-        logger.info(
-            f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm for {self.beam.dose_rate_peak:.2g} Gy/s"
-        )
+        if self.env.parameters["variable_GValues"]:
+            _dr = self.beam.dose_rate_peak
+            logger.info(
+                f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm for {_dr:.2g} Gy/s"
+            )
+        else:
+            _dr = None
+            logger.info(
+                f"Adapting (from Boscolo) Radiolytic yields to {let} keV/µm (No dose rate dep.)"
+            )
+
         for reaction in self.env.reactions.radiolytic:
             sp = reaction.species()
             if sp.label not in self.g_val or (not self.env.species.is_dyn_species(sp)):
                 continue
-            reaction.update_from_ge(
-                self.g_val.values_at(sp.label, let, self.beam.dose_rate_peak)
-            )
+            reaction.update_from_ge(self.g_val.values_at(sp.label, let, _dr))
 
         # Recompute the Gi_mat accordingly
         # self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
         self._update_matrices()
 
-        logger.debug(
-            f"New G values [radical / 100eV / incident particle] at {self.beam.dose_rate_peak:.2g} Gy/s are:"
-        )
+        logger.debug("New G values [radical / 100eV / incident particle] are:")
         for reaction in self.env.reactions.radiolytic:
             logger.debug(f"-> {reaction.label()}: {reaction.ge():.3f}")
 
