@@ -12,6 +12,7 @@ Author:
 from __future__ import annotations
 
 import collections
+import copy
 import logging
 import time
 import typing as tp
@@ -20,9 +21,8 @@ from contextlib import suppress
 import numpy as np
 from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 
-from radiopyo.chemistry.utils.units import Temperature
-
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.ron import RonFileParser
 from radiopyo.parser.toml import TOMLFileParser
@@ -653,6 +653,49 @@ class UnitCell(object):
             use_beam=use_beam,
             force_positive=force_positive,
         )
+
+    def run_multi_doses(
+        self,
+        t_span: tp.Tuple[float, float],
+        doses: tp.Collection[float],
+        **kwargs: tp.Unpack[KwargsRun],
+    ) -> tp.Iterator[ODEResult]:
+        """ """
+        if len(doses) <= 0:
+            raise ValueError("No dose provided")
+        kwargs_beam_off = copy.deepcopy(kwargs)
+        kwargs_beam_off["use_beam"] = False
+
+        _doses = list(doses)
+
+        ## First run
+        self.beam.update_beam_param(max_dose=_doses.pop(0))
+        time_max = self.beam.time_at_max_dose
+        sim = self.prepare_chunked_run(t_span=(t_span[0], time_max), **kwargs)
+        acc_res = sim.run()  # To accumulate beam ON runs
+
+        res = self.run(
+            t_span=(time_max, t_span[1]),
+            y0=acc_res.final_cc,
+            **kwargs_beam_off,
+        )
+        yield copy.deepcopy(acc_res) + res
+
+        for dose in _doses:
+            self.beam.update_beam_param(max_dose=dose)
+            time_max = self.beam.time_at_max_dose
+            sim = self.prepare_chunked_run(
+                t_span=(acc_res.time[-1], time_max),
+                y0=acc_res.final_cc,
+                **kwargs,
+            )
+            acc_res = acc_res + sim.run()
+            res = self.run(
+                t_span=(time_max, t_span[1]),
+                y0=acc_res.final_cc,
+                **kwargs_beam_off,
+            )
+            yield copy.deepcopy(acc_res) + res
 
 
 # -------------------------- Chunked Simulation Run ------------------------- #

@@ -165,6 +165,14 @@ class O2Convert(SpeciesConvert):
     convertor = ConcentrationConvert(henry_cst=1.3e-3, mass=32.0)
 
 
+class CO2Convert(SpeciesConvert):
+    convertor = ConcentrationConvert(henry_cst=3.4e-2, mass=44.0)
+
+
+class N2Convert(SpeciesConvert):
+    convertor = ConcentrationConvert(henry_cst=6.1e-4, mass=28.0)
+
+
 class ResCollection(object):
     """
     Container class storing ODEResult instances.
