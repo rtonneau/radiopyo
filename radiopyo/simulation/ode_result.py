@@ -714,7 +714,11 @@ class ODEResult(object):
         env = SimEnv(*SimEnv._chemistry_builder(config))
 
         beam_type, beam_config = next(iter(config["beam"].items()))
-        _, beam, LET = BeamCollection.build_beam_from_dict(beam_type, beam_config)
+        _, beam, LET = BeamCollection.build_beam_from_dict(
+            beam_type,
+            beam_config,
+            verbose=False,
+        )
         mat = env.build_all_matrices()
         t_zero = config["parameters"].get("t_zero_pulse", 1e-7)
         out = cls(

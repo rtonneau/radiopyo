@@ -835,8 +835,6 @@ class SimChunksIter:
                     from tqdm.notebook import (  # type: ignore[import-untyped]
                         tqdm,
                     )
-
-                    print(f"Ok TQDM available for jupyter ({gip})")
             # Perform Simulation with TQDM.
             sim = tqdm(self)
         except ImportError:

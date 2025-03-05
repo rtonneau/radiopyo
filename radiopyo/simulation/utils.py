@@ -742,7 +742,9 @@ class SimCollection:
     def _copy_dataframe(self) -> pd.DataFrame:
         return self._content.copy()
 
-    def select(self, keys: tp.List[str]) -> None:
+    def select(self, keys: tp.Optional[tp.List[str]] = None) -> None:
+        if keys is None:
+            keys = []
         self.keys = keys
         self._read_content()
 
