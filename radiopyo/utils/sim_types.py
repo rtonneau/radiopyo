@@ -139,7 +139,7 @@ def default_SimParameters() -> SimParameters:
         temperature=Temperature._DEFAULT,
         timestamp=0.0,
         t_zero_pulse=1e-7,
-        force_positive=True,
+        force_positive=False,
         variable_GValues=False,
     )
 

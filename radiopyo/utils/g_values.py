@@ -93,10 +93,12 @@ class GValuesBoscolo:
 
     @staticmethod
     def _scale_factor(dose_rate: tp.Optional[float]) -> float:
-        # return 1.0
         if dose_rate is None:
             return 1.0
-        return 0.83337949 * np.power(dose_rate, -0.1)
+        # return 0.83337949 * np.power(dose_rate, -0.1) # First fit with 30 Gy Blain data
+        return 0.97207704 * np.power(
+            dose_rate, -0.10972
+        )  # Second fit with whole Blain data, Gfit
 
     def values_at(
         self,
