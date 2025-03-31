@@ -113,7 +113,7 @@ file. Files defined at the package level are the following:
    Includes both 'basic_water_radiolysis.toml' and 'reactions_biology.toml' and add a
    constant beam matching the one used in the excellent paper of R. Labarbe.
 
-### [parameters]
+### \[parameters\]
 
 Contains the main parameters (initial pH, variable pH or not, force positive values,...)
 
