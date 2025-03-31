@@ -210,6 +210,10 @@ class UnitCell(object):
         """
         return cls.from_parser(file, RonFileParser)
 
+    def update_env(self) -> None:
+        """ """
+        self._update_matrices()
+
     def _update_matrices(self) -> None:
         """ """
         self.mat = self.env.build_all_matrices(self._T)
@@ -661,6 +665,7 @@ class UnitCell(object):
         **kwargs: tp.Unpack[KwargsRun],
     ) -> tp.Iterator[ODEResult]:
         """ """
+        raise NotImplementedError
         if len(doses) <= 0:
             raise ValueError("No dose provided")
         kwargs_beam_off = copy.deepcopy(kwargs)
@@ -845,32 +850,3 @@ class SimChunksIter:
         res = collections.deque(sim, maxlen=1).pop()
         logger.info("Simulation done!")
         return res
-
-    # def subdivide_last_chunk(
-    #     self,
-    #     n: int,
-    #     max_step_size: tp.Optional[float] = None,
-    #     scale: str = "log",
-    # ) -> SimChunksIter:
-    #     last = self.chunks.pop()
-    #     if max_step_size is None or max_step_size < last.max_step_size:
-    #         max_step_size = last.max_step_size
-
-    #     if scale == "linear":
-    #         chunks = np.linspace(last.start, last.stop, num=n + 1)
-    #         steps = np.linspace(last.max_step_size, max_step_size, num=n)
-    #     elif scale == "log":
-    #         chunks = np.logspace(np.log10(last.start), np.log10(last.stop), num=n + 1)
-    #         steps = np.logspace(
-    #             np.log10(last.max_step_size), np.log10(max_step_size), num=n
-    #         )
-
-    #     for idx in range(n):
-    #         self.chunks.append(
-    #             SimChunk(
-    #                 chunks[idx],
-    #                 chunks[idx + 1],
-    #                 steps[idx],
-    #             )
-    #         )
-    #     return self

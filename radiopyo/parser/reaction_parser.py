@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import typing as tp
+import warnings
 from pathlib import Path
 
 import lark
@@ -150,8 +151,8 @@ class TreeToReaction(lark.Transformer):
             return (Molecule.from_atom_dict(**kwargs), stoi, Operation.ADD)
         raise ValueError(f"Unknown species: {kwargs}")
 
-    def enzyme(self, items: tp.List) -> str:
-        return items[0]
+    def enzyme(self, items: tp.List) -> BasicSpecies:
+        return BasicSpecies(items[0])
 
     def ion(self, items: tp.List) -> tp.Dict:
         return items[0]
@@ -248,7 +249,7 @@ class ReactionParser(object):
                     self._set_mass(species)
                 except KeyError:
                     logger.warning(
-                        f"Unable to compute mass of {species}. "
+                        f"Unable to compute mass of {species} "
                         "Setting it to default mass, i.e. 0"
                     )
                     species.mass = 0
@@ -258,7 +259,7 @@ class ReactionParser(object):
                     self._set_mass(species)
                 except KeyError:
                     logger.warning(
-                        f"Unable to compute mass of {species}. "
+                        f"Unable to compute mass of {species} "
                         "Setting it to default mass, i.e. 0"
                     )
                     species.mass = 0
@@ -267,10 +268,9 @@ class ReactionParser(object):
                 self._set_mass(r["enzyme"])
             except KeyError:
                 logger.warning(
-                    f"Unable to compute mass of {species}. "
+                    f"Unable to compute mass of {species} "
                     "Setting it to default mass, i.e. 0"
                 )
-                r["enzyme"].mass = 0
         return r
 
     def parse_species(self, species: str) -> BasicSpecies | Atom | Molecule:
@@ -300,26 +300,14 @@ class ReactionParser(object):
                 if unknown species
                 i.e. not in 'data/_data_atomic_weights.txt'
         """
+        # Not usable yet. Issues with some molecule's name and the
+        # "parse_species" method used in several places.
+        return
         if isinstance(species, Atom):
-            try:
-                species.mass = self.atomix.get(species.raw_label())
-                return
-            except KeyError as e:
-                # Let's add an exception for Carbon Centered molecules named R, ROOH,...
-                if "R" not in species.raw_label():
-                    msg = f"Unable to compute mass of: {species}"
-                    raise KeyError(msg) from e
-                species.mass = 0
-                return
+            species.mass = self.atomix.get(species.raw_label())
+            return
 
+        # species is a molecule
         for atom, _ in species:
-            try:
-                atom.mass = self.atomix.get(atom.raw_label())
-            except KeyError as e:
-                # Let's add an exception for Carbon Centered molecules named R, ROOH,...
-                if "R" not in atom.raw_label():
-                    msg = f"Unable to compute mass of: {atom} for molecule: {species}"
-                    raise KeyError(msg) from e
-                atom.mass = np.inf
-                return
+            atom.mass = self.atomix.get(atom.raw_label())
         return

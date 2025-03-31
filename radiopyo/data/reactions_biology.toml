@@ -1,9 +1,6 @@
-[parameters]
-pH = 7
 
 #---------------------- Definition of Constants concentrations -------------------------
 [concentrations.fixed] # Unit is [mol]/[l]
-H2O = 55
 catalase = 8.0e-8
 Fe_plus_plus = 8.9e-7
 GSH = 6.5e-3
@@ -11,19 +8,19 @@ RH = 1
 unsat_lipid = 1e-6
 
 #----------------------- Definition of initial concentrations --------------------------
-# Rem: if unspecified, initial cc are assumed 0 (except for constant species)    
+# Rem: if unspecified, initial cc are assumed 0 (except for constant species)
 [concentrations.initial] # Unit is [mol]/[l]
 O2 = 50e-6
 
 # ----------------------------------------------------------------------------------
-#                             DEFINE RADIOLYTIC REACTIONS                            
+#                             DEFINE RADIOLYTIC REACTIONS
 # ----------------------------------------------------------------------------------
 [reactions.radiolytic] # Unit is [radical / 100eV / incident particle]
 R_r = 0.59
 
 
 # ----------------------------------------------------------------------------------
-#                                 DEFINE K-REACTIONS                             
+#                                 DEFINE K-REACTIONS
 # ----------------------------------------------------------------------------------
 
 #For [X].[X] -> ... reactions 2k value is given
@@ -79,7 +76,7 @@ k_value = 20
 
 
 # ----------------------------------------------------------------------------------
-#                            DEFINE ENZYMATIC REACTIONS                             
+#                            DEFINE ENZYMATIC REACTIONS
 # ----------------------------------------------------------------------------------
 # These reactions are implemented via the Michaelis Menten kinetic
 

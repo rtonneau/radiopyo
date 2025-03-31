@@ -3,7 +3,7 @@
 ![version](https://img.shields.io/badge/version-0.3.0-blue)
 ![License](https://img.shields.io/badge/License-LGPL3-radiopyo.svg)
 ![maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
-![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)
+![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)
 
 This python3 module allows you to perform radiobiology related simulations. The embedded
 science (all Physics, Chemistry & Biology) has the purpose to solve systems of Ordinary
@@ -19,13 +19,13 @@ support. Second, please be aware that this code base uses the fast
 [RUFF](https://github.com/astral-sh/ruff) linter and comply with the
 [Mypy](https://mypy.readthedocs.io/en/stable/index.html) static type checker.
 
-ps: Needless to say that Python2 is forbidden...  
+ps: Needless to say that Python2 is forbidden...
 pps: There is currently no code coverage (tests)... a big problem to solve.
 
 ## Getting Started
 
 This documentation assumes you already have or know how to install a new python3
-environment on your local machine. If it is not yest the suggest, I suggest to check
+environment on your local machine. If it is not the case, we suggest to check
 [this](https://www.anaconda.com/) out.
 
 Currently the main dependencies of this modules are:
@@ -67,37 +67,16 @@ For JupyterLab user, think to also install (to have nice progressbar):
 ## Usage
 
    ```python
-   import radiopyo as rp 
+   import radiopyo as rp
 
    # Simulation handler
-   # rp.LABARBE_CONFIG_FILE contains environment and beam definitions
+   # rp.LABARBE_CONFIG_FILE contains environment and beam definition
    sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
-   res = sim.run(t_span=[1e-9, 10]) #Run simulation from 1e-9 s to 10 s.
+   res = sim.run(t_span=[1e-7, 10]) #Run simulation from 1e-7 s to 10 s.
 
    # Extract results to a nice pandas DataFrame.
-   df = res.to_pandas() 
+   df = res.to_pandas()
 
-   # ---------- Same but change beam definition ----------
-   peak_dose_rate  = 1000 # Gy/s (dose rate during ON time)
-   max_dose = 10 # Gy
-   period = 10e-3 # seconds
-   on_time = 1e-3 # seconds (=> Duty cycle of 10%)
-   beam = rp.PulsedBeam.from_peak_dose_rate(peak_dose_rate, period, on_time, max_dose)
-   
-   sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
-   sim.set_beam(beam)
-   
-   # Better to adapt simulation settings during ON and OFF time.
-   res = sim.prepare_chunked_run(t_span=[1e-9, 10],
-                                 atol=1e-4, #Absolute tolerance of the ODE Solver
-                                 rtol=1e-6, #Relative tolerance of the ODE Solver
-                                 max_step_size_on=1e-8,  #seconds
-                                 max_step_size_off=0.01, #seconds
-                                 ).run()
-   # /!\ For atol and rtol, the base unit for the ODE solver is [µmol/l]
-
-   df = res.to_pandas() # pandas.DataFrame
-   
    # Time integrate species concentrations.
    s = res.integrate_species() # pandas.Series
    ```
@@ -105,8 +84,7 @@ For JupyterLab user, think to also install (to have nice progressbar):
 ## Configuring Simulation
 
 For the moment, the only ways to load simulation configurations is via
-[ron](https://github.com/ron-rs/ron) or [toml](https://toml.io/en/) files.
-TOML files are recommended.
+[toml](https://toml.io/en/) file.
 The TOML configuration file consists of several sections:
 
 ### [includes]
@@ -118,7 +96,7 @@ in an included file.
 
 ```toml
 toml = [
-    "radiopyo/basic_water_radiolysis.toml",
+    "radiopyo/advanced_water_radiolysis.toml",
     "radiopyo/reactions_biology.toml",
 ]
 ```
@@ -127,17 +105,17 @@ toml = [
 package. Of course, each entry can be an absolute path towards a valid configuration
 file. Files defined at the package level are the following:
 
-- basic_water_radiolysis.toml  
+- advanced_water_radiolysis.toml
    Contains all reactions related to the radiolysis of pure water.
-- reactions_biology.toml  
+- reactions_biology.toml
    Includes 'basic_water_radiolysis.toml' and add biological reactions.
-- config_Labarbe.toml  
+- config_Labarbe.toml
    Includes both 'basic_water_radiolysis.toml' and 'reactions_biology.toml' and add a
    constant beam matching the one used in the excellent paper of R. Labarbe.
 
-### [bio_param]
+### [parameters]
 
-Contains the main biological parameters (only pH for now)
+Contains the main parameters (initial pH, variable pH or not, force positive values,...)
 
 ### [concentrations.fixed]
 
@@ -147,7 +125,6 @@ For example:
 
 ```toml
 [concentrations.fixed] # Unit is [mol]/[l]
-H2O = 55
 catalase = 8.0e-8
 ```
 
@@ -183,9 +160,10 @@ For example:
 
 ```toml
 [[reactions.acid_base]]
-acid = "OH_r"
-base = "O_r_minus"
-pKa = 11.9
+reaction = "H2O2 <-> H3O_plus + HO2_minus"
+pKa = 11.65
+k_forward = 9.43e-2
+k_backward = 5.02e10
 
 ```
 
@@ -205,7 +183,7 @@ k_value = 6.0e8
 
 Charges must be specified either by '_minus' or '_plus'. For multiple charge, just
 multiply the specifier e.g. $Fe^{2+}$ -> Fe_plus_plus.
-Reactants and products must only be separated by '->' characters.
+Reactants and products must only be separated by the '->' string.
 
 Blanks/spaces for separation are allowed but not mandatory.
 
@@ -251,7 +229,7 @@ period         = 121   # Beam period repetition [s]
 on_time        = 0.1   # Time duration for beam ON [s]
 n_pulse        = 8     # Number of pulses
 start_time     = 30    # Time of first pulse [s]
-LET            = 0.201 # [keV/µm] 
+LET            = 0.201 # [keV/µm]
 ```
 
 ```toml
@@ -277,7 +255,7 @@ LET            = 3.2   # [keV/µm]
 ```toml
 [[beam.singlepulse]]
 label          = "singlepulse example"
-dose_rate      = 2.2e6 # Average dose rate (for singlepulse beam, same as peak) [Gy/s]    
+dose_rate      = 2.2e6 # Average dose rate (for singlepulse beam, same as peak) [Gy/s]
 on_time        = 3e-6  # Time duration for beam ON [s]
 LET            = 0.201 # [keV/µm]
 ```
@@ -298,7 +276,7 @@ LET values will redefine the G-values of the following species:
 - H2O2
 
 G-values are extrapolated according to the work of [D.
-Boscolo](https://doi.org/10.3390/ijms21020424)  
+Boscolo](https://doi.org/10.3390/ijms21020424)
 Therefore, LET values must be in the range: [0.13, 150] keV/µm
 
 ## Ways of Running Simulation
@@ -308,32 +286,32 @@ The module currently supports 2 ways of running simulations:
 - run in one single block
 
    ```python
-   import radiopyo as rp 
+   import radiopyo as rp
 
    # Simulation handler
    sim = rp.UnitCell.from_toml_file(rp.LABARBE_CONFIG_FILE)
-   res = sim.run(t_span=[1e-9, 10]) #Run simulation from 1e-9 s to 10 s.
+   res = sim.run(t_span=[1e-7, 10]) #Run simulation.
 
    ```
 
 - run in several chunks (useful for pulsed beams)
 
    ```python
-   import radiopyo as rp 
+   import radiopyo as rp
 
    # Beam Definition
-   peak_dose_rate  = 1000 # Gy/s
+   dose_rate_peak  = 1000 # Gy/s
    max_dose        = 10   # Gy
    period          = 1e-3 # seconds
    on_time         = 5e-6 # seconds
-   beam = rp.PulsedBeam.from_peak_dose_rate(peak_dose_rate, period, on_time, max_dose)
-   
+   beam = rp.PulsedBeam.from_dose_rate_peak(dose_rate_peak, period, on_time, max_dose)
+
    # Simulation handler
    sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
    sim.set_beam(beam)
-   
+
    # Better to adapt simulation settings during ON and OFF time.
-   res = sim.prepare_chunked_run(t_span=[1e-9, 10],
+   res = sim.prepare_chunked_run(t_span=[1e-7, 10],
                                  max_step_size_on=1e-8,  #seconds
                                  max_step_size_off=0.01, #seconds
                                  ).run()

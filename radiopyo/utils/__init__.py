@@ -10,7 +10,11 @@ from __future__ import annotations
 import typing as tp
 
 # ----------------------------- Internal imports ---------------------------- #
-from .useful_path import LABARBE_CONFIG_FILE, PACKAGE_DATA_PATH
+from .useful_path import (
+    LABARBE_CONFIG_FILE,
+    PACKAGE_DATA_PATH,
+    PURE_WATER_CONFIG_FILE,
+)
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -20,6 +24,7 @@ if tp.TYPE_CHECKING:
 __all__: tp.List = [
     "PACKAGE_DATA_PATH",
     "LABARBE_CONFIG_FILE",
+    "PURE_WATER_CONFIG_FILE",
 ]
 
 # ---------------------------------- Logging -------------------------------- #

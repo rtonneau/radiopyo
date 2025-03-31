@@ -20,6 +20,7 @@ if tp.TYPE_CHECKING:
 __all__: tp.List = [
     "PACKAGE_DATA_PATH",
     "LABARBE_CONFIG_FILE",
+    "PURE_WATER_CONFIG_FILE",
 ]
 
 # ---------------------------------- Logging -------------------------------- #
@@ -27,3 +28,4 @@ __all__: tp.List = [
 # --------------------------------------------------------------------------- #
 PACKAGE_DATA_PATH = Path(f"{Path(__file__).parent.parent}//data").absolute()
 LABARBE_CONFIG_FILE = PACKAGE_DATA_PATH / "config_Labarbe.toml"
+PURE_WATER_CONFIG_FILE = PACKAGE_DATA_PATH / "advanced_water_radiolysis.toml"

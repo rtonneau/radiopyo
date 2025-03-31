@@ -13,7 +13,11 @@ from pathlib import Path
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
 from radiopyo.simulation.unit_cell import UnitCell
-from radiopyo.utils import LABARBE_CONFIG_FILE, PACKAGE_DATA_PATH
+from radiopyo.utils import (
+    LABARBE_CONFIG_FILE,
+    PACKAGE_DATA_PATH,
+    PURE_WATER_CONFIG_FILE,
+)
 from radiopyo.utils.logging import (
     disable_logging,
     enable_logging,
@@ -36,6 +40,7 @@ __all__: tp.List = [
     "set_logging_level",
     "PACKAGE_DATA_PATH",
     "LABARBE_CONFIG_FILE",
+    "PURE_WATER_CONFIG_FILE",
     "enable_logging",
     "set_logging_level",
     "enable_logging",

@@ -35,6 +35,7 @@ global EPSILON
 EPSILON = 1e-25  # µmol/L
 
 
+# Unused for the moment
 def jacobian(
     t: float,
     y: NDArray[np.float64],
