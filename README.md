@@ -87,7 +87,7 @@ For the moment, the only ways to load simulation configurations is via
 [toml](https://toml.io/en/) file.
 The TOML configuration file consists of several sections:
 
-### [includes]
+### \[includes\]
 
 This section enable the user to reference other config file to read.
 All included files will have a lower precedence i.e. will be erased by new definitions.
@@ -117,7 +117,7 @@ file. Files defined at the package level are the following:
 
 Contains the main parameters (initial pH, variable pH or not, force positive values,...)
 
-### [concentrations.fixed]
+### \[concentrations.fixed\]
 
 Contains the concentrations of species supposed to be constant.
 => If a species is recorded in this section, its concentration will be forced constant.
@@ -128,7 +128,7 @@ For example:
 catalase = 8.0e-8
 ```
 
-### [concentrations.initial]
+### \[concentrations.initial\]
 
 Contains the initial concentrations of the species.
 => If a species is not recorded in this section, its initial concentration will be
@@ -140,7 +140,7 @@ For example:
 O2 = 50e-6
 ```
 
-### [reactions.radiolytic]
+### \[reactions.radiolytic\]
 
 Contains the G-values of the species created by the radiation
 source. The unit is [radical/100eV/incident particle].
@@ -152,7 +152,7 @@ e_aq = 2.8
 OH_r = 2.8
 ```
 
-### [[reactions.acid_base]]
+### \[\[reactions.acid_base\]\]
 
 Contains all the acid/base reactions involved in the model. Each
 entry must defined 3 fields: "acid", "base" & "pKa".
@@ -167,9 +167,9 @@ k_backward = 5.02e10
 
 ```
 
-ps: note the double "[[" and "]]", mandatory for each entry!
+ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 
-### [[reactions.k_reaction]]
+### \[\[reactions.k_reaction\]\]
 
 Contains all the simple chemical reactions involved in the model.
 Each list entry must defined 2 fields: "reaction" & "k_value".
@@ -187,9 +187,9 @@ Reactants and products must only be separated by the '->' string.
 
 Blanks/spaces for separation are allowed but not mandatory.
 
-ps: note the double "[[" and "]]", mandatory for each entry!
+ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 
-### [[reactions.enzymatic]]
+### \[\[reactions.enzymatic\]\]
 
 Contains all the Enzymatic reactions involved in the model. The
 enzymatic reactions are modelled with the Michaelis-Menten kinetic. Each list
@@ -207,7 +207,7 @@ k_micha = 1.1 #  [mol/l]
 The same grammar as for "k_reactions" applies. For enzymatic reactions, the enzyme name
 must be specified in the operator arrow (-- 'enzyme name' >>).
 
-ps: note the double "[[" and "]]", mandatory for each entry!
+ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 
 ### Possible beam definitions
 
@@ -260,7 +260,7 @@ on_time        = 3e-6  # Time duration for beam ON [s]
 LET            = 0.201 # [keV/µm]
 ```
 
-ps: note the double "[[" and "]]", mandatory for each entry!
+ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 
 The 'label' keyword is not mandatory. If not specify, the 'default' label will be given.
 However, be aware that any attempt to create another unlabelled (or labelled 'default')
