@@ -20,7 +20,7 @@ from radiopyo.chemistry.species_collection import ListSpecies
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.basic_reaction import GenericReaction
+    from radiopyo.chemistry.generics import GenericReaction
     from radiopyo.chemistry.species import SimSpecies
 # --------------------------------------------------------------------------- #
 

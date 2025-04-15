@@ -718,15 +718,36 @@ class SimCollection:
         self.keys = keys if keys is not None else []
         self._read_content()
 
-    def __getitem__(self, key: tp.Any) -> ODEResult:
-        return self._sims[key]
+    def get_by_sim_id(
+        self, sim_id: SimIdentifier | tp.List[SimIdentifier]
+    ) -> tp.List[ODEResult]:
+        if isinstance(sim_id, SimIdentifier):
+            sim_id = [
+                sim_id,
+            ]
+        return [self.hdf.read_ODEResult(idx) for idx in sim_id]
+
+    def __getitem__(self, key: tp.Any) -> tp.Tuple[SimIdentifier, ODEResult]:
+        if isinstance(key, SimIdentifier):
+            return key, self.get_by_sim_id(key)[0]
+
+        with suppress(KeyError, TypeError):
+            sid = self._content.loc[key]["sim_id"]
+            return sid, self.get_by_sim_id(sid)[0]
+
+        with suppress(IndexError, TypeError, KeyError):
+            sid = self._content.iloc[key]["sim_id"]
+            return sid, self.get_by_sim_id(sid)[0]
+
+        raise IndexError(f"{key} is not a valid index")
 
     def __len__(self) -> int:
         return len(self._sims)
 
     def __iter__(self) -> tp.Iterator[tp.Tuple[tp.Any, SimIdentifier, ODEResult]]:
         for label, row in self._content.iterrows():
-            yield (label, row["sim_id"], self._sims[label])
+            # yield (label, row["sim_id"], self._sims[label])
+            yield (label, row["sim_id"], self.get_by_sim_id(row["sim_id"])[0])
 
     def _read_content(self) -> None:
         self._content = self.hdf.list_identifiers(
@@ -734,10 +755,10 @@ class SimCollection:
             keys=self.keys,
             recursive=False,
         )
-        self._sims = {
-            key: self.hdf.read_ODEResult(elt["sim_id"])
-            for key, elt in self._content.iterrows()
-        }
+        # self._sims = {
+        #    key: self.hdf.read_ODEResult(elt["sim_id"])
+        #    for key, elt in self._content.iterrows()
+        # }
 
     def _copy_dataframe(self) -> pd.DataFrame:
         return self._content.copy()
@@ -754,7 +775,7 @@ class SimCollection:
 
     def get_SimEnv(self, label: tp.Any) -> SimEnv:
         """ """
-        return self[label].env
+        return self[label][1].env
 
     def get_values_of(self, label: str) -> np.ndarray[tp.Any, tp.Any]:
         return self._content[label].unique()

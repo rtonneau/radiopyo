@@ -27,7 +27,7 @@ import typing as tp
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.chemistry.basic_reaction import revert_reaction
+from radiopyo.chemistry.generics import revert_reaction
 from radiopyo.chemistry.k_reactions import (
     BiReaction,
 )
@@ -36,7 +36,7 @@ from radiopyo.chemistry.utils.units import Temperature
 
 # ------------------------ Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.basic_reaction import GenericReaction
+    from radiopyo.chemistry.generics import GenericReaction
     from radiopyo.chemistry.species_collection import ListSpecies
 
 

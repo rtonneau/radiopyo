@@ -39,7 +39,7 @@ from .basic_reaction import BasicReaction
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.basic_reaction import GenericReaction, Operation
+    from radiopyo.chemistry.generics import GenericReaction, Operation
     from radiopyo.chemistry.species import BasicSpecies, SimSpecies
 
 # --------------------------------------------------------------------------- #

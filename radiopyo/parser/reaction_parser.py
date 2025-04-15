@@ -11,14 +11,12 @@ from __future__ import annotations
 
 import logging
 import typing as tp
-import warnings
 from pathlib import Path
 
 import lark
-import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.chemistry.basic_reaction import GenericReaction, Operation
+from radiopyo.chemistry.generics import GenericReaction, Operation
 from radiopyo.chemistry.species import (
     Atom,
     BasicSpecies,
@@ -32,7 +30,7 @@ if tp.TYPE_CHECKING:
     pass
 
 # ------------------------- Expose importable stuffs ------------------------ #
-__all__: tp.List = []
+__all__: tp.List[str] = []
 
 # ----------------------------------- Logging ------------------------------- #
 logger = logging.getLogger("radiopyo")

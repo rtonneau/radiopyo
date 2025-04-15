@@ -14,7 +14,7 @@ import typing as tp
 import numpy as np
 
 # ---------------------------- Internal imports ----------------------------- #
-from radiopyo.chemistry.basic_reaction import GenericReaction, revert_reaction
+from radiopyo.chemistry.generics import GenericReaction, revert_reaction
 from radiopyo.chemistry.k_reactions import (
     BiReaction,
     KReaction,

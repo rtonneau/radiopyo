@@ -25,7 +25,7 @@ from radiopyo.chemistry.utils.units import Temperature
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    from radiopyo.chemistry.basic_reaction import GenericReaction
+    from radiopyo.chemistry.generics import GenericReaction
 
 # --------------------------------------------------------------------------- #
 

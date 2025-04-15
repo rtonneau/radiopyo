@@ -11,17 +11,18 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import copy
 import typing as tp
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from dataclasses import dataclass
-from enum import Enum
 from functools import reduce
 from itertools import chain
 from operator import add
 
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.parser import RPARSER
+
+from .generics import GenericReaction, Operation, dict_to_generic_reaction
 from .species import BasicSpecies, ChemicalSpecies, SimSpecies
 
 if tp.TYPE_CHECKING:
@@ -29,58 +30,21 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Type checking ONLY imports----------------------- #
 # --------------------------------------------------------------------------- #
-__all__ = [
+__all__: tp.List[str] = [
     "BasicReaction",
-    "GenericReaction",
-    "Operation",
     "ReactionSpecies",
     "ReactionSpeciesCollection",
-    "revert_reaction",
 ]
 
 
 # --------------------------------------------------------------------------- #
 #                             FUNCTION DEFINITIONS                            #
 # --------------------------------------------------------------------------- #
-def revert_reaction(reaction: GenericReaction) -> GenericReaction:
-    """ """
-    # Revert the reaction only if all products are related to addition
-    # operation.
-    for _, (_, _, ope) in reaction["products"].items():
-        if ope != Operation.ADD:
-            raise TypeError(
-                f"Cannot revert reaction with subtraction operation: {reaction}"
-            )
-    return GenericReaction(
-        products=reaction["reactants"].copy(),
-        reactants=reaction["products"].copy(),
-        constants=reaction["constants"].copy(),
-        enzyme=copy.copy(reaction["enzyme"]),
-    )
 
 
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
 # --------------------------------------------------------------------------- #
-class Operation(Enum):
-    ADD = 1
-    SUBTRACT = 2
-
-    def __str__(self) -> str:
-        match self:
-            case Operation.ADD:
-                return "+"
-            case Operation.SUBTRACT:
-                return "-"
-
-
-class GenericReaction(tp.TypedDict):
-    products: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]]
-    reactants: tp.Dict[str, tp.Tuple[BasicSpecies, int, Operation]]
-    constants: tp.Dict[str, float | tp.List[float]]
-    enzyme: BasicSpecies | None
-
-
 @dataclass(frozen=True)
 class ReactionSpecies:
     """ """
@@ -133,6 +97,9 @@ class ReactionSpeciesCollection:
         if not isinstance(key, str):
             key = key.label
         return self.species_col[key]
+
+    def items(self) -> tp.Generator[tp.Tuple[str, ReactionSpecies], None, None]:
+        yield from ((label, self.species_col[label]) for label in self._order)
 
     def iter_stoi(self) -> tp.Iterable[tp.Tuple[ReactionSpecies, int]]:
         for sp in self.__iter__():
@@ -260,6 +227,43 @@ class BasicReaction(ABC):
             return (other in self.reactants) or (other in self.products)
         raise NotImplementedError
 
+    def __eq__(self, other: tp.Any) -> bool:
+        """
+        Check if two reactions are equal.
+
+        Args:
+            other: The other reaction to compare.
+
+        Returns:
+            bool: True if the reactions are equal, False otherwise.
+        """
+        if isinstance(other, str):
+            r = RPARSER.parse_reaction(other)
+        elif isinstance(other, dict):
+            r = dict_to_generic_reaction(other)
+        elif isinstance(other, BasicReaction):
+            r = other.to_generic()
+        else:
+            raise TypeError(f"Cannot compare {self} with {type(other)}")
+
+        for label, sp in r["reactants"].items():
+            if (
+                label not in self.reactants
+                or sp[1] != self.reactants[label].stoi
+                or sp[2] != self.reactants[label].ope
+            ):
+                return False
+        for label, sp in r["products"].items():
+            if (
+                label not in self.products
+                or sp[1] != self.products[label].stoi
+                or sp[2] != self.products[label].ope
+            ):
+                return False
+        return len(r["reactants"]) + len(r["products"]) == len(self.reactants) + len(
+            self.products
+        )
+
     @abstractmethod
     def to_dict(self) -> tp.Dict[str, tp.Any]:
         """
@@ -314,6 +318,27 @@ class BasicReaction(ABC):
         Returns:
             Self: An instance of Reaction.
         """
+
+    def to_generic(self) -> GenericReaction:
+        """
+        Convert the reaction to a GenericReaction.
+
+        Returns:
+            GenericReaction: A GenericReaction representation of the
+                reaction.
+        """
+        return GenericReaction(
+            products={
+                label: (sp.species.raw_species, sp.stoi, sp.ope)
+                for label, sp in self.products.items()
+            },
+            reactants={
+                label: (sp.species.raw_species, sp.stoi, sp.ope)
+                for label, sp in self.reactants.items()
+            },
+            constants={},
+            enzyme=None,
+        )
 
     def get_stoi_of(self, species: SimSpecies | ChemicalSpecies | str) -> int:
         """
