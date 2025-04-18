@@ -7,7 +7,9 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import ast
 import dataclasses as dc
+import re
 import typing as tp
 from contextlib import AbstractContextManager, suppress
 from pathlib import Path
@@ -327,9 +329,26 @@ class SimIdentifier:
         return self._FIELD_DELIMITER.join(out)
 
     @classmethod
+    def from_repr(cls: tp.Type[tp.Self], value: str) -> tp.Self:
+        """ """
+        content = value.replace("SimID(", "").replace(")", "")
+        kwargs = {}  # type: tp.Dict[str, tp.Any]
+        for key, value in re.findall(r"(\w+)\s*=\s*(\[[^\]]*\]|[^,]+)", content):
+            kwargs[key] = ast.literal_eval(value)
+
+        for field in cls.iter_fields():
+            if field.type is bool:
+                kwargs[field.name] = bool(kwargs[field.name])
+            elif isinstance(field.type, type) and callable(field.type):
+                kwargs[field.name] = field.type(kwargs[field.name])
+            else:
+                kwargs[field.name] = kwargs[field.name]
+        return cls(**kwargs)
+
+    @classmethod
     def from_string(cls: tp.Type[tp.Self], value: str) -> tp.Self:
         """ """
-        kwargs = {}
+        kwargs = {}  # type: tp.Dict[str, tp.Any]
         value = value.split("/")[-1]
         for elt in value.split(cls._FIELD_DELIMITER):
             key, val = elt.split(cls._VALUE_DELIMITER)
@@ -338,9 +357,11 @@ class SimIdentifier:
             if field.type is bool:
                 _ = {"True": True, "False": False}
                 kwargs[field.name] = _.get(kwargs[field.name], None)
+            elif isinstance(field.type, type):
+                kwargs[field.name] = field.type(kwargs[field.name])
             else:
-                kwargs[field.name] = field.type(kwargs[field.name])  # type: ignore[operator]
-        return cls(**kwargs)  # type: ignore[arg-type]
+                kwargs[field.name] = kwargs[field.name]
+        return cls(**kwargs)
 
 
 class H5Manager(AbstractContextManager):
@@ -536,7 +557,10 @@ class H5Manager(AbstractContextManager):
     ) -> None:
         """ """
         if "json_config" in grp[name].attrs:
-            Path(grp[name].attrs["json_config"]).unlink()
+            _p = Path(grp[name].attrs["json_config"])
+            if not _p.exists():
+                _p = self._store_folder / _p.name
+            _p.unlink()
         name_pr = self._dataset_name_to_prod_name(name)
         if name_pr in grp:
             self.delete_dataset(grp, name_pr)
@@ -746,7 +770,6 @@ class SimCollection:
 
     def __iter__(self) -> tp.Iterator[tp.Tuple[tp.Any, SimIdentifier, ODEResult]]:
         for label, row in self._content.iterrows():
-            # yield (label, row["sim_id"], self._sims[label])
             yield (label, row["sim_id"], self.get_by_sim_id(row["sim_id"])[0])
 
     def _read_content(self) -> None:
@@ -755,10 +778,6 @@ class SimCollection:
             keys=self.keys,
             recursive=False,
         )
-        # self._sims = {
-        #    key: self.hdf.read_ODEResult(elt["sim_id"])
-        #    for key, elt in self._content.iterrows()
-        # }
 
     def _copy_dataframe(self) -> pd.DataFrame:
         return self._content.copy()
