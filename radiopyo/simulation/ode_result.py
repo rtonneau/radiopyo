@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import datetime
+import itertools as it
 import json
 import logging
 import typing as tp
@@ -449,7 +450,10 @@ class ODEResult(object):
         dfr = self.reconstruct_reactions().loc[_slice, :]
         reactions = {
             elt.as_label(): elt
-            for elt in self.env.kreactions_involving_product(species)
+            for elt in it.chain(
+                self.env.kreactions_involving_product(species),
+                self.env.enzymatic_involving_product(species),
+            )
         }
 
         rdf = dfr.loc[:, list(reactions.keys())]
@@ -506,7 +510,10 @@ class ODEResult(object):
         dfr = self.reconstruct_reactions().loc[_slice, :]
         reactions = {
             elt.as_label(): elt
-            for elt in self.env.kreactions_involving_reactant(species)
+            for elt in it.chain(
+                self.env.kreactions_involving_reactant(species),
+                self.env.enzymatic_involving_reactant(species),
+            )
         }
         rdf = dfr.loc[:, list(reactions.keys())]
 

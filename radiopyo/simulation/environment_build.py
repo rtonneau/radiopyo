@@ -162,6 +162,11 @@ class ReactionsList:
         for reaction in self.radiolytic:
             yield reaction
 
+    def iter_enzymatic(self) -> tp.Iterator[MichaelisMenten]:
+        """ """
+        for reaction in self.enzymatic:
+            yield reaction
+
     def iter_all_kreactions_and_kvalues(
         self, T: tp.Optional[Temperature | float] = None
     ) -> tp.Iterator[tp.Tuple[str, KReaction, float]]:
@@ -744,6 +749,32 @@ class SimEnv:
 
         for r in self.reactions.iter_kreactions():
             if all(r.has_reactant(elt) for elt in species):
+                out.append(r)
+        return out
+
+    def enzymatic_involving_reactant(
+        self,
+        species: str | SimSpecies | tp.List[str | SimSpecies],
+    ) -> tp.List[MichaelisMenten]:
+        out: tp.List[MichaelisMenten] = []
+        if isinstance(species, (str | SimSpecies)):
+            species = [species]
+
+        for r in self.reactions.iter_enzymatic():
+            if all(r.has_reactant(elt) for elt in species):
+                out.append(r)
+        return out
+
+    def enzymatic_involving_product(
+        self,
+        species: str | SimSpecies | tp.List[str | SimSpecies],
+    ) -> tp.List[MichaelisMenten]:
+        out: tp.List[MichaelisMenten] = []
+        if isinstance(species, (str | SimSpecies)):
+            species = [species]
+
+        for r in self.reactions.iter_enzymatic():
+            if all(r.has_product(elt) for elt in species):
                 out.append(r)
         return out
 
