@@ -244,6 +244,30 @@
         "ticket": "07-simenv-builders",
         "commit": "3f8035f"
       }
+    },
+    {
+      "at": "2026-11-09T22:56:53.959Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/08-split-sim-utils.md",
+        "03-implement/08-split-sim-utils/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "08-split-sim-utils"
+      }
+    },
+    {
+      "at": "2026-11-09T23:02:52.621Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/08-split-sim-utils/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "08-split-sim-utils",
+        "commit": "aefda6e"
+      }
     }
   ],
   "current_phase": "ship",
