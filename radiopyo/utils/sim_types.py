@@ -77,7 +77,13 @@ def _lock_arrays(container: tp.Any) -> None:
 # --------------------------------------------------------------------------- #
 
 
-class KwargsRun(tp.TypedDict):
+class KwargsRun(tp.TypedDict, total=False):
+    """
+    Optional keyword arguments of UnitCell.run, as forwarded by
+    UnitCell.run_till_max_dose (every key may be omitted). 't_span' is
+    accepted but overwritten by run_till_max_dose.
+    """
+
     t_span: tp.Tuple[float, float]
     t_eval: tp.Optional[NDArray[np.float64]]
     use_jac: bool
@@ -86,6 +92,8 @@ class KwargsRun(tp.TypedDict):
     rtol: tp.Optional[float]
     max_step: tp.Optional[float]
     y0: tp.Optional[NDArray[np.float64]]
+    use_beam: bool
+    force_positive: bool
 
 
 class ConcentrationDict(tp.TypedDict):
