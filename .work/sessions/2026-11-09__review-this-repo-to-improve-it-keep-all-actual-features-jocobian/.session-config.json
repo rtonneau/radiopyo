@@ -124,6 +124,30 @@
         "ticket": "02-port-tests",
         "commit": "9424c85"
       }
+    },
+    {
+      "at": "2026-11-09T21:39:08.461Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-packaging-hygiene.md",
+        "03-implement/03-packaging-hygiene/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-packaging-hygiene"
+      }
+    },
+    {
+      "at": "2026-11-09T21:41:38.354Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-packaging-hygiene/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-packaging-hygiene",
+        "commit": "9a8e758"
+      }
     }
   ],
   "current_phase": "ship",
