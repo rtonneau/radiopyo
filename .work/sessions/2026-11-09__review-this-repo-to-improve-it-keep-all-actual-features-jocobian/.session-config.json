@@ -100,6 +100,30 @@
         "ticket": "01-golden-outputs",
         "commit": "dba163a"
       }
+    },
+    {
+      "at": "2026-11-09T21:31:58.718Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-port-tests.md",
+        "03-implement/02-port-tests/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-port-tests"
+      }
+    },
+    {
+      "at": "2026-11-09T21:38:59.646Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-port-tests/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-port-tests",
+        "commit": "9424c85"
+      }
     }
   ],
   "current_phase": "ship",
