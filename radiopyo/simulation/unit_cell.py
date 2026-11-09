@@ -25,7 +25,8 @@ from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.toml import TOMLFileParser
-from radiopyo.physics.beam import BeamCollection, ParticleBeam
+from radiopyo.physics.beam import ParticleBeam
+from radiopyo.physics.beam_collection import BeamCollection
 from radiopyo.simulation import exceptions as rp_excep
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import (

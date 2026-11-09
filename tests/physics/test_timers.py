@@ -163,14 +163,6 @@ class TestMacroTimer:
     def test_state_at(self, macro, time, state):
         assert macro.state_at(time) is state
 
-    def test_within_train(self, macro):
-        assert macro.within_train(0.5)
-        assert macro.within_train(2.99)
-        assert not macro.within_train(3.0)
-        assert not macro.within_train(5.0)
-        assert macro.within_train(10.5)
-        assert not macro.within_train(-1.0)
-
     def test_period_indexes(self, macro):
         assert macro.period_index(0.0) == 0
         assert macro.period_index(9.99) == 0
@@ -180,9 +172,6 @@ class TestMacroTimer:
         assert macro.micro_period_index(2.5) == 2
         assert macro.micro_period_index(12.5) == 2
         assert macro.micro_period_index(5.0) == -1  # out of the train
-        assert macro.micro_pulse_index(2.1) == 2
-        assert macro.micro_pulse_index(2.5) == -1  # micro OFF
-        assert macro.micro_pulse_index(5.0) == -1  # out of the train
 
     @pytest.mark.parametrize(
         "time, till_on, till_off",

@@ -7,6 +7,8 @@ Author:
 """
 # ----------------------------- External imports ---------------------------- #
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.exceptions import RadioPyoError
+
 # ------------------------ Type checking ONLY imports ----------------------- #
 # --------------------------------------------------------------------------- #
 
@@ -19,10 +21,6 @@ __all__ = [
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
 # --------------------------------------------------------------------------- #
-
-
-class RadioPyoError(Exception):
-    """Generic Module Related Exception"""
 
 
 class SimulationError(RadioPyoError):
