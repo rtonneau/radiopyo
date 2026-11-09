@@ -12,3 +12,4 @@ __pycache__
 /.jupytest
 /.ipynb_checkpoints
 
+.scratch/
