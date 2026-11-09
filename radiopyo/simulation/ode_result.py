@@ -35,7 +35,7 @@ if tp.TYPE_CHECKING:
     from radiopyo.chemistry.k_reactions import BiReaction
     from radiopyo.chemistry.species import SimSpecies
     from radiopyo.physics.beam import ParticleBeam
-    from radiopyo.simulation.utils import H5Manager
+    from radiopyo.simulation.persistence import H5Manager
     from radiopyo.utils.sim_types import SimMatrices
 
     T = tp.TypeVar("T", bound="ODEResult")
@@ -202,28 +202,13 @@ class ODEResult(object):
     def to_hdf(
         self, file: str | Path, name: str, group: tp.Optional[str] = None
     ) -> H5Manager:
-        """ """
-        from .utils import H5Manager
+        """Store this result in ``file`` (delegates to ``H5Manager.push_ODEResult``)."""
+        from .persistence import H5Manager
 
         h5file = H5Manager.from_path(file)
-        with h5file:
-            grp = h5file.create_group(group)
-            data = self.to_pandas().reset_index()
-            ds = h5file.insert_dataset(grp, name, data.values)
-            labels = [str(_) for _ in data.columns]
-            labels[0] = "time"
-            ds.attrs["columns"] = labels
-            ds.attrs["sol"] = self.sol
-            ds.attrs["t_events"] = self.t_events
-            ds.attrs["y_events"] = self.y_events
-            ds.attrs["nfev"] = self.nfev
-            ds.attrs["njev"] = self.njev
-            ds.attrs["nlu"] = self.nlu
-            ds.attrs["status"] = self.status
-            ds.attrs["message"] = self.message
-            ds.attrs["success"] = self.success
-            ds.attrs["n_points"] = self.n_points
-            ds.attrs["exec_time"] = self.exec_time
+        h5file.push_ODEResult(
+            name, self, keys=[group] if group is not None else None
+        )
         return h5file
 
     def _default_init(self) -> None:
