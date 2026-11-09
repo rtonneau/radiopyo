@@ -8,7 +8,7 @@ version = "0.6.0"
 authors = [{ name = "Romain Tonneau", email = "romain.tonneau@unamur.be" }]
 description = "A small module to perform UHDR/CONV simulations with resolution of ODE's"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "LGPL-3.0-only"
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -23,7 +23,8 @@ dependencies = [
   "lark>=1.1.2",
   "more-itertools",
   "pytest",
-  "tqdm"
+  "tqdm",
+  "h5py>=3.8"
 ]
 
 [project.urls]
@@ -107,7 +108,7 @@ ignore = [
   "E731",
 ]
 show-fixes = true
-target-version = "py39"
+target-version = "py311"
 
 [tool.logging]
 version = 1
