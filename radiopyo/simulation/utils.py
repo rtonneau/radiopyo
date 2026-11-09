@@ -14,7 +14,7 @@ import typing as tp
 from contextlib import AbstractContextManager, suppress
 from pathlib import Path
 
-import h5py  # type: ignore[import-untyped]
+import h5py
 import numpy as np
 import pandas as pd
 
@@ -407,17 +407,19 @@ class H5Manager(AbstractContextManager):
                 return cls(path)
             p.unlink()
         # File does not exists, yet.
-        h5py.File(p, mode="w").close()
+        h5py.File(str(p), mode="w").close()
         return cls(path)
 
     def exists(self) -> bool:
         """ """
         return self.hdf_path.exists()
 
-    def open_h5file(self, mode: str = "r+") -> h5py.File:
+    def open_h5file(
+        self, mode: tp.Literal["r", "r+", "a", "w", "w-"] = "r+"
+    ) -> h5py.File:
         """ """
         if self._is_open == 0:
-            self._hdf = h5py.File(self.hdf_path, mode)
+            self._hdf = h5py.File(str(self.hdf_path), mode)
         self._is_open += 1
         return self._hdf
 
@@ -432,7 +434,7 @@ class H5Manager(AbstractContextManager):
             self._is_open -= 1
             if self._is_open <= 0 or force:
                 self._hdf.close()
-                self._hdf = None
+                self._hdf = None  # type: ignore[assignment]  # closed; reset
             else:
                 return
         self._is_open = 0
@@ -470,7 +472,7 @@ class H5Manager(AbstractContextManager):
             KeyError:
                 if group name doesn't exists
         """
-        return self._hdf[name] if name is not None else self._hdf
+        return tp.cast(h5py.Group, self._hdf[name]) if name is not None else self._hdf
 
     def read_dataset(
         self,
@@ -479,8 +481,9 @@ class H5Manager(AbstractContextManager):
     ) -> pd.DataFrame:
         with self:
             group = self.group(grp) if grp is None or isinstance(grp, str) else grp
-            data = group[name][()]
-            labels = group[name].attrs["columns"]
+            dataset = tp.cast(h5py.Dataset, group[name])
+            data = dataset[()]
+            labels = list(dataset.attrs["columns"])  # type: ignore[arg-type]
         return pd.DataFrame(data=data, columns=labels).set_index(labels[0])
 
     @staticmethod
@@ -515,33 +518,6 @@ class H5Manager(AbstractContextManager):
         """ """
         return self.create_group(self._keys_to_path(keys))
 
-    def push_result(
-        self,
-        name: str,
-        data: pd.DataFrame,
-        keys: tp.Optional[tp.List[str]] = None,
-        overwrite: bool = False,
-    ) -> None:
-        """ """
-        raise NotImplementedError
-        with self:
-            grp = self._keys_to_group(keys)
-            if name in grp and overwrite:
-                self.delete_dataset(grp, name)
-            data = data.reset_index()
-            ds = self.insert_dataset(grp, name, data.values)
-            labels = [str(_) for _ in data.columns]
-            labels[0] = "time"
-            ds.attrs["columns"] = labels
-
-    def read_result(
-        self, name: str, keys: tp.Optional[tp.List[str]] = None
-    ) -> pd.DataFrame:
-        raise NotImplementedError
-        with self:
-            grp = self._keys_to_group(keys)
-            return self.read_dataset(name, grp)
-
     def look_at(
         self, keys: tp.Optional[tp.List[str] | h5py.Group] = None
     ) -> tp.Iterator[str]:
@@ -557,7 +533,7 @@ class H5Manager(AbstractContextManager):
     ) -> None:
         """ """
         if "json_config" in grp[name].attrs:
-            _p = Path(grp[name].attrs["json_config"])
+            _p = Path(str(grp[name].attrs["json_config"]))
             if not _p.exists():
                 _p = self._store_folder / _p.name
             _p.unlink()
@@ -598,7 +574,7 @@ class H5Manager(AbstractContextManager):
             ds.attrs["columns"] = labels
             json_file = self._store_folder / f"{name}.json"
             ds.attrs["json_config"] = str(json_file)
-            result.to_json_config(ds.attrs["json_config"], overwrite)
+            result.to_json_config(json_file, overwrite)
 
             if production_rate:
                 name_pr = self._dataset_name_to_prod_name(name)
@@ -619,7 +595,7 @@ class H5Manager(AbstractContextManager):
         with self:
             grp = self._keys_to_group(keys)
 
-            json_path = Path(grp[name].attrs["json_config"])
+            json_path = Path(str(grp[name].attrs["json_config"]))
             if not json_path.exists():
                 _ = self.hdf_path.parent / f".{self.hdf_path.stem}"
                 json_path = _ / json_path.name
@@ -813,7 +789,7 @@ class SimCollection:
             name=reaction,
         )
         for label, _, res in self:
-            out.loc[label] = res.integrate_single_reaction(
+            out.loc[label] = res.integrate_single_reaction(  # type: ignore[call-overload]
                 reaction,
                 start,
                 stop,

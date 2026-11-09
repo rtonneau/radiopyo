@@ -54,14 +54,15 @@ class Atomix(object):
                 if idx == 0:
                     continue
                 _ = line.strip().split(",")
+                weight: tp.Optional[float]
                 try:
-                    _[3] = float(_[3])
+                    weight = float(_[3])
                 except ValueError:
-                    _[3] = None
+                    weight = None
                 self._data[_[0].strip()] = Entry(symbol=_[0].strip(),
                                                  name=_[1].strip(),
                                                  Z=int(_[2]),
-                                                 atomic_weight=_[3],
+                                                 atomic_weight=weight,
                                                  )
 
     def get(self, key: str) -> float:

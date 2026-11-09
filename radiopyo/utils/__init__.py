@@ -22,8 +22,8 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = [
-    "PACKAGE_DATA_PATH",
     "LABARBE_CONFIG_FILE",
+    "PACKAGE_DATA_PATH",
     "PURE_WATER_CONFIG_FILE",
 ]
 

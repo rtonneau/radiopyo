@@ -10,10 +10,9 @@ Author:
 from __future__ import annotations
 
 import logging
+import tomllib
 import typing as tp
 from contextlib import suppress
-
-import tomllib
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser.file_parser import FileParser

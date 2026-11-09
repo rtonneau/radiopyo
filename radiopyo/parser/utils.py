@@ -75,7 +75,7 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     # First, let's make a set of the AB presents in root. Each one
     # should have a unique ID ==> Make AcidBase and then use the str
     # version of it!
-    r_root = {}
+    r_root: tp.Dict[str, tp.Tuple[tp.Any, int]] = {}
     for idx, _ in enumerate(root["reactions"]["acid_base"]):
         _ = acid_base_from_dict(_, list_sp=None)[0][0]
         r_root[str(_)] = (_, idx)
@@ -232,22 +232,6 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     root["reactions"]["enzymatic"] += to_add
 
     return root
-
-
-def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Dict:
-    """
-    Dictionary comparison, insightful.
-    From:
-    https://stackoverflow.com/questions/4527942
-    """
-    d1_keys = set(d1.keys())
-    d2_keys = set(d2.keys())
-    shared_keys = d1_keys.intersection(d2_keys)
-    removed = d1_keys - d2_keys
-    added = d2_keys - d1_keys
-    modified = {o: (d1[o], d2[o]) for o in shared_keys if d1[o] != d2[o]}
-    same = {o for o in shared_keys if d1[o] == d2[o]}
-    return {"added": added, "removed": removed, "modified": modified, "same": same}
 
 
 # --------------------------------------------------------------------------- #

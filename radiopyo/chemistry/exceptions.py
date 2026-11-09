@@ -15,8 +15,8 @@ from radiopyo.simulation.exceptions import RadioPyoError
 __all__ = [
     "IsConstantSpeciesError",
     "IsSimSpeciesError",
-    "NotReactionReactant",
     "NotReactionProduct",
+    "NotReactionReactant",
     "UnknownSpeciesError",
 ]
 

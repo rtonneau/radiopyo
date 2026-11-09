@@ -36,6 +36,9 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = [
+    "LABARBE_CONFIG_FILE",
+    "PACKAGE_DATA_PATH",
+    "PURE_WATER_CONFIG_FILE",
     "ConstantBeam",
     "MacroPulsedBeam",
     "PulsedBeam",
@@ -44,9 +47,6 @@ __all__: tp.List = [
     "disable_logging",
     "enable_logging",
     "set_logging_level",
-    "PACKAGE_DATA_PATH",
-    "LABARBE_CONFIG_FILE",
-    "PURE_WATER_CONFIG_FILE",
 ]
 
 

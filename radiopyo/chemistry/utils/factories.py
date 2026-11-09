@@ -75,10 +75,7 @@ def polynomial_factory(
         else:
             raise ValueError("Cannot make a polynomial with no coeff!")
     else:
-        if value >= 0:
-            _coef = [np.log10(value) if log10 else value]
-        else:
-            _coef = [-np.inf]
+        _coef = [np.log10(value) if log10 else value] if value >= 0 else [-np.inf]
 
     return np.polynomial.Polynomial(_coef)
 

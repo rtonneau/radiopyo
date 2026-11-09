@@ -247,7 +247,7 @@ class SimEnv:
         _poly = np.polynomial.Polynomial(
             [14.947, -4.273e-2, 2.115e-4, -5.786e-7, 7.529e-10]
         )
-        return _poly(_T.celsius)
+        return tp.cast(float, _poly(_T.celsius))
 
     def pKH2O(self, T: tp.Optional[Temperature | float] = None) -> float:
         """ """
@@ -255,7 +255,7 @@ class SimEnv:
         _poly = np.polynomial.Polynomial(
             [16.690, -4.262e-2, 2.071e-4, -5.594e-7, 7.161e-10]
         )
-        return _poly(_T.celsius)
+        return tp.cast(float, _poly(_T.celsius))
 
     def make_hash(self, method: str = "sha256") -> str:
         """ """
@@ -358,7 +358,7 @@ class SimEnv:
         list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
         # Copy initial cc and strip species name on the fly.
         initial_cc = {}
-        list_sp.add_cst_species(RPARSER.parse_species("H2O"), cc=H2O.cc_init.coef)
+        list_sp.add_cst_species(RPARSER.parse_species("H2O"), cc=tp.cast("list[float]", H2O.cc_init.coef))
         for key, cc in config["concentrations"].get("initial", {}).items():
             initial_cc[key.strip()] = cc
 
@@ -862,7 +862,7 @@ class SimEnv:
             if elt.label in ["H3O_plus", "OH_minus"]:
                 continue
             if len(elt.cc_init) > 1:
-                out["concentrations"]["initial"][elt.label] = elt.cc_init.coef.tolist()
+                out["concentrations"]["initial"][elt.label] = elt.cc_init.coef.tolist()  # type: ignore[assignment]  # poly coeffs; TypedDict says float
             elif elt.initial_cc() <= 0:
                 continue
             else:
@@ -871,7 +871,7 @@ class SimEnv:
             if elt.label in ["H2O", "H3O_plus", "OH_minus"]:
                 continue
             if len(elt.cc_init) > 1:
-                out["concentrations"]["fixed"][elt.label] = elt.cc_init.coef.tolist()
+                out["concentrations"]["fixed"][elt.label] = elt.cc_init.coef.tolist()  # type: ignore[assignment]  # poly coeffs; TypedDict says float
             else:
                 out["concentrations"]["fixed"][elt.label] = elt.initial_cc()
 

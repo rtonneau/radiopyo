@@ -7,7 +7,6 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import abc
 import copy
 import typing as tp
 from enum import Enum

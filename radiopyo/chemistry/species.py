@@ -320,7 +320,11 @@ class SimSpecies:
             SimSpecies: A new SimSpecies instance with the same label,
                 index, and initial concentration coefficients.
         """
-        return SimSpecies(self.raw_species, self.index, self.cc_init.coef)
+        return SimSpecies(
+            self.raw_species,
+            self.index,
+            tp.cast("list[float]", self.cc_init.coef),  # ndarray accepted at runtime
+        )
 
     @property
     def label(self) -> str:
@@ -340,7 +344,8 @@ class SimSpecies:
                 temperature.
         """
         T = Temperature(T)
-        return self.cc_init(T.celsius) if self.cc_init(T.celsius) > 0 else 0
+        cc = float(self.cc_init(T.celsius))
+        return cc if cc > 0 else 0
 
     def set_initial_cc(
         self, value: float | tp.List[float] | np.polynomial.Polynomial

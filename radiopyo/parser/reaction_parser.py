@@ -298,14 +298,5 @@ class ReactionParser(object):
                 if unknown species
                 i.e. not in 'data/_data_atomic_weights.txt'
         """
-        # Not usable yet. Issues with some molecule's name and the
-        # "parse_species" method used in several places.
-        return
-        if isinstance(species, Atom):
-            species.mass = self.atomix.get(species.raw_label())
-            return
-
-        # species is a molecule
-        for atom, _ in species:
-            atom.mass = self.atomix.get(atom.raw_label())
-        return
+        # Mass lookup is disabled (issues with some molecule names and the
+        # "parse_species" method used in several places).

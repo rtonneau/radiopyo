@@ -159,9 +159,6 @@ def derive(
         S = np.matmul(y, Ez_mat[0])
         # Compute the reaction rate of all enzymatic reactions.
         MM = Ez_mat[2][1, :] * E * S / (Ez_mat[2][0, :] + S)
-        if np.isnan(MM).any():
-            print("NaN found. E={E}; S={S}; MM={MM}")
-
         # Add this term to the total
         dydt += np.matmul(Ez_mat[3], MM.T)
 
@@ -174,13 +171,10 @@ def derive(
     if force_positive:
         _mask = np.where((y < LIMIT) & (dydt < 0))
         dydt[_mask] = 0.0
-        # dydt[_mask] = -dydt[_mask] / 2.0
 
     # ==> dynamical species
     # ==> convert back to [µmol/l]
     dydt = dydt[: -len(cst_sp)]
-
-    # print(np.where((y < 0) & (dydt < 0)))
 
     return dydt * 1e6  # mol/l => µmol/l
 

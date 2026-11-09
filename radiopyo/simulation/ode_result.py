@@ -23,10 +23,9 @@ import pandas as pd
 from scipy.integrate import trapezoid  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import SimEnv
-from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
+from radiopyo.simulation.ode_functions_solver import ScipyODEResult
 from radiopyo.utils.sim_types import ConfigDict
 
 # -------------------------- Type checking ONLY import----------------------- #
@@ -290,33 +289,6 @@ class ODEResult(object):
 
         return pd.concat([df_sp, df_cst], axis=1)
 
-    def reconstruct_jacobian(self) -> pd.DataFrame:
-        raise NotImplementedError
-        if self.beam is None:
-            raise TypeError("Beam is None, unable to compute jacobian")
-
-        sp_label = [elt.label for elt in self.env.species.iter_dyn_species()]
-        dsp_label = ["".join(["d", elt]) for elt in sp_label]
-
-        out = pd.DataFrame(
-            index=self.t,
-            columns=pd.MultiIndex.from_product(
-                [sp_label, dsp_label], names=["sp", "dsp"]
-            ),
-            dtype=np.float64,
-        )
-
-        for idx, t_val in enumerate(self.t):
-            jac = jacobian(
-                t_val,
-                self.y[:, idx],
-                self.beam,
-                self.env.species["H_plus"].index,
-                **self.mat,
-            )
-            out.iloc[idx, :] = jac.flatten()
-        return out
-
     def reconstruct_reactions(self, recompute: bool = False) -> pd.DataFrame:
         """
         returns:
@@ -377,7 +349,6 @@ class ODEResult(object):
             # the ODE solver such possibility to ensure good quality
             # results. The next line is then added only here
             # (not in ODE solver) to give a more suitable meaning.
-            # Rki[np.where(Rki < 0)] = 0.0
 
             out.iloc[idx, idx_kr] = Rki
 
@@ -420,7 +391,7 @@ class ODEResult(object):
         )
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
-            _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
+            _ser.loc[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)  # type: ignore[call-overload]  # pandas-stubs: Hashable key
 
         if include_radiolytic:
             n_pulse = self.beam.tot_pulses()
@@ -494,7 +465,7 @@ class ODEResult(object):
         )
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
-            _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
+            _ser.loc[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)  # type: ignore[call-overload]  # pandas-stubs: Hashable key
         return _ser.sort_values(ascending=reverse)
 
     def detail_consumption_of(
@@ -568,7 +539,7 @@ class ODEResult(object):
                 r1, r2 = bi_r.forward.as_label(), bi_r.backward.as_label()
             else:
                 r2, r1 = bi_r.forward.as_label(), bi_r.backward.as_label()
-            _df = self.reconstruct_reactions().loc[:, (r1, r2)]  # type: ignore[index]
+            _df = self.reconstruct_reactions().loc[:, (r1, r2)]
             return _df[r1] - _df[r2]
 
         return self.reconstruct_reactions().loc[:, reaction]
@@ -617,7 +588,7 @@ class ODEResult(object):
 
         Therefore, the column names of the DataFrame will always be
         the label of the reaction producing the species.
-        /!\ Negative values are allowed. The meaning is a net consumption.
+        /!\\ Negative values are allowed. The meaning is a net consumption.
         """
         _slice = make_slice_from_time_boundaries(start, stop)
 

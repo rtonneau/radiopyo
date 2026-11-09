@@ -6,7 +6,7 @@ species => Production of radicals and charged species. These reactions
 are defined using so called "G-values" -> radiolytic yields i.e.
 [#radical / 100eV / incident particle].
 
-/!\ Here, the solvent density is assumed to be the same as Water,
+/!\\ Here, the solvent density is assumed to be the same as Water,
 thus a constant concentration of 1 kg/l.
 
 Classes:
@@ -48,7 +48,6 @@ __all__ = [
     "RadiolyticReaction",
     "RadiolyticReactionDict",
     "ge_to_kr",
-    "umol_per_joule_to_ge",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -58,23 +57,6 @@ __all__ = [
 # Kr units => mol/l/Gy
 
 # Define some functions for unit conversion:
-
-
-def umol_per_joule_to_ge(value: float) -> float:
-    """
-    Converts a given value from umol/J to Ge units.
-
-    Args:
-        value (float): The value to be converted.
-
-    Returns:
-        float: The converted value in Ge units.
-
-    Note:
-        Unused and probably wrong function.
-    """
-    raise NotImplementedError
-    return value * 1e-6 * Avogadro / elementary_charge * 100
 
 
 def ge_to_kr(ge: float) -> float:

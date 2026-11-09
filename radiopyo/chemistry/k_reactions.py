@@ -166,7 +166,7 @@ class KReaction(BasicReaction):
         if self._k_value is None:
             return None
         if len(self._k_value) > 1:
-            return self._k_value.coef
+            return tp.cast("list[float]", self._k_value.coef)  # ndarray at runtime
 
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
@@ -216,57 +216,6 @@ class KReaction(BasicReaction):
             reaction.add_as_product(sim_sp, stoi, ope)
 
         return reaction
-
-    @classmethod
-    def from_dict(
-        cls,
-        reactants: tp.List[str],
-        products: tp.List[str],
-        k_value: None | float | tp.List[float],
-        list_sp: tp.Optional[ListSpecies] = None,
-    ) -> tp.Self:
-        """
-        Create a KReaction from a dictionary (via destructuring).
-
-        Args:
-            reactants: List[str]
-                List of reactants
-            products: List[str]
-                List of products
-            k_value: float | tp.List[float]
-                k value of the reactions or the coefficients of the
-                    poly version
-            list_sp: ListSpecies
-                Collection of species already involved in the
-                simulation. This collection will grow if some reactants
-                and/or products do not exist yet.
-
-        Returns:
-            KReaction
-                An instance of KReaction.
-        """
-        raise NotImplementedError
-        if isinstance(k_value, (float, int)):
-            k_value = [k_value]
-
-        new = cls(k_value)
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        for sp in reactants:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_reactant(sim_sp)
-
-        # Case of n*A -> B, then n*k is measured/given
-        if k_value is not None and len(new.reactants) == 1 and len(k_value) == 1:
-            # Compute k: divide by reactant's stoichio
-            new.set_k_value(k_value[0] / new.get_stoi_of(sp))
-
-        for sp in products:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_product(sim_sp)
-        return new
 
     def __str__(self) -> str:
         """
@@ -395,47 +344,6 @@ class Arrhenius(KReaction):
             sim_sp = list_sp.get_or_create_dyn_species(sp)
             reaction.add_as_product(sim_sp, stoi, ope)
         return reaction
-
-    @classmethod
-    def from_dict(
-        cls,
-        reactants: tp.List[str],
-        products: tp.List[str],
-        k_value: None | float | tp.List[float],
-        list_sp: tp.Optional[ListSpecies] = None,
-    ) -> tp.Self:
-        """
-        Create an Arrhenius from a dictionary (via destructuring).
-
-        Args:
-            reactants (List[str]): List of reactants
-            products (List[str]): List of products
-            k_value (float | List[float]): k value of the reactions or
-                the coefficients of the poly version
-            list_sp (ListSpecies): Collection of species already
-                involved in the simulation. This collection will grow if
-                some reactants and/or products do not exist yet.
-
-        Returns:
-            Arrhenius: An instance of Arrhenius.
-        """
-        raise NotImplementedError
-        if k_value is None or isinstance(k_value, float):
-            raise TypeError
-        new = cls(k_value[0], k_value[1])
-
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        for sp in reactants:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_reactant(sim_sp)
-
-        for sp in products:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_product(sim_sp)
-        return new
 
 
 class CstReaction(KReaction):

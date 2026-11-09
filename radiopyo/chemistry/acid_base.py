@@ -108,7 +108,7 @@ class AcidBase(BiReaction):
     ):
         """ """
         super().__init__()
-        self._pKa = np.polynomial.Polynomial(pKa)
+        self._pKa = np.polynomial.Polynomial(tp.cast("list[float]", pKa))
 
         if reaction["constants"].get("k_backward", None) is None:
             raise ValueError("For A/B reaction, k_backward must be defined")
@@ -165,7 +165,7 @@ class AcidBase(BiReaction):
             float: The pKa value at the given temperature.
         """
         _T = Temperature(T)
-        return self._pKa(_T.celsius)
+        return tp.cast(float, self._pKa(_T.celsius))
 
     def k_equilibrium(
         self,
@@ -183,7 +183,7 @@ class AcidBase(BiReaction):
             float: The equilibrium constant at the given temperature.
         """
         _T = Temperature(T)
-        return 10 ** (-self._pKa(_T.celsius))
+        return tp.cast(float, 10 ** (-self._pKa(_T.celsius)))
 
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
@@ -199,8 +199,8 @@ class AcidBase(BiReaction):
         """
         _T = Temperature(T)
         if self.forward.has_reactant("H2O"):
-            return 10 ** self._k_forward(1.0 / _T.kelvin)  # / 55.5
-        return 10 ** self._k_forward(1.0 / _T.kelvin)
+            return tp.cast(float, 10 ** self._k_forward(1.0 / _T.kelvin))
+        return tp.cast(float, 10 ** self._k_forward(1.0 / _T.kelvin))
 
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
@@ -217,8 +217,8 @@ class AcidBase(BiReaction):
 
         _T = Temperature(T)
         if self.backward.has_reactant("H2O"):
-            return 10 ** self._k_backward(1.0 / _T.kelvin)  # / 55.5
-        return 10 ** self._k_backward(1.0 / _T.kelvin)
+            return tp.cast(float, 10 ** self._k_backward(1.0 / _T.kelvin))
+        return tp.cast(float, 10 ** self._k_backward(1.0 / _T.kelvin))
 
     def is_acid(self) -> bool:
         """

@@ -187,11 +187,3 @@ class MichaelisMenten(BasicReaction):
             "k_value": self.raw_k_value(),
             "k_micha": self.k_micha,
         }
-
-
-class MichaelisMentenDict(tp.TypedDict):
-    enzyme: str
-    substrate: tp.List[str] | str
-    products: tp.List[str]
-    k_value: float
-    k_micha: float

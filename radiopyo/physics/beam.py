@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import Enum
-from math import isinf, isnan
+from math import isinf
 
 import numpy as np
 
@@ -32,17 +32,17 @@ logger = logging.getLogger("radiopyo")
 
 # -------------------------- Expose importable stuffs ----------------------- #
 __all__ = [
-    "TimeMessage",
-    "TimerState",
-    "Timer",
-    "ParticleBeam",
-    "ConstantBeam",
-    "SinglePulseBeam",
-    "PulsedBeam",
-    "MacroPulsedBeam",
     "BaseTimer",
-    "MacroTimer",
     "BeamCollection",
+    "ConstantBeam",
+    "MacroPulsedBeam",
+    "MacroTimer",
+    "ParticleBeam",
+    "PulsedBeam",
+    "SinglePulseBeam",
+    "TimeMessage",
+    "Timer",
+    "TimerState",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -262,9 +262,7 @@ class BaseTimer(ABC):
 
         # Calculate the period index by dividing the time relative to the
         # start time by the period duration and taking the integer part.
-        period_index = int(time_relative // self.period)
-
-        return period_index
+        return int(time_relative // self.period)
 
     def _relative_time_pulse(self, time: float) -> float:
         """
@@ -296,16 +294,7 @@ class BaseTimer(ABC):
         # Calculate the relative time within a single pulse by subtracting
         # the start time of the timer and the start time of the current
         # pulse from the given time.
-        relative_time = time - self.start_time - self.period * self.period_index(time)
-        return relative_time
-
-    # def _relative_time_pulse(self, time: float) -> float:
-    #     """ """
-    #     if time < self.start_time:
-    #         raise ValueError("Time < timer.start_time")
-    #     if time > self.start_time + self.period:
-    #         time = time - self.start_time - self.period * self.period_index(time)
-    #     return time
+        return time - self.start_time - self.period * self.period_index(time)
 
     def duty_cycle(self) -> float:
         """
@@ -848,7 +837,7 @@ class ParticleBeam:
             out[:,0] = initial time (t0) of an interval [s]
             out[:,1] = time interval (duration [s])
             out[:,2] = delivered dose [Gy]
-            /!\ out[-1,1] = np.nan, always!
+            /!\\ out[-1,1] = np.nan, always!
         """
         out = np.zeros([len(times), 3])
         for idx, _ in enumerate(times[:-1]):
@@ -861,23 +850,6 @@ class ParticleBeam:
             self.at(times[-1]).current_dose_rate,
         )
         return out
-
-    def make_beam_func(self) -> tp.Callable[[float], float]:
-        """
-        USELESS FOR NOW
-        => TODO ? or to clean?
-        """
-
-        def beam_func(time: float) -> float:
-            if (
-                time >= self.timer.start_time
-                and ((time - self.timer.start_time) % self.timer.period)
-                <= self.timer.on_time
-            ):
-                return self.dose_rate_peak
-            return 0.0
-
-        return beam_func
 
     def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
         """
@@ -1113,7 +1085,7 @@ class SinglePulseBeam(ConstantBeam):
             Time to start beam ON (default: 0.0)
 
     TODO: remove this class as it just mimic ConstantBeam?
-    /!\ useful constructor from'on_time' though
+    /!\\ useful constructor from'on_time' though
     """
 
     def __init__(

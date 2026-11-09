@@ -12,7 +12,6 @@ Author:
 from __future__ import annotations
 
 import collections
-import copy
 import logging
 import time
 import typing as tp
@@ -24,7 +23,6 @@ from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
-from radiopyo.parser.ron import RonFileParser
 from radiopyo.parser.toml import TOMLFileParser
 from radiopyo.physics.beam import BeamCollection, ParticleBeam
 from radiopyo.simulation import exceptions as rp_excep
@@ -197,19 +195,6 @@ class UnitCell(object):
         """
         return cls.from_parser(file, TOMLFileParser, init)
 
-    @classmethod
-    def from_ron(cls, file: str | Path) -> tp.Self:
-        """Create a Simulation Environment from a RON file:
-
-        Args:
-            file: str | pathlib.Path
-                Path to the RON file
-
-        Returns:
-            UnitCell
-        """
-        return cls.from_parser(file, RonFileParser)
-
     def update_env(self) -> None:
         """ """
         self._update_matrices()
@@ -284,7 +269,6 @@ class UnitCell(object):
             reaction.update_from_ge(self.g_val.values_at(sp.label, let, _dr))
 
         # Recompute the Gi_mat accordingly
-        # self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
         self._update_matrices()
 
         logger.debug("New G values [radical / 100eV / incident particle] are:")
@@ -509,10 +493,6 @@ class UnitCell(object):
         chunks = self.beam_list.current.make_time_intervals(
             start=t_span[0], stop=t_span[1]
         )
-        # chunks[np.where(chunks[:, 1] > 0)[0], 1] = max_step_size_on
-        # chunks[np.where(chunks[:, 1] == 0)[0], 1] = max_step_size_off
-        # if max_step_size_final is not None:
-        #    chunks[-2, 1] = max_step_size_final
 
         chunk_list: tp.List[SimChunk] = []
         for idx in range(len(chunks[0:-2, :])):
@@ -657,50 +637,6 @@ class UnitCell(object):
             use_beam=use_beam,
             force_positive=force_positive,
         )
-
-    def run_multi_doses(
-        self,
-        t_span: tp.Tuple[float, float],
-        doses: tp.Collection[float],
-        **kwargs: tp.Unpack[KwargsRun],
-    ) -> tp.Iterator[ODEResult]:
-        """ """
-        raise NotImplementedError
-        if len(doses) <= 0:
-            raise ValueError("No dose provided")
-        kwargs_beam_off = copy.deepcopy(kwargs)
-        kwargs_beam_off["use_beam"] = False
-
-        _doses = list(doses)
-
-        ## First run
-        self.beam.update_beam_param(max_dose=_doses.pop(0))
-        time_max = self.beam.time_at_max_dose
-        sim = self.prepare_chunked_run(t_span=(t_span[0], time_max), **kwargs)
-        acc_res = sim.run()  # To accumulate beam ON runs
-
-        res = self.run(
-            t_span=(time_max, t_span[1]),
-            y0=acc_res.final_cc,
-            **kwargs_beam_off,
-        )
-        yield copy.deepcopy(acc_res) + res
-
-        for dose in _doses:
-            self.beam.update_beam_param(max_dose=dose)
-            time_max = self.beam.time_at_max_dose
-            sim = self.prepare_chunked_run(
-                t_span=(acc_res.time[-1], time_max),
-                y0=acc_res.final_cc,
-                **kwargs,
-            )
-            acc_res = acc_res + sim.run()
-            res = self.run(
-                t_span=(time_max, t_span[1]),
-                y0=acc_res.final_cc,
-                **kwargs_beam_off,
-            )
-            yield copy.deepcopy(acc_res) + res
 
 
 # -------------------------- Chunked Simulation Run ------------------------- #

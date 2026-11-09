@@ -141,10 +141,10 @@ class EReaction(BiReaction):
             )
 
         self.add_forward_reaction(reaction, list_sp)
-        self.forward.set_k_value(self._k_forward)  # type: ignore [arg-type]
+        self.forward.set_k_value(self._k_forward)
 
         self.add_backward_reaction(revert_reaction(reaction), list_sp)
-        self.backward.set_k_value(self._k_backward)  # type: ignore [arg-type]
+        self.backward.set_k_value(self._k_backward)
 
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
@@ -159,7 +159,7 @@ class EReaction(BiReaction):
             float: The equilibrium constant at the given temperature.
         """
         _T = Temperature(T)
-        return 10 ** self._k_equilibrium(1 / _T.kelvin)
+        return tp.cast(float, 10 ** self._k_equilibrium(1 / _T.kelvin))
 
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
