@@ -148,6 +148,30 @@
         "ticket": "03-packaging-hygiene",
         "commit": "9a8e758"
       }
+    },
+    {
+      "at": "2026-11-09T21:41:43.637Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-dead-code-lint-zero.md",
+        "03-implement/04-dead-code-lint-zero/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-dead-code-lint-zero"
+      }
+    },
+    {
+      "at": "2026-11-09T21:49:42.658Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/04-dead-code-lint-zero/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-dead-code-lint-zero",
+        "commit": "ad88152"
+      }
     }
   ],
   "current_phase": "ship",
