@@ -292,6 +292,30 @@
         "ticket": "09-chemistry-cleanup",
         "commit": "a0bee93"
       }
+    },
+    {
+      "at": "2026-11-09T23:22:57.395Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/10-beam-split.md",
+        "03-implement/10-beam-split/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "10-beam-split"
+      }
+    },
+    {
+      "at": "2026-11-09T23:31:41.948Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/10-beam-split/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "10-beam-split",
+        "commit": "cd77b2b"
+      }
     }
   ],
   "current_phase": "ship",
