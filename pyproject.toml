@@ -16,19 +16,19 @@ classifiers = [
 ]
 dependencies = [
   "pandas>=1.5.3",
-  "pandas-stubs>=1.5.3",
   "numpy>=1.24.3",
   "scipy>=1.10.1",
-  "mypy",
   "lark>=1.1.2",
   "more-itertools",
-  "pytest",
-  "tqdm",
-  "h5py>=3.8"
+  "h5py>=3.8",
 ]
 
+[project.optional-dependencies]
+dev = ["mypy", "pytest", "pandas-stubs>=1.5.3"]
+tqdm = ["tqdm"]
+
 [project.urls]
-"Source" = "https://gitlab.unamur.be/rtonneau/radiopyo"
+"Source" = "https://github.com/rtonneau/radiopyo"
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
@@ -41,7 +41,7 @@ clean_env = 'conda env remove -n radiobio'
 # dependencies = ["hatch-mypyc"]
 
 [tool.hatch.build]
-exclude = [".env", ".vscode", "tests", "doc"]
+exclude = [".env", ".vscode", "tests", "doc", "radiopyo/data/IBA"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["radiopyo"]
@@ -72,6 +72,10 @@ exclude = ["tests/.*"]
 
 [tool.ruff]
 extend-exclude = ["tests/"]
+show-fixes = true
+target-version = "py311"
+
+[tool.ruff.lint]
 extend-select = [
   "B",
   "BLE",
@@ -107,33 +111,3 @@ ignore = [
   "N802",
   "E731",
 ]
-show-fixes = true
-target-version = "py311"
-
-[tool.logging]
-version = 1
-disable_existing_loggers = true
-
-[tool.logging.filters]
-
-[tool.logging.formatters.formatter]
-format = "%(asctime)s::%(name)s::%(levelname)s::%(message)s"
-
-[tool.logging.filters.InfoOnly]
-class = "radiopyo.utils.logging.InfoOnly"
-
-[tool.logging.handlers.info_handler]
-class = "radiopyo.utils.logging.InfoHandler"
-formatter = "formatter"
-stream = "ext://sys.stdout"
-level = "INFO"
-
-[tool.logging.handlers.err_console]
-class = "logging.StreamHandler"
-formatter = "formatter"
-stream = "ext://sys.stderr"
-level = "ERROR"
-
-[tool.logging.loggers.radiopyo]
-level = "DEBUG"
-handlers = ["info_handler", "err_console"]

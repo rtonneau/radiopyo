@@ -1,14 +1,9 @@
 [tool.logging]
 version = 1
-disable_existing_loggers = true
-
-[tool.logging.filters]
+disable_existing_loggers = false
 
 [tool.logging.formatters.formatter]
 format = "%(asctime)s::%(name)s::%(levelname)s::%(message)s"
-
-[tool.logging.filters.InfoOnly]
-class = "radiopyo.utils.logging.InfoOnly"
 
 [tool.logging.handlers.info_handler]
 class = "radiopyo.utils.logging.InfoHandler"

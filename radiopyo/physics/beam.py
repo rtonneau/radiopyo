@@ -37,7 +37,11 @@ __all__ = [
     "Timer",
     "ParticleBeam",
     "ConstantBeam",
+    "SinglePulseBeam",
     "PulsedBeam",
+    "MacroPulsedBeam",
+    "BaseTimer",
+    "MacroTimer",
     "BeamCollection",
 ]
 

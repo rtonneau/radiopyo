@@ -25,6 +25,7 @@ __all__ = [
     "InfoHandler",
     "disable_logging",
     "enable_logging",
+    "set_logging_level",
 ]
 # --------------------------------------------------------------------------- #
 
