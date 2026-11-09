@@ -196,6 +196,30 @@
         "ticket": "05-solver-core",
         "commit": "f567a6f"
       }
+    },
+    {
+      "at": "2026-11-09T22:24:44.894Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/06-run-flow.md",
+        "03-implement/06-run-flow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "06-run-flow"
+      }
+    },
+    {
+      "at": "2026-11-09T22:45:41.473Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/06-run-flow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "06-run-flow",
+        "commit": "d24bc92"
+      }
     }
   ],
   "current_phase": "ship",
