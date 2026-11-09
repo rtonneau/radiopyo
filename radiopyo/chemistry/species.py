@@ -5,9 +5,12 @@ definitions.
 It also provides a collection to ease their handling.
 
 Classes:
-    ChemSpecies: Class used for species with cc (cst or dyn).
-    RawSpecies: Basic class for species.
-    H2O: A predefined species for water.
+    BasicSpecies: The most basic, named, species.
+    ChemicalSpecies: Species with charge, radical flag and mass (with the
+        HydratedElectron, Atom and Molecule subclasses).
+    SimSpecies: A species as involved in a simulation (index and
+        initial concentration, cst or dyn).
+    H2O: A predefined SimSpecies for water.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 16/03/2023
@@ -78,18 +81,28 @@ class BasicSpecies(object):
     def __eq__(self, other: object) -> bool:
         """
         Checks if the given object is equal to the current species.
+        A species equals another species or a str with the same label.
 
         Args:
             other (object): The object to be compared.
 
         Returns:
             bool: True if the objects are equal, False otherwise.
+                NotImplemented for any other type (Python then falls
+                back to the reflected comparison / identity).
         """
         if isinstance(other, str):
             return self.label == other
         if isinstance(other, BasicSpecies):
             return self.label == other.label
-        raise NotImplementedError(f"Equality between RawSpecies and {other}")
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """
+        Hash consistent with __eq__: equal species (or a species and its
+        label) share the same hash.
+        """
+        return hash(self.label)
 
 
 class ChemicalSpecies(BasicSpecies):
@@ -273,22 +286,26 @@ class SimSpecies:
     """
     Class used to define species from concentration coefficient (cc).
 
-    This class extends the RawSpecies class and adds attributes and
-    methods related to the concentration coefficient.
+    This class wraps a BasicSpecies (or ChemicalSpecies) and adds the
+    simulation index and the initial concentration coefficient.
 
     Attributes:
-        label (str): The label of the species.
-            cc_init (Polynomial): The initial concentration coefficient
-            of the species.
+        raw_species (BasicSpecies | ChemicalSpecies): The wrapped
+            species (gives the label).
+        index (int): Index of the species in the simulation (-1 if not
+            attributed yet).
+        cc_init (Polynomial | None): The initial concentration
+            coefficient(s) of the species in [mol/l], as a polynomial of
+            the temperature in °C. None when no initial concentration was
+            given (the initial concentration is then 0).
 
     Methods:
         set_initial_cc(value): Sets the initial concentration
             coefficient of the species.
-        ... (other methods specific to ChemSpecies)
     """
 
     raw_species: BasicSpecies | ChemicalSpecies
-    cc_init: np.polynomial.Polynomial  # Store initial value as [mol/l]
+    cc_init: tp.Optional[np.polynomial.Polynomial]  # [mol/l], None if not set
     index: int
 
     def __init__(
@@ -300,8 +317,9 @@ class SimSpecies:
         """ """
         self.raw_species = raw_species
         self.index = index
-        cc_init = cc_init if cc_init is not None else -1
-        self.cc_init = polynomial_factory(cc_init, log10=False)
+        self.cc_init = (
+            polynomial_factory(cc_init, log10=False) if cc_init is not None else None
+        )
 
     def __repr__(self) -> str:
         """
@@ -314,7 +332,8 @@ class SimSpecies:
 
     def __copy__(self) -> SimSpecies:
         """
-        Creates a deep copy of the current SimSpecies instance.
+        Creates a copy of the current SimSpecies instance (the wrapped
+        species is shared, the initial concentration is copied).
 
         Returns:
             SimSpecies: A new SimSpecies instance with the same label,
@@ -323,7 +342,7 @@ class SimSpecies:
         return SimSpecies(
             self.raw_species,
             self.index,
-            tp.cast("list[float]", self.cc_init.coef),  # ndarray accepted at runtime
+            self.cc_init.copy() if self.cc_init is not None else None,
         )
 
     @property
@@ -343,6 +362,8 @@ class SimSpecies:
             float: The initial concentration of the species at the given
                 temperature.
         """
+        if self.cc_init is None:
+            return 0
         T = Temperature(T)
         cc = float(self.cc_init(T.celsius))
         return cc if cc > 0 else 0

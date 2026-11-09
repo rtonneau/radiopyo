@@ -12,6 +12,7 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import copy as _copy
 import operator as op
 import typing as tp
 from contextlib import suppress
@@ -58,9 +59,9 @@ class ListSpecies:
     id and loop over species.
 
     Attributes:
-        dyn_sp: Dict[str, ChemSpecies]
+        dyn_sp: Dict[str, SimSpecies]
             Dictionary storing dyn species
-        cst_sp: Dict[str, ChemSpecies]
+        cst_sp: Dict[str, SimSpecies]
             Dictionary storing cst species
         next_index: int
             Index for the next Species (Cst or Dyn) creation
@@ -93,8 +94,8 @@ class ListSpecies:
         Checks if a given key is in the ListSpecies instance.
 
         Args:
-            key (str | ChemSpecies): The key to be searched. It can be
-                either a string or a ChemSpecies instance.
+            key (str | SimSpecies): The key to be searched. It can be
+                either a string or a species instance.
 
         Returns:
             bool: True if the key is found in the ListSpecies instance,
@@ -110,7 +111,7 @@ class ListSpecies:
         the ListSpecies instance.
 
         Returns:
-            Iterator(ChemSpecies)
+            Iterator(SimSpecies)
         """
         return chain(self.dyn_sp.values(), self.cst_sp.values())
 
@@ -125,13 +126,13 @@ class ListSpecies:
 
     def __getitem__(self, item: str) -> SimSpecies:
         """
-        Returns the ChemSpecies instance associated with the given item.
+        Returns the SimSpecies instance associated with the given item.
 
         Args:
             item (str): The label of the species to be retrieved.
 
         Returns:
-            ChemSpecies: The ChemSpecies instance associated with the
+            SimSpecies: The SimSpecies instance associated with the
                 given item.
 
         Raises:
@@ -172,7 +173,7 @@ class ListSpecies:
         return pd.Series(sp, idx).sort_index()
 
     def get_by_index(self, index: int) -> SimSpecies:
-        """Returns the ChemSpecies instance associated with the given index."""
+        """Returns the SimSpecies instance associated with the given index."""
         for sp in self:
             if sp.index == index:
                 return sp
@@ -188,11 +189,11 @@ class ListSpecies:
 
         Args:
             label (str): The label of the species to be retrieved.
-            default (ChemSpecies, optional): The default value to return
+            default (SimSpecies, optional): The default value to return
                 if the species does not exist. Defaults to None.
 
         Returns:
-            ChemSpecies: The ChemSpecies instance associated with the
+            SimSpecies: The SimSpecies instance associated with the
                 given label, or the default value if not found.
         """
         with suppress(KeyError):
@@ -277,7 +278,7 @@ class ListSpecies:
             label (str): The label of the dynamic species.
 
         Returns:
-            ChemSpecies: The retrieved or created dynamic species.
+            SimSpecies: The retrieved or created dynamic species.
         """
         if (out := self.get(species)) is not None:
             return out
@@ -298,7 +299,7 @@ class ListSpecies:
             label (str): The label of the constant species.
 
         Returns:
-            ChemSpecies: The retrieved or created constant species.
+            SimSpecies: The retrieved or created constant species.
         """
         if (out := self.get(species)) is not None:
             return out
@@ -311,7 +312,7 @@ class ListSpecies:
         Get an iterator over all the CstSpecies (ordered).
 
         Returns:
-            Iterator(ChemSpecies)
+            Iterator(SimSpecies)
         """
         return map(
             op.itemgetter(1), sorted(self.cst_sp.items(), key=lambda x: x[1].index)
@@ -322,7 +323,7 @@ class ListSpecies:
         Get an iterator over all the dynamic species (ordered).
 
         Returns:
-            Iterator(ChemSpecies)
+            Iterator(SimSpecies)
         """
         return map(
             op.itemgetter(1), sorted(self.dyn_sp.items(), key=lambda x: x[1].index)
@@ -333,7 +334,7 @@ class ListSpecies:
         Get an iterator over all the constant species (not ordered).
 
         Returns:
-            Iterator(ChemSpecies)
+            Iterator(SimSpecies)
         """
         return iter(self.cst_sp.values())
 
@@ -342,7 +343,7 @@ class ListSpecies:
         Get an iterator over all the DynSpecies (not ordered).
 
         Returns:
-            Iterator(ChemSpecies)
+            Iterator(SimSpecies)
         """
         return iter(self.dyn_sp.values())
 
@@ -369,21 +370,25 @@ class ListSpecies:
             self[label].index = idx
         for idx, label in enumerate(cst_sp, start=len(dyn_sp)):
             self[label].index = idx
-        self.next_index = idx + 1
+        self.next_index = len(dyn_sp) + len(cst_sp)
         self.sorted = True
 
     def copy(self) -> ListSpecies:
         """
+        Copy the collection: the SimSpecies are copied (same raw species,
+        index and initial concentration), so that modifying the copy
+        (indices, concentrations, new species) leaves the original
+        untouched.
+
         Returns:
             ListSpecies:
                 A copy of the ListSpecies instance.
         """
         new_ls = ListSpecies()
-
-        for sp in self.iter_dyn_species():
-            new_ls.add_dyn_species(sp.raw_species, sp.cc_init)
-        for sp in self.iter_cst_species():
-            new_ls.add_cst_species(sp.raw_species, sp.cc_init)
+        new_ls.dyn_sp = {label: _copy.copy(sp) for label, sp in self.dyn_sp.items()}
+        new_ls.cst_sp = {label: _copy.copy(sp) for label, sp in self.cst_sp.items()}
+        new_ls.next_index = self.next_index
+        new_ls.sorted = self.sorted
         return new_ls
 
     def sort(
@@ -426,7 +431,7 @@ class ListSpecies:
         ):
             out[species.label].index = idx
 
-        out.next_index = idx + 1
+        out.next_index = len(out)
         out.sorted = True
         return out if not inplace else None
 
@@ -435,8 +440,8 @@ class ListSpecies:
         Checks if a given key is a constant species.
 
         Args:
-            key (str | ChemSpecies): The key to be searched. It can be
-                either a string or a ChemSpecies instance.
+            key (str | SimSpecies): The key to be searched. It can be
+                either a string or a species instance.
 
         Returns:
             bool: True if the key is found in the constant species,
@@ -451,8 +456,8 @@ class ListSpecies:
         Checks if a given key is a dynamic species.
 
         Args:
-            key (str | ChemSpecies): The key to be searched. It can be
-                either a string or a ChemSpecies instance.
+            key (str | SimSpecies): The key to be searched. It can be
+                either a string or a species instance.
 
         Returns:
             bool: True if the key is found in the dynamic species,

@@ -11,7 +11,6 @@ Author:
 # ------------------------------ External imports --------------------------- #
 from __future__ import annotations
 
-import hashlib
 import typing as tp
 
 # ----------------------------- Internal imports ---------------------------- #
@@ -36,7 +35,7 @@ __all__ = [
 class MichaelisMenten(BasicReaction):
     """
     Class implementing the Michaelis-Menten kinetic. Child class of
-    BaseChemicalReaction with few additions. In the Michaelis-Menten
+    BasicReaction with few additions. In the Michaelis-Menten
     kinetic the reaction rate is defined by:
         k_value * [enzyme] * [substrate] / (k_micha + [substrate])
 
@@ -84,19 +83,12 @@ class MichaelisMenten(BasicReaction):
             return self.k_value * sp.stoi
         return self.k_value
 
-    def make_hash(self, method: str = "sha256") -> str:
+    def _hash_source(self) -> str:
         """
-        Produce a unique identifier (content based) for easy comparison.
-
-        Args:
-            method (str): Hash method to use (default: "sha256").
-
-        Returns:
-            str: A hash value representing the object.
+        make_hash() historically digested a __repr__ that lacked its
+        closing ")". Keep digesting that form so that hashes stay stable.
         """
-        hasher = hashlib.new(method, usedforsecurity=False)
-        hasher.update(repr(self).encode())
-        return hasher.hexdigest()
+        return repr(self).removesuffix(")")
 
     @classmethod
     def from_generic(
@@ -129,18 +121,11 @@ class MichaelisMenten(BasicReaction):
 
         reaction.enzyme = list_sp.get_or_create_dyn_species(generic["enzyme"])
 
-        for _, (sp, stoi, ope) in generic["reactants"].items():
-            if reaction.tot_number_reactants() < 1:
-                substrate = list_sp.get_or_create_dyn_species(sp)
-                reaction.add_as_reactant(substrate, stoi, ope)
-                continue
+        if len(generic["reactants"]) > 1:
             raise ValueError(
                 f"MichaelisMenten reaction must have only one substrate. Found: {generic}"
             )
-
-        for _, (sp, stoi, ope) in generic["products"].items():
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
-            reaction.add_as_product(sim_sp, stoi, ope)
+        reaction._add_species_from_generic(generic, list_sp)
         return reaction
 
     def as_label(self) -> str:
@@ -157,10 +142,7 @@ class MichaelisMenten(BasicReaction):
             str
                 A string label for the reaction.
         """
-        if self.index is not None and self.index >= 0:
-            return f"EZ_{self.index}"
-
-        raise KeyError("Unknown reaction index. Cannot make a label.")
+        return self._index_label("EZ")
 
     def __str__(self) -> str:
         out = []
@@ -178,7 +160,7 @@ class MichaelisMenten(BasicReaction):
         return (
             f"MichaelisMenten('{self.__str__()}', "
             f"k_value={round(self.k_value, 5)}, "
-            f"k_micha={round(self.k_micha, 5)}"
+            f"k_micha={round(self.k_micha, 5)})"
         )
 
     def to_dict(self) -> tp.Dict[str, tp.Any]:

@@ -27,6 +27,17 @@ class TestListSpecies_empty:
         assert empty_list_species.next_index == 0
         assert empty_list_species.sorted is False
 
+    def test_sort_empty(self, empty_list_species):
+        out = empty_list_species.sort(inplace=False)
+        assert len(out) == 0
+        assert out.next_index == 0
+        assert out.sorted is True
+
+    def test_set_order_empty(self, empty_list_species):
+        empty_list_species.set_order([], [])
+        assert empty_list_species.next_index == 0
+        assert empty_list_species.sorted is True
+
     def test_add_dyn_species(self, empty_list_species):
         # From empty list
         empty_list_species.add_dyn_species(BasicSpecies("H2O2"))
@@ -272,6 +283,13 @@ class TestListSpecies:
             assert sim_sp.raw_species is list_species.dyn_sp[label].raw_species
         assert copy.sorted == list_species.sorted
         assert copy.next_index == list_species.next_index
+
+    def test_copy_keeps_indices(self, list_species):
+        list_species.sort(inplace=True)
+        copy = list_species.copy()
+        for sim_sp in list_species:
+            assert copy[sim_sp.label].index == sim_sp.index
+            assert copy[sim_sp.label].initial_cc() == sim_sp.initial_cc()
 
     def test_copy_with_changes(self, list_species, non_existing_species):
         copy = list_species.copy()

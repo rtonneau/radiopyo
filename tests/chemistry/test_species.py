@@ -37,8 +37,16 @@ def test_raw_species_eq(raw_H2O2):
 def test_raw_species_eq_unsupported_type(raw_H2O2):
     # BasicSpecies no longer supports `in` (former "contains" test): the
     # equality with str / BasicSpecies is the remaining comparison API.
-    with pytest.raises(NotImplementedError):
-        raw_H2O2 == 3.2  # noqa: B015
+    # Foreign types: __eq__ returns NotImplemented -> Python falls back
+    # to identity, i.e. not equal (no exception).
+    assert (raw_H2O2 == 3.2) is False
+    assert raw_H2O2 != 3.2
+    assert raw_H2O2.__eq__(3.2) is NotImplemented
+
+
+def test_raw_species_hash(raw_H2O2):
+    assert hash(raw_H2O2) == hash(sp.BasicSpecies("H2O2"))
+    assert len({raw_H2O2, sp.BasicSpecies("H2O2"), sp.BasicSpecies("H2")}) == 2
 
 
 def test_raw_species_string(raw_H2O2):
@@ -49,7 +57,7 @@ def test_raw_species_string(raw_H2O2):
 @pytest.fixture
 def H2():
     """
-    Generate a unique ChemSpecies instance.
+    Generate a unique SimSpecies instance.
     """
     return sp.SimSpecies(sp.BasicSpecies("H2"))
 
@@ -57,7 +65,7 @@ def H2():
 @pytest.fixture
 def H2O2():
     """
-    Generate a unique ChemSpecies instance.
+    Generate a unique SimSpecies instance.
     """
     return sp.SimSpecies(sp.BasicSpecies("H2O2"), index=4, cc_init=25.4)
 
@@ -65,7 +73,7 @@ def H2O2():
 def test_simspecies_init(H2O2, H2O, H2):
     assert H2.label == "H2"
     assert H2.index == -1
-    assert H2.cc_init == np.polynomial.Polynomial(-np.inf)
+    assert H2.cc_init is None  # empty initial concentration
     assert H2O2.label == "H2O2"
     assert H2O2.index == 4
     assert H2O2.cc_init == np.polynomial.Polynomial(25.4)

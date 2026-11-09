@@ -370,6 +370,7 @@ class SimEnv:
         list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
         # Copy initial cc and strip species name on the fly.
         initial_cc = {}
+        assert H2O.cc_init is not None  # module constant, always defined
         list_sp.add_cst_species(
             RPARSER.parse_species("H2O"), cc=tp.cast("list[float]", H2O.cc_init.coef)
         )
@@ -860,7 +861,7 @@ class SimEnv:
         for elt in self.species.iter_dyn_species():
             if elt.label in ["H3O_plus", "OH_minus"]:
                 continue
-            if len(elt.cc_init) > 1:
+            if elt.cc_init is not None and len(elt.cc_init) > 1:
                 out["concentrations"]["initial"][elt.label] = elt.cc_init.coef.tolist()  # type: ignore[assignment]  # poly coeffs; TypedDict says float
             elif elt.initial_cc() <= 0:
                 continue
@@ -869,7 +870,7 @@ class SimEnv:
         for elt in self.species.iter_cst_species():
             if elt.label in ["H2O", "H3O_plus", "OH_minus"]:
                 continue
-            if len(elt.cc_init) > 1:
+            if elt.cc_init is not None and len(elt.cc_init) > 1:
                 out["concentrations"]["fixed"][elt.label] = elt.cc_init.coef.tolist()  # type: ignore[assignment]  # poly coeffs; TypedDict says float
             else:
                 out["concentrations"]["fixed"][elt.label] = elt.initial_cc()
