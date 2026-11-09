@@ -1,0 +1,88 @@
+{
+  "session_id": "2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian",
+  "feature_name": "review this repo to improve it. Keep all actual features. Jocobian will be one of the first next job. Just improve flow and readability. Don't break how code is used by user. Other things can be adapted if needed",
+  "scratch_dir": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian",
+  "created_at": "2026-11-09T20:05:46.317Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-09T20:05:46.317Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-09T20:25:06.924Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-09T20:25:07.097Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-09T20:54:42.401Z",
+      "event": "auto_started",
+      "phase": "plan",
+      "detail": {
+        "target": "finish",
+        "steps": "write:plan → ship → finish",
+        "shipMode": "delegate"
+      }
+    },
+    {
+      "at": "2026-11-09T20:54:47.004Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "refactor/readability-and-jacobian-prep",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-09T20:54:47.104Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-golden-outputs.md",
+        "02-plan/tickets/02-port-tests.md",
+        "02-plan/tickets/03-packaging-hygiene.md",
+        "02-plan/tickets/04-dead-code-lint-zero.md",
+        "02-plan/tickets/05-solver-core.md",
+        "02-plan/tickets/06-run-flow.md",
+        "02-plan/tickets/07-simenv-builders.md",
+        "02-plan/tickets/08-split-sim-utils.md",
+        "02-plan/tickets/09-chemistry-cleanup.md",
+        "02-plan/tickets/10-beam-split.md",
+        "02-plan/tickets/11-beam-generic-matrix.md",
+        "02-plan/tickets/12-fix-run-burst.md",
+        "02-plan/tickets/13-fix-temperature.md",
+        "02-plan/tickets/14-fix-include-merge.md",
+        "02-plan/tickets/15-fix-macro-beam.md",
+        "02-plan/tickets/16-fix-species-order.md",
+        "02-plan/tickets/17-fix-arrhenius-enzymes-add.md",
+        "02-plan/tickets/18-docs.md"
+      ],
+      "detail": {
+        "tickets": 18
+      }
+    }
+  ],
+  "current_phase": "ship",
+  "git": {
+    "branch": "refactor/readability-and-jacobian-prep",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-09T20:54:47.004Z",
+    "pr_url": null
+  }
+}
