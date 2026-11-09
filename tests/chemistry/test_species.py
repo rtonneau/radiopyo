@@ -12,13 +12,13 @@ import radiopyo.chemistry.species as sp
 from radiopyo.chemistry.utils.units import Temperature
 
 
-# ----------------------------- RawSpecies tests ---------------------------- #
+# ----------------------------- BasicSpecies tests ---------------------------- #
 @pytest.fixture
 def raw_H2O2():
     """
-    GEnerate a unique RawSpecies instance.
+    GEnerate a unique BasicSpecies instance.
     """
-    return sp.RawSpecies("H2O2")
+    return sp.BasicSpecies("H2O2")
 
 
 def test_raw_species_label(raw_H2O2):
@@ -26,34 +26,32 @@ def test_raw_species_label(raw_H2O2):
 
 
 def test_raw_species_eq(raw_H2O2):
-    other = sp.RawSpecies("H2O2")
+    other = sp.BasicSpecies("H2O2")
     assert raw_H2O2 == other
     assert raw_H2O2 == "H2O2"
-    other = sp.RawSpecies("H2O3")
+    other = sp.BasicSpecies("H2O3")
     assert raw_H2O2 != other
     assert raw_H2O2 != "H2O3"
 
 
-def test_raw_species_contains(raw_H2O2):
-    other = sp.RawSpecies("H2O2")
-    assert other in raw_H2O2
-    assert "H2O2" in raw_H2O2
-    other = sp.RawSpecies("H2O3")
-    assert other not in raw_H2O2
-    assert "H2O3" not in raw_H2O2
+def test_raw_species_eq_unsupported_type(raw_H2O2):
+    # BasicSpecies no longer supports `in` (former "contains" test): the
+    # equality with str / BasicSpecies is the remaining comparison API.
+    with pytest.raises(NotImplementedError):
+        raw_H2O2 == 3.2  # noqa: B015
 
 
 def test_raw_species_string(raw_H2O2):
     assert str(raw_H2O2) == "H2O2"
 
 
-# ---------------------------- ChemSpecies tests ---------------------------- #
+# ---------------------------- SimSpecies tests ---------------------------- #
 @pytest.fixture
 def H2():
     """
     Generate a unique ChemSpecies instance.
     """
-    return sp.ChemSpecies(label="H2")
+    return sp.SimSpecies(sp.BasicSpecies("H2"))
 
 
 @pytest.fixture
@@ -61,10 +59,10 @@ def H2O2():
     """
     Generate a unique ChemSpecies instance.
     """
-    return sp.ChemSpecies(label="H2O2", index=4, cc_init=25.4)
+    return sp.SimSpecies(sp.BasicSpecies("H2O2"), index=4, cc_init=25.4)
 
 
-def test_chemspecies_init(H2O2, H2O, H2):
+def test_simspecies_init(H2O2, H2O, H2):
     assert H2.label == "H2"
     assert H2.index == -1
     assert H2.cc_init == np.polynomial.Polynomial(-np.inf)

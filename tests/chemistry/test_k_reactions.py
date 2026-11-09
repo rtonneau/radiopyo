@@ -3,7 +3,7 @@ import numpy as np
 from numpy.polynomial import Polynomial
 
 from radiopyo.chemistry import k_reactions as kr
-from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry.species import BasicSpecies, SimSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from tests.chemistry.test_basic_chemistry import TestBasicReaction
 
@@ -82,5 +82,8 @@ class TestKReaction(TestBasicReaction):
         with pytest.raises(KeyError):
             empty_reaction.as_label()
 
-    @pytest.mark.parametrize("",[])
-    def raw_k_value(self):
+    def test_raw_k_value(self):
+        assert kr.KReaction().raw_k_value() is None
+        assert kr.KReaction(4).raw_k_value() == pytest.approx(4)
+        coefs = [13.339, -2.220e3, 7.333e5, -1.065e8]
+        assert list(kr.KReaction(coefs).raw_k_value()) == coefs
