@@ -25,7 +25,7 @@ from scipy.integrate import trapezoid  # type: ignore[import-untyped]
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import SimEnv
-from radiopyo.simulation.ode_functions_solver import ScipyODEResult
+from radiopyo.simulation.ode_functions_solver import ScipyODEResult, reaction_rates
 from radiopyo.utils.sim_types import ConfigDict
 
 # -------------------------- Type checking ONLY import----------------------- #
@@ -291,85 +291,49 @@ class ODEResult(object):
 
     def reconstruct_reactions(self, recompute: bool = False) -> pd.DataFrame:
         """
+        Rate of every reaction at every time point, computed with the
+        same rate function as the ODE solver (ode_functions_solver.
+        reaction_rates). The result is cached in self.dydt (and stored
+        in HDF5 files); use recompute=True to ignore the cache.
+
+        Columns are ordered: k-reactions (acid/base and equilibrium
+        forward/backward first), radiolytic, then enzymatic reactions.
+        /!\\ This is NOT the global reaction index order (k-reactions,
+        enzymatic, radiolytic, see ReactionsList): the column order is
+        kept as is for the rates already stored in HDF5 files.
+
         returns:
             dataframe [mol/l/s]
         Rem: to integrate df
             >>> df.apply(lambda x: trapezoid(y=x.values, x=x.index))
         """
-        # Compute column names and Pre compute slices to ease access in
-        # the dataframe columns
-        cols_kr = [kr.as_label() for kr in self.env.reactions.iter_all_kreactions()]
-        idx_kr = slice(0, len(cols_kr))
-
-        cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
-        idx_gi = slice(idx_kr.stop, idx_kr.stop + len(cols_gi))
-
-        if self.mat["Ez_mat"] is not None:
-            cols_ez = [er.as_label() for er in self.env.reactions.enzymatic]
-            idx_ez = slice(idx_gi.stop, idx_gi.stop + len(cols_ez))
-        else:
-            cols_ez = []
+        columns = list(
+            chain(
+                (kr.as_label() for kr in self.env.reactions.iter_all_kreactions()),
+                (gr.as_label() for gr in self.env.reactions.radiolytic),
+                (er.as_label() for er in self.env.reactions.enzymatic),
+            )
+        )
 
         if self.dydt.shape[-1] == self.y.shape[-1] > 0 and not recompute:
             return pd.DataFrame(
-                columns=list(chain.from_iterable([cols_kr, cols_gi, cols_ez])),
+                columns=columns,
                 index=self.t,
                 dtype=np.float64,
                 data=self.dydt.T,
             )
 
+        data = None
+        if self.t.size > 0:
+            y_full = self.mat.state.to_full_molar(self.y)
+            data = reaction_rates(self.t, y_full, self.mat, self.beam).stacked().T
+
         out = pd.DataFrame(
-            columns=list(chain.from_iterable([cols_kr, cols_gi, cols_ez])),
+            columns=columns,
             index=self.t,
             dtype=np.float64,
+            data=data,
         )
-
-        # Prefill values for radiolytic reactions
-        for label, reaction in zip(cols_gi, self.env.reactions.radiolytic):
-            out.loc[:, label] = reaction.kr()
-
-        for (idx, t_val), y in zip(enumerate(self.t), self.y.T):
-            y = y * 1.0e-6  # µmol/L => mol/l
-
-            y = np.append(y, self.mat["cst_sp"])
-
-            # K Reactions
-            Rki = np.nan_to_num(
-                np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
-            )
-
-            Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
-            _ = np.any(
-                (y <= 1e-12)[:, np.newaxis] * self.mat["Ki_mat"][1][:, :, 1], axis=0
-            )
-            Rki[_] = 0.0
-
-            # Sometimes, some species are < 0.0 for a very short while.
-            # It has no physical meaning. But it is necessary to give
-            # the ODE solver such possibility to ensure good quality
-            # results. The next line is then added only here
-            # (not in ODE solver) to give a more suitable meaning.
-
-            out.iloc[idx, idx_kr] = Rki
-
-            # Radiolytic Reactions
-            dr = 0.0
-            if self.beam is not None:
-                dr = self.beam.at(t_val).dose_rate()
-            out.iloc[idx, idx_gi] *= dr
-
-            # Enzimatic reactions
-            if self.mat["Ez_mat"] is not None:
-                E = np.matmul(y, self.mat["Ez_mat"][1])
-                S = np.matmul(y, self.mat["Ez_mat"][0])
-                MM = (
-                    self.mat["Ez_mat"][2][1, :]
-                    * E
-                    * S
-                    / (self.mat["Ez_mat"][2][0, :] + S)
-                )
-                out.iloc[idx, idx_ez] = MM
-
         self.dydt = out.values.T
         return out
 

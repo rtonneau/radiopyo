@@ -219,9 +219,9 @@ def _derive_adapter(
 ) -> np.ndarray:
     """
     Single place calling ``derive()``. Today its signature is
-    ``derive(t, y, beam, cst_sp, Ki_mat, Gi_mat, Ez_mat, force_positive)``
-    with the matrices taken from ``cell.mat``. Later tickets restructure
-    these matrices: update only this function.
+    ``derive(t, y, beam, mat, force_positive)`` with ``mat`` the
+    ``SimMatrices`` of ``cell.mat``. Later tickets restructure these
+    matrices: update only this function.
 
     Args:
         y: state vector in dynamical-species index order, [µmol/L]
@@ -233,10 +233,7 @@ def _derive_adapter(
         t,
         y,
         cell.beam if use_beam else None,
-        cell.mat["cst_sp"],
-        cell.mat["Ki_mat"],
-        cell.mat["Gi_mat"],
-        cell.mat["Ez_mat"],
+        cell.mat,
         force_positive,
     )
 

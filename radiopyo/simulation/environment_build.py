@@ -39,7 +39,11 @@ from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
 from radiopyo.utils.sim_types import (
+    EzMatrices,
+    GVector,
+    KMatrices,
     SimMatrices,
+    StateLayout,
     deep_update,
     default_ConfigDict,
     default_SimParameters,
@@ -542,173 +546,134 @@ class SimEnv:
         self,
         T: tp.Optional[Temperature | float] = None,
     ) -> SimMatrices:
-        """ """
+        """Build every (immutable) matrix used by the ODE solver.
+
+        Args:
+            T: Temperature object or float, sets the k values
+                (default: None -> default temperature).
+        Returns:
+            SimMatrices
+        """
         return SimMatrices(
-            Ki_mat=self.make_kreaction_matrix(T),
-            Gi_mat=self.make_radiolytic_vector(),
-            Ez_mat=self.make_enzymatic_matrix(),
-            cst_sp=self.make_cst_species_vector(),
+            k_reactions=self.make_kreaction_matrix(T),
+            radiolytic=self.make_radiolytic_vector(),
+            enzymatic=self.make_enzymatic_matrix(),
+            state=StateLayout(cst_sp=self.make_cst_species_vector()),
         )
 
     def make_kreaction_matrix(
         self,
         T: tp.Optional[Temperature | float] = None,
-    ) -> tp.Tuple[
-        NDArray[np.float64],
-        NDArray[np.int8],
-        NDArray[np.float32],
-        NDArray[np.float32],
-    ]:
+    ) -> KMatrices:
         """
         Construct all matrices necessary to compute the variation of
-        the species concentrations due to all k reactions.
+        the species concentrations due to all k reactions (column r is
+        the k-reaction of global index r). See KMatrices.
         """
-        # Step 1 -> Find the highest species's stoichio
-        max_reactants = 0
-        for reaction in self.reactions.iter_all_kreactions():
-            max_reactants = max(max_reactants, reaction.tot_number_reactants())
+        n_species = len(self.species)
+        n_kr = self.reactions.total_kreactions()
 
-        Ki = np.zeros(self.reactions.total_kreactions(), dtype=np.float64)
-
-        # 0 for reactants, 1 for products
-        Riy = np.zeros(
-            [len(self.species), self.reactions.total_kreactions(), 2],
-            dtype=np.int8,
+        # Highest number of reactant molecules in a single reaction
+        max_reactants = max(
+            (r.tot_number_reactants() for r in self.reactions.iter_all_kreactions()),
+            default=0,
         )
 
-        Rki = np.full(
-            [
-                len(self.species),
-                self.reactions.total_kreactions(),
-                max_reactants,
-            ],
-            fill_value=np.nan,
-            dtype=np.float32,
+        k_values = np.zeros(n_kr, dtype=np.float64)
+        # Unused slots point to the extra 1.0 appended by the rate law
+        reactant_index = np.full(
+            [n_kr, max_reactants],
+            fill_value=n_species,
+            dtype=np.intp,
         )
-
-        JRki = np.full(
-            [
-                len(self.species),
-                self.reactions.total_kreactions(),
-                max_reactants,
-                len(self.species),
-            ],
-            fill_value=np.nan,
-            dtype=np.float32,
-        )
+        stoichiometry = np.zeros([n_species, n_kr], dtype=np.float64)
+        negative_products = np.zeros([n_species, n_kr], dtype=np.bool_)
 
         for _, reaction, k_value in self.reactions.iter_all_kreactions_and_kvalues(T):
             idx_r: int = reaction.get_index()
-            Ki[idx_r] = k_value
+            k_values[idx_r] = k_value
             # Loop over all reaction's reactants
-            idx_reactant: int = 0
+            slot: int = 0
             for r_sp in reaction.reactants:
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(r_sp.species):
-                    Riy[r_sp.species.index, idx_r, 0] -= r_sp.stoi
+                    stoichiometry[r_sp.species.index, idx_r] -= r_sp.stoi
                 for _ in range(r_sp.stoi):
-                    Rki[:, idx_r, idx_reactant] = 0
-                    Rki[r_sp.species.index, idx_r, idx_reactant] = 1
-                    idx_reactant += 1
+                    reactant_index[idx_r, slot] = r_sp.species.index
+                    slot += 1
 
             # Loop over all reaction's products
             for r_sp in reaction.products:
                 # If declared as cst, keep it 0
-                if not self.species.is_cst_species(r_sp.species):
-                    if r_sp.ope is Operation.ADD:
-                        Riy[r_sp.species.index, idx_r, 0] += r_sp.stoi
-                    else:
-                        Riy[r_sp.species.index, idx_r, 0] -= r_sp.stoi
-                        Riy[r_sp.species.index, idx_r, 1] += r_sp.stoi
-
-            # Jacobian related loops:
-            for sp in self.species:
-                # sp not involved in reaction => derivative = 0
-                if not reaction.has_reactant(sp) or self.species.is_cst_species(sp):
-                    JRki[:, idx_r, :, sp.index] = 0
+                if self.species.is_cst_species(r_sp.species):
                     continue
+                if r_sp.ope is Operation.ADD:
+                    stoichiometry[r_sp.species.index, idx_r] += r_sp.stoi
+                else:
+                    stoichiometry[r_sp.species.index, idx_r] -= r_sp.stoi
+                    negative_products[r_sp.species.index, idx_r] = True
 
-                idx_reactant = 0
-                for r_sp in reaction.reactants:
-                    if r_sp.species != sp:
-                        for _ in range(r_sp.stoi):
-                            JRki[:, idx_r, idx_reactant, sp.index] = 0
-                            JRki[r_sp.species.index, idx_r, idx_reactant, sp.index] = 1
-                            idx_reactant += 1
-                        continue
-                    derive = r_sp.stoi - 1
-                    for _ in range(derive):
-                        JRki[:, idx_r, idx_reactant, sp.index] = 0
-                        index = (r_sp.species.index, idx_r, idx_reactant, sp.index)
-                        JRki[index] = 1
-                        if _ == 0:
-                            JRki[index] = r_sp.stoi
-                        idx_reactant += 1
+        return KMatrices(
+            k_values=k_values,
+            reactant_index=reactant_index,
+            stoichiometry=stoichiometry,
+            negative_products=negative_products,
+        )
 
-        return (Ki, Riy, Rki, JRki)
-
-    def make_radiolytic_vector(self) -> NDArray:
+    def make_radiolytic_vector(self) -> GVector:
         """
         Construct matrix necessary to compute the variation of the
-        species concentrations due irradiation via GValues.
+        species concentrations due irradiation via GValues (column r is
+        ReactionsList.radiolytic[r]). See GVector.
         """
-        Gi = np.zeros(
-            [len(self.species), len(self.reactions.radiolytic)],
-            dtype=np.float64,
-        )
+        n_g = len(self.reactions.radiolytic)
+        yields = np.zeros(n_g, dtype=np.float64)
+        stoichiometry = np.zeros([len(self.species), n_g], dtype=np.float64)
         for col, radiolytic in enumerate(self.reactions.radiolytic):
-            Gi[radiolytic.species().index, col] = radiolytic.kr()
-        return Gi.sum(axis=1)
+            yields[col] = radiolytic.kr()
+            species = radiolytic.species()
+            # If declared as cst, keep it 0
+            if not self.species.is_cst_species(species):
+                stoichiometry[species.index, col] = 1.0
+        return GVector(yields=yields, stoichiometry=stoichiometry)
 
-    def make_enzymatic_matrix(
-        self,
-    ) -> tp.Optional[
-        tp.Tuple[
-            NDArray[np.float32],
-            NDArray[np.float32],
-            NDArray[np.float64],
-            NDArray[np.int8],
-        ]
-    ]:
+    def make_enzymatic_matrix(self) -> EzMatrices:
         """
         Construct all matrices necessary to compute the variation of
-        the species concentrations due enzymatic reactions.
-        Tricks to keep in mind:
-            => Invert x. where x=0 -> result=0 as well
+        the species concentrations due enzymatic reactions (column r is
+        ReactionsList.enzymatic[r]). See EzMatrices. Without enzymatic
+        reactions, the matrices have 0 columns.
         """
-        if len(self.reactions.enzymatic) == 0:
-            return None
-
-        Ez_substrate = np.full(
-            [len(self.species), len(self.reactions.enzymatic)],
-            fill_value=0,
-            dtype=np.float32,
-        )
-        Ez_enzyme = np.full(
-            [len(self.species), len(self.reactions.enzymatic)],
-            fill_value=0,
-            dtype=np.float32,
-        )
-
-        Ez_kmki = np.zeros([2, len(self.reactions.enzymatic)], dtype=np.float64)
-
-        Ez_iy = np.zeros(
-            [len(self.species), len(self.reactions.enzymatic)],
-            dtype=np.int8,
-        )
+        n_ez = len(self.reactions.enzymatic)
+        k_values = np.zeros(n_ez, dtype=np.float64)
+        k_michaelis = np.zeros(n_ez, dtype=np.float64)
+        substrate_index = np.zeros(n_ez, dtype=np.intp)
+        enzyme_index = np.zeros(n_ez, dtype=np.intp)
+        stoichiometry = np.zeros([len(self.species), n_ez], dtype=np.float64)
 
         for col, enzymatic in enumerate(self.reactions.enzymatic):
-            Ez_substrate[enzymatic.substrate.index, col] = 1
-            Ez_enzyme[enzymatic.enzyme.index, col] = 1
-            Ez_kmki[0, col] = enzymatic.k_micha
-            Ez_kmki[1, col] = enzymatic.k_value
+            substrate_index[col] = enzymatic.substrate.index
+            enzyme_index[col] = enzymatic.enzyme.index
+            k_michaelis[col] = enzymatic.k_micha
+            k_values[col] = enzymatic.k_value
+            # NOTE: '=' (not '+=' / '-='), kept as is to not change any
+            # result: a species on both sides of the reaction only gets its
+            # product stoichiometry, and negative products ('ope') are not
+            # handled. Unlike the k-reactions.
             for r_sp in enzymatic.reactants:
                 if not self.species.is_cst_species(r_sp.species):
-                    Ez_iy[r_sp.species.index, col] = -r_sp.stoi
+                    stoichiometry[r_sp.species.index, col] = -r_sp.stoi
             for r_sp in enzymatic.products:
                 if not self.species.is_cst_species(r_sp.species):
-                    Ez_iy[r_sp.species.index, col] = r_sp.stoi
-        return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
+                    stoichiometry[r_sp.species.index, col] = r_sp.stoi
+
+        return EzMatrices(
+            k_values=k_values,
+            k_michaelis=k_michaelis,
+            substrate_index=substrate_index,
+            enzyme_index=enzyme_index,
+            stoichiometry=stoichiometry,
+        )
 
     def make_cst_species_vector(
         self,

@@ -30,7 +30,6 @@ from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import (
     ScipyODEResult,
     derive,
-    jacobian,
 )
 from radiopyo.simulation.ode_result import ODEResult
 from radiopyo.utils.g_values import GValuesBoscolo
@@ -268,7 +267,7 @@ class UnitCell(object):
                 continue
             reaction.update_from_ge(self.g_val.values_at(sp.label, let, _dr))
 
-        # Recompute the Gi_mat accordingly
+        # Recompute the radiolytic yields (mat.radiolytic) accordingly
         self._update_matrices()
 
         logger.debug("New G values [radical / 100eV / incident particle] are:")
@@ -289,6 +288,11 @@ class UnitCell(object):
         beam_ON: bool = True,
         force_positive: bool = False,
     ) -> ScipyODEResult:
+        if use_jac:
+            raise NotImplementedError(
+                "The analytical Jacobian is being rewritten and is not "
+                "available for the moment: use use_jac=False."
+            )
         if len(self.beam_list) <= 0:
             rp_excep.NoBeamDefinedError("Simulation aborted")
         first_step = self.FIRST_STEP
@@ -299,7 +303,6 @@ class UnitCell(object):
         # Building kwargs for solve_ivp:
         kwargs: tp.Dict[str, tp.Any] = {}
         kwargs["first_step"] = self.FIRST_STEP
-        kwargs["jac"] = jacobian if use_jac else None
         kwargs["rtol"] = rtol if rtol is not None else 1e-10
         kwargs["atol"] = atol if atol is not None else 1e-12
 
@@ -341,14 +344,7 @@ class UnitCell(object):
         sol: ScipyODEResult = solve_ivp(
             derive,
             t_span,
-            args=(
-                beam,
-                self.mat["cst_sp"],
-                self.mat["Ki_mat"],
-                self.mat["Gi_mat"],
-                self.mat["Ez_mat"],
-                force_positive,
-            ),
+            args=(beam, self.mat, force_positive),
             t_eval=t_eval,
             method=method,
             **kwargs,
@@ -392,7 +388,8 @@ class UnitCell(object):
             t_eval: [NDArray[np.float64], optional
                 Force function evaluation on t_eval (default: None)
             use_jac: bool
-                Use the Jacobian ?
+                Use the analytical Jacobian? Not available for the
+                moment (being rewritten): True raises NotImplementedError.
             method: str
                 Which ODE solver to use? Define in
                 scipy.integrate.solve_ivp
@@ -456,8 +453,10 @@ class UnitCell(object):
                 t_span[0] -> start time, in seconds
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
-                Whether to use the jacobian along with the ODE solver
-                (default:False)
+                Whether to use the analytical jacobian along with the ODE
+                solver (default:False). Not available for the moment
+                (being rewritten): True raises NotImplementedError when
+                the chunks are run.
             method: str, optional
                 Which ODE solver to use? Define in
                 scipy.integrate.solve_ivp
@@ -555,8 +554,10 @@ class UnitCell(object):
                 t_span[0] -> start time, in seconds
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
-                Whether to use the jacobian along with the ODE solver
-                (default:False)
+                Whether to use the analytical jacobian along with the ODE
+                solver (default:False). Not available for the moment
+                (being rewritten): True raises NotImplementedError when
+                the chunks are run.
             method: str, optional
                 Which ODE solver to use? Define in
                 scipy.integrate.solve_ivp
@@ -678,6 +679,8 @@ class SimChunksIter:
             Absolute tolerance used for scipy.integrate.solve_ivp
         use_jac: bool
             Whether jacobian is used with scipy.integrate.solve_ivp
+            (True raises NotImplementedError: the Jacobian is being
+            rewritten)
         method: str
             Defines the ODE method used with scipy.integrate.solve_ivp
         y0: NDArray[np.float64], optional
