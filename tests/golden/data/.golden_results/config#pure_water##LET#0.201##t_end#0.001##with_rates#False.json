@@ -1,0 +1,312 @@
+{
+    "includes": {},
+    "parameters": {
+        "pH": 7,
+        "force_cst_pH": false,
+        "species_order": {},
+        "temperature": 25,
+        "timestamp": 1794258385.158077,
+        "t_zero_pulse": 1e-07,
+        "force_positive": false,
+        "variable_GValues": false
+    },
+    "concentrations": {
+        "fixed": {},
+        "initial": {}
+    },
+    "beam": {
+        "Constant": {
+            "dose_rate": 10000000.0,
+            "max_dose": 10.0,
+            "start_time": 0.0,
+            "LET": 0.201
+        }
+    },
+    "reactions": {
+        "acid_base": [
+            {
+                "reaction": "H2O2 <-> H3O_plus + HO2_minus",
+                "pKa": 11.65,
+                "k_forward": 0.09429999999999998,
+                "k_backward": 50200000000.00004
+            },
+            {
+                "reaction": "OH_r <-> O_minus + H3O_plus",
+                "pKa": 11.9,
+                "k_forward": 0.09429999999999998,
+                "k_backward": 50200000000.00004
+            },
+            {
+                "reaction": "HO2 <-> O2_minus + H3O_plus",
+                "pKa": 4.57,
+                "k_forward": 773000.0000000001,
+                "k_backward": 50200000000.00004
+            }
+        ],
+        "k_reaction": [
+            {
+                "reaction": "e_aq + OH_r -> OH_minus",
+                "k_value": 35499999999.99994
+            },
+            {
+                "reaction": "e_aq + H2O2 -> OH_r + OH_minus",
+                "k_value": 11000000000.000008
+            },
+            {
+                "reaction": "e_aq + O2_minus + H2O -> HO2_minus + OH_minus",
+                "k_value": 13000000000.000006
+            },
+            {
+                "reaction": "e_aq + HO2 -> HO2_minus",
+                "k_value": 13000000000.000006
+            },
+            {
+                "reaction": "e_aq + O2 -> O2_minus",
+                "k_value": 18999999999.999996
+            },
+            {
+                "reaction": "2e_aq -> H2 + 2OH_minus",
+                "k_value": 11000000000.000006
+            },
+            {
+                "reaction": "e_aq + H_r -> H2 + OH_minus",
+                "k_value": 27600000000.00003
+            },
+            {
+                "reaction": "e_aq + HO2_minus -> O_minus + OH_minus",
+                "k_value": 3500000000.0000005
+            },
+            {
+                "reaction": "e_aq + O_minus + H2O -> 2OH_minus",
+                "k_value": 22000000000.00002
+            },
+            {
+                "reaction": "e_aq + O3_minus + H2O -> 2OH_minus + O2",
+                "k_value": 16000000000.00001
+            },
+            {
+                "reaction": "e_aq + O3 -> O3_minus",
+                "k_value": 36000000000.00004
+            },
+            {
+                "reaction": "H_r + H2O -> H2 + OH_r",
+                "k_value": 10.0
+            },
+            {
+                "reaction": "H_r + O_minus -> OH_minus",
+                "k_value": 10000000000.0
+            },
+            {
+                "reaction": "H_r + HO2_minus -> OH_r + OH_minus",
+                "k_value": 90000000.00000007
+            },
+            {
+                "reaction": "H_r + O3_minus -> OH_minus + O2",
+                "k_value": 10000000000.0
+            },
+            {
+                "reaction": "2H_r -> H2",
+                "k_value": 5139999999.999995
+            },
+            {
+                "reaction": "H_r + OH_r -> H2O",
+                "k_value": 10900000000.000004
+            },
+            {
+                "reaction": "H_r + H2O2 -> OH_r + H2O",
+                "k_value": 90000000.00000007
+            },
+            {
+                "reaction": "H_r + O2 -> HO2",
+                "k_value": 13099999999.999979
+            },
+            {
+                "reaction": "H_r + HO2 -> H2O2",
+                "k_value": 11400000000.000004
+            },
+            {
+                "reaction": "H_r + O2_minus -> HO2_minus",
+                "k_value": 11400000000.000004
+            },
+            {
+                "reaction": "H_r + O3 -> HO3",
+                "k_value": 38000000000.0
+            },
+            {
+                "reaction": "2OH_r -> H2O2",
+                "k_value": 11000000000.000006
+            },
+            {
+                "reaction": "OH_r + HO2 -> H2O + O2",
+                "k_value": 8840000000.00001
+            },
+            {
+                "reaction": "OH_r + O2_minus -> OH_minus + O2",
+                "k_value": 8000000000.000003
+            },
+            {
+                "reaction": "OH_r + H2 -> H_r + H2O",
+                "k_value": 39500000.00000003
+            },
+            {
+                "reaction": "OH_r + H2O2 -> HO2 + H2O",
+                "k_value": 29200000.000000007
+            },
+            {
+                "reaction": "OH_r + O_minus -> HO2_minus",
+                "k_value": 24999999999.999992
+            },
+            {
+                "reaction": "OH_r + HO2_minus -> HO2 + OH_minus",
+                "k_value": 7500000000.000001
+            },
+            {
+                "reaction": "OH_r + O3_minus -> O3 + OH_minus",
+                "k_value": 2600000000.0000014
+            },
+            {
+                "reaction": "OH_r + O3_minus -> 2O2_minus + H3O_plus",
+                "k_value": 6000000000.000003
+            },
+            {
+                "reaction": "OH_r + O3 -> HO2 + O2",
+                "k_value": 110000000.00000007
+            },
+            {
+                "reaction": "HO2 + O2_minus -> HO2_minus + O2",
+                "k_value": 80000000.00000003
+            },
+            {
+                "reaction": "2HO2 -> H2O2 + O2",
+                "k_value": 840000.0000000006
+            },
+            {
+                "reaction": "HO2 + O_minus -> O2 + OH_minus",
+                "k_value": 6000000000.000003
+            },
+            {
+                "reaction": "HO2 + H2O2 -> OH_r + O2 + H2O",
+                "k_value": 0.5
+            },
+            {
+                "reaction": "HO2 + HO2_minus -> OH_r + OH_minus + O2",
+                "k_value": 0.5
+            },
+            {
+                "reaction": "HO2 + O3_minus -> OH_minus + 2O2",
+                "k_value": 6000000000.000003
+            },
+            {
+                "reaction": "HO2 + O3 -> HO3 + O2",
+                "k_value": 499999999.99999994
+            },
+            {
+                "reaction": "2O2_minus + 2H2O -> H2O2 + 2OH_minus + O2",
+                "k_value": 0.29999999999999993
+            },
+            {
+                "reaction": "O2_minus + O_minus + H2O -> 2OH_minus + O2",
+                "k_value": 600000000.0000004
+            },
+            {
+                "reaction": "O2_minus + H2O2 -> OH_r + OH_minus + O2",
+                "k_value": 0.13000000000000003
+            },
+            {
+                "reaction": "O2_minus + HO2_minus -> O_minus + OH_minus + O2",
+                "k_value": 0.13000000000000003
+            },
+            {
+                "reaction": "O2_minus + O3_minus + H2O -> 2O2 + 2OH_minus",
+                "k_value": 10000.0
+            },
+            {
+                "reaction": "O2_minus + O3 -> O3_minus + O2",
+                "k_value": 1500000000.0000005
+            },
+            {
+                "reaction": "2O_minus + H2O -> HO2_minus + OH_minus",
+                "k_value": 1000000000.0
+            },
+            {
+                "reaction": "O_minus + O2 -> O3_minus",
+                "k_value": 3750000000.0
+            },
+            {
+                "reaction": "O_minus + H2 -> H_r + OH_minus",
+                "k_value": 128000000.00000012
+            },
+            {
+                "reaction": "O_minus + H2O2 -> O2_minus + H2O",
+                "k_value": 499999999.99999994
+            },
+            {
+                "reaction": "O_minus + HO2_minus -> O2_minus + OH_minus",
+                "k_value": 785999999.9999992
+            },
+            {
+                "reaction": "O_minus + O3_minus -> 2O2_minus",
+                "k_value": 700000000.0000001
+            },
+            {
+                "reaction": "O_minus + O3 -> O2_minus + O2",
+                "k_value": 4999999999.999999
+            },
+            {
+                "reaction": "O3_minus -> O_minus + O2",
+                "k_value": 2619.9999999999986
+            },
+            {
+                "reaction": "O3_minus + H3O_plus -> OH_r + O2",
+                "k_value": 90000000000.00006
+            },
+            {
+                "reaction": "HO3 -> OH_r + O2",
+                "k_value": 110000.00000000009
+            }
+        ],
+        "equilibrium": [
+            {
+                "reaction": "HO2 + OH_minus <-> O2_minus + H2O",
+                "k_forward": 13300000000.0,
+                "k_backward": 0.155
+            },
+            {
+                "reaction": "H2O <-> H3O_plus + OH_minus",
+                "k_forward": 2.120000000000001e-05,
+                "k_backward": 118000000000.00015
+            },
+            {
+                "reaction": "H2O2 + OH_minus <-> HO2_minus + H2O",
+                "k_forward": 13300000000.0,
+                "k_backward": 1270000.0000000012
+            },
+            {
+                "reaction": "e_aq + H2O <-> H_r + OH_minus",
+                "k_forward": 18.999999999999996,
+                "k_backward": 24400000.00000001
+            },
+            {
+                "reaction": "H_r <-> e_aq + H3O_plus",
+                "k_forward": 5.83,
+                "k_backward": 20900000000.00001
+            },
+            {
+                "reaction": "OH_r + OH_minus <-> O_minus + H2O",
+                "k_forward": 13300000000.0,
+                "k_backward": 1270000.0000000012
+            }
+        ],
+        "enzymatic": [],
+        "radiolytic": {
+            "e_aq": 2.699445436619687,
+            "OH_r": 2.720465032457192,
+            "H_r": 0.599983709022411,
+            "H2": 0.42510503809309313,
+            "H2O2": 0.6741416568533262,
+            "H3O_plus": 2.699445436619687
+        },
+        "arrhenius": [],
+        "constant": []
+    }
+}
