@@ -32,6 +32,7 @@ from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import (
     ScipyODEResult,
     derive,
+    jacobian,
 )
 from radiopyo.simulation.ode_result import ODEResult
 from radiopyo.utils.g_values import GValuesBoscolo
@@ -60,6 +61,8 @@ logger = logging.getLogger("radiopyo")
 # Tolerances passed to solve_ivp when the user gives none.
 DEFAULT_ATOL: float = 1e-12
 DEFAULT_RTOL: float = 1e-10
+# solve_ivp methods that accept a Jacobian (the others would warn)
+JAC_METHODS: tp.Final = ("LSODA", "BDF", "Radau")
 # Duration [s] of the ON -> OFF transition chunk of prepare_single_pulse.
 DEFAULT_TRANS_TIME: float = 100e-6
 
@@ -130,8 +133,8 @@ class RunOptions:
             Whether derive() zeroes the consumption of depleted species
             (default: False)
         use_jac: bool
-            Analytical Jacobian: not available for the moment (being
-            rewritten), True raises NotImplementedError (default: False)
+            Pass the analytical jacobian() to the solver; used only by
+            LSODA, BDF and Radau, ignored by other methods (default: False)
         t_eval: NDArray[np.float64], optional
             Times at which solve_ivp stores the solution (None -> solver
             steps)
@@ -443,13 +446,7 @@ class UnitCell(object):
 
         Raises:
             NoBeamDefinedError: no beam is defined
-            NotImplementedError: options.use_jac is True
         """
-        if options.use_jac:
-            raise NotImplementedError(
-                "The analytical Jacobian is being rewritten and is not "
-                "available for the moment: use use_jac=False."
-            )
         self._require_beam()
 
         t_span = widen_empty_span(t_span)
@@ -568,7 +565,15 @@ class UnitCell(object):
         options: RunOptions,
         solver_kwargs: tp.Dict[str, tp.Any],
     ) -> ScipyODEResult:
-        """Call solve_ivp on derive() and store its wall time in last_exec_time."""
+        """
+        Call solve_ivp on derive() and store its wall time in last_exec_time.
+
+        With options.use_jac, jacobian() (same arguments as derive) is
+        passed as jac, only for the methods that use one (LSODA, BDF,
+        Radau); other methods ignore use_jac without any warning.
+        """
+        if options.use_jac and options.method in JAC_METHODS:
+            solver_kwargs = {**solver_kwargs, "jac": jacobian}
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(
             derive,
@@ -636,8 +641,8 @@ class UnitCell(object):
             t_eval: [NDArray[np.float64], optional
                 Force function evaluation on t_eval (default: None)
             use_jac: bool
-                Use the analytical Jacobian? Not available for the
-                moment (being rewritten): True raises NotImplementedError.
+                Use the analytical Jacobian? Only for LSODA, BDF and
+                Radau, ignored by other methods (default: False).
             method: str
                 Which ODE solver to use? Define in
                 scipy.integrate.solve_ivp (default: "LSODA")
@@ -725,9 +730,8 @@ class UnitCell(object):
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
                 Whether to use the analytical jacobian along with the ODE
-                solver (default:False). Not available for the moment
-                (being rewritten): True raises NotImplementedError when
-                the chunks are run.
+                solver (default:False). Only for LSODA, BDF and Radau,
+                ignored by other methods.
             method: str, optional
                 Which ODE solver to use? Define in
                 scipy.integrate.solve_ivp (default: "LSODA")
@@ -821,9 +825,8 @@ class UnitCell(object):
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
                 Whether to use the analytical jacobian along with the ODE
-                solver (default:False). Not available for the moment
-                (being rewritten): True raises NotImplementedError when
-                the chunks are run.
+                solver (default:False). Only for LSODA, BDF and Radau,
+                ignored by other methods.
             method: str, optional
                 Which ODE solver to use? Define in
                 scipy.integrate.solve_ivp (default: "LSODA")
@@ -952,8 +955,7 @@ class SimChunksIter:
             Keeps tracks of the current integration step.
         options: RunOptions
             Solver options shared by every chunk (the max step of each
-            chunk replaces options.max_step). options.use_jac=True
-            raises NotImplementedError: the Jacobian is being rewritten.
+            chunk replaces options.max_step).
         y0: NDArray[np.float64], optional
             Initial concentration of DynSpecies [µmol/L] (default:
             None). If None, calls EnvSim.initial_values(). Later chunks

@@ -412,14 +412,3 @@ def test_zero_depleted_consumption() -> None:
         zero_depleted_consumption(y_full, dydt), [0.0, 1.0, -1.0, 0.0]
     )
 
-
-# --------------------------------------------------------------------------- #
-#                                  Jacobian                                   #
-# --------------------------------------------------------------------------- #
-def test_run_with_jacobian_is_not_implemented(labarbe_cell: UnitCell) -> None:
-    with pytest.raises(NotImplementedError, match="rewritten"):
-        labarbe_cell.run(t_span=(0.0, 1e-6), use_jac=True)
-
-    chunks = labarbe_cell.prepare_chunked_run(t_span=(0.0, 1e-6), use_jac=True)
-    with pytest.raises(NotImplementedError, match="rewritten"):
-        chunks.run()
