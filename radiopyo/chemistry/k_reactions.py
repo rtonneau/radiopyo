@@ -9,6 +9,7 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import logging
 import operator
 import typing as tp
 import uuid
@@ -35,6 +36,9 @@ __all__ = [
     "KReactionCollection",
     "KValType",
 ]
+
+# ---------------------------------- Logging -------------------------------- #
+logger = logging.getLogger("radiopyo")
 
 
 # --------------------------------------------------------------------------- #
@@ -129,6 +133,24 @@ class KReaction(BasicReaction):
         """
         self._k_value = polynomial_factory(value, log10=True)
 
+    def _warn_nk_not_divided(self) -> None:
+        """
+        Log a warning when the n·k convention would have divided k by n
+        (single reactant species of stoichiometry n > 1) but k is not a
+        scalar, so it is used as given (ADR 0001).
+        """
+        if len(self.reactants) != 1:
+            return
+        reactant = next(iter(self.reactants))
+        if reactant.stoi > 1:
+            logger.warning(
+                "Reaction '%s': single reactant with stoichiometry %d and a"
+                " non-scalar k (polynomial, Arrhenius or equilibrium): k is"
+                " used as given, not divided by n (ADR 0001).",
+                self,
+                reactant.stoi,
+            )
+
     def _apply_nk_convention(self) -> None:
         """
         n·k convention (ADR 0001): for n A -> ..., the configured scalar
@@ -141,6 +163,8 @@ class KReaction(BasicReaction):
         ):
             reactant = next(iter(self.reactants))
             self.set_k_value(self.k_value() / reactant.stoi)
+        elif self._k_value is not None:
+            self._warn_nk_not_divided()
 
     def to_dict(self) -> tp.Dict[str, tp.Any]:
         """
@@ -334,6 +358,7 @@ class Arrhenius(KReaction):
             generic["constants"]["Ea"],  # type: ignore[arg-type]
         )
         reaction._add_species_from_generic(generic, list_sp)
+        reaction._warn_nk_not_divided()
         return reaction
 
 
@@ -849,6 +874,8 @@ class BiReaction(KReactionCollection, ABC):
         self.forward.set_k_value(k_forward)
         self.add_backward_reaction(revert_reaction(reaction), list_sp=list_sp)
         self.backward.set_k_value(k_backward)
+        self.forward._warn_nk_not_divided()
+        self.backward._warn_nk_not_divided()
 
     @abstractmethod
     def to_dict(self) -> tp.Dict[str, tp.Any]:
