@@ -93,7 +93,6 @@ class KwargsRun(tp.TypedDict, total=False):
     max_step: tp.Optional[float]
     y0: tp.Optional[NDArray[np.float64]]
     use_beam: bool
-    force_positive: bool
 
 
 class ConcentrationDict(tp.TypedDict):
@@ -118,7 +117,6 @@ class SimParameters(tp.TypedDict, total=False):
     temperature: float
     timestamp: float
     t_zero_pulse: float
-    force_positive: bool
     variable_GValues: bool
 
 
@@ -327,7 +325,6 @@ def default_SimParameters() -> SimParameters:
         temperature=Temperature._DEFAULT,
         timestamp=0.0,
         t_zero_pulse=1e-7,
-        force_positive=False,
         variable_GValues=False,
     )
 

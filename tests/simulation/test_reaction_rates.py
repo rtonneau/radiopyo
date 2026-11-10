@@ -34,7 +34,6 @@ from radiopyo.simulation.ode_functions_solver import (
     negative_product_block,
     reaction_rates,
     species_rates,
-    zero_depleted_consumption,
 )
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult
 from radiopyo.simulation.unit_cell import UnitCell
@@ -403,12 +402,3 @@ def test_negative_product_blocks_reaction(negative_product_env: SimEnv) -> None:
     np.testing.assert_array_equal(
         negative_product_block(states, kmat)[r_neg.get_index()], [True, False]
     )
-
-
-def test_zero_depleted_consumption() -> None:
-    y_full = np.array([0.0, 0.0, 1.0, 1e-13])
-    dydt = np.array([-1.0, 1.0, -1.0, -2.0])
-    np.testing.assert_array_equal(
-        zero_depleted_consumption(y_full, dydt), [0.0, 1.0, -1.0, 0.0]
-    )
-

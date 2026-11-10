@@ -129,9 +129,6 @@ class RunOptions:
             it is larger than the integration span.
         use_beam: bool
             Whether the beam dose rate enters the ODE (default: True)
-        force_positive: bool
-            Whether derive() zeroes the consumption of depleted species
-            (default: False)
         use_jac: bool
             Pass the analytical jacobian() to the solver; used only by
             LSODA, BDF and Radau, ignored by other methods (default: True)
@@ -146,7 +143,6 @@ class RunOptions:
     max_step: tp.Optional[float] = None
     first_step: tp.Optional[float] = None
     use_beam: bool = True
-    force_positive: bool = False
     use_jac: bool = True
     t_eval: tp.Optional[NDArray[np.float64]] = None
 
@@ -579,7 +575,7 @@ class UnitCell(object):
             derive,
             t_span,
             y0,
-            args=(beam, self.mat, options.force_positive),
+            args=(beam, self.mat),
             t_eval=options.t_eval,
             method=options.method,
             **solver_kwargs,
@@ -630,7 +626,6 @@ class UnitCell(object):
         max_step: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
-        force_positive: bool = False,
     ) -> ODEResult:
         """Solve ODE over t_span
 
@@ -658,9 +653,6 @@ class UnitCell(object):
                 None). If None, calls EnvSim.initial_values().
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
-            force_positive: bool, optional
-                Whether derive() zeroes the consumption of depleted
-                species (default: False).
 
         The beam is assumed switched ON at t_span[0]: unless
         use_beam=False, the first T_ZERO seconds are skipped and the
@@ -685,7 +677,6 @@ class UnitCell(object):
             method=method,
             max_step=max_step,
             use_beam=use_beam,
-            force_positive=force_positive,
             use_jac=use_jac,
             t_eval=t_eval,
         )
@@ -717,7 +708,6 @@ class UnitCell(object):
         max_step_size_final: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
-        force_positive: bool = False,
     ) -> SimChunksIter:
         """Method used to prepare a multi step ODE integration, one chunk
         per beam ON / beam OFF interval of the current beam (from
@@ -755,9 +745,6 @@ class UnitCell(object):
                 None). If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
-            force_positive: bool, optional
-                Whether to force the concentration to be positive
-                (default: False).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE
@@ -791,7 +778,6 @@ class UnitCell(object):
                 rtol=rtol,
                 method=method,
                 use_beam=use_beam,
-                force_positive=force_positive,
                 use_jac=use_jac,
             ),
             y0,
@@ -811,7 +797,6 @@ class UnitCell(object):
         trans_time: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
-        force_positive: bool = False,
     ) -> SimChunksIter:
         """Method used to prepare a three step ODE integration of a
         single pulse (tm = time at max dose of the current beam):
@@ -852,9 +837,6 @@ class UnitCell(object):
                 None). If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
-            force_positive: bool, optional
-                Whether to force the concentration to be positive
-                (default: False).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE
@@ -881,7 +863,6 @@ class UnitCell(object):
                 rtol=rtol,
                 method=method,
                 use_beam=use_beam,
-                force_positive=force_positive,
                 use_jac=use_jac,
             ),
             y0,

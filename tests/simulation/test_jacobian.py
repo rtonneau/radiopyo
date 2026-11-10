@@ -2,7 +2,7 @@
 """
 Tests of the analytic Jacobian of the ODE right hand side: compared with
 the central finite-difference Jacobian of ``derive`` on the bundled
-configs (beam on/off, enzymes, fixed species, force_positive) and on toy
+configs (beam on/off, enzymes, fixed species) and on toy
 environments (repeated reactant, active negative-product blocks).
 
 The Jacobian is piecewise (ADR 0003): the finite differences are taken
@@ -127,7 +127,6 @@ def fd_jacobian(
     beam: tp.Optional[ParticleBeam],
     mat: SimMatrices,
     t: float,
-    force_positive: bool = False,
     rel_step: float = 1e-3,
 ) -> FDJacobian:
     """Central finite-difference Jacobian of derive (relative step), with
@@ -139,8 +138,8 @@ def fd_jacobian(
         up, down = y.copy(), y.copy()
         up[j] += h
         down[j] -= h
-        f_up = derive(t, up, beam, mat, force_positive)
-        f_down = derive(t, down, beam, mat, force_positive)
+        f_up = derive(t, up, beam, mat)
+        f_down = derive(t, down, beam, mat)
         jac[:, j] = (f_up - f_down) / (2 * h)
         noise[:, j] = 10 * np.finfo(float).eps * (np.abs(f_up) + np.abs(f_down)) / (2 * h)
     return FDJacobian(jac, noise)
@@ -167,13 +166,10 @@ def assert_jacobian_matches(
 #                      Bundled configs vs finite differences                  #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("t", [T_BEAM_ON, T_BEAM_OFF], ids=["beam_on", "beam_off"])
-@pytest.mark.parametrize("force_positive", [False, True])
-def test_matches_finite_differences(
-    cell: UnitCell, t: float, force_positive: bool
-) -> None:
+def test_matches_finite_differences(cell: UnitCell, t: float) -> None:
     y = random_state(cell.mat)
-    analytic = jacobian(t, y, cell.beam, cell.mat, force_positive)
-    numeric = fd_jacobian(y, cell.beam, cell.mat, t, force_positive)
+    analytic = jacobian(t, y, cell.beam, cell.mat)
+    numeric = fd_jacobian(y, cell.beam, cell.mat, t)
     assert_jacobian_matches(analytic, numeric)
 
 
@@ -189,7 +185,7 @@ def test_shape_and_pure(cell: UnitCell) -> None:
     np.testing.assert_array_equal(jac, jacobian(T_BEAM_ON, y, cell.beam, mat))
 
 
-def test_independent_of_beam_without_force_positive(cell: UnitCell) -> None:
+def test_independent_of_beam(cell: UnitCell) -> None:
     y = random_state(cell.mat)
     on = jacobian(T_BEAM_ON, y, cell.beam, cell.mat)
     off = jacobian(T_BEAM_OFF, y, cell.beam, cell.mat)
@@ -205,25 +201,19 @@ def test_labarbe_has_enzymes_and_fixed_species() -> None:
     assert mat.state.n_cst > 0
 
 
-@pytest.mark.parametrize("force_positive", [False, True])
-def test_depleted_species_with_force_positive(
-    cell: UnitCell, force_positive: bool
-) -> None:
+def test_depleted_species_still_consumed(cell: UnitCell) -> None:
     """Every solved species far below the threshold: the ones still
-    consumed (by the constant species) have a 0 row with force_positive."""
+    consumed (by the constant species) keep a non-zero row."""
     mat = cell.mat
     y = DEPLETED * random_state(mat)
     dydt = derive(T_BEAM_OFF, y, cell.beam, mat)
     consumed = np.flatnonzero(dydt < 0)
     assert consumed.size >= 2
 
-    analytic = jacobian(T_BEAM_OFF, y, cell.beam, mat, force_positive)
-    numeric = fd_jacobian(y, cell.beam, mat, T_BEAM_OFF, force_positive)
+    analytic = jacobian(T_BEAM_OFF, y, cell.beam, mat)
+    numeric = fd_jacobian(y, cell.beam, mat, T_BEAM_OFF)
     assert_jacobian_matches(analytic, numeric)
-    if force_positive:
-        assert not analytic[consumed].any()
-    else:
-        assert analytic[consumed].any()
+    assert analytic[consumed].any()
 
 
 # --------------------------------------------------------------------------- #
@@ -303,7 +293,7 @@ def test_michaelis_menten_derivatives(enzymatic_env: SimEnv) -> None:
     )
 
 
-def test_force_positive_zeroes_consumed_depleted_rows(mass_action_env: SimEnv) -> None:
+def test_depleted_consumed_species_keeps_row(mass_action_env: SimEnv) -> None:
     env = mass_action_env
     mat = env.build_all_matrices()
     b, c = env.species["B"].index, env.species["C"].index
@@ -312,11 +302,6 @@ def test_force_positive_zeroes_consumed_depleted_rows(mass_action_env: SimEnv) -
     # source, is off since C is depleted too)
     y[[b, c]] = DEPLETED
 
-    plain = jacobian(0.0, y, None, mat, force_positive=False)
-    forced = jacobian(0.0, y, None, mat, force_positive=True)
-    assert plain[b].any()
-    assert not forced[b].any()
-    other = np.arange(y.size) != b
-    np.testing.assert_array_equal(plain[other], forced[other])
-    assert_jacobian_matches(forced, fd_jacobian(y, None, mat, 0.0, True))
-    assert_jacobian_matches(plain, fd_jacobian(y, None, mat, 0.0, False))
+    jac = jacobian(0.0, y, None, mat)
+    assert jac[b].any()
+    assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0))

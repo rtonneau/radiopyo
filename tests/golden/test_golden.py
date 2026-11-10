@@ -220,11 +220,10 @@ def _derive_adapter(
     t: float,
     y: np.ndarray,
     use_beam: bool,
-    force_positive: bool,
 ) -> np.ndarray:
     """
     Single place calling ``derive()``. Today its signature is
-    ``derive(t, y, beam, mat, force_positive)`` with ``mat`` the
+    ``derive(t, y, beam, mat)`` with ``mat`` the
     ``SimMatrices`` of ``cell.mat``. Later tickets restructure these
     matrices: update only this function.
 
@@ -239,7 +238,6 @@ def _derive_adapter(
         y,
         cell.beam if use_beam else None,
         cell.mat,
-        force_positive,
     )
 
 
@@ -294,7 +292,7 @@ def _derive_states(cell: UnitCell) -> tp.Dict[str, tp.Dict[str, float]]:
     initial = dict(zip(labels, cell.env.initial_values()))
     synthetic = {lb: _synthetic_value(lb) + initial[lb] for lb in labels}
     # Exactly-zero radicals exercise the "negative product" guard of the
-    # k-reactions and the force_positive branch.
+    # k-reactions.
     zeros = {
         lb: (0.0 if lb in ("e_aq", "H_r", "OH_r") else val)
         for lb, val in synthetic.items()
@@ -302,12 +300,12 @@ def _derive_states(cell: UnitCell) -> tp.Dict[str, tp.Dict[str, float]]:
     return {"initial": initial, "synthetic": synthetic, "zeros": zeros}
 
 
-# (name, time, use_beam, force_positive)
-DERIVE_CASES: tp.List[tp.Tuple[str, float, bool, bool]] = [
-    ("beam_on", T_BEAM_ON, True, False),
-    ("beam_off", T_BEAM_OFF, True, False),
-    ("no_beam", T_BEAM_ON, False, False),
-    ("beam_on_force_positive", T_BEAM_ON, True, True),
+# (name, time, use_beam). The recorded file also holds the removed
+# case of the removed derive() option (ADR 0004); it is ignored when comparing.
+DERIVE_CASES: tp.List[tp.Tuple[str, float, bool]] = [
+    ("beam_on", T_BEAM_ON, True),
+    ("beam_off", T_BEAM_OFF, True),
+    ("no_beam", T_BEAM_ON, False),
 ]
 
 
@@ -323,8 +321,8 @@ def compute_derive() -> tp.Dict[str, tp.Any]:
         entry: tp.Dict[str, tp.Any] = {"g_values": _g_values(cell), "dydt": {}}
         for state_name, state in _derive_states(cell).items():
             y = np.array([state[lb] for lb in labels], dtype=np.float64)
-            for case, t, use_beam, force_positive in DERIVE_CASES:
-                dydt = _derive_adapter(cell, t, y.copy(), use_beam, force_positive)
+            for case, t, use_beam in DERIVE_CASES:
+                dydt = _derive_adapter(cell, t, y.copy(), use_beam)
                 entry["dydt"][f"{state_name}__{case}"] = dict(
                     zip(labels, (float(v) for v in dydt))
                 )
@@ -377,9 +375,8 @@ def compute_labarbe_run() -> tp.Dict[str, np.ndarray]:
       seeds), plus its number of points;
     * 'labarbe_curve': same run with ``t_eval`` (N_CURVE log spaced times)
       giving a reproducible description of the whole trajectory.
-    Note: ``run()`` currently skips the initial radiolytic burst (it passes
-    ``force_positive`` in the ``beam_ON`` slot of ``_raw_run``); this is the
-    behaviour being recorded.
+    Note: ``run()`` currently skips the initial radiolytic burst (a legacy
+    argument mix-up); this is the behaviour being recorded.
     """
     cell = build_cell("labarbe")
     res = cell.run(t_span=RUN_T_SPAN)
@@ -638,10 +635,10 @@ def test_derive_matches_golden() -> None:
         assert actual[config]["g_values"] == pytest.approx(
             golden[config]["g_values"], rel=RTOL_ALGEBRA
         ), f"{config}: radiolytic yields changed"
-        assert set(actual[config]["dydt"]) == set(golden[config]["dydt"])
-        for case, ref in golden[config]["dydt"].items():
+        assert set(actual[config]["dydt"]) <= set(golden[config]["dydt"])
+        for case, vec in actual[config]["dydt"].items():
             _assert_vector_close(
-                actual[config]["dydt"][case], ref, f"derive {config}/{case}"
+                vec, golden[config]["dydt"][case], f"derive {config}/{case}"
             )
 
 

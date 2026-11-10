@@ -17,8 +17,7 @@ families, of stoichiometry @ rates (see ``species_rates``).
 ``jacobian`` is the analytic Jacobian of ``derive``: the same sum with the
 rates replaced by their derivatives with respect to the concentrations
 (mass_action_derivatives, michaelis_menten_derivatives). It is piecewise
-like ``derive`` (ADR 0003): a blocked reaction, or a row zeroed by
-``force_positive``, contributes 0.
+like ``derive`` (ADR 0003): a blocked reaction contributes 0.
 
 Units: the full molar state and all rates are in [mol/L] and [mol/L/s].
 Only ``derive`` deals with the [µmol/L] solver state, through
@@ -63,7 +62,6 @@ __all__ = [
     "radiolytic_rates",
     "reaction_rates",
     "species_rates",
-    "zero_depleted_consumption",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -226,15 +224,6 @@ def species_rates(
     return dydt
 
 
-def zero_depleted_consumption(
-    y_full: NDArray[np.float64],
-    dydt: NDArray[np.float64],
-) -> NDArray[np.float64]:
-    """Set to 0 the (negative) derivative of every species already below
-    DEPLETION_LIMIT, so that it cannot go further below 0."""
-    return np.where((y_full < DEPLETION_LIMIT) & (dydt < 0), 0.0, dydt)
-
-
 def mass_action_derivatives(
     y_full: NDArray[np.float64],
     kmat: KMatrices,
@@ -300,7 +289,6 @@ def jacobian(
     y: NDArray[np.float64],
     beam: tp.Optional[ParticleBeam],
     mat: SimMatrices,
-    force_positive: bool = False,
 ) -> NDArray[np.float64]:
     """Analytic Jacobian d(dy/dt)/dy of ``derive`` (the ``jac`` argument of
     scipy.integrate.solve_ivp).
@@ -308,7 +296,7 @@ def jacobian(
     Pure function. Piecewise like ``derive`` (ADR 0003): it is the
     derivative on the current side of every on/off switch, i.e. a k or
     enzymatic reaction blocked by a depleted negative product contributes
-    0, and so does every row zeroed by ``force_positive``. Radiolytic
+    0. Radiolytic
     reactions (they do not depend on the concentrations) and constant
     species (they are not solved) contribute nothing.
 
@@ -320,7 +308,6 @@ def jacobian(
         y: (n_dyn,) concentrations of the dynamical species [µmol/L]
         beam: ParticleBeam, or None for no irradiation.
         mat: SimMatrices
-        force_positive: same meaning as in ``derive``.
 
     Returns:
         NDArray[np.float64]: (n_dyn, n_dyn) [1/s], entry (i, j) is
@@ -337,10 +324,6 @@ def jacobian(
 
     jac = kmat.stoichiometry[:n_dyn] @ d_k[:, :n_dyn]
     jac += ezmat.stoichiometry[:n_dyn] @ d_ez[:, :n_dyn]
-
-    if force_positive:
-        dydt = species_rates(reaction_rates(t, y_full, mat, beam), mat)
-        jac[(y_full[:n_dyn] < DEPLETION_LIMIT) & (dydt[:n_dyn] < 0)] = 0.0
     return jac
 
 
@@ -349,7 +332,6 @@ def derive(
     y: NDArray[np.float64],
     beam: tp.Optional[ParticleBeam],
     mat: SimMatrices,
-    force_positive: bool = False,
 ) -> NDArray[np.float64]:
     """Compute the time derivative of species concentration (right hand
     side of the ODE system given to scipy.integrate.solve_ivp).
@@ -360,16 +342,12 @@ def derive(
         y: (n_dyn,) concentrations of the dynamical species [µmol/L]
         beam: ParticleBeam, or None for no irradiation.
         mat: SimMatrices
-        force_positive: if True, depleted species are not consumed
-            further (see zero_depleted_consumption).
 
     Returns:
         NDArray[np.float64]: (n_dyn,) dy/dt [µmol/L/s]
     """
     y_full = mat.state.to_full_molar(y)
     dydt = species_rates(reaction_rates(t, y_full, mat, beam), mat)
-    if force_positive:
-        dydt = zero_depleted_consumption(y_full, dydt)
     return mat.state.to_dynamic_micromolar(dydt)
 
 
