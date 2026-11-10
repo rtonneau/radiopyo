@@ -448,6 +448,30 @@
         "ticket": "11-beam-generic-matrix",
         "commit": "10978f3"
       }
+    },
+    {
+      "at": "2026-11-10T08:01:45.059Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/16-fix-species-order.md",
+        "03-implement/16-fix-species-order/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "16-fix-species-order"
+      }
+    },
+    {
+      "at": "2026-11-10T08:10:36.956Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/16-fix-species-order/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "16-fix-species-order",
+        "commit": "5b3b9e2"
+      }
     }
   ],
   "current_phase": "ship",
