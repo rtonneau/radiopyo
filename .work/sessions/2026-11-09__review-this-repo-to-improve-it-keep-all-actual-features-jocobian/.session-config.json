@@ -364,6 +364,30 @@
         "ticket": "12-fix-run-burst",
         "commit": "af5b8ca"
       }
+    },
+    {
+      "at": "2026-11-10T06:06:03.865Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/13-fix-temperature.md",
+        "03-implement/13-fix-temperature/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "13-fix-temperature"
+      }
+    },
+    {
+      "at": "2026-11-10T06:16:07.597Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/13-fix-temperature/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "13-fix-temperature",
+        "commit": "bafa16f"
+      }
     }
   ],
   "current_phase": "ship",
