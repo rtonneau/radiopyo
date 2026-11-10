@@ -63,8 +63,6 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 
 ### Known issues (not fixed in this release)
 
-- The analytic Jacobian is not available: `use_jac=True` raises `NotImplementedError` (rewrite planned on top
-  of `reaction_rates` / `SimMatrices`). Enzymatic reactions ignore the negative-product flag.
 - `GValuesBoscolo._scale_factor` (dose-rate factor of `variable_GValues`) has no validated range and is
   infinite at 0 Gy/s.
 - The H2O concentration polynomial (`radiopyo/chemistry/species.py`) rises with the temperature (55.93 M at
@@ -185,8 +183,7 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 
 - RON config format: `radiopyo.parser.ron`, its grammar and `UnitCell.from_ron`. Use TOML.
 - The stale `jacobian()` of the solver (its signature did not match `derive`, it was unused), `EPSILON`
-  and the 4-D `JRki` tensor. `UnitCell.run(use_jac=True)` (and the chunked runs) now raises
-  `NotImplementedError` until the Jacobian is rewritten.
+  and the 4-D `JRki` tensor. (A new `jacobian()` replaces it, see the next release.)
 - `SimEnv.pKw`, `pKH2O`, `update_temperature` and `update_flag_positive` (use `set_temperature` and the
   `force_positive` parameter); `ParticleBeam.delivery`,
   `MacroTimer.within_train`, `micro_pulse_index`, `micro_pulses_left_in_train`, `GROWTH_FACTOR`

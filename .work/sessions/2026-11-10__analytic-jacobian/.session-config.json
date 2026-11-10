@@ -1,0 +1,229 @@
+{
+  "session_id": "2026-11-10__analytic-jacobian",
+  "feature_name": "analytic-jacobian",
+  "scratch_dir": ".scratch/tests/2026-11-10__analytic-jacobian",
+  "created_at": "2026-11-10T10:48:00.872Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-10T10:48:00.872Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-10T10:55:16.268Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-10T10:55:16.456Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-10T10:57:42.689Z",
+      "event": "auto_started",
+      "phase": "plan",
+      "detail": {
+        "target": "finish",
+        "steps": "write:plan → ship → finish",
+        "shipMode": "delegate"
+      }
+    },
+    {
+      "at": "2026-11-10T10:57:43.101Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/analytic-jacobian",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-10T10:57:43.157Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-enzymatic-depletion-block.md",
+        "02-plan/tickets/02-jacobian-function.md",
+        "02-plan/tickets/03-wire-use-jac.md",
+        "02-plan/tickets/04-benchmark-and-default.md",
+        "02-plan/tickets/05-docs.md"
+      ],
+      "detail": {
+        "tickets": 5
+      }
+    },
+    {
+      "at": "2026-11-10T10:57:49.161Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-enzymatic-depletion-block.md",
+        "03-implement/01-enzymatic-depletion-block/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-enzymatic-depletion-block"
+      }
+    },
+    {
+      "at": "2026-11-10T11:03:01.291Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-enzymatic-depletion-block/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-enzymatic-depletion-block",
+        "commit": "c9052c6"
+      }
+    },
+    {
+      "at": "2026-11-10T11:03:06.473Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-jacobian-function.md",
+        "03-implement/02-jacobian-function/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-jacobian-function"
+      }
+    },
+    {
+      "at": "2026-11-10T11:15:22.360Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-jacobian-function/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-jacobian-function",
+        "commit": "694616c"
+      }
+    },
+    {
+      "at": "2026-11-10T11:15:22.827Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-wire-use-jac.md",
+        "03-implement/03-wire-use-jac/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-wire-use-jac"
+      }
+    },
+    {
+      "at": "2026-11-10T11:22:11.446Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-wire-use-jac/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-wire-use-jac",
+        "commit": "d37c2f8"
+      }
+    },
+    {
+      "at": "2026-11-10T11:22:12.197Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-benchmark-and-default.md",
+        "03-implement/04-benchmark-and-default/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-and-default"
+      }
+    },
+    {
+      "at": "2026-11-10T12:08:58.302Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/04-benchmark-and-default/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-and-default",
+        "commit": "cb75447"
+      }
+    },
+    {
+      "at": "2026-11-10T12:08:59.147Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/05-docs.md",
+        "03-implement/05-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-docs"
+      }
+    },
+    {
+      "at": "2026-11-10T12:11:47.537Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/05-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-docs",
+        "commit": "8750a82"
+      }
+    },
+    {
+      "at": "2026-11-10T12:12:15.858Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-10T12:12:28.069Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/2"
+      }
+    },
+    {
+      "at": "2026-11-10T12:12:21.236Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    }
+  ],
+  "current_phase": "finished",
+  "git": {
+    "branch": "feat/analytic-jacobian",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-10T10:57:43.101Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/2"
+  },
+  "ship_mode": "delegate",
+  "changelog": {
+    "bump": "minor",
+    "floor": "minor",
+    "reason": null,
+    "bullets": 5,
+    "path": ".work/changelog/2026-11-10__analytic-jacobian.md",
+    "written_at": "2026-11-10T12:12:15.846Z"
+  },
+  "finished_at": "2026-11-10T12:12:21.236Z"
+}

@@ -1,21 +1,4 @@
 {
-  "analytic-jacobian": {
-    "strength": "Strong",
-    "severity": "High",
-    "files": [
-      "radiopyo/simulation/ode_functions_solver.py",
-      "radiopyo/simulation/unit_cell.py",
-      "radiopyo/utils/sim_types.py",
-      "radiopyo/simulation/environment_build.py"
-    ],
-    "problem": "F1, F9: no analytic Jacobian (use_jac=True raises NotImplementedError) and enzymatic reactions ignore the negative-product depletion flag, so a Jacobian would be inconsistent with them.",
-    "solution": "Write the Jacobian on top of reaction_rates and SimMatrices, add negative_products to EzMatrices and apply the same block in reaction_rates, validate against a finite-difference Jacobian of derive, then wire use_jac to solve_ivp(jac=).",
-    "benefits": null,
-    "sourceDirection": null,
-    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
-    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
-    "createdAt": "2026-11-10T09:29:18.858Z"
-  },
   "h2o-concentration-sign": {
     "strength": "Strong",
     "severity": "High",

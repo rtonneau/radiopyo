@@ -671,6 +671,7 @@ class SimEnv:
         substrate_index = np.zeros(n_ez, dtype=np.intp)
         enzyme_index = np.zeros(n_ez, dtype=np.intp)
         stoichiometry = np.zeros([len(self.species), n_ez], dtype=np.float64)
+        negative_products = np.zeros([len(self.species), n_ez], dtype=np.bool_)
 
         for col, enzymatic in enumerate(self.reactions.enzymatic):
             substrate_index[col] = enzymatic.substrate.index
@@ -678,14 +679,20 @@ class SimEnv:
             k_michaelis[col] = enzymatic.k_micha
             k_values[col] = enzymatic.k_value
             # Net stoichiometry: a species on both sides of the reaction
-            # gets product - reactant. NOTE: negative products ('ope') are
-            # not handled here (unlike the k-reactions), deferred.
+            # gets product - reactant. A negative product ('ope') is
+            # consumed and blocks the reaction while it is depleted (as
+            # for the k-reactions).
             for r_sp in enzymatic.reactants:
                 if not self.species.is_cst_species(r_sp.species):
                     stoichiometry[r_sp.species.index, col] -= r_sp.stoi
             for r_sp in enzymatic.products:
-                if not self.species.is_cst_species(r_sp.species):
+                if self.species.is_cst_species(r_sp.species):
+                    continue
+                if r_sp.ope is Operation.ADD:
                     stoichiometry[r_sp.species.index, col] += r_sp.stoi
+                else:
+                    stoichiometry[r_sp.species.index, col] -= r_sp.stoi
+                    negative_products[r_sp.species.index, col] = True
 
         return EzMatrices(
             k_values=k_values,
@@ -693,6 +700,7 @@ class SimEnv:
             substrate_index=substrate_index,
             enzyme_index=enzyme_index,
             stoichiometry=stoichiometry,
+            negative_products=negative_products,
         )
 
     def make_cst_species_vector(
