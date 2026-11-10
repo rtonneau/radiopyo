@@ -136,6 +136,30 @@
         "ticket": "03-smooth-depletion-switch",
         "commit": "85168c7"
       }
+    },
+    {
+      "at": "2026-11-10T18:19:35.620Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-catalase-k.md",
+        "03-implement/04-catalase-k/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-catalase-k"
+      }
+    },
+    {
+      "at": "2026-11-10T18:28:22.003Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/04-catalase-k/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-catalase-k",
+        "commit": "8c8eb90"
+      }
     }
   ],
   "current_phase": "ship",
