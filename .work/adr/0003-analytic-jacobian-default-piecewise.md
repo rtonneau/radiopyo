@@ -1,5 +1,7 @@
 # Analytic Jacobian on by default, piecewise like derive
 
+**Status:** the piecewise part (blocked reactions and `force_positive` rows contributing 0) is superseded by ADR 0005 (smooth depletion switch); `use_jac` defaulting to True still holds.
+
 _ADR 0003, recorded 2026-11-10 (session 2026-11-10__analytic-jacobian)._
 
 <!-- Format adapted from mattpocock-skills' domain-modeling (ADR-FORMAT.md): https://github.com/mattpocock/skills.git -->

@@ -6,7 +6,7 @@ prepare_chunked_run / prepare_single_pulse, SimChunksIter, and the
 public keyword arguments and defaults of the run methods.
 
 run() applies the initial radiolytic burst on beam ON (unless the beam
-is not used), forwards force_positive to the solver, never modifies the
+is not used), never modifies the
 y0 it is given and raises NoBeamDefinedError without beam.
 
 Author:
@@ -113,7 +113,6 @@ def test_run_options_defaults() -> None:
     assert opts.max_step is None
     assert opts.first_step is None
     assert opts.use_beam is True
-    assert opts.force_positive is False
     assert opts.use_jac is True
     assert opts.t_eval is None
 
@@ -286,24 +285,24 @@ def test_run_forwards_options(
     assert opts.t_eval is t_eval
 
 
-@pytest.mark.parametrize("force_positive", [False, True])
-def test_run_forwards_force_positive_to_options(
-    labarbe_cell: UnitCell, monkeypatch: pytest.MonkeyPatch, force_positive: bool
-) -> None:
-    """force_positive lands in RunOptions, whatever the burst does."""
-    calls = _spy_raw_run(monkeypatch, labarbe_cell)
-    with pytest.raises(_Captured):
-        labarbe_cell.run(t_span=(1e-7, 1.0), force_positive=force_positive)
-    (call,) = calls
-    assert call["options"].force_positive is force_positive
-    assert call["beam_on"] is True  # independent of force_positive
+def test_run_options_rejects_force_positive() -> None:
+    """force_positive was removed (ADR 0004)."""
+    with pytest.raises(TypeError):
+        RunOptions(force_positive=True)  # type: ignore[call-arg]
 
 
-@pytest.mark.parametrize("force_positive", [False, True])
-def test_force_positive_reaches_derive(
-    labarbe_cell: UnitCell, monkeypatch: pytest.MonkeyPatch, force_positive: bool
+@pytest.mark.parametrize(
+    "method", ["run", "prepare_chunked_run", "prepare_single_pulse", "run_till_max_dose"]
+)
+def test_run_methods_reject_force_positive(labarbe_cell: UnitCell, method: str) -> None:
+    with pytest.raises(TypeError):
+        getattr(labarbe_cell, method)(t_span=(0.0, 1.0), force_positive=True)
+
+
+def test_raw_run_passes_beam_and_matrices_to_solver(
+    labarbe_cell: UnitCell, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The args given by solve_ivp to derive() carry force_positive."""
+    """The args given by solve_ivp to derive() are (beam, mat)."""
     seen: tp.Dict[str, tp.Any] = {}
 
     def fake_solve_ivp(
@@ -313,13 +312,10 @@ def test_force_positive_reaches_derive(
         return "sol"
 
     monkeypatch.setattr(unit_cell_module, "solve_ivp", fake_solve_ivp)
-    labarbe_cell._raw_run(
-        (1e-7, 1.0), RunOptions(force_positive=force_positive), beam_on=True
-    )
-    beam, mat, forced = seen["args"]
+    labarbe_cell._raw_run((1e-7, 1.0), RunOptions(), beam_on=True)
+    beam, mat = seen["args"]
     assert beam is labarbe_cell.beam
     assert mat is labarbe_cell.mat
-    assert forced is force_positive
 
 
 def test_run_applies_burst_by_default(labarbe_cell: UnitCell) -> None:
@@ -408,12 +404,10 @@ def test_run_till_max_dose_forwards_kwargs(
             time_start=1e-8,
             t_span=(5.0, 6.0),  # overwritten
             max_step=1e-9,
-            force_positive=True,
         )
     (call,) = calls
     assert call["t_span"] == (1e-8, labarbe_cell.beam.time_at_max_dose)
     assert call["options"].max_step == 1e-9
-    assert call["options"].force_positive is True
     assert call["beam_on"] is True
 
 
@@ -445,7 +439,6 @@ _COMMON_CHUNKED = [
                 ("max_step", None),
                 ("y0", None),
                 ("use_beam", True),
-                ("force_positive", False),
             ],
         ),
         (
@@ -457,7 +450,6 @@ _COMMON_CHUNKED = [
                 ("max_step_size_final", None),
                 ("y0", None),
                 ("use_beam", True),
-                ("force_positive", False),
             ],
         ),
         (
@@ -470,7 +462,6 @@ _COMMON_CHUNKED = [
                 ("trans_time", None),
                 ("y0", None),
                 ("use_beam", True),
-                ("force_positive", False),
             ],
         ),
         ("run_till_max_dose", [("time_start", 1e-9), ("kwargs", _EMPTY)]),
@@ -537,10 +528,9 @@ def test_prepare_chunked_run_options(pulsed_cell: UnitCell) -> None:
         rtol=1e-7,
         y0=y0,
         use_beam=False,
-        force_positive=True,
     )
     assert it.options == RunOptions(
-        atol=1e-9, rtol=1e-7, method="BDF", use_beam=False, force_positive=True
+        atol=1e-9, rtol=1e-7, method="BDF", use_beam=False
     )
     assert it.y0 is y0
 
@@ -568,14 +558,13 @@ def test_prepare_single_pulse_trans_time_and_options(labarbe_cell: UnitCell) -> 
         trans_time=1e-5,
         atol=1e-9,
         use_jac=True,
-        force_positive=True,
     )
     assert _chunk_table(it.chunks) == [
         (0.0, t_max, None, True),
         (t_max, t_max + 1e-5, None, False),
         (t_max + 1e-5, 1.0, 1e-3, False),
     ]
-    assert it.options == RunOptions(atol=1e-9, use_jac=True, force_positive=True)
+    assert it.options == RunOptions(atol=1e-9, use_jac=True)
 
 
 @pytest.mark.parametrize("method", ["prepare_chunked_run", "prepare_single_pulse"])

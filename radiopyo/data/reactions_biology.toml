@@ -82,5 +82,5 @@ k_value = 20
 
 [[reactions.enzymatic]] #  (Rb10 in R.Labarbe)
 reaction = "2 H2O2 -- catalase >> O2 + 2H2O"
-k_value = 1.324e8                            # i.e. 6.62e7 x 2 [1/s]
+k_value = 6.62e7                             # per-reaction k, used as given, not doubled (ADR 0006); assumed to be Labarbe's Rb10 value, not verified [1/s]
 k_micha = 1.1                                #  [mol/l]

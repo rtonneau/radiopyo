@@ -93,7 +93,6 @@ class KwargsRun(tp.TypedDict, total=False):
     max_step: tp.Optional[float]
     y0: tp.Optional[NDArray[np.float64]]
     use_beam: bool
-    force_positive: bool
 
 
 class ConcentrationDict(tp.TypedDict):
@@ -118,7 +117,6 @@ class SimParameters(tp.TypedDict, total=False):
     temperature: float
     timestamp: float
     t_zero_pulse: float
-    force_positive: bool
     variable_GValues: bool
 
 
@@ -193,8 +191,9 @@ class KMatrices:
     being the reaction of global index r (0 <= r < n_reactions).
 
     Rate of reaction r (mass action law):
-        k_values[r] * prod_s full_state[reactant_index[r, s]]
-    then forced to 0 while one of its negative products is depleted.
+        k_values[r] * prod_s max(full_state[reactant_index[r, s]], 0)
+    times the depletion switch c/(c + DEPLETION_LIMIT) of each of its
+    negative products (ADR 0005).
 
     Attributes:
         k_values: (n_kr,) rate constants at the temperature the matrices
@@ -208,8 +207,8 @@ class KMatrices:
             Negative products count as consumed.
         negative_products: (n_species, n_kr) bool, True when the species
             is a negative product of the reaction (written '- species' on
-            the product side). Such a reaction does not occur while that
-            species is depleted.
+            the product side). Such a reaction is slowed by the depletion
+            switch as that species runs out (ADR 0005).
     """
 
     k_values: NDArray[np.float64]
@@ -270,8 +269,9 @@ class EzMatrices:
         stoichiometry: (n_species, n_ez) float64 stoichiometry matrix.
             Negative products count as consumed.
         negative_products: (n_species, n_ez) bool, True when the species
-            is a negative product of the reaction. Such a reaction does
-            not occur while that species is depleted.
+            is a negative product of the reaction. Such a reaction is
+            slowed by the depletion switch as that species runs out
+            (ADR 0005).
     """
 
     k_values: NDArray[np.float64]
@@ -327,7 +327,6 @@ def default_SimParameters() -> SimParameters:
         temperature=Temperature._DEFAULT,
         timestamp=0.0,
         t_zero_pulse=1e-7,
-        force_positive=False,
         variable_GValues=False,
     )
 

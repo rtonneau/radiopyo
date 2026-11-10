@@ -27,14 +27,13 @@ from radiopyo.physics.beam import ConstantBeam
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import (
     DEPLETION_LIMIT,
+    depletion_switch,
     derive,
     dose_rates,
     mass_action_rates,
     michaelis_menten_rates,
-    negative_product_block,
     reaction_rates,
     species_rates,
-    zero_depleted_consumption,
 )
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult
 from radiopyo.simulation.unit_cell import UnitCell
@@ -361,9 +360,9 @@ def test_reconstruct_reactions_without_time_points(labarbe_cell: UnitCell) -> No
 
 
 # --------------------------------------------------------------------------- #
-#                     Negative products / forced positivity                   #
+#                    Negative products / depletion switch                     #
 # --------------------------------------------------------------------------- #
-def test_negative_product_blocks_reaction(negative_product_env: SimEnv) -> None:
+def test_negative_product_depletion_switch(negative_product_env: SimEnv) -> None:
     env = negative_product_env
     mat = env.build_all_matrices()
     kmat = mat.k_reactions
@@ -382,33 +381,97 @@ def test_negative_product_blocks_reaction(negative_product_env: SimEnv) -> None:
         y_full[idx["D"]] = d
         return y_full
 
-    for d, blocked in [
-        (DEPLETION_LIMIT, True),
-        (0.0, True),
-        (2 * DEPLETION_LIMIT, False),
+    # Switch c / (c + eps): 0 at 0 (and below), 1/2 at eps, ~1 well above
+    for d, switch in [
+        (0.0, 0.0),
+        (-1e-9, 0.0),
+        (DEPLETION_LIMIT, 0.5),
+        (2 * DEPLETION_LIMIT, 2 / 3),
+        (1e-10, 1e-10 / (1e-10 + DEPLETION_LIMIT)),
+        (1e-6, 1e-6 / (1e-6 + DEPLETION_LIMIT)),
     ]:
         y_full = state(d)
-        assert negative_product_block(y_full, kmat)[r_neg.get_index()] == blocked
+        factors = depletion_switch(y_full, kmat)
+        assert factors[r_neg.get_index()] == pytest.approx(switch, rel=1e-14)
+        assert factors[r_cst.get_index()] == 1.0  # no negative product
         rates = reaction_rates(0.0, y_full, mat, None).k_reactions
-        expected_neg = 0.0 if blocked else 1e9 * 1e-4 * 1e-4
+        expected_neg = switch * 1e9 * 1e-4 * 1e-4
         assert rates[r_neg.get_index()] == pytest.approx(expected_neg, rel=1e-14)
-        # The other reaction (with a fixed reactant F) is never blocked
+        # The other reaction (with a fixed reactant F) is never slowed down
         expected_cst = (
             2e8 * 1e-4 * 1e-4 * mat.cst_sp[idx["F"] - (mat.n_species - mat.state.n_cst)]
         )
         assert rates[r_cst.get_index()] == pytest.approx(expected_cst, rel=1e-14)
 
-    # Vectorised over time points: same decisions column by column
-    states = np.stack([state(d) for d in (0.0, 2 * DEPLETION_LIMIT)], axis=1)
-    np.testing.assert_array_equal(
-        negative_product_block(states, kmat)[r_neg.get_index()], [True, False]
+    # Almost no slowdown at 1e-6 mol/L (< 1e-5 relative), under 1 % at 1e-10
+    assert depletion_switch(state(1e-6), kmat)[r_neg.get_index()] > 1 - 1e-5
+    assert depletion_switch(state(1e-10), kmat)[r_neg.get_index()] > 0.99
+
+    # Vectorised over time points: same factors column by column
+    ds = (0.0, DEPLETION_LIMIT, 1e-6)
+    states = np.stack([state(d) for d in ds], axis=1)
+    np.testing.assert_allclose(
+        depletion_switch(states, kmat)[r_neg.get_index()],
+        [0.0, 0.5, 1e-6 / (1e-6 + DEPLETION_LIMIT)],
+        rtol=1e-14,
     )
+    np.testing.assert_array_equal(depletion_switch(states, kmat)[r_cst.get_index()], 1.0)
+    vec = reaction_rates(np.zeros(3), states, mat, None).k_reactions
+    for col, d in enumerate(ds):
+        np.testing.assert_array_equal(
+            vec[:, col], reaction_rates(0.0, state(d), mat, None).k_reactions
+        )
 
 
-def test_zero_depleted_consumption() -> None:
-    y_full = np.array([0.0, 0.0, 1.0, 1e-13])
-    dydt = np.array([-1.0, 1.0, -1.0, -2.0])
+# --------------------------------------------------------------------------- #
+#                     Clipped concentrations (ADR 0004)                       #
+# --------------------------------------------------------------------------- #
+def _overshoot(
+    y_full: np.ndarray, mat: SimMatrices, rng: np.random.Generator
+) -> np.ndarray:
+    """Copy of a full state with a third of the dynamic species pushed below
+    0 (as a solver overshoot would do); constant species are untouched."""
+    out = y_full.copy()
+    n_dyn = mat.n_species - mat.state.n_cst
+    flip = rng.random(n_dyn) < 0.33
+    out[:n_dyn][flip] *= -1.0
+    return out
+
+
+def test_rates_read_clipped_concentrations(cell: UnitCell) -> None:
+    mat, beam = cell.mat, cell.beam
+    rng = np.random.default_rng(3)
+    y_neg = _overshoot(random_full_state(mat, rng), mat, rng)
+    assert (y_neg < 0).any()
+    y_clip = np.maximum(y_neg, 0.0)
+
+    mass_action = mass_action_rates(y_neg, mat.k_reactions)
     np.testing.assert_array_equal(
-        zero_depleted_consumption(y_full, dydt), [0.0, 1.0, -1.0, 0.0]
+        mass_action, mass_action_rates(y_clip, mat.k_reactions)
     )
+    assert (mass_action >= 0.0).all()
+    michaelis = michaelis_menten_rates(y_neg, mat.enzymatic)
+    np.testing.assert_array_equal(
+        michaelis, michaelis_menten_rates(y_clip, mat.enzymatic)
+    )
+    assert (michaelis >= 0.0).all()
 
+    rates_neg = reaction_rates(T_BEAM_ON, y_neg, mat, beam)
+    rates_clip = reaction_rates(T_BEAM_ON, y_clip, mat, beam)
+    np.testing.assert_array_equal(rates_neg.stacked(), rates_clip.stacked())
+
+    # Same for several states at once (n_species, n_t)
+    states = np.stack([y_neg, y_clip], axis=1)
+    both = reaction_rates(np.array([T_BEAM_ON, T_BEAM_ON]), states, mat, beam)
+    np.testing.assert_array_equal(both.stacked()[:, 0], both.stacked()[:, 1])
+    np.testing.assert_array_equal(both.stacked()[:, 0], rates_neg.stacked())
+
+
+def test_michaelis_menten_negative_enzyme_or_substrate(labarbe_cell: UnitCell) -> None:
+    mat = labarbe_cell.mat
+    ezmat = mat.enzymatic
+    y_full = random_full_state(mat, np.random.default_rng(4))
+    for index in (ezmat.enzyme_index, ezmat.substrate_index):
+        y_neg = y_full.copy()
+        y_neg[index] *= -1.0
+        np.testing.assert_array_equal(michaelis_menten_rates(y_neg, ezmat), 0.0)

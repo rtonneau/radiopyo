@@ -680,8 +680,8 @@ class SimEnv:
             k_values[col] = enzymatic.k_value
             # Net stoichiometry: a species on both sides of the reaction
             # gets product - reactant. A negative product ('ope') is
-            # consumed and blocks the reaction while it is depleted (as
-            # for the k-reactions).
+            # consumed and slows the reaction through the depletion
+            # switch as it runs out (as for the k-reactions, ADR 0005).
             for r_sp in enzymatic.reactants:
                 if not self.species.is_cst_species(r_sp.species):
                     stoichiometry[r_sp.species.index, col] -= r_sp.stoi
