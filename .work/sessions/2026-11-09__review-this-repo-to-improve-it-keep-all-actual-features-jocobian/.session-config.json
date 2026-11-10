@@ -520,14 +520,87 @@
         "ticket": "18-docs",
         "commit": "4ea057d"
       }
+    },
+    {
+      "at": "2026-11-10T09:31:14.062Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-10T09:31:26.357Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/1"
+      }
+    },
+    {
+      "at": "2026-11-10T09:31:19.755Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    },
+    {
+      "at": "2026-11-10T09:31:26.633Z",
+      "event": "scratch_cleaned",
+      "phase": "finished",
+      "detail": {
+        "policy": "build-artifacts",
+        "removed": [
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/__pycache__"
+        ],
+        "freedBytes": 1747449
+      }
     }
   ],
-  "current_phase": "finish-pending",
+  "current_phase": "finished",
   "git": {
     "branch": "refactor/readability-and-jacobian-prep",
     "base_branch": "main",
     "branch_created_at": "2026-11-09T20:54:47.004Z",
-    "pr_url": null
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/1"
   },
-  "ship_mode": "delegate"
+  "ship_mode": "delegate",
+  "changelog": {
+    "bump": "minor",
+    "floor": "patch",
+    "reason": "breaking removals (RON format, run_multi_doses, e_LET, use_jac) in a 0.x version",
+    "bullets": 8,
+    "path": ".work/changelog/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian.md",
+    "written_at": "2026-11-10T09:31:13.978Z"
+  },
+  "finished_at": "2026-11-10T09:31:19.755Z"
 }
