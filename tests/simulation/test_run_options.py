@@ -114,7 +114,7 @@ def test_run_options_defaults() -> None:
     assert opts.first_step is None
     assert opts.use_beam is True
     assert opts.force_positive is False
-    assert opts.use_jac is False
+    assert opts.use_jac is True
     assert opts.t_eval is None
 
 
@@ -281,7 +281,7 @@ def test_run_forwards_options(
         1e-3,
     )
     assert opts.use_beam is False
-    assert opts.use_jac is False
+    assert opts.use_jac is True
     assert opts.first_step is None
     assert opts.t_eval is t_eval
 
@@ -422,7 +422,7 @@ def test_run_till_max_dose_forwards_kwargs(
 # --------------------------------------------------------------------------- #
 _EMPTY = inspect.Parameter.empty
 _COMMON_CHUNKED = [
-    ("use_jac", False),
+    ("use_jac", True),
     ("method", "LSODA"),
     ("atol", None),
     ("rtol", None),
@@ -438,7 +438,7 @@ _COMMON_CHUNKED = [
             [
                 ("t_span", _EMPTY),
                 ("t_eval", None),
-                ("use_jac", False),
+                ("use_jac", True),
                 ("method", "LSODA"),
                 ("atol", None),
                 ("rtol", None),

@@ -134,7 +134,7 @@ class RunOptions:
             (default: False)
         use_jac: bool
             Pass the analytical jacobian() to the solver; used only by
-            LSODA, BDF and Radau, ignored by other methods (default: False)
+            LSODA, BDF and Radau, ignored by other methods (default: True)
         t_eval: NDArray[np.float64], optional
             Times at which solve_ivp stores the solution (None -> solver
             steps)
@@ -147,7 +147,7 @@ class RunOptions:
     first_step: tp.Optional[float] = None
     use_beam: bool = True
     force_positive: bool = False
-    use_jac: bool = False
+    use_jac: bool = True
     t_eval: tp.Optional[NDArray[np.float64]] = None
 
 
@@ -623,7 +623,7 @@ class UnitCell(object):
         self,
         t_span: tp.Tuple[float, float],
         t_eval: tp.Optional[NDArray[np.float64]] = None,
-        use_jac: bool = False,
+        use_jac: bool = True,
         method: str = "LSODA",
         atol: tp.Optional[float] = None,
         rtol: tp.Optional[float] = None,
@@ -642,7 +642,7 @@ class UnitCell(object):
                 Force function evaluation on t_eval (default: None)
             use_jac: bool
                 Use the analytical Jacobian? Only for LSODA, BDF and
-                Radau, ignored by other methods (default: False).
+                Radau, ignored by other methods (default: True).
             method: str
                 Which ODE solver to use? Define in
                 scipy.integrate.solve_ivp (default: "LSODA")
@@ -708,7 +708,7 @@ class UnitCell(object):
     def prepare_chunked_run(
         self,
         t_span: tp.Tuple[float, float],
-        use_jac: bool = False,
+        use_jac: bool = True,
         method: str = "LSODA",
         atol: tp.Optional[float] = None,
         rtol: tp.Optional[float] = None,
@@ -730,7 +730,7 @@ class UnitCell(object):
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
                 Whether to use the analytical jacobian along with the ODE
-                solver (default:False). Only for LSODA, BDF and Radau,
+                solver (default: True). Only for LSODA, BDF and Radau,
                 ignored by other methods.
             method: str, optional
                 Which ODE solver to use? Define in
@@ -801,7 +801,7 @@ class UnitCell(object):
     def prepare_single_pulse(
         self,
         t_span: tp.Tuple[float, float],
-        use_jac: bool = False,
+        use_jac: bool = True,
         method: str = "LSODA",
         atol: tp.Optional[float] = None,
         rtol: tp.Optional[float] = None,
@@ -825,7 +825,7 @@ class UnitCell(object):
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
                 Whether to use the analytical jacobian along with the ODE
-                solver (default:False). Only for LSODA, BDF and Radau,
+                solver (default: True). Only for LSODA, BDF and Radau,
                 ignored by other methods.
             method: str, optional
                 Which ODE solver to use? Define in

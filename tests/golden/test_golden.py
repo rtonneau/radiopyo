@@ -97,6 +97,11 @@ ATOL_ALGEBRA_FRAC_OF_MAX = 1e-12
 #   * radicals living at 1e-8..1e-13 uM, i.e. at the level of the solver
 #     absolute tolerance (1e-12 uM), differ by up to a few 1e-12 uM
 #     absolute (up to ~1e-3 relative).
+# Since ADR 0003 runs use the analytic Jacobian by default (use_jac=True)
+# while the data were recorded with finite differences; the benchmark
+# (final states, analytic vs FD, LSODA and BDF, bundled configs) showed
+# differences <= 2e-9 uM absolute and <= 8e-9 relative, so the tolerances
+# below were left unchanged.
 # RTOL_RUN is thus ~3 orders of magnitude above the relative spread...
 RTOL_RUN = 1e-6
 # ... and the absolute floor for species (uM) is ~100x the solver atol.

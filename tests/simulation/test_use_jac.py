@@ -40,8 +40,8 @@ def assert_close(a: np.ndarray, b: np.ndarray) -> None:
 
 
 # --------------------------------- Tests ----------------------------------- #
-def test_use_jac_default_is_false() -> None:
-    assert RunOptions().use_jac is False
+def test_use_jac_default_is_true() -> None:
+    assert RunOptions().use_jac is True
 
 
 @pytest.mark.parametrize("method", ["LSODA", "BDF", "Radau"])
