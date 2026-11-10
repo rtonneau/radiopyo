@@ -87,6 +87,30 @@
         "ticket": "01-enzymatic-depletion-block",
         "commit": "c9052c6"
       }
+    },
+    {
+      "at": "2026-11-10T11:03:06.473Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-jacobian-function.md",
+        "03-implement/02-jacobian-function/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-jacobian-function"
+      }
+    },
+    {
+      "at": "2026-11-10T11:15:22.360Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-jacobian-function/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-jacobian-function",
+        "commit": "694616c"
+      }
     }
   ],
   "current_phase": "ship",
