@@ -402,3 +402,57 @@ def test_negative_product_blocks_reaction(negative_product_env: SimEnv) -> None:
     np.testing.assert_array_equal(
         negative_product_block(states, kmat)[r_neg.get_index()], [True, False]
     )
+
+
+# --------------------------------------------------------------------------- #
+#                     Clipped concentrations (ADR 0004)                       #
+# --------------------------------------------------------------------------- #
+def _overshoot(
+    y_full: np.ndarray, mat: SimMatrices, rng: np.random.Generator
+) -> np.ndarray:
+    """Copy of a full state with a third of the dynamic species pushed below
+    0 (as a solver overshoot would do); constant species are untouched."""
+    out = y_full.copy()
+    n_dyn = mat.n_species - mat.state.n_cst
+    flip = rng.random(n_dyn) < 0.33
+    out[:n_dyn][flip] *= -1.0
+    return out
+
+
+def test_rates_read_clipped_concentrations(cell: UnitCell) -> None:
+    mat, beam = cell.mat, cell.beam
+    rng = np.random.default_rng(3)
+    y_neg = _overshoot(random_full_state(mat, rng), mat, rng)
+    assert (y_neg < 0).any()
+    y_clip = np.maximum(y_neg, 0.0)
+
+    mass_action = mass_action_rates(y_neg, mat.k_reactions)
+    np.testing.assert_array_equal(
+        mass_action, mass_action_rates(y_clip, mat.k_reactions)
+    )
+    assert (mass_action >= 0.0).all()
+    michaelis = michaelis_menten_rates(y_neg, mat.enzymatic)
+    np.testing.assert_array_equal(
+        michaelis, michaelis_menten_rates(y_clip, mat.enzymatic)
+    )
+    assert (michaelis >= 0.0).all()
+
+    rates_neg = reaction_rates(T_BEAM_ON, y_neg, mat, beam)
+    rates_clip = reaction_rates(T_BEAM_ON, y_clip, mat, beam)
+    np.testing.assert_array_equal(rates_neg.stacked(), rates_clip.stacked())
+
+    # Same for several states at once (n_species, n_t)
+    states = np.stack([y_neg, y_clip], axis=1)
+    both = reaction_rates(np.array([T_BEAM_ON, T_BEAM_ON]), states, mat, beam)
+    np.testing.assert_array_equal(both.stacked()[:, 0], both.stacked()[:, 1])
+    np.testing.assert_array_equal(both.stacked()[:, 0], rates_neg.stacked())
+
+
+def test_michaelis_menten_negative_enzyme_or_substrate(labarbe_cell: UnitCell) -> None:
+    mat = labarbe_cell.mat
+    ezmat = mat.enzymatic
+    y_full = random_full_state(mat, np.random.default_rng(4))
+    for index in (ezmat.enzyme_index, ezmat.substrate_index):
+        y_neg = y_full.copy()
+        y_neg[index] *= -1.0
+        np.testing.assert_array_equal(michaelis_menten_rates(y_neg, ezmat), 0.0)

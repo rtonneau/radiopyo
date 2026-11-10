@@ -19,6 +19,11 @@ rates replaced by their derivatives with respect to the concentrations
 (mass_action_derivatives, michaelis_menten_derivatives). It is piecewise
 like ``derive`` (ADR 0003): a blocked reaction contributes 0.
 
+Every rate law reads the clipped concentration max(c, 0) (ADR 0004): a
+species driven below 0 by a solver overshoot counts as absent, so it is
+not consumed further and cannot run a reaction backwards, and
+``derive`` stays exactly stoichiometry @ rates.
+
 Units: the full molar state and all rates are in [mol/L] and [mol/L/s].
 Only ``derive`` deals with the [µmol/L] solver state, through
 ``SimMatrices.state`` (StateLayout).
@@ -102,6 +107,7 @@ def mass_action_rates(
     kmat: KMatrices,
 ) -> NDArray[np.float64]:
     """Mass action law of every k-reaction, ignoring negative products.
+    Reads the clipped concentrations max(c, 0) (ADR 0004).
 
     Args:
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t).
@@ -112,7 +118,7 @@ def mass_action_rates(
     """
     # Unused reactant slots point to this extra row of 1.0
     ones = np.ones((1, *y_full.shape[1:]), dtype=np.float64)
-    y_ext = np.concatenate([y_full, ones], axis=0)
+    y_ext = np.concatenate([np.maximum(y_full, 0.0), ones], axis=0)
 
     # (n_kr, max_reactants[, n_t]): concentration of each reactant molecule
     factors = y_ext[kmat.reactant_index]
@@ -143,7 +149,8 @@ def michaelis_menten_rates(
     y_full: NDArray[np.float64],
     ezmat: EzMatrices,
 ) -> NDArray[np.float64]:
-    """Michaelis-Menten law of every enzymatic reaction.
+    """Michaelis-Menten law of every enzymatic reaction. Reads the clipped
+    concentrations max(c, 0) of the enzyme and the substrate (ADR 0004).
 
     Args:
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t).
@@ -152,8 +159,8 @@ def michaelis_menten_rates(
     Returns:
         NDArray[np.float64]: rates [mol/L/s], (n_ez,) or (n_ez, n_t).
     """
-    enzyme = y_full[ezmat.enzyme_index]
-    substrate = y_full[ezmat.substrate_index]
+    enzyme = np.maximum(y_full[ezmat.enzyme_index], 0.0)
+    substrate = np.maximum(y_full[ezmat.substrate_index], 0.0)
     k_values, k_michaelis = ezmat.k_values, ezmat.k_michaelis
     if y_full.ndim > 1:
         k_values = k_values[:, np.newaxis]
@@ -235,6 +242,10 @@ def mass_action_derivatives(
     the product of the other slots, summed over the slots holding s (a
     repeated reactant, 2 A, fills two slots).
 
+    The rate reads the clipped concentrations max(c, 0) (ADR 0004): a
+    species with c < 0 contributes 0 to every derivative it enters; at
+    exactly c = 0 the derivative of the c > 0 side is used.
+
     Args:
         y_full: full molar state [mol/L], (n_species,).
         kmat: KMatrices
@@ -245,7 +256,8 @@ def mass_action_derivatives(
     """
     n_species = y_full.shape[0]
     n_kr, n_slots = kmat.reactant_index.shape
-    y_ext = np.append(y_full, 1.0)  # unused slots point to the extra 1.0
+    # unused slots point to the extra 1.0
+    y_ext = np.append(np.maximum(y_full, 0.0), 1.0)
     factors = y_ext[kmat.reactant_index]  # (n_kr, n_slots)
 
     rows = np.arange(n_kr)
@@ -253,6 +265,7 @@ def mass_action_derivatives(
     for slot in range(n_slots):
         others = np.prod(np.delete(factors, slot, axis=1), axis=1) * kmat.k_values
         np.add.at(out, (rows, kmat.reactant_index[:, slot]), others)
+    out[:, :n_species][:, y_full < 0.0] = 0.0  # clipped: no dependence below 0
     return out[:, :n_species]  # drop the extra column of the unused slots
 
 
@@ -263,6 +276,10 @@ def michaelis_menten_derivatives(
     """Derivative of the Michaelis-Menten rate of every enzymatic reaction
     with respect to every species, ignoring negative products.
 
+    The rate reads the clipped concentrations max(c, 0) (ADR 0004): a
+    species with c < 0 contributes 0; at exactly c = 0 the derivative of
+    the c > 0 side is used.
+
     Args:
         y_full: full molar state [mol/L], (n_species,).
         ezmat: EzMatrices
@@ -271,11 +288,17 @@ def michaelis_menten_derivatives(
         NDArray[np.float64]: (n_ez, n_species) d rate / d concentration
         [1/s].
     """
-    enzyme = y_full[ezmat.enzyme_index]
-    substrate = y_full[ezmat.substrate_index]
+    raw_enzyme = y_full[ezmat.enzyme_index]
+    raw_substrate = y_full[ezmat.substrate_index]
+    enzyme = np.maximum(raw_enzyme, 0.0)
+    substrate = np.maximum(raw_substrate, 0.0)
     denominator = ezmat.k_michaelis + substrate
-    d_enzyme = ezmat.k_values * substrate / denominator
-    d_substrate = ezmat.k_values * enzyme * ezmat.k_michaelis / denominator**2
+    d_enzyme = np.where(raw_enzyme < 0.0, 0.0, ezmat.k_values * substrate / denominator)
+    d_substrate = np.where(
+        raw_substrate < 0.0,
+        0.0,
+        ezmat.k_values * enzyme * ezmat.k_michaelis / denominator**2,
+    )
 
     rows = np.arange(ezmat.n_reactions)
     out = np.zeros((ezmat.n_reactions, y_full.shape[0]), dtype=np.float64)
@@ -296,7 +319,8 @@ def jacobian(
     Pure function. Piecewise like ``derive`` (ADR 0003): it is the
     derivative on the current side of every on/off switch, i.e. a k or
     enzymatic reaction blocked by a depleted negative product contributes
-    0. Radiolytic
+    0. It follows the clipped concentrations of ``derive`` (ADR 0004): a
+    species below 0 contributes 0 to every derivative it enters. Radiolytic
     reactions (they do not depend on the concentrations) and constant
     species (they are not solved) contribute nothing.
 

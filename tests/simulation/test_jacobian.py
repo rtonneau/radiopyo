@@ -305,3 +305,63 @@ def test_depleted_consumed_species_keeps_row(mass_action_env: SimEnv) -> None:
     jac = jacobian(0.0, y, None, mat)
     assert jac[b].any()
     assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0))
+
+
+# --------------------------------------------------------------------------- #
+#                     Clipped concentrations (ADR 0004)                       #
+# --------------------------------------------------------------------------- #
+def test_negative_species_contributes_zero(mass_action_env: SimEnv) -> None:
+    env = mass_action_env
+    mat = env.build_all_matrices()
+    a, c = env.species["A"].index, env.species["C"].index
+
+    y = random_state(mat)
+    y[a] = -y[a]  # a solver overshoot below 0
+    jac = jacobian(0.0, y, None, mat)
+    assert not jac[:, a].any()  # no derivative depends on A (also 2 A + F -> E)
+    assert jac[:, c].any()  # C -> B + A is unaffected
+    assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0))
+
+
+def test_zero_species_uses_positive_side(mass_action_env: SimEnv) -> None:
+    env = mass_action_env
+    mat = env.build_all_matrices()
+    a, b, c, e = (env.species[n].index for n in ("A", "B", "C", "E"))
+
+    y = random_state(mat)
+    y[a] = 0.0
+    y_full = mat.state.to_full_molar(y)
+    jac = jacobian(0.0, y, None, mat)
+    k_ab = 1e9  # A + B -> C - D: rate = k A B, d rate / dA = k B at A = 0
+    assert jac[c, a] == pytest.approx(k_ab * y_full[b], rel=1e-12)
+    assert jac[c, b] == 0.0  # d rate / dB = k A = 0
+    assert jac[e, a] == 0.0  # 2 A + F -> E: d rate / dA = 2 k A F = 0
+
+
+def test_negative_enzymatic_species_contribute_zero(enzymatic_env: SimEnv) -> None:
+    env = enzymatic_env
+    mat = env.build_all_matrices()
+    p, s, enz = (env.species[n].index for n in ("P", "S", "enz"))
+    k, km = mat.enzymatic.k_values[0], mat.enzymatic.k_michaelis[0]
+
+    y = random_state(mat)
+    y[s] = -y[s]
+    jac = jacobian(0.0, y, None, mat)
+    assert not jac[:, s].any()
+    assert jac[p, enz] == 0.0  # clipped substrate = 0: no rate
+    assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0))
+
+    y = random_state(mat)
+    y[enz] = -y[enz]
+    jac = jacobian(0.0, y, None, mat)
+    assert not jac[:, enz].any()
+    assert jac[p, s] == 0.0  # clipped enzyme = 0: no rate
+    assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0))
+
+    # exactly 0: the derivative of the positive side
+    y = random_state(mat)
+    y[s] = 0.0
+    jac = jacobian(0.0, y, None, mat)
+    y_full = mat.state.to_full_molar(y)
+    assert jac[p, s] == pytest.approx(k * y_full[enz] / km, rel=1e-12)
+    assert jac[p, enz] == 0.0
