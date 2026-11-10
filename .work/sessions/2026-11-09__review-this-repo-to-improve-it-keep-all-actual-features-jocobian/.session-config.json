@@ -436,6 +436,18 @@
         "ticket": "15-fix-macro-beam",
         "commit": "10978f3"
       }
+    },
+    {
+      "at": "2026-11-10T08:01:39.809Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/11-beam-generic-matrix/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "11-beam-generic-matrix",
+        "commit": "10978f3"
+      }
     }
   ],
   "current_phase": "ship",

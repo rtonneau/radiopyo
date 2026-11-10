@@ -1,6 +1,6 @@
 # Ticket 11: beam-generic-matrix
 
-**Status:** In Progress
+**Status:** ✅ Done
 
 ## Local Test Result
 
@@ -18,6 +18,8 @@ Feasibility check: `.scratch/tests/2026-11-09__review-this-repo-to-improve-it-ke
 Implementer check against the Acceptance Criteria (no review rounds): AC1 (one walk up to `min(stop, time_at_max_dose)`, the four versions removed) and AC2 (beam goldens exact, quirks included) contradict each other for MacroPulsedBeam. They also clash for Constant/SinglePulse unless a type-specific branch is added. Per the ticket Notes nothing was implemented (see Blockers). AC3 (chunked-run golden) uses a PulsedBeam only. The prototype walk is bit-identical for PulsedBeam, so a generic version would leave that golden unchanged.
 
 - Parent decision: ACs 1 and 2 contradict (generic walk bit-identical only for PulsedBeam 156/156; Macro 4/35, Constant/SinglePulse 37/66, evidence/11-generic-vs-base.txt). As anticipated by the ticket Notes, the generic make_matrix is merged into ticket 15, whose golden regeneration needs user approval anyway. Ticket 11 will be closed with ticket 15's commit.
+
+- Parent acceptance: AC1 (one generic make_matrix walking timer transitions up to min(stop, time_at_max_dose)) delivered in ticket 15, commit 10978f3. AC2 (bit-identical quirks) dropped on purpose; the beam goldens were re-recorded there after user approval. AC3 (chunked-run golden) still passes.
 
 ## Blockers / Challenges
 
@@ -39,8 +41,8 @@ What a generic version gives instead: Pulsed unchanged. Constant/SinglePulse clo
 
 ## Commits
 
-Filled by ticket-complete.js.
+- 10978f3 fix: generic beam make_matrix, macro beam and timer fixes, average dose rate from start_time (tickets 15, 11)
 
 ## Time Spent
 
-Filled by ticket-complete.js.
+8h 30m (ticket-start.js to ticket-complete.js)
