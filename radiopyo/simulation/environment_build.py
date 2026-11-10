@@ -240,7 +240,9 @@ class SimEnv:
         species: ListSpecies
             List of all species involved, cst and dyn
         parameters: Dict[str, float]
-            Dictionary with some biological parameter like pH
+            Dictionary with some biological parameter like pH. The key
+            "temperature" [°C] is the single source of truth of the
+            simulation temperature (see SimEnv.temperature).
         initial_cc: Dict[str, float]
             Dictionary with the initial concentration of some species
     """
@@ -450,6 +452,37 @@ class SimEnv:
             initial_cc,
         )
 
+    @property
+    def temperature(self) -> Temperature:
+        """
+        Simulation temperature (parameters["temperature"], in °C, default
+        25). It is the single source of truth: the rate constants, the pKa
+        and the concentrations of the species all derive from it.
+        """
+        return Temperature(
+            self.parameters.get("temperature", Temperature._DEFAULT), "celsius"
+        )
+
+    def set_temperature(self, T: float | Temperature, unit: str = "celsius") -> None:
+        """
+        Set the simulation temperature (stored in °C in
+        parameters["temperature"]).
+
+        WARNING: matrices already built (SimMatrices, e.g. UnitCell.mat) are
+        not updated: rebuild them with build_all_matrices() (or use
+        UnitCell.set_temperature which does it).
+
+        Args:
+            T: temperature value, or Temperature object (unit ignored)
+            unit: "celsius" (default) or "kelvin"
+        """
+        if isinstance(T, Temperature):
+            celsius = T.celsius
+        else:
+            celsius = Temperature(T, unit).celsius if unit.lower() != "celsius" else T
+            Temperature(celsius)  # validates (raises ValueError if absurd)
+        self.parameters["temperature"] = float(celsius)
+
     def update_flag_GValues(self, variable_GValues: bool) -> None:
         """ """
         self.parameters["variable_GValues"] = variable_GValues
@@ -488,6 +521,9 @@ class SimEnv:
         values of species
 
         Args:
+            T: Temperature object or float in °C (the initial
+                concentrations are polynomials of the temperature in °C).
+                Default: None -> the simulation temperature (self.temperature).
             all: bool, optional
                 if False, vector only contains initial cc of DynSpecies
                 (default=False)
@@ -496,6 +532,7 @@ class SimEnv:
             NDArray[np.float64]: vector with initial concentrations
             in [µmol/l]
         """
+        T = self.temperature if T is None else T
         out_dyn = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
         for species in self.species.iter_dyn_species():
             out_dyn[species.index] = species.initial_cc(T) * 1e6
@@ -524,16 +561,20 @@ class SimEnv:
         """Build every (immutable) matrix used by the ODE solver.
 
         Args:
-            T: Temperature object or float, sets the k values
-                (default: None -> default temperature).
+            T: Temperature object or float in °C, sets the k values (as
+                1/K polynomials, converted internally), the pKa and the
+                concentrations of the constant species (°C polynomials).
+                Default: None -> the simulation temperature
+                (self.temperature).
         Returns:
             SimMatrices
         """
+        T = self.temperature if T is None else T
         return SimMatrices(
             k_reactions=self.make_kreaction_matrix(T),
             radiolytic=self.make_radiolytic_vector(),
             enzymatic=self.make_enzymatic_matrix(),
-            state=StateLayout(cst_sp=self.make_cst_species_vector()),
+            state=StateLayout(cst_sp=self.make_cst_species_vector(T)),
         )
 
     def make_kreaction_matrix(
@@ -544,7 +585,12 @@ class SimEnv:
         Construct all matrices necessary to compute the variation of
         the species concentrations due to all k reactions (column r is
         the k-reaction of global index r). See KMatrices.
+
+        Args:
+            T: Temperature object or float in °C (None -> the simulation
+                temperature).
         """
+        T = self.temperature if T is None else T
         n_species = len(self.species)
         n_kr = self.reactions.total_kreactions()
 
@@ -657,10 +703,12 @@ class SimEnv:
         """Create cc vector of Cst Species
 
         Args:
-            T Temperature object or float
+            T: Temperature object or float in °C (None -> the simulation
+                temperature).
         Returns:
-            NDArray[np.float64]
+            NDArray[np.float64]: concentrations in [mol/L]
         """
+        T = self.temperature if T is None else T
         out = np.zeros(self.species.len_cst_species(), dtype=np.float64)
         len_dyn = self.species.len_dyn_species()
         for sp in self.species.iter_cst_species():

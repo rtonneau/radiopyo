@@ -21,6 +21,15 @@ All notable changes to this project. Versions follow [semantic versioning](https
   per beam pulse; results read from a file keep the former assumption
   (`burst_dose_rates` is not persisted).
 - A missing beam now raises `NoBeamDefinedError` in `run` (the exception was created but not raised).
+- Temperature now has a single source of truth, `env.parameters["temperature"]` (degC, default 25;
+  `SimEnv.temperature` / `SimEnv.set_temperature`). `UnitCell.T`, `set_temperature` (and a new `T`
+  setter) read and write it, and the `temperature` key of a config file is now honoured (it was
+  ignored). The constant-species vector (e.g. H2O, a polynomial of the temperature in degC) was built
+  without temperature, so it stayed at its 25 degC value whatever `set_temperature` said;
+  `SimEnv.initial_values`, `ODEResult.to_pandas` and `ODEResult.__getitem__` also evaluated the
+  species at the default temperature. All now use the simulation temperature. Results at 25 degC are
+  unchanged; at another temperature the H2O concentration (hence the rates involving it) changes.
+  Units: k polynomials take 1/K, pKa and initial concentrations take degC (conversion is internal).
 
 ### Removed (breaking)
 

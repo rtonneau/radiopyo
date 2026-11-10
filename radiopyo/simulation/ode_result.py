@@ -153,7 +153,9 @@ class ODEResult(object):
         # Is it a constant species?
         if not self.env.species.is_dyn_species(sp):
             return pd.Series(
-                data=self.env.species[key].initial_cc() * 1e6, index=self.t, name=key
+                data=self.env.species[key].initial_cc(self.env.temperature) * 1e6,
+                index=self.t,
+                name=key,
             )
 
         return pd.Series(data=self.y[sp.index, :], index=self.t, name=sp.label)
@@ -301,8 +303,8 @@ class ODEResult(object):
         )
         for sp_cst in self.env.species.iter_cst_species():
             df_cst.loc[:, sp_cst.label] = (
-                sp_cst.initial_cc() * 1e6
-            )  # TODO include temperature!
+                sp_cst.initial_cc(self.env.temperature) * 1e6
+            )
 
         return pd.concat([df_sp, df_cst], axis=1)
 

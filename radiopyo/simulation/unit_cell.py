@@ -156,9 +156,13 @@ class UnitCell(object):
     concentration over time.
 
     Attributes:
-        T: Temperature
-            Sets the values of chemical reaction constants (default=25).
-            Unit = °C.
+        T: float
+            Simulation temperature in °C (default=25, or the
+            "temperature" parameter of the config file). Read-only view
+            of env.parameters["temperature"], the single source of truth;
+            set it with set_temperature (or the T setter). It sets the
+            rate constants, the pKa and the concentrations of the
+            constant species (e.g. H2O).
         env: SimEnv
             SimEnv build from the input file
         mat: SimMatrices
@@ -184,7 +188,6 @@ class UnitCell(object):
     FIRST_STEP: float = 1e-15
     T_ZERO: float = 1e-7
 
-    _T: Temperature
     env: SimEnv
     mat: SimMatrices
     beam_list: BeamCollection
@@ -199,7 +202,6 @@ class UnitCell(object):
         init: bool = True,
     ) -> None:
         self.env = env
-        self._T = Temperature()
         self.g_val = GValuesBoscolo()  # To do before set_beam
 
         if init:
@@ -218,7 +220,16 @@ class UnitCell(object):
 
     @property
     def T(self) -> float:
-        return self._T.celsius
+        """Simulation temperature in °C (see set_temperature)."""
+        return self.env.temperature.celsius
+
+    @T.setter
+    def T(self, value: float) -> None:
+        self.set_temperature(value)
+
+    @property
+    def _T(self) -> Temperature:
+        return self.env.temperature
 
     @property
     def beam(self) -> ParticleBeam:
@@ -299,11 +310,28 @@ class UnitCell(object):
 
     def _update_matrices(self) -> None:
         """ """
-        self.mat = self.env.build_all_matrices(self._T)
+        self.mat = self.env.build_all_matrices(self.env.temperature)
 
     def set_temperature(self, T: float, unit: str = "celsius") -> tp.Self:
-        """ """
-        self._T = Temperature(T, unit)
+        """
+        Set the simulation temperature (stored in
+        env.parameters["temperature"], in °C) and rebuild the matrices.
+
+        Units: T is given in `unit` ("celsius" default, or "kelvin").
+        Internally the k polynomials (Arrhenius/equilibria) use 1/K,
+        while the pKa and the initial concentrations (polynomials, e.g.
+        H2O) use °C: the conversion is done for you.
+
+        Args:
+            T: float
+                Temperature
+            unit: str
+                "celsius" (default) or "kelvin"
+
+        Returns:
+            Self
+        """
+        self.env.set_temperature(T, unit)
         self._update_matrices()
         return self
 
