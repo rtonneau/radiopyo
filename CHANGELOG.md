@@ -4,6 +4,79 @@ All notable changes to this project. Versions follow [semantic versioning](https
 
 ## [Unreleased]
 
+### Added
+
+- `radiopyo.exceptions.RadioPyoError`, the root of the exception hierarchy (the `chemistry`, `physics`
+  and `simulation` exceptions derive from it; `radiopyo.simulation.exceptions.RadioPyoError` still works).
+- `RunOptions` (`radiopyo.simulation.unit_cell`): the solver options (`atol`, `rtol`, `method`,
+  `max_step`, `first_step`, `use_beam`, `force_positive`, `use_jac`, `t_eval`) behind the existing keyword
+  arguments of `run`, `prepare_chunked_run` and `prepare_single_pulse` (their signatures are unchanged).
+- `SimEnv.reactions_involving(species, role=, kinds=)`: one query behind the ten historical
+  `*_involving*` methods, which stay as aliases. A `SimSpecies` is accepted as species.
+- `UnitCell.T` setter, `SimEnv.temperature` / `SimEnv.set_temperature`.
+- `MacroPulsedBeam` exported from `radiopyo`; `dev` (pytest, mypy, pandas-stubs) and `tqdm` extras in
+  `pyproject.toml`; test suite (`tests/`, 551 tests) with golden outputs recorded from the code before the
+  refactoring (`tests/golden/`).
+- README: `[[beam.macro_pulsed]]`, `[[reactions.equilibrium]]`, the `[parameters]` keys, the n*k convention,
+  `variable_GValues` and H3O_plus = e_aq (G(H3O+) is taken equal to G(e_aq), the `H3O_plus` column of the
+  Boscolo data is not used).
+
+### Changed
+
+Internal refactoring: results are unchanged (bit-identical on the golden outputs) unless listed under
+"Fixed"; the public names and call signatures are kept.
+
+- Solver matrices: the positional tuples (`Ki_mat`, `Gi_mat`, `Ez_mat`, `cst_sp`) are replaced by the frozen
+  dataclass `SimMatrices` (`radiopyo.utils.sim_types`) made of `KMatrices`, `GVector`, `EzMatrices` and
+  `StateLayout` (read-only arrays). `derive(t, y, beam, mat, force_positive)` and
+  `ODEResult.reconstruct_reactions` share one pure `reaction_rates()`; the depletion threshold is the single
+  constant `DEPLETION_LIMIT`. `reconstruct_reactions` is vectorised over the time points. The conversion
+  umol/L <-> mol/L and the fixed-species handling live in `StateLayout`.
+- `UnitCell`: `_raw_run` is a sequence of small steps (`widen_empty_span`, `_solver_kwargs`,
+  `_apply_initial_burst`, `_timed_solve`); `prepare_chunked_run` and `prepare_single_pulse` share their
+  chunk-building code. The docstrings now give the real defaults (atol 1e-12, rtol 1e-10, first step 1e-15).
+- `SimEnv`: table-driven readers for the reaction sections (`reactions_from_dict`, `_REACTION_BUILDERS`);
+  `acid_base_from_dict` & co. are kept as thin wrappers. `pH = 0` is honoured. A config without the
+  `concentrations` / `parameters` section raises a `ValueError` naming it.
+- `radiopyo.simulation.utils` is split into `units.py` (unit converters), `result_collection.py`
+  (`ResCollection`) and `persistence.py` (`H5Manager`, `SimIdentifier`, `SimCollection`); `utils.py` re-exports
+  everything, so the old import paths keep working. The HDF5 format is unchanged (files written before
+  still load). `ODEResult.to_hdf` delegates to `H5Manager.push_ODEResult`.
+- Chemistry: the reactant/product population is shared (`BasicReaction._add_species_from_generic`);
+  `BiReaction` owns its two k-reactions and their k values (`AcidBase.get_couple` deduplicated);
+  `KReactionCollection` re-indexes after sorting and `update_label` renames in place;
+  `SimSpecies.cc_init` is `None` (not a `Polynomial(-inf)`) without initial concentration;
+  `BasicSpecies` has `__eq__` / `__hash__`; `RadiolyticReaction.label` is a property (the old
+  `label()` call still works); `MichaelisMenten.__repr__` has its closing parenthesis (`make_hash` unchanged).
+- Beams: `radiopyo.physics.beam` is split into `timer.py` (`Timer`, `MacroTimer`), `beam.py` (beams and the
+  `BEAM_TYPES` registry) and `beam_collection.py` (`BeamCollection`); `beam.py` re-exports the others.
+  `from_dict` of the beams does not modify the dictionary it is given. `PulsedBeam.update_beam_param(period=)`
+  and a bad unlabelled beam config no longer raise `KeyError`.
+- Packaging and logging: `mypy`, `pytest` and `pandas-stubs` moved to the `dev` extra, `tqdm` to the `tqdm`
+  extra, `radiopyo/data/IBA` left out of the wheel, `dist/`, `.coverage` and `tests/output/` untracked,
+  ruff settings under `[tool.ruff.lint]`, `__all__` fixed. Importing `radiopyo` configures its logger from
+  `utils/default_log_config.toml` only, without disabling the loggers of the application
+  (`disable_existing_loggers = false`); `[tool.logging]` is gone from `pyproject.toml`.
+- `ruff check radiopyo` and `mypy radiopyo` report no error.
+- README brought in line with the code (version badge, `from_toml`, `max_dose=` keyword in
+  `PulsedBeam.from_dose_rate_peak`, bundled files, acid/base keys, dependencies, GitHub URL).
+
+### Known issues (not fixed in this release)
+
+- The analytic Jacobian is not available: `use_jac=True` raises `NotImplementedError` (rewrite planned on top
+  of `reaction_rates` / `SimMatrices`). Enzymatic reactions ignore the negative-product flag.
+- `GValuesBoscolo._scale_factor` (dose-rate factor of `variable_GValues`) has no validated range and is
+  infinite at 0 Gy/s.
+- The H2O concentration polynomial (`radiopyo/chemistry/species.py`) rises with the temperature (55.93 M at
+  25 degC) whereas the density of water falls (about 55.35 M at 25 degC): to be checked against its source.
+- `Timer.time_till_next_OFF` returns NaN for continuous timers (infinite period).
+- `SimEnv.make_hash` always raises `TypeError` and hashes the `repr` of a `frozenset`
+  (depends on `PYTHONHASHSEED`).
+- `parse_dataset_name` strips characters (`.strip(".sim")`) instead of a suffix; `burst_dose_rates` is not
+  stored in HDF5 files; `ODEResult.reconstruct_reactions` uses the beam of the result even for a run made with
+  `use_beam=False`.
+- No golden output for a chunked run with a `MacroPulsedBeam`.
+
 ### Fixed
 
 - `[[reactions.arrhenius]]` could not be read from a config file (the reader asked for a `k_value`
@@ -76,8 +149,7 @@ All notable changes to this project. Versions follow [semantic versioning](https
     reverse), so global reaction indices change for configs with includes. Results do not change
     beyond floating-point summation order.
   `TOMLFileParser.parse` now starts from an empty-parameters config, so a default can never shadow an
-  included value. The `ODEResult` json round trip of an enzymatic reaction still doubles its `k_value`
-  (`MichaelisMenten.to_dict`), this is unrelated to includes and not changed here.
+  included value.
 - Beams (`radiopyo.physics`): one generic `ParticleBeam.make_matrix` walks the timer transitions up to
   `min(stop, time_at_max_dose)`; the four hand-written versions (constant, single pulse, pulsed, macro
   pulsed) are removed. `make_time_intervals` is shared and its second column is now always 0 (OFF) or 1
@@ -112,6 +184,13 @@ All notable changes to this project. Versions follow [semantic versioning](https
 ### Removed (breaking)
 
 - RON config format: `radiopyo.parser.ron`, its grammar and `UnitCell.from_ron`. Use TOML.
+- The stale `jacobian()` of the solver (its signature did not match `derive`, it was unused), `EPSILON`
+  and the 4-D `JRki` tensor. `UnitCell.run(use_jac=True)` (and the chunked runs) now raises
+  `NotImplementedError` until the Jacobian is rewritten.
+- `SimEnv.pKw`, `pKH2O`, `update_temperature` and `update_flag_positive` (use `set_temperature` and the
+  `force_positive` parameter); `ParticleBeam.delivery`,
+  `MacroTimer.within_train`, `micro_pulse_index`, `micro_pulses_left_in_train`, `GROWTH_FACTOR`
+  (unused).
 - `UnitCell.run_multi_doses` (was a non-functional stub raising `NotImplementedError`).
 - `radiopyo.utils.e_LET` and the `data/energy_LET` data.
 - `GValuesBoscolo._average_val_before_100ns`, `RawReader`, `umol_per_joule_to_ge`,
