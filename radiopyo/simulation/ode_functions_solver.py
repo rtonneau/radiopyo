@@ -14,6 +14,12 @@ be reused when differentiating the system:
 The time derivative of the species is then the sum, over the reaction
 families, of stoichiometry @ rates (see ``species_rates``).
 
+``jacobian`` is the analytic Jacobian of ``derive``: the same sum with the
+rates replaced by their derivatives with respect to the concentrations
+(mass_action_derivatives, michaelis_menten_derivatives). It is piecewise
+like ``derive`` (ADR 0003): a blocked reaction, or a row zeroed by
+``force_positive``, contributes 0.
+
 Units: the full molar state and all rates are in [mol/L] and [mol/L/s].
 Only ``derive`` deals with the [µmol/L] solver state, through
 ``SimMatrices.state`` (StateLayout).
@@ -48,7 +54,10 @@ __all__ = [
     "ScipyODEResult",
     "derive",
     "dose_rates",
+    "jacobian",
+    "mass_action_derivatives",
     "mass_action_rates",
+    "michaelis_menten_derivatives",
     "michaelis_menten_rates",
     "negative_product_block",
     "radiolytic_rates",
@@ -224,6 +233,115 @@ def zero_depleted_consumption(
     """Set to 0 the (negative) derivative of every species already below
     DEPLETION_LIMIT, so that it cannot go further below 0."""
     return np.where((y_full < DEPLETION_LIMIT) & (dydt < 0), 0.0, dydt)
+
+
+def mass_action_derivatives(
+    y_full: NDArray[np.float64],
+    kmat: KMatrices,
+) -> NDArray[np.float64]:
+    """Derivative of the mass action rate of every k-reaction with respect
+    to every species, ignoring negative products.
+
+    Product rule on the reactant slots: d/dy_s of k * prod(slots) is k times
+    the product of the other slots, summed over the slots holding s (a
+    repeated reactant, 2 A, fills two slots).
+
+    Args:
+        y_full: full molar state [mol/L], (n_species,).
+        kmat: KMatrices
+
+    Returns:
+        NDArray[np.float64]: (n_kr, n_species) d rate / d concentration
+        [1/s].
+    """
+    n_species = y_full.shape[0]
+    n_kr, n_slots = kmat.reactant_index.shape
+    y_ext = np.append(y_full, 1.0)  # unused slots point to the extra 1.0
+    factors = y_ext[kmat.reactant_index]  # (n_kr, n_slots)
+
+    rows = np.arange(n_kr)
+    out = np.zeros((n_kr, n_species + 1), dtype=np.float64)
+    for slot in range(n_slots):
+        others = np.prod(np.delete(factors, slot, axis=1), axis=1) * kmat.k_values
+        np.add.at(out, (rows, kmat.reactant_index[:, slot]), others)
+    return out[:, :n_species]  # drop the extra column of the unused slots
+
+
+def michaelis_menten_derivatives(
+    y_full: NDArray[np.float64],
+    ezmat: EzMatrices,
+) -> NDArray[np.float64]:
+    """Derivative of the Michaelis-Menten rate of every enzymatic reaction
+    with respect to every species, ignoring negative products.
+
+    Args:
+        y_full: full molar state [mol/L], (n_species,).
+        ezmat: EzMatrices
+
+    Returns:
+        NDArray[np.float64]: (n_ez, n_species) d rate / d concentration
+        [1/s].
+    """
+    enzyme = y_full[ezmat.enzyme_index]
+    substrate = y_full[ezmat.substrate_index]
+    denominator = ezmat.k_michaelis + substrate
+    d_enzyme = ezmat.k_values * substrate / denominator
+    d_substrate = ezmat.k_values * enzyme * ezmat.k_michaelis / denominator**2
+
+    rows = np.arange(ezmat.n_reactions)
+    out = np.zeros((ezmat.n_reactions, y_full.shape[0]), dtype=np.float64)
+    np.add.at(out, (rows, ezmat.enzyme_index), d_enzyme)
+    np.add.at(out, (rows, ezmat.substrate_index), d_substrate)
+    return out
+
+
+def jacobian(
+    t: float,
+    y: NDArray[np.float64],
+    beam: tp.Optional[ParticleBeam],
+    mat: SimMatrices,
+    force_positive: bool = False,
+) -> NDArray[np.float64]:
+    """Analytic Jacobian d(dy/dt)/dy of ``derive`` (the ``jac`` argument of
+    scipy.integrate.solve_ivp).
+
+    Pure function. Piecewise like ``derive`` (ADR 0003): it is the
+    derivative on the current side of every on/off switch, i.e. a k or
+    enzymatic reaction blocked by a depleted negative product contributes
+    0, and so does every row zeroed by ``force_positive``. Radiolytic
+    reactions (they do not depend on the concentrations) and constant
+    species (they are not solved) contribute nothing.
+
+    The units cancel: the concentrations and their derivative are both
+    scaled by 1e6, so the Jacobian is the same in [µmol/L] and [mol/L].
+
+    Args:
+        t: time [s]
+        y: (n_dyn,) concentrations of the dynamical species [µmol/L]
+        beam: ParticleBeam, or None for no irradiation.
+        mat: SimMatrices
+        force_positive: same meaning as in ``derive``.
+
+    Returns:
+        NDArray[np.float64]: (n_dyn, n_dyn) [1/s], entry (i, j) is
+        d (dy_i/dt) / d y_j.
+    """
+    y_full = mat.state.to_full_molar(y)
+    n_dyn = y_full.shape[0] - mat.state.n_cst
+    kmat, ezmat = mat.k_reactions, mat.enzymatic
+
+    d_k = mass_action_derivatives(y_full, kmat)
+    d_k[negative_product_block(y_full, kmat)] = 0.0
+    d_ez = michaelis_menten_derivatives(y_full, ezmat)
+    d_ez[negative_product_block(y_full, ezmat)] = 0.0
+
+    jac = kmat.stoichiometry[:n_dyn] @ d_k[:, :n_dyn]
+    jac += ezmat.stoichiometry[:n_dyn] @ d_ez[:, :n_dyn]
+
+    if force_positive:
+        dydt = species_rates(reaction_rates(t, y_full, mat, beam), mat)
+        jac[(y_full[:n_dyn] < DEPLETION_LIMIT) & (dydt[:n_dyn] < 0)] = 0.0
+    return jac
 
 
 def derive(
