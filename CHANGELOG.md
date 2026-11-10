@@ -6,6 +6,23 @@ All notable changes to this project. Versions follow [semantic versioning](https
 
 ### Fixed
 
+- `[[reactions.arrhenius]]` could not be read from a config file (the reader asked for a `k_value`
+  instead of `A` and `Ea`), and `Arrhenius.k_value` used `Ea` as a temperature
+  (`A * exp(-Ea / T)`). `Ea` is now the activation energy in kJ/mol:
+  `k = A * exp(-Ea * 1000 / (R * T))`, T in K from the simulation temperature (documented in the README).
+  Any former `Ea` (in K) must be multiplied by 8.314e-3.
+- Enzyme names with capitals (`-- SOD >>`, `-- GPx >>`) were parsed as chemical formulas (`BasicSpecies`
+  holding a dict). In the reaction grammar an enzyme is now only a name.
+- `ODEResult.__add__` modified and returned its left operand. It now returns a new `ODEResult` and leaves
+  both operands unchanged.
+- `MichaelisMenten.to_dict` wrote `k_value` times the substrate stoichiometry, while the reader takes the value
+  as is: results saved to HDF5 and read back had their catalase `k_value` doubled (1.324e8 -> 2.648e8), hence
+  2x enzymatic rates when rebuilt from the file. Files written before this fix keep their doubled value.
+- `ODEResult.species_balance_evolution` only summed the k-reactions: the radiolytic and enzymatic terms were
+  missing (e.g. H2O2 at 2.6 ms: +3.5e-9 mol/L/s reported, -1.15e-5 real) and `start`/`stop` were ignored. It
+  now applies the solver stoichiometry matrices to all the reaction rates and honours `start`/`stop`.
+- Enzymatic stoichiometry matrix: a species on both sides of the reaction (`Aa -- Ee >> Aa + Bb`) only got its
+  product stoichiometry (`=`); it now gets the net one (`+=`). Catalase and the bundled configs are unchanged.
 - Species indices (and the summation order in the solver) depended on `PYTHONHASHSEED`:
   `ListSpecies.sort` numbered the non-starter dynamic species by iterating a `set`. It now keeps the
   insertion order (order of appearance in the config file), so indices, matrices and the solver step

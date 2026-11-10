@@ -15,6 +15,7 @@ import uuid
 from abc import ABC, abstractmethod
 
 import numpy as np
+from scipy.constants import R as GAS_CONSTANT  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.basic_reaction import BasicReaction
@@ -233,7 +234,10 @@ class KReaction(BasicReaction):
 
 class Arrhenius(KReaction):
     """
-    Class representing an Arrhenius reaction.
+    Class representing an Arrhenius reaction:
+        k(T) = A * exp(-Ea / (R * T))
+    with T the simulation temperature in K and R the gas constant
+    (8.314 J/mol/K). Ea is given in kJ/mol (converted to J/mol here).
 
     Args:
         A: float
@@ -277,7 +281,10 @@ class Arrhenius(KReaction):
                 temperature.
         """
         T = Temperature(T)
-        return self._pre_exp * np.exp(-self._activation_energy / T.kelvin)
+        return float(
+            self._pre_exp
+            * np.exp(-self._activation_energy * 1e3 / (GAS_CONSTANT * T.kelvin))
+        )
 
     def raw_k_value(self) -> tp.List[float]:
         """

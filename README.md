@@ -224,6 +224,30 @@ Blanks/spaces for separation are allowed but not mandatory.
 
 ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 
+### \[\[reactions.arrhenius\]\]
+
+Same as "k_reaction" for the reaction string, but the rate constant depends on the
+temperature of the simulation (`temperature` in `[parameters]`, in degC). Each list entry
+must define 3 fields: "reaction", "A" and "Ea". The constant is
+
+$k(T) = A \exp\left(-\frac{E_a}{R\,T}\right)$
+
+with `A` the pre-exponential factor (same unit as a "k_value", e.g. L/mol/s for a
+bimolecular reaction), `Ea` the activation energy in **kJ/mol**, $R$ = 8.314 J/mol/K and
+$T$ the temperature in K. For example (k = 3.13e6 L/mol/s at 25 degC):
+
+```toml
+[[reactions.arrhenius]]
+reaction = "H_r + OH_r -> H2O"
+A = 1e10    # [L/mol/s]
+Ea = 20     # [kJ/mol]
+```
+
+Before this was documented, `Ea` was read as $E_a/R$ in K, i.e. $k = A \exp(-E_a/T)$:
+multiply an old value by 8.314e-3 to get kJ/mol.
+
+ps: note the double "\[\[" and "\]\]", mandatory for each entry!
+
 ### \[\[reactions.enzymatic\]\]
 
 Contains all the Enzymatic reactions involved in the model. The
@@ -240,7 +264,8 @@ k_micha = 1.1 #  [mol/l]
 ```
 
 The same grammar as for "k_reactions" applies. For enzymatic reactions, the enzyme name
-must be specified in the operator arrow (-- 'enzyme name' >>).
+must be specified in the operator arrow (-- 'enzyme name' >>). It is a plain name, in any
+case (`catalase`, `SOD`, `GPx`), never read as a chemical formula.
 
 ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 

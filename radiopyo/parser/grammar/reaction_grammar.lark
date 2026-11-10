@@ -13,7 +13,8 @@ products: species? (signed_species)*
 // Species definitions
 signed_species: SIGN species
 species: multiple? (atom | molecule | radical | ion) | element
-enzyme: multiple? (atom | molecule) | element
+// An enzyme is only a name ('SOD', 'GPx', 'catalase'): never a chemical formula.
+enzyme: element
 element: /\w+/ // Some species like 'catalase' doesn't have a formula
 
 //Charged species

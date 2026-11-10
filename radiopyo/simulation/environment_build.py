@@ -677,16 +677,15 @@ class SimEnv:
             enzyme_index[col] = enzymatic.enzyme.index
             k_michaelis[col] = enzymatic.k_micha
             k_values[col] = enzymatic.k_value
-            # NOTE: '=' (not '+=' / '-='), kept as is to not change any
-            # result: a species on both sides of the reaction only gets its
-            # product stoichiometry, and negative products ('ope') are not
-            # handled. Unlike the k-reactions.
+            # Net stoichiometry: a species on both sides of the reaction
+            # gets product - reactant. NOTE: negative products ('ope') are
+            # not handled here (unlike the k-reactions), deferred.
             for r_sp in enzymatic.reactants:
                 if not self.species.is_cst_species(r_sp.species):
-                    stoichiometry[r_sp.species.index, col] = -r_sp.stoi
+                    stoichiometry[r_sp.species.index, col] -= r_sp.stoi
             for r_sp in enzymatic.products:
                 if not self.species.is_cst_species(r_sp.species):
-                    stoichiometry[r_sp.species.index, col] = r_sp.stoi
+                    stoichiometry[r_sp.species.index, col] += r_sp.stoi
 
         return EzMatrices(
             k_values=k_values,
@@ -1027,7 +1026,7 @@ def _from_generic_builder(
 _REACTION_BUILDERS: tp.Dict[str, tp.Callable[[tp.Dict, ListSpecies], tp.Any]] = {
     "acid_base": _build_acid_base,
     "equilibrium": _build_equilibrium,
-    "arrhenius": _from_generic_builder(Arrhenius),
+    "arrhenius": _from_generic_builder(Arrhenius, ("A", "Ea")),
     "k_reaction": _from_generic_builder(KReaction),
     "constant": _from_generic_builder(CstReaction),
     "enzymatic": _from_generic_builder(MichaelisMenten, ("k_value", "k_micha")),

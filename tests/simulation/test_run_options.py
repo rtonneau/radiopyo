@@ -677,3 +677,87 @@ def test_chunked_run_without_beam_use_has_no_burst(pulsed_cell: UnitCell) -> Non
     assert res.burst_dose_rates == []
     assert res.t[0] == 0.0
     np.testing.assert_array_equal(res.y[:, 0], pulsed_cell.env.initial_values())
+
+
+# ------------------------------ ODEResult + -------------------------------- #
+def test_ode_result_add_returns_a_new_object_and_keeps_the_operands(
+    labarbe_cell: UnitCell,
+) -> None:
+    first = labarbe_cell.run(t_span=(0.0, 1e-3))
+    second = labarbe_cell.run(t_span=(1e-3, 2e-3))
+    first_before, second_before = copy.deepcopy(first), copy.deepcopy(second)
+
+    total = first + second
+
+    assert isinstance(total, ODEResult)
+    assert total is not first and total is not second
+    assert len(total) == len(first_before) + len(second_before)
+    np.testing.assert_array_equal(total.t, np.append(first_before.t, second_before.t))
+    np.testing.assert_array_equal(total.y, np.hstack([first_before.y, second_before.y]))
+    for operand, before in ((first, first_before), (second, second_before)):
+        np.testing.assert_array_equal(operand.t, before.t)
+        np.testing.assert_array_equal(operand.y, before.y)
+        for name in ("nfev", "njev", "nlu", "status", "message", "success"):
+            assert getattr(operand, name) == getattr(before, name), name
+        assert operand.n_points == before.n_points
+        assert operand.exec_time == before.exec_time
+        assert operand.sol == before.sol
+        assert operand.burst_dose_rates == before.burst_dose_rates
+    # the lists of the result are not shared with the operands
+    total.nfev.append(0)
+    assert len(first.nfev) == len(first_before.nfev)
+
+
+def test_ode_result_add_rejects_other_types_and_overlapping_times(
+    labarbe_cell: UnitCell,
+) -> None:
+    res = labarbe_cell.run(t_span=(0.0, 1e-3))
+    with pytest.raises(TypeError):
+        res + 1  # type: ignore[operator]
+    with pytest.raises(TypeError):
+        res + res
+
+
+# ------------------------- species_balance_evolution ----------------------- #
+def test_species_balance_matches_the_slope_of_the_solution(
+    labarbe_cell: UnitCell,
+) -> None:
+    """H2O2 is made by radiolysis and eaten by catalase: all terms are needed."""
+    res = labarbe_cell.run(t_span=(0.0, 10.0))
+    balance = res.species_balance_evolution()["H2O2"]
+    slope = np.gradient(res["H2O2"].to_numpy() * 1e-6, res.t)  # mol/L/s
+    sel = res.t > 1e-3
+    np.testing.assert_allclose(
+        balance.to_numpy()[sel],
+        slope[sel],
+        rtol=5e-2,
+        atol=1e-3 * np.abs(slope[sel]).max(),
+    )
+    # The catalase term alone is far from negligible at late times
+    assert abs(balance.iloc[-5:]).max() > 0
+
+
+def test_species_balance_has_radiolytic_and_enzymatic_terms(
+    labarbe_cell: UnitCell,
+) -> None:
+    res = labarbe_cell.run(t_span=(0.0, 10.0))
+    rr = res.reconstruct_reactions()
+    ez = res.env.reactions.enzymatic[0]
+    label = ez.as_label()
+    balance = res.species_balance_evolution()
+    # catalase: 2 H2O2 -> O2 + 2 H2O; rate columns are per reaction, in the
+    # stoichiometry of the reaction (see reaction_rates)
+    k_only = balance["H2O2"] - (-2.0 * rr[label])
+    assert not np.allclose(balance["H2O2"], k_only)
+    assert (balance["H2O2"] - k_only).abs().max() == pytest.approx(
+        (2.0 * rr[label]).abs().max()
+    )
+
+
+def test_species_balance_honours_start_and_stop(labarbe_cell: UnitCell) -> None:
+    res = labarbe_cell.run(t_span=(0.0, 10.0))
+    full = res.species_balance_evolution()
+    part = res.species_balance_evolution(start=1e-3, stop=1.0)
+    assert 0 < len(part) < len(full)
+    assert part.index.min() >= 1e-3 and part.index.max() <= 1.0
+    np.testing.assert_array_equal(part.to_numpy(), full.loc[part.index].to_numpy())

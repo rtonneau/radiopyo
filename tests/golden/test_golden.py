@@ -480,10 +480,11 @@ def compute_hdf(path: Path) -> tp.Dict[str, np.ndarray]:
     expectation arrays:
     * '<prefix>__species'/'__rate': the original in-memory results;
     * '<prefix>__rebuilt_rate': rates recomputed on the result read back.
-      They are NOT equal to the original rates for the enzymatic (catalase)
-      reaction: the json round trip doubles its k_value
-      (1.324e8 -> 2.648e8), a pre-existing quirk that is pinned here
-      on purpose (an unplanned change of this number must be noticed).
+      The committed json store was written by the old code, which doubled
+      the k_value of the enzymatic (catalase) reaction (1.324e8 -> 2.648e8):
+      reading it back still gives these doubled rates (pinned on purpose).
+      Since MichaelisMenten.to_dict was fixed, a freshly written store
+      round-trips the k_value and gives rates equal to the original ones.
     """
     path = Path(path)
     collection = SimCollection(path, GoldenSimID(), keys=list(HDF_KEYS), new=True)

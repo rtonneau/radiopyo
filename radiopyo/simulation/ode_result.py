@@ -161,7 +161,10 @@ class ODEResult(object):
         return pd.Series(data=self.y[sp.index, :], index=self.t, name=sp.label)
 
     def __add__(self, other: tp.Any) -> ODEResult:
-        """ """
+        """
+        Concatenate two results in time. Returns a new ODEResult, both
+        operands are left unchanged.
+        """
         # Sanity checks
         if not isinstance(other, ODEResult):
             raise TypeError(f"Cannot add type: {type(other)}, to ODEResult")
@@ -175,29 +178,29 @@ class ODEResult(object):
                 "Trying to add ODEResults with different number of tracked species"
             )
 
-        # Combine all together
-        self.t = np.append(self.t, other.t)
-        self.y = np.hstack([self.y, other.y])
-        if other.sol is not None:
-            self.sol = self.sol + other.sol
-        if other.t_events is not None:
-            self.t_events += other.t_events
-        if other.y_events is not None:
-            self.y_events += other.y_events
-        self.nfev += other.nfev
-        self.njev += other.njev
-        self.nlu += other.nlu
-        self.status += other.status
-        self.message += other.message
-        self.success += other.success
+        # Combine all together in a NEW object: neither operand is modified.
+        # The (read-only) env, beam and matrices are shared with 'self'.
+        out = copy.copy(self)
+        out.t = np.append(self.t, other.t)
+        out.y = np.hstack([self.y, other.y])
+        out.dydt = self.dydt.copy()
+        out.sol = [*self.sol, *other.sol]
+        out.t_events = [*self.t_events, *other.t_events]
+        out.y_events = [*self.y_events, *other.y_events]
+        out.nfev = [*self.nfev, *other.nfev]
+        out.njev = [*self.njev, *other.njev]
+        out.nlu = [*self.nlu, *other.nlu]
+        out.status = [*self.status, *other.status]
+        out.message = [*self.message, *other.message]
+        out.success = [*self.success, *other.success]
         if self.burst_dose_rates is not None or other.burst_dose_rates is not None:
-            self.burst_dose_rates = [
+            out.burst_dose_rates = [
                 *(self.burst_dose_rates or []),
                 *(other.burst_dose_rates or []),
             ]
-        self.n_points += other.n_points
-        self.exec_time += other.exec_time
-        return self
+        out.n_points = [*self.n_points, *other.n_points]
+        out.exec_time = [*self.exec_time, *other.exec_time]
+        return out
 
     @property
     def time(self) -> NDArray[np.float64]:
@@ -605,25 +608,38 @@ class ODEResult(object):
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
-        """ """
+        """
+        Net rate of change [mol/L/s] of every dynamic species due to all
+        the reactions: k-reactions (including acid/base and equilibria),
+        radiolytic and enzymatic ones. It is the stoichiometry matrices
+        of the solver applied to the reaction rates.
+
+        Args:
+            start, stop: time boundaries [s] (or a slice) of the rows
+                to return, all the times by default.
+
+        Returns:
+            DataFrame indexed by time, one column per dynamic species.
+        """
         _slice = make_slice_from_time_boundaries(start, stop)
 
-        rr = self.reconstruct_reactions()  # if stored then no "heavy calculation"
-        out = pd.DataFrame(
-            index=self.t,
-            columns=[elt.label for elt in self.env.species.iter_dyn_species()],
+        # if stored then no "heavy calculation"
+        rr = self.reconstruct_reactions().loc[_slice, :]
+        n_k = self.mat.k_reactions.stoichiometry.shape[1]
+        n_g = self.mat.radiolytic.stoichiometry.shape[1]
+        rates = rr.to_numpy().T
+        balance = (
+            self.mat.k_reactions.stoichiometry @ rates[:n_k]
+            + self.mat.radiolytic.stoichiometry @ rates[n_k : n_k + n_g]
+            + self.mat.enzymatic.stoichiometry @ rates[n_k + n_g :]
+        )
+        species = list(self.env.species.iter_dyn_species())
+        return pd.DataFrame(
+            data=balance[[sp.index for sp in species], :].T,
+            index=rr.index,
+            columns=[sp.label for sp in species],
             dtype=np.float64,
         )
-        out.iloc[:, :] = 0
-
-        for species in self.env.species.iter_dyn_species():
-            for reaction, _ in self.env.reactions_involving_product(species):
-                stoi = reaction.products.stoichiometry_of(species)
-                out.loc[:, species.label] += rr[reaction.as_label()] * stoi
-            for reaction, _ in self.env.reactions_involving_reactant(species):
-                stoi = reaction.reactants.stoichiometry_of(species)
-                out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
-        return out
 
     def integrate_species(
         self,

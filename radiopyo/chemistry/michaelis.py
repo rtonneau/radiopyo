@@ -72,10 +72,12 @@ class MichaelisMenten(BasicReaction):
 
     def raw_k_value(self) -> float:
         """
-        Produce the k_value as provided by config files.
+        Produce the n x k value (k_value times the stoichiometry of the
+        single reactant). Not what 'from_generic' reads: use 'k_value'
+        to give a value back to a config (see 'to_dict').
 
         Returns:
-            float: k_value as provided by config files.
+            float: n x k value.
         """
         # Case of n*A -> B, then n*k is measured/given
         if len(self.reactants) == 1:
@@ -164,8 +166,13 @@ class MichaelisMenten(BasicReaction):
         )
 
     def to_dict(self) -> tp.Dict[str, tp.Any]:
+        """
+        Convert to the config dict structure. 'from_generic' keeps the
+        configured k_value as is (no n x k division), so 'k_value' is
+        written as is too: to_dict -> from_dict is a round trip.
+        """
         return {
             "reaction": self.__str__(),
-            "k_value": self.raw_k_value(),
+            "k_value": self.k_value,
             "k_micha": self.k_micha,
         }

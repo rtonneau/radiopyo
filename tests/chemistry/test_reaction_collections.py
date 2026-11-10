@@ -196,3 +196,14 @@ def test_radiolytic_label_attribute_and_call():
     assert str(r) == repr(r) == "RadiolyticReaction('e_aq')"
     assert r.as_label() == "G_e_aq"
     assert np.isclose(r.ge(), 2.6)
+
+
+def test_michaelis_to_dict_roundtrip_keeps_k_value(michaelis):
+    """2H2O2 -- catalase: to_dict used to write n*k (the k doubled when reloaded)."""
+    d = michaelis.to_dict()
+    assert d["k_value"] == pytest.approx(132400000.0)
+    gen = RPARSER.parse_reaction(d["reaction"])
+    gen["constants"] = {"k_value": d["k_value"], "k_micha": d["k_micha"]}
+    again = MichaelisMenten.from_generic(gen)
+    assert again.k_value == pytest.approx(michaelis.k_value)
+    assert again.to_dict() == d

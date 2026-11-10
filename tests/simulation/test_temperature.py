@@ -13,6 +13,7 @@ Author:
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 
 import pytest
 
@@ -148,3 +149,41 @@ def test_result_uses_simulation_temperature(cell: UnitCell) -> None:
     # The result keeps its own snapshot of the temperature
     cell.set_temperature(25.0)
     assert res["H2O"].iloc[0] == pytest.approx(expected)
+
+
+def test_arrhenius_reaction_from_a_toml_file_follows_the_temperature(
+    tmp_path: Path,
+) -> None:
+    """[[reactions.arrhenius]] A [L/mol/s], Ea [kJ/mol]: k = A exp(-Ea / (R T))."""
+    config = tmp_path / "arrhenius.toml"
+    config.write_text(
+        '[includes]\ntoml = ["radiopyo/advanced_water_radiolysis.toml"]\n'
+        '[[reactions.arrhenius]]\nreaction = "Zz + Yy -> Xx"\nA = 1e10\nEa = 20\n'
+    )
+    reactions = UnitCell.from_toml(config).env.reactions.k_reaction
+    k = {
+        temp: next(
+            k_value
+            for _, reaction, k_value in reactions.iter_reactions_and_kvalues(temp)
+            if str(reaction) == "Zz + Yy -> Xx"
+        )
+        for temp in (25.0, T_HOT)
+    }
+    assert k[25.0] == pytest.approx(3.134379609536337e6, rel=1e-9)
+    assert k[T_HOT] == pytest.approx(4.282711680029348e6, rel=1e-9)
+
+
+def test_enzymatic_species_on_both_sides_gets_its_net_stoichiometry(
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "enzyme.toml"
+    config.write_text(
+        '[includes]\ntoml = ["radiopyo/advanced_water_radiolysis.toml"]\n'
+        '[[reactions.enzymatic]]\nreaction = "Aa -- Ee >> Aa + Bb"\n'
+        "k_value = 1e3\nk_micha = 1.0\n"
+    )
+    env = UnitCell.from_toml(config).env
+    stoichiometry = env.build_all_matrices().enzymatic.stoichiometry
+    assert stoichiometry[env.species["Aa"].index, 0] == 0.0
+    assert stoichiometry[env.species["Bb"].index, 0] == 1.0
+    assert stoichiometry[env.species["Ee"].index, 0] == 0.0
