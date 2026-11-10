@@ -635,7 +635,7 @@ def test_derive_matches_golden() -> None:
         assert actual[config]["g_values"] == pytest.approx(
             golden[config]["g_values"], rel=RTOL_ALGEBRA
         ), f"{config}: radiolytic yields changed"
-        assert set(actual[config]["dydt"]) <= set(golden[config]["dydt"])
+        assert set(actual[config]["dydt"]) == set(golden[config]["dydt"])
         for case, vec in actual[config]["dydt"].items():
             _assert_vector_close(
                 vec, golden[config]["dydt"][case], f"derive {config}/{case}"
