@@ -160,6 +160,30 @@
         "ticket": "04-catalase-k",
         "commit": "8c8eb90"
       }
+    },
+    {
+      "at": "2026-11-10T18:28:27.019Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/05-poly-k-warning.md",
+        "03-implement/05-poly-k-warning/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-poly-k-warning"
+      }
+    },
+    {
+      "at": "2026-11-10T18:33:48.120Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/05-poly-k-warning/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-poly-k-warning",
+        "commit": "8c094c7"
+      }
     }
   ],
   "current_phase": "ship",
