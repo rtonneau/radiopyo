@@ -88,6 +88,30 @@
         "ticket": "01-remove-force-positive",
         "commit": "3375410"
       }
+    },
+    {
+      "at": "2026-11-10T17:55:54.766Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-clipped-concentrations.md",
+        "03-implement/02-clipped-concentrations/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-clipped-concentrations"
+      }
+    },
+    {
+      "at": "2026-11-10T18:03:37.426Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-clipped-concentrations/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-clipped-concentrations",
+        "commit": "ba8d133"
+      }
     }
   ],
   "current_phase": "ship",
