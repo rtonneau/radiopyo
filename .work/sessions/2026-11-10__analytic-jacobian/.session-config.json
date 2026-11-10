@@ -135,6 +135,30 @@
         "ticket": "03-wire-use-jac",
         "commit": "d37c2f8"
       }
+    },
+    {
+      "at": "2026-11-10T11:22:12.197Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-benchmark-and-default.md",
+        "03-implement/04-benchmark-and-default/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-and-default"
+      }
+    },
+    {
+      "at": "2026-11-10T12:08:58.302Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/04-benchmark-and-default/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-and-default",
+        "commit": "cb75447"
+      }
     }
   ],
   "current_phase": "ship",
