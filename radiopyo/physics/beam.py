@@ -14,13 +14,20 @@ from __future__ import annotations
 import logging
 import typing as tp
 from dataclasses import dataclass, field
-from math import isinf
+from math import floor, isclose, isinf
 
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
 from .exceptions import ParameterError
-from .timer import BaseTimer, MacroTimer, Timer, TimerState
+from .timer import (
+    COUNT_RTOL,
+    BaseTimer,
+    MacroTimer,
+    Timer,
+    TimerState,
+    split_periods,
+)
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -204,13 +211,18 @@ class ParticleBeam:
         )
 
     def _compute_average_dose_rate(self) -> float:
-        """ """
+        """
+        Average dose rate: delivered dose over the time elapsed between
+        the beam start and `time_at_max_dose`. Without a max dose (never
+        reached) it is the peak dose rate times the timer duty cycle.
+        """
         if isinf(self.timer.period):
             return self.dose_rate_peak
+        duration = self.time_at_max_dose - self.timer.start_time
+        if isinf(duration) or duration <= 0:
+            return self.dose_rate_peak * self.timer.duty_cycle()
         return self.dose_rate_peak * (
-            self.tot_pulses()
-            * self.timer.on_time
-            / (self.time_at_max_dose - self.timer.start_time)
+            self.tot_pulses() * self.timer.on_time / duration
         )
 
     def dose_per_pulse(self) -> float:
@@ -251,18 +263,57 @@ class ParticleBeam:
 
     def tot_pulses(self) -> float:
         """
-        Computes the total number of pulses.
+        Computes the total number of pulses delivered between the beam
+        start and `time_at_max_dose` (the last one may be partial).
 
         Returns:
             float
-                Number of pulses
+                Number of pulses (inf if the max dose is never reached)
         """
         if isinf(self.timer.period):
             return 1.0
-        fp = self.time_at_max_dose // self.timer.period
-        return fp + (
-            (self.time_at_max_dose - fp * self.timer.period) / self.timer.on_time
-        )
+        duration = self.time_at_max_dose - self.timer.start_time
+        if isinf(duration):
+            return float("inf")
+        if duration <= 0:
+            return 0.0
+        n, remainder = split_periods(duration, self.timer.period)
+        return n + min(remainder / self.timer.on_time, 1.0)
+
+    def _first_on_timer(self) -> BaseTimer:
+        """Timer whose start time is the earliest possible beam ON."""
+        return self.timer
+
+    def _transitions(self, start: float) -> tp.Iterator[tp.Tuple[float, bool]]:
+        """
+        Beam state transitions from `start`, as (time, is_on) pairs. The
+        first one is the state at `start`; the following ones alternate
+        ON/OFF with increasing time (times accumulate period by period).
+        A timer that never switches OFF yields (inf, False) last.
+        """
+        timer = self.timer
+        if isinf(timer.period):  # continuous / single pulse
+            if start < timer.start_time:
+                yield start, False
+                yield timer.start_time, True
+            else:
+                yield start, True
+            yield float("inf"), False
+            return
+        if start < timer.start_time:
+            yield start, False
+            t_on = timer.start_time
+        elif timer.state_at(start) is TimerState.isOn:
+            yield start, True
+            yield start + timer.time_till_next_OFF(start), False
+            t_on = start + timer.time_till_next_period(start)
+        else:
+            yield start, False
+            t_on = start + timer.time_till_next_period(start)
+        while True:
+            yield t_on, True
+            yield t_on + timer.on_time, False
+            t_on = t_on + timer.period
 
     def make_matrix(self, stop: float, start: float = 0.0) -> NDArray[np.float64]:
         """
@@ -292,8 +343,9 @@ class ParticleBeam:
 
         This matrix definition of the beam structure is useful to
         predefine integration steps width (i.e. used by the
-        "make_time_intervals" method). No default implementation
-        provided.
+        "make_time_intervals" method). The matrix is built by walking
+        the timer transitions up to min(stop, time_at_max_dose); the
+        last row is always [stop, 0.0].
 
         Args:
             stop: float
@@ -305,7 +357,28 @@ class ParticleBeam:
         Returns:
             NDArray[np.float64]: 2 cols matrix
         """
-        raise NotImplementedError
+        # Always OFF cases:
+        if start > self.time_at_max_dose or stop < self._first_on_timer().start_time:
+            return np.array([[start, 0.0], [stop, 0.0]], dtype=np.float64)
+
+        end = min(stop, self.time_at_max_dose)
+        walk = self._transitions(start)
+        start_time, start_on = next(walk)
+        rows = [[start_time, self.dose_rate_peak if start_on else 0.0]]
+        for time, is_on in walk:
+            if time < end:
+                rows.append([time, self.dose_rate_peak if is_on else 0.0])
+            elif not is_on:
+                # The beam is ON at `end` (max dose reached or stop): cut.
+                rows.append([end, 0.0])
+                break
+            else:
+                break
+        if rows[-1][0] < stop:
+            rows.append([stop, 0.0])
+        else:
+            rows[-1][1] = 0.0
+        return np.array(rows, dtype=np.float64)
 
     def make_time_intervals(
         self,
@@ -330,47 +403,16 @@ class ParticleBeam:
         # Retrieve Time Structure Matrix
         out = self.make_matrix(stop, start)
 
-        # If 3 lines ==> line 0 is for ON, line 1 is for OFF, line 2
-        # is for END TIME
-        # # ==> Only need to grow time interval def by line 1 - line 0
-        if out.shape[0] == 3:
-            out[0, 1] = 1.0
+        # Shift every OFF row that is neither the first nor the last one
+        # (pulse ends) by GROWTH_TIME, unless the next row is closer:
+        # the beam ON time is expanded to refine the integration step
+        # at OFF transitions.
+        beam_on = out[:, 1] > 0.0
+        for idx in range(1, out.shape[0] - 1):
+            if not beam_on[idx] and (out[idx + 1, 0] - out[idx, 0]) > self.GROWTH_TIME:
+                out[idx, 0] += self.GROWTH_TIME
 
-            if (out[2, 0] - out[1, 0]) > self.GROWTH_TIME:
-                out[1, 0] = out[1, 0] + self.GROWTH_TIME
-
-            if out[1, 0] >= out[2, 0]:
-                out = out[0:2, :]
-            return out
-
-        # if 2 lines ==> line 0 is for ON, line 1 is for OFF AND End time.
-        # ==> only ON, no need to expand anything.
-        if out.shape[0] == 2:
-            return out
-
-        # From now on, at least 2 ON times.
-        # Check whether it is no bigger than on period.
-        GT = self.GROWTH_TIME
-        if (self.timer.period - self.timer.on_time) <= GT:
-            GT = 0.0
-
-        # 1) Shift the pulse end to "pulse end"  + (delta/2)
-        # -------------------------------------------------------
-        # select indices of the lines to modify (where dr > 0.0)
-        # indexes must be a tuple of len 2 as matrix of 2 cols.
-        # Want to modify time -> col 0
-        indexes = np.where(out[:, 1] == 0.0)[0], [0]
-        # IF first item is index 0, remove it, it is the start point.
-        if indexes[0][0] == 0:
-            indexes = (indexes[0][1:], indexes[1])
-        # If last item is corresponding to end time, do not modify it.
-        if indexes[0][-1] == out.shape[0] - 1:
-            indexes = (indexes[0][0:-1], indexes[1])
-
-        out[indexes] = out[indexes] + GT
-
-        # Set all Dose rate values (-> col 1) > 0 to 1
-        out[:, 1] /= self.dose_rate_peak
+        out[:, 1] = beam_on
         return out
 
     def as_dict(self) -> tp.Dict:
@@ -423,46 +465,6 @@ class ConstantBeam(ParticleBeam):
 
     def beam_type(self) -> str:
         return "Constant"
-
-    def make_matrix(
-        self,
-        stop: float,
-        start: float = 0.0,
-    ) -> NDArray[np.float64]:
-        out = np.empty([0, 2])
-
-        # Always OFF cases:
-        if stop < self.timer.start_time or start > self.time_at_max_dose:
-            return np.array([[start, 0.0], [stop, 0.0]])
-
-        # Always ON cases:
-        if start >= self.timer.start_time and stop < self.time_at_max_dose:
-            dr = self.dose_rate_peak
-            return np.array([[start, dr], [stop, dr]])
-
-        # 2 possibilities for start:
-        if start >= self.timer.start_time:
-            out = np.vstack([out, [start, self.dose_rate_peak]])
-        else:
-            out = np.vstack(
-                [
-                    out,
-                    [start, 0.0],
-                    [self.timer.start_time, self.dose_rate_peak],
-                ]
-            )
-
-        # 2 possibilities for stop:
-        if stop < self.time_at_max_dose:
-            return np.vstack([out, [stop, self.dose_rate_peak]])
-
-        return np.vstack(
-            [
-                out,
-                [self.time_at_max_dose, 0.0],
-                [stop, 0.0],
-            ]
-        )
 
     def as_dict(self) -> tp.Dict[str, float]:
         """ """
@@ -614,9 +616,12 @@ class PulsedBeam(ParticleBeam):
             max_dose if max_dose is not None else float("inf"),
         )
 
-    # @override waiting for this baby to show up (Python3.12 fall 2023!)
-    # => https://peps.python.org/pep-0698/
-    def update_beam_param(self, **kwargs: float) -> None:
+    def _update_timers(self, kwargs: tp.Dict[str, float]) -> None:
+        """
+        Rebuild the timer(s) from the timing keywords found in `kwargs`
+        (they are removed from it): start_time, on_time, period or
+        frequency.
+        """
         if (
             "start_time" in kwargs
             or "on_time" in kwargs
@@ -631,6 +636,11 @@ class PulsedBeam(ParticleBeam):
                 period = kwargs.pop("period", self.timer.period)
             self.timer = Timer.new_pulsed(period, on_time, start_time)
 
+    # @override waiting for this baby to show up (Python3.12 fall 2023!)
+    # => https://peps.python.org/pep-0698/
+    def update_beam_param(self, **kwargs: float) -> None:
+        self._update_timers(kwargs)
+
         if "dose_per_pulse" in kwargs or "n_pulse" in kwargs:
             dpp = kwargs.pop("dose_per_pulse", self.dose_per_pulse())
             n_pulse = kwargs.pop("n_pulse", self.tot_pulses())
@@ -641,72 +651,6 @@ class PulsedBeam(ParticleBeam):
 
     def beam_type(self) -> str:
         return "pulsed"
-
-    def make_matrix(
-        self,
-        stop: float,
-        start: float = 0.0,
-    ) -> NDArray[np.float64]:
-        if start > self.time_at_max_dose or stop < self.timer.start_time:
-            return np.array([[start, 0.0], [stop, 0.0]], dtype=np.float64)
-
-        out = np.empty([0, 2])
-        if start < self.timer.start_time:
-            out = np.vstack(
-                [
-                    out,
-                    [
-                        start,
-                        0.0,
-                    ],
-                    [self.timer.start_time, self.dose_rate_peak],
-                ]
-            )
-        else:
-            if self.timer.state_at(start) is TimerState.isOn:
-                out = np.vstack(
-                    [
-                        out,
-                        [start, self.dose_rate_peak],
-                        [start + self.timer.time_till_next_OFF(start), 0.0],
-                        [
-                            start + self.timer.time_till_next_period(start),
-                            self.dose_rate_peak,
-                        ],
-                    ]
-                )
-            else:
-                out = np.vstack(
-                    [
-                        out,
-                        [start, 0.0],
-                        [
-                            start + self.timer.time_till_next_period(start),
-                            self.dose_rate_peak,
-                        ],
-                    ]
-                )
-
-        end = min(stop, self.time_at_max_dose)
-        while out[-1, 0] < end:
-            out = np.vstack(
-                [
-                    out,
-                    [out[-1, 0] + self.timer.on_time, 0.0],
-                    [out[-1, 0] + self.timer.period, self.dose_rate_peak],
-                ]
-            )
-
-        if out[-1, 0] > end:
-            out = out[:-1, :]
-            if out[-1, 0] > end:
-                out[-1, 0] = end
-
-        if out[-1, 0] < stop:
-            out = np.vstack([out, [stop, 0.0]])
-        else:
-            out[-1, 1] = 0
-        return out
 
     def as_dict(self) -> tp.Dict[str, float]:
         """ """
@@ -753,7 +697,7 @@ class PulsedBeam(ParticleBeam):
         if (
             not isinf(max_dose)
             and not isinf(max_dose_n_pulse)
-            and max_dose_n_pulse != max_dose
+            and not isclose(max_dose_n_pulse, max_dose, rel_tol=1e-9)
         ):
             raise ValueError(
                 "Inconsistent max dose provided by both max dose and number of pulses"
@@ -861,6 +805,14 @@ class PulsedBeam(ParticleBeam):
 
 
 class MacroPulsedBeam(PulsedBeam):
+    """
+    Class representing a Macro/Micro pulsed Radiation Source: trains
+    (macro pulses) of micro pulses. `timer` is the micro timer (its start
+    time, `micro_start_time`, is relative to the start of a train) and
+    `macro_timer` the train timer (`start_time`, `period`, `on_time`);
+    the micro timer is also the `subtimer` of `macro_timer`. Both are
+    always kept in sync.
+    """
 
     macro_timer: MacroTimer
 
@@ -876,7 +828,7 @@ class MacroPulsedBeam(PulsedBeam):
         start_time: tp.Optional[float] = None,
     ):
         self.macro_timer = MacroTimer.new_macropulse(
-            period, on_time, micro_period, micro_on_time, start_time
+            period, on_time, micro_period, micro_on_time, start_time, micro_start_time
         )
 
         super().__init__(
@@ -886,9 +838,50 @@ class MacroPulsedBeam(PulsedBeam):
             max_dose if max_dose is not None else float("inf"),
             micro_start_time,
         )
+        # One micro timer object, shared with the macro timer.
+        self.timer = self.macro_timer.subtimer
 
     def beam_type(self) -> str:
         return "macro_pulsed"
+
+    def _update_timers(self, kwargs: tp.Dict[str, float]) -> None:
+        """
+        Rebuild both timers from the timing keywords found in `kwargs`
+        (they are removed from it). Same names as `as_dict`: period (or
+        frequency), on_time and start_time are the macro ones;
+        micro_period (or micro_frequency), micro_on_time and
+        micro_start_time the micro ones.
+        """
+        names = (
+            "start_time",
+            "on_time",
+            "period",
+            "frequency",
+            "micro_start_time",
+            "micro_on_time",
+            "micro_period",
+            "micro_frequency",
+        )
+        if not any(name in kwargs for name in names):
+            return
+        macro, micro = self.macro_timer, self.timer
+        if (freq := kwargs.pop("frequency", None)) is not None:
+            period = 1.0 / freq
+        else:
+            period = kwargs.pop("period", macro.period)
+        if (micro_freq := kwargs.pop("micro_frequency", None)) is not None:
+            micro_period = 1.0 / micro_freq
+        else:
+            micro_period = kwargs.pop("micro_period", micro.period)
+        self.macro_timer = MacroTimer.new_macropulse(
+            period,
+            kwargs.pop("on_time", macro.on_time),
+            micro_period,
+            kwargs.pop("micro_on_time", micro.on_time),
+            kwargs.pop("start_time", macro.start_time),
+            kwargs.pop("micro_start_time", micro.start_time),
+        )
+        self.timer = self.macro_timer.subtimer
 
     def tot_trains(self) -> float:
         """ """
@@ -904,6 +897,20 @@ class MacroPulsedBeam(PulsedBeam):
 
     def dose_per_train(self) -> float:
         return self.dose_per_pulse() * self.macro_timer.micro_pulses_per_train()
+
+    def _compute_average_dose_rate(self) -> float:
+        """
+        Average dose rate: delivered dose over the time elapsed between
+        the start of the first train and `time_at_max_dose`. Without a
+        max dose (never reached) it is the peak dose rate times the
+        macro timer duty cycle.
+        """
+        duration = self.time_at_max_dose - self.macro_timer.start_time
+        if isinf(duration) or duration <= 0:
+            return self.dose_rate_peak * self.macro_timer.duty_cycle()
+        return self.dose_rate_peak * (
+            self.tot_pulses() * self.timer.on_time / duration
+        )
 
     def _compute_time_at_max_dose(self, max_dose: tp.Optional[float] = None) -> float:
         """
@@ -922,22 +929,24 @@ class MacroPulsedBeam(PulsedBeam):
         if max_dose >= float("inf") or self.dose_rate_peak <= 0:
             return float("inf")
 
-        # How many full pulse trains needed?
-        n = max_dose // self.dose_per_train()
-
-        if max_dose % self.dose_per_train() == 0:
+        # How many full pulse trains needed? (tolerance: 3 trains of
+        # 1/3 Gy are exactly 1 Gy only up to rounding)
+        dose_per_train = self.dose_per_train()
+        n = floor(max_dose / dose_per_train + COUNT_RTOL)
+        remaining = max_dose - n * dose_per_train
+        if remaining <= COUNT_RTOL * dose_per_train:
+            # Whole trains: the max dose is reached at the end of the
+            # last micro pulse of the last train.
             return (
                 self.macro_timer.start_time
                 + (n - 1) * self.macro_timer.period
-                + self.macro_timer.on_time
+                + super()._compute_time_at_max_dose(max_dose=dose_per_train)
             )
 
         return (
             self.macro_timer.start_time
             + n * self.macro_timer.period
-            + super()._compute_time_at_max_dose(
-                max_dose=max_dose - n * self.dose_per_train()
-            )
+            + super()._compute_time_at_max_dose(max_dose=remaining)
         )
 
     def at(self, time: float) -> TimeMessage:
@@ -952,7 +961,7 @@ class MacroPulsedBeam(PulsedBeam):
             TimeMessage
         """
         dr = 0.0
-        if self.timer.start_time <= time < self.time_at_max_dose:
+        if time < self.time_at_max_dose:
             match self.macro_timer.state_at(time):
                 case TimerState.isOff:
                     dr = 0.0
@@ -976,80 +985,37 @@ class MacroPulsedBeam(PulsedBeam):
             "start_time": self.macro_timer.start_time,
         }
 
-    def make_matrix(
-        self,
-        stop: float,
-        start: float = 0.0,
-    ) -> NDArray[np.float64]:
-        if start > self.time_at_max_dose or stop < self.timer.start_time:
-            return np.array([[start, 0.0], [stop, 0.0]], dtype=np.float64)
+    def _first_on_timer(self) -> BaseTimer:
+        return self.macro_timer
 
-        out = np.empty([0, 2])
-        trains_left = self.tot_trains()
-        cur_time = 0.0
-
-        # If start is before start_time
-        if start < self.macro_timer.start_time:
-            out = np.vstack(
-                [
-                    out,
-                    [
-                        start,
-                        0.0,
-                    ],
-                    [
-                        self.macro_timer.start_time + self.timer.start_time,
-                        self.dose_rate_peak,
-                    ],
-                ]
-            )
-            cur_time = out[-1, 0]
-        else:
-            out = np.vstack(
-                [
-                    out,
-                    super().make_matrix(
-                        start=start,
-                        stop=start + self.macro_timer.time_till_end_micro_pulse(start),
-                    ),
-                ]
-            )[:-1, :]
-            cur_time = start + self.macro_timer.time_till_next_train(start)
-            trains_left -= 1.0
-
-        while trains_left >= 1.0:
-            _ = super().make_matrix(
-                start=self.timer.start_time,
-                stop=self.timer.start_time + self.macro_timer.on_time,
-            )
-            _[:, 0] = _[:, 0] + cur_time
-            out = np.vstack(
-                [
-                    out,
-                    _[:-1, :],
-                ]
-            )
-            trains_left -= 1.0
-            cur_time += self.macro_timer.period
-
-        if trains_left > 0:
-            _ = super().make_matrix(
-                start=self.timer.start_time,
-                stop=self.timer.start_time + self.macro_timer.on_time * trains_left,
-            )
-            _[:, 0] = _[:, 0] + cur_time
-            out = np.vstack(
-                [
-                    out,
-                    _,
-                ]
-            )
-
-        if out[-1, 0] < stop:
-            out = np.vstack([out, [stop, 0.0]])
-        else:
-            out[-1, 1] = 0
-        return out
+    def _transitions(self, start: float) -> tp.Iterator[tp.Tuple[float, bool]]:
+        """
+        Beam state transitions from `start` (see `ParticleBeam`): trains
+        start every `macro_timer.period` from `macro_timer.start_time`;
+        micro pulses start every micro period, `micro_start_time` after
+        the train start, and are cut by the end of the train.
+        """
+        macro = self.macro_timer
+        micro = macro.subtimer
+        is_on = macro.state_at(start) is TimerState.isOn
+        yield start, is_on
+        train_idx = max(0, floor((start - macro.start_time) / macro.period))
+        tolerance = COUNT_RTOL * micro.on_time
+        while True:
+            train_start = macro.start_time + train_idx * macro.period
+            train_end = train_start + macro.on_time
+            pulse_idx = 0
+            while True:
+                t_on = train_start + micro.start_time + pulse_idx * micro.period
+                if t_on >= train_end - tolerance:
+                    break
+                t_off = min(t_on + micro.on_time, train_end)
+                for time, state in ((t_on, True), (t_off, False)):
+                    if time >= start and state != is_on:
+                        is_on = state
+                        yield time, state
+                pulse_idx += 1
+            train_idx += 1
 
     @classmethod
     def from_dict(cls, param: tp.Dict[str, float]) -> MacroPulsedBeam:

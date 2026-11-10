@@ -23,6 +23,7 @@ is what proves that files written by older versions still load.
 Re-recorded since the original recording (result-changing fixes approved
 by the user):
     runs   ticket 12 (initial burst applied by run(), y0 never mutated)
+    beams  ticket 15 (generic make_matrix, macro beam fixes, average dose rate from start_time)
 
 Files written in tests/golden/data:
     derive.json          dydt keyed by species label (+ radiolytic yields)

@@ -333,7 +333,7 @@ class BeamCollection(object):
                     s[name] = (beam, beam_type)
                     continue
                 if s[name][1] == beam_type:
-                    s[name][0] |= beam
+                    s[name][0].update(beam)
                     continue
                 s[name] = (beam, beam_type)
 

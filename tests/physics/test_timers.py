@@ -111,14 +111,12 @@ class TestTimer:
         # Same `inf * 0 = nan` quirk as for the constant timer
         assert math.isnan(timer.time_till_next_OFF(0.25))
 
-    def test_copy_drops_start_time(self):
-        # TODO(ticket 15): copy() currently resets start_time to the default
-        # (0.0) when none is given instead of keeping the original one.
+    def test_copy_keeps_start_time(self):
         timer = Timer.new_pulsed(period=2, on_time=0.5, start_time=1.0)
         copy = timer.copy()
         assert copy is not timer
         assert (copy.period, copy.on_time) == (2, 0.5)
-        assert copy.start_time == 0.0
+        assert copy.start_time == 1.0
         assert timer.copy(start_time=3.0).start_time == 3.0
 
 
@@ -218,25 +216,63 @@ class TestMacroTimer:
         assert macro.micro_pulses_per_train() == 4.0
 
     def test_micro_pulses_per_train_partial_remainder(self):
-        # TODO(ticket 15): walrus operator precedence in
-        # `if r := x % p > 0` binds `r` to a bool. The hand-computed value
-        # is 3 + 0.1 / 0.25 = 3.4 pulses; the current code gives 4.0.
+        # 3 + 0.1 / 0.25 = 3.4 pulses
         macro = MacroTimer.new_macropulse(10, 3.1, 1, 0.25)
-        assert macro.micro_pulses_per_train() == 4.0
+        assert macro.micro_pulses_per_train() == pytest.approx(3.4)
+
+    def test_micro_pulses_per_train_half_pulse(self):
+        # train 0.205 s, micro period 0.1 s, micro on_time 0.01 s
+        macro = MacroTimer.new_macropulse(1.0, 0.205, 0.1, 0.01)
+        assert macro.micro_pulses_per_train() == pytest.approx(2.5)
+        assert macro.duty_cycle() == pytest.approx(0.025)
+
+    def test_micro_pulses_per_train_float_noise(self):
+        # 0.001 // 0.0001 is 9.0 in floating point
+        macro = MacroTimer.new_macropulse(0.1, 1e-3, 1e-4, 2e-6)
+        assert macro.micro_pulses_per_train() == 10.0
+
+    def test_micro_pulses_per_train_micro_start(self):
+        # micro pulses at 0.5, 1.5, 2.5 (train of 3 s)
+        macro = MacroTimer.new_macropulse(10, 3, 1, 0.25, micro_start_time=0.5)
+        assert macro.micro_pulses_per_train() == 3.0
+        # ... and only 0.1 / 0.25 of the pulse at 2.5 in a train of 2.6 s
+        macro = MacroTimer.new_macropulse(10, 2.6, 1, 0.25, micro_start_time=0.5)
+        assert macro.micro_pulses_per_train() == pytest.approx(2.4)
 
     def test_duty_cycle(self, macro):
         # 3 pulses of 0.25 s over a 10 s period
         assert macro.duty_cycle() == pytest.approx(0.075)
 
     def test_duty_cycle_partial_remainder(self):
-        # TODO(ticket 15): walrus precedence + no-op `tot_on_time + res`.
-        # Hand-computed: (3 * 0.25 + 0.1) / 10 = 0.085; current: 0.1.
+        # (3 * 0.25 + 0.1) / 10
         macro = MacroTimer.new_macropulse(10, 3.1, 1, 0.25)
-        assert macro.duty_cycle() == pytest.approx(0.1)
+        assert macro.duty_cycle() == pytest.approx(0.085)
 
-    def test_copy_drops_start_time(self):
-        # TODO(ticket 15): copy() resets start_time to the default (0.0)
-        # when none is given instead of keeping the original one.
+    def test_time_till_next_ON_with_start_time(self):
+        # trains at 5, 15, ...: [5, 8], micro pulses at 5, 6, 7 (0.25 s)
+        macro = MacroTimer.new_macropulse(
+            macro_period=10, macro_on_time=3, micro_period=1, micro_on_time=0.25,
+            macro_start_time=5.0,
+        )
+        assert macro.time_till_next_ON(2.0) == pytest.approx(3.0)  # before start
+        assert macro.time_till_next_ON(5.1) == 0.0  # ON
+        assert macro.time_till_next_ON(5.5) == pytest.approx(0.5)  # next micro
+        assert macro.time_till_next_ON(7.5) == pytest.approx(7.5)  # next train
+        assert macro.time_till_next_ON(12.0) == pytest.approx(3.0)
+        assert macro.time_till_next_train(12.0) == pytest.approx(3.0)
+        assert macro.time_till_next_train(2.0) == pytest.approx(3.0)
+
+    def test_time_till_next_ON_micro_start(self):
+        macro = MacroTimer.new_macropulse(10, 3, 1, 0.25, micro_start_time=0.5)
+        assert macro.time_till_next_ON(0.0) == pytest.approx(0.5)
+        assert macro.time_till_next_ON(9.0) == pytest.approx(1.5)
+
+    def test_time_till_next_OFF_cut_by_train_end(self):
+        # micro pulse [2.9, 3.4] cut by the end of the train at 3.0
+        macro = MacroTimer.new_macropulse(10, 3, 1, 0.5, micro_start_time=0.9)
+        assert macro.time_till_next_OFF(2.95) == pytest.approx(0.05)
+
+    def test_copy_keeps_start_time(self):
         macro = MacroTimer.new_macropulse(
             10, 3, 1, 0.25, macro_start_time=5.0, micro_start_time=0.0
         )
@@ -244,5 +280,5 @@ class TestMacroTimer:
         assert copy is not macro
         assert copy.subtimer is not macro.subtimer
         assert (copy.period, copy.on_time) == (10, 3)
-        assert copy.start_time == 0.0
+        assert copy.start_time == 5.0
         assert macro.copy(start_time=7.0).start_time == 7.0

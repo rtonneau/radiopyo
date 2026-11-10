@@ -55,6 +55,36 @@ All notable changes to this project. Versions follow [semantic versioning](https
   `TOMLFileParser.parse` now starts from an empty-parameters config, so a default can never shadow an
   included value. The `ODEResult` json round trip of an enzymatic reaction still doubles its `k_value`
   (`MichaelisMenten.to_dict`), this is unrelated to includes and not changed here.
+- Beams (`radiopyo.physics`): one generic `ParticleBeam.make_matrix` walks the timer transitions up to
+  `min(stop, time_at_max_dose)`; the four hand-written versions (constant, single pulse, pulsed, macro
+  pulsed) are removed. `make_time_intervals` is shared and its second column is now always 0 (OFF) or 1
+  (ON) (it was the raw dose rate for 2-row matrices and the first row was flagged ON when the window
+  started before the beam). `PulsedBeam` matrices are unchanged. Behaviour changes:
+  - `ConstantBeam` / `SinglePulseBeam` ON at `stop` (before the max dose) now end with `[stop, 0]`
+    like `PulsedBeam` (they ended with `[stop, dose_rate]`), and no zero-length ON row is added when
+    `stop` is the start time or the max-dose time;
+  - `MacroPulsedBeam` without `max_dose` hung forever in `make_matrix`; it now respects `stop`. Micro
+    pulses are no longer duplicated at train start, the matrix honours `start` / `stop` windows and
+    `micro_start_time` (which was not given to the macro timer), and the max dose of whole trains is
+    reached at the end of the last micro pulse (it was the end of the train);
+  - `MacroPulsedBeam.update_beam_param` accepts `period`/`frequency`/`on_time`/`start_time` (macro) and
+    `micro_period`/`micro_frequency`/`micro_on_time`/`micro_start_time`, and keeps `timer` and
+    `macro_timer.subtimer` as one object (before, the micro timer only was rebuilt, with the macro
+    names);
+  - average dose rate and `tot_pulses()` account for `start_time` (a pulsed beam delayed by 1 ms
+    reported an average dose rate 144 times too large), and `max_dose=inf` gives `peak * duty cycle` / `inf`
+    instead of `nan`;
+  - `MacroTimer`: `micro_pulses_per_train` and `duty_cycle` had an operator precedence error in the
+    remainder test (train of 0.205 s, micro period 0.1 s, micro on_time 0.01 s: 2.5 pulses, not 3)
+    and `duty_cycle` dropped the partial pulse; `time_till_next_ON` shifted `start_time` twice;
+  - `Timer.copy` / `MacroTimer.copy` keep the start time (they reset it to 0);
+  - counting pulses and trains (`MacroTimer`, `MacroPulsedBeam` max dose) and the `n_pulse` /
+    `max_dose` consistency check of `PulsedBeam.from_dose_rate_peak` use a relative tolerance instead
+    of exact float comparisons.
+  - a `micro_start_time` >= the train `on_time` (no micro pulse fits in a train) now raises
+    `ValueError` (`make_matrix` looped forever).
+- `BeamCollection.merge` always raised `TypeError` when both collections hold a beam of the same name
+  and type.
 
 ### Removed (breaking)
 

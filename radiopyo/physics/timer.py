@@ -11,6 +11,7 @@ Author:
 from __future__ import annotations
 
 import logging
+import math
 import typing as tp
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -27,6 +28,36 @@ __all__ = [
 
 # ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
+
+# --------------------------------------------------------------------------- #
+#                             FUNCTION DEFINITIONS                            #
+# --------------------------------------------------------------------------- #
+# Relative tolerance used when counting how many periods fit in a duration
+# (0.001 / 0.0001 is not exactly 10 in floating point).
+COUNT_RTOL = 1e-9
+
+
+def split_periods(duration: float, period: float) -> tp.Tuple[int, float]:
+    """
+    Split a duration in a whole number of periods and a remainder, with
+    a relative tolerance on the period.
+
+    Args:
+        duration: float
+            Duration to split, in seconds.
+        period: float
+            Period, in seconds.
+
+    Returns:
+        Tuple[int, float]: (number of full periods, remainder >= 0).
+        A remainder within COUNT_RTOL * period of 0 is returned as 0.
+    """
+    n = math.floor(duration / period + COUNT_RTOL)
+    remainder = duration - n * period
+    if remainder <= COUNT_RTOL * period:
+        remainder = 0.0
+    return n, remainder
+
 
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
@@ -386,8 +417,8 @@ class Timer(BaseTimer):
         return self.on_time - self._phase(time)
 
     def copy(self, start_time: tp.Optional[float] = None) -> Timer:
-        """Make a simple copy of the Timer"""
-        stime = start_time if start_time is not None else Timer._default_start_time()
+        """Make a simple copy of the Timer (same start time unless given)"""
+        stime = start_time if start_time is not None else self.start_time
         return Timer(self.period, self.on_time, stime)
 
 
@@ -427,11 +458,21 @@ class MacroTimer(BaseTimer):
             on_time: float
                 Time during which timer is ON in seconds.
                 on_time should be <= period.
+
+        Raises:
+            ValueError: if macro_period <= micro_period, or if
+                micro_start_time >= macro_on_time (no micro pulse would
+                fit in a train).
         """
         if macro_period <= micro_period:
             raise ValueError(
                 "Macro Period is <= than micro period. "
                 "Do you really need a macro timer?"
+            )
+        if micro_start_time is not None and micro_start_time >= macro_on_time:
+            raise ValueError(
+                f"micro_start_time ({micro_start_time}) must be < the train "
+                f"on_time ({macro_on_time}): no micro pulse would fit in a train."
             )
         stime = (
             macro_start_time
@@ -466,14 +507,21 @@ class MacroTimer(BaseTimer):
         return TimerState.isOff
 
     def micro_pulses_per_train(self) -> float:
-        """ """
-        n = self.on_time // self.subtimer.period
-        if r := self.on_time % self.subtimer.period > 0:
-            if r >= self.subtimer.on_time:
-                n += 1.0
-            else:
-                n += r / self.subtimer.on_time
-        return n
+        """
+        Number of micro pulses delivered during one train. Micro pulses
+        start at `subtimer.start_time` after the train start; a pulse cut
+        by the end of the train counts for the fraction of its on_time
+        that is delivered (train 0.205 s, micro period 0.1 s, micro
+        on_time 0.01 s gives 2.5).
+        """
+        available = self.on_time - self.subtimer.start_time
+        if available <= 0:
+            return 0.0
+        n, remainder = split_periods(available, self.subtimer.period)
+        out = float(n)
+        if remainder > 0:
+            out += min(remainder / self.subtimer.on_time, 1.0)
+        return out
 
     def micro_period_index(self, time: float) -> int:
         """ """
@@ -491,28 +539,38 @@ class MacroTimer(BaseTimer):
 
     def time_till_next_train(self, time: float) -> float:
         """
-        Computes time remaining before next pulse.
+        Computes time remaining before next train starts.
         """
+        if time < self.start_time:
+            return self.start_time - time
         return self.period - self._relative_time_pulse(time)
 
     def time_till_next_ON(self, time: float) -> float:
         """
-        Computes time remaining before next pulse.
+        Computes time remaining before next pulse (0.0 if the beam is
+        ON at `time`). The next micro pulse is searched in the current
+        train, then at the start of the next one.
         """
-        time = self._relative_time_pulse(time)
-        if time >= self.on_time:
-            return self.time_till_next_train(time)
-        return self.subtimer.time_till_next_ON(time)
+        if time < self.start_time:
+            return self.start_time - time + self.subtimer.start_time
+        if self.state_at(time) is TimerState.isOn:
+            return 0.0
+        rel = self._relative_time_pulse(time)
+        if rel <= self.on_time:
+            wait = self.subtimer.time_till_next_ON(rel)
+            if rel + wait < self.on_time:
+                return wait
+        return self.period - rel + self.subtimer.start_time
 
     def time_till_next_OFF(self, time: float) -> float:
         """
-        Computes time remaining before beam is off. Returns 0 if
-        beam already off.
+        Computes time remaining before beam is off (the end of a train
+        cuts the micro pulse). Returns 0 if beam already off.
         """
-        time = self._relative_time_pulse(time)
-        if time >= self.on_time:
+        if self.state_at(time) is TimerState.isOff:
             return 0.0
-        return self.subtimer.time_till_next_OFF(time)
+        rel = self._relative_time_pulse(time)
+        return min(self.subtimer.time_till_next_OFF(rel), self.on_time - rel)
 
     def duty_cycle(self) -> float:
         """Computes the duty cycle of the MacroTimer.
@@ -523,16 +581,9 @@ class MacroTimer(BaseTimer):
         Returns:
             float
         """
-        # Duty cycle of macro pulse:
-        tot_on_time = (self.on_time // self.subtimer.period) * self.subtimer.on_time
-        if res := self.on_time % self.subtimer.period > 0:
-            if res > self.subtimer.on_time:
-                tot_on_time += self.subtimer.on_time
-            else:
-                tot_on_time + res
-        return tot_on_time / self.period
+        return self.micro_pulses_per_train() * self.subtimer.on_time / self.period
 
     def copy(self, start_time: tp.Optional[float] = None) -> MacroTimer:
-        """Make a simple copy of the Timer"""
-        stime = start_time if start_time is not None else Timer._default_start_time()
+        """Make a simple copy of the Timer (same start time unless given)"""
+        stime = start_time if start_time is not None else self.start_time
         return MacroTimer(self.period, self.on_time, self.subtimer.copy(), stime)
