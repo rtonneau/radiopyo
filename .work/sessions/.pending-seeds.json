@@ -1,0 +1,140 @@
+{
+  "analytic-jacobian": {
+    "strength": "Strong",
+    "severity": "High",
+    "files": [
+      "radiopyo/simulation/ode_functions_solver.py",
+      "radiopyo/simulation/unit_cell.py",
+      "radiopyo/utils/sim_types.py",
+      "radiopyo/simulation/environment_build.py"
+    ],
+    "problem": "F1, F9: no analytic Jacobian (use_jac=True raises NotImplementedError) and enzymatic reactions ignore the negative-product depletion flag, so a Jacobian would be inconsistent with them.",
+    "solution": "Write the Jacobian on top of reaction_rates and SimMatrices, add negative_products to EzMatrices and apply the same block in reaction_rates, validate against a finite-difference Jacobian of derive, then wire use_jac to solve_ivp(jac=).",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "h2o-concentration-sign": {
+    "strength": "Strong",
+    "severity": "High",
+    "files": [
+      "radiopyo/chemistry/species.py",
+      "radiopyo/simulation/environment_build.py"
+    ],
+    "problem": "F3: the H2O initial-concentration polynomial has only positive coefficients, 55.93 M at 25 degC and rising with T, while water density falls with T (about 55.35 M at 25 degC).",
+    "solution": "Trace the coefficients to their source, fix the sign or variable (K vs degC), add a test at 4, 25 and 80 degC, and regenerate goldens with approval.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "g-value-dose-rate-range": {
+    "strength": "Worth exploring",
+    "severity": "Medium",
+    "files": [
+      "radiopyo/utils/g_values.py",
+      "radiopyo/simulation/unit_cell.py"
+    ],
+    "problem": "F2: GValuesBoscolo._scale_factor (variable_GValues) has no valid dose-rate range, no clamp and is inf at 0 Gy/s.",
+    "solution": "Document the fitted dose-rate range, clamp or raise ValueError outside it and reject non-positive dose rates.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "timer-next-off-nan": {
+    "strength": "Worth exploring",
+    "severity": "Medium",
+    "files": [
+      "radiopyo/physics/timer.py",
+      "radiopyo/physics/beam.py"
+    ],
+    "problem": "F4: Timer.time_till_next_OFF returns NaN for continuous timers (period = inf: inf * 0 in _phase).",
+    "solution": "Return time - start_time as phase when the period is infinite and add tests for constant and single-pulse timers.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "result-persistence-gaps": {
+    "strength": "Worth exploring",
+    "severity": "Medium",
+    "files": [
+      "radiopyo/simulation/ode_result.py",
+      "radiopyo/simulation/persistence.py",
+      "radiopyo/chemistry/michaelis.py",
+      "tests/golden/test_golden.py"
+    ],
+    "problem": "F7, F8, F6, F12: burst_dose_rates is not persisted to HDF5, reconstruct_reactions ignores use_beam=False, parse_dataset_name uses .strip('.sim') (characters, not suffix), and old files keep a doubled catalase k_value.",
+    "solution": "Record use_beam and burst_dose_rates in the json config (optional keys, fallback for old files), pass beam=None to reaction_rates when use_beam is False, use removesuffix('.sim'), and add a format version to handle old enzymatic k_value.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "simenv-make-hash": {
+    "strength": "Speculative",
+    "severity": "Low",
+    "files": [
+      "radiopyo/simulation/environment_build.py"
+    ],
+    "problem": "F5: SimEnv.make_hash always raises TypeError (unhashable species_order dict) and hashes repr(frozenset), which depends on PYTHONHASHSEED.",
+    "solution": "Hash a canonical json serialisation (sort_keys) of parameters and initial concentrations, or remove the unused method.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "macro-chunked-golden": {
+    "strength": "Speculative",
+    "severity": "Low",
+    "files": [
+      "tests/golden/record_golden.py",
+      "tests/golden/test_golden.py"
+    ],
+    "problem": "F10: no golden output for a chunked run with MacroPulsedBeam.",
+    "solution": "Add a short chunked macro run to tests/golden/record_golden.py and compare by label with the existing tolerances.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "minor-cleanups": {
+    "strength": "Speculative",
+    "severity": "Low",
+    "files": [
+      "radiopyo/simulation/environment_build.py",
+      "radiopyo/simulation/unit_cell.py",
+      "radiopyo/utils/sim_types.py"
+    ],
+    "problem": "F11, F13, F14: temperature leftovers (iter_*_kvalues default 25 degC, convert_to_config_dict), UnitCell API traps (set_beam LET=None, run_till_max_dose t_span, intervals[-2] IndexError) and ruff format would reformat 34 files.",
+    "solution": "Pass the env temperature in ReactionsList, write polynomial coefficients in convert_to_config_dict, make the UnitCell traps explicit (log/raise), and do one dedicated ruff format commit with .gitattributes line endings.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "refresh-example-notebook": {
+    "strength": "Worth exploring",
+    "severity": "Low",
+    "files": [
+      "examples/notebook_basic_usage.ipynb"
+    ],
+    "problem": "Notebook check: examples/notebook_basic_usage.ipynb cell 19 passes max_dose positionally to PulsedBeam.from_dose_rate_peak (it lands in n_pulse; the 10 Gy total matches by coincidence); cells 25 and 27 hold a corrupted µ sign; stored outputs predate the refactor.",
+    "solution": "Through the Jupyter MCP tools: use max_dose= in cell 19, fix the µ sign, re-run the notebook and save fresh outputs.",
+    "benefits": null,
+    "sourceDirection": null,
+    "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
+    "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
+    "createdAt": "2026-11-10T09:29:18.858Z"
+  }
+}

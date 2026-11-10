@@ -496,9 +496,33 @@
         "ticket": "17-fix-arrhenius-enzymes-add",
         "commit": "2ad881e"
       }
+    },
+    {
+      "at": "2026-11-10T09:10:44.295Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/18-docs.md",
+        "03-implement/18-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "18-docs"
+      }
+    },
+    {
+      "at": "2026-11-10T09:30:48.241Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/18-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "18-docs",
+        "commit": "4ea057d"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "refactor/readability-and-jacobian-prep",
     "base_branch": "main",
