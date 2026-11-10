@@ -167,7 +167,6 @@ Contains the main parameters. All are optional:
 | `pH` | 7 | Initial pH |
 | `force_cst_pH` | false | Keep the pH constant during the simulation |
 | `temperature` | 25 | Simulation temperature [degC] |
-| `force_positive` | false | Force concentrations to stay positive |
 | `variable_GValues` | false | Apply a dose-rate dependent correction to the LET dependent G-values (see "Possible beam definitions") |
 | `species_order` | (none) | Explicit order of the species in the state vector |
 
@@ -318,7 +317,8 @@ must be specified in the operator arrow (-- 'enzyme name' >>). It is a plain nam
 case (`catalase`, `SOD`, `GPx`), never read as a chemical formula. As for k-reactions,
 the rate of an enzymatic reaction is multiplied, for each of its "negative" products, by
 c / (c + 1e-12 mol/L) (c = concentration of the product): it is halved at 1e-12 mol/L and
-vanishes as the product is depleted.
+vanishes as the product is depleted. Rate laws always read the clipped concentration
+max(c, 0), so a species that overshoots below 0 is never consumed.
 
 ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 
