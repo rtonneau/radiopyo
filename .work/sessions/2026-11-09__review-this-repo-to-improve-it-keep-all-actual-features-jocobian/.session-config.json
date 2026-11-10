@@ -412,6 +412,30 @@
         "ticket": "14-fix-include-merge",
         "commit": "662277a"
       }
+    },
+    {
+      "at": "2026-11-10T07:10:39.747Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/15-fix-macro-beam.md",
+        "03-implement/15-fix-macro-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "15-fix-macro-beam"
+      }
+    },
+    {
+      "at": "2026-11-10T08:01:28.131Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/15-fix-macro-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "15-fix-macro-beam",
+        "commit": "10978f3"
+      }
     }
   ],
   "current_phase": "ship",
