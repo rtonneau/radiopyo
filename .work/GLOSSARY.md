@@ -44,12 +44,16 @@ A bug fix that changes numerical simulation output; delivered as its own ticket 
 _Avoid_: behaviour fix
 
 **Negative product**:
-A species written `- species` on the product side of a reaction: the reaction consumes it, and the reaction cannot occur while that species is depleted (at or below `DEPLETION_LIMIT`).
+A species written `- species` on the product side of a reaction: the reaction consumes it although it is not in the rate law, so the reaction is slowed by a depletion switch as that species runs out.
 _Avoid_: ope, negative species
 
-**Depletion block**:
-Forcing to 0 the rate of a reaction (k-reaction or enzymatic) while one of its negative products is depleted.
-_Avoid_: negative-product blocking, zeroing
+**Depletion switch**:
+The smooth factor c⁺/(c⁺ + ε), ε = `DEPLETION_LIMIT`, multiplying the rate of a reaction (k-reaction or enzymatic) for each of its negative products (ADR 0005); it replaces the former hard depletion block.
+_Avoid_: depletion block, negative-product blocking, zeroing
+
+**Clipped concentration**:
+The concentration a rate law reads, max(c, 0): a species driven below 0 by a solver overshoot counts as absent, so it can neither be consumed further nor run a reaction backwards.
+_Avoid_: positive part, clamped state
 
 **Analytic Jacobian**:
 The matrix d(dy/dt)/dy of the dynamic species computed in closed form from the reaction matrices, given to the stiff solvers in place of a finite-difference estimate.
