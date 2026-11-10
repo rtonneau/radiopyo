@@ -472,6 +472,30 @@
         "ticket": "16-fix-species-order",
         "commit": "5b3b9e2"
       }
+    },
+    {
+      "at": "2026-11-10T08:10:46.103Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/17-fix-arrhenius-enzymes-add.md",
+        "03-implement/17-fix-arrhenius-enzymes-add/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "17-fix-arrhenius-enzymes-add"
+      }
+    },
+    {
+      "at": "2026-11-10T09:10:18.862Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/17-fix-arrhenius-enzymes-add/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "17-fix-arrhenius-enzymes-add",
+        "commit": "2ad881e"
+      }
     }
   ],
   "current_phase": "ship",
