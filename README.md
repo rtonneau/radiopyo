@@ -10,7 +10,9 @@ science (all Physics, Chemistry & Biology) has the purpose to solve systems of O
 Differential Equations (a.k.a. ODE) based on equations provided via an input file.
 The default solver is the LSODA solver from the good
 [scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html)
-module.
+module. The solver uses the analytic Jacobian by default (`use_jac=True`, honoured by
+LSODA, BDF and Radau; the other methods ignore it). Pass `use_jac=False` to `run` to
+fall back on the finite-difference Jacobian of scipy.
 
 ## Remarks for developer
 
@@ -313,7 +315,8 @@ k_micha = 1.1 #  [mol/l]
 
 The same grammar as for "k_reactions" applies. For enzymatic reactions, the enzyme name
 must be specified in the operator arrow (-- 'enzyme name' >>). It is a plain name, in any
-case (`catalase`, `SOD`, `GPx`), never read as a chemical formula.
+case (`catalase`, `SOD`, `GPx`), never read as a chemical formula. As for k-reactions,
+an enzymatic reaction is blocked while one of its "negative" products is depleted.
 
 ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 

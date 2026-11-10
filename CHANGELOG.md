@@ -21,7 +21,18 @@ All notable changes to this project. Versions follow [semantic versioning](https
   `variable_GValues` and H3O_plus = e_aq (G(H3O+) is taken equal to G(e_aq), the `H3O_plus` column of the
   Boscolo data is not used).
 
+- `jacobian(t, y, beam, mat, force_positive=False)` (`radiopyo.simulation.ode_functions_solver`): the pure,
+  dense analytic Jacobian of `derive` (piecewise: blocked reactions and `force_positive` rows contribute 0,
+  ADR 0003).
+- `EzMatrices.negative_products`: negative-product flags of the enzymatic reactions.
+
 ### Changed
+
+- `use_jac` now defaults to `True` (`RunOptions`, `run`, `prepare_chunked_run`, `prepare_single_pulse`). It
+  passes the analytic Jacobian to LSODA, BDF and Radau; the other methods ignore it, without a warning.
+  On the bundled configs LSODA is 1.03-2.12x faster and BDF 0.97-1.49x, results agree to about 1e-9
+  relative.
+- Enzymatic reactions are blocked while a negative product is below `DEPLETION_LIMIT`, like k-reactions.
 
 Internal refactoring: results are unchanged (bit-identical on the golden outputs) unless listed under
 "Fixed"; the public names and call signatures are kept.
@@ -63,8 +74,6 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 
 ### Known issues (not fixed in this release)
 
-- The analytic Jacobian is not available: `use_jac=True` raises `NotImplementedError` (rewrite planned on top
-  of `reaction_rates` / `SimMatrices`). Enzymatic reactions ignore the negative-product flag.
 - `GValuesBoscolo._scale_factor` (dose-rate factor of `variable_GValues`) has no validated range and is
   infinite at 0 Gy/s.
 - The H2O concentration polynomial (`radiopyo/chemistry/species.py`) rises with the temperature (55.93 M at
@@ -79,6 +88,8 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 
 ### Fixed
 
+- A negative product of an enzymatic reaction was added in the stoichiometry instead of subtracted. No
+  bundled result changes.
 - `[[reactions.arrhenius]]` could not be read from a config file (the reader asked for a `k_value`
   instead of `A` and `Ea`), and `Arrhenius.k_value` used `Ea` as a temperature
   (`A * exp(-Ea / T)`). `Ea` is now the activation energy in kJ/mol:
@@ -185,8 +196,7 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 
 - RON config format: `radiopyo.parser.ron`, its grammar and `UnitCell.from_ron`. Use TOML.
 - The stale `jacobian()` of the solver (its signature did not match `derive`, it was unused), `EPSILON`
-  and the 4-D `JRki` tensor. `UnitCell.run(use_jac=True)` (and the chunked runs) now raises
-  `NotImplementedError` until the Jacobian is rewritten.
+  and the 4-D `JRki` tensor. (A new `jacobian()` was added later, see "Added".)
 - `SimEnv.pKw`, `pKH2O`, `update_temperature` and `update_flag_positive` (use `set_temperature` and the
   `force_positive` parameter); `ParticleBeam.delivery`,
   `MacroTimer.within_train`, `micro_pulse_index`, `micro_pulses_left_in_train`, `GROWTH_FACTOR`
