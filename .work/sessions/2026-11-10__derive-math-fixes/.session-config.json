@@ -112,6 +112,30 @@
         "ticket": "02-clipped-concentrations",
         "commit": "ba8d133"
       }
+    },
+    {
+      "at": "2026-11-10T18:03:45.534Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-smooth-depletion-switch.md",
+        "03-implement/03-smooth-depletion-switch/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-smooth-depletion-switch"
+      }
+    },
+    {
+      "at": "2026-11-10T18:19:30.589Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-smooth-depletion-switch/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-smooth-depletion-switch",
+        "commit": "85168c7"
+      }
     }
   ],
   "current_phase": "ship",
