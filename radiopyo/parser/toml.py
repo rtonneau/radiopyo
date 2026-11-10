@@ -16,11 +16,11 @@ from contextlib import suppress
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.parser.file_parser import FileParser
-from radiopyo.utils.sim_types import ConfigDict, default_ConfigDict
+from radiopyo.parser.utils import blank_config
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
-    pass
+    from radiopyo.utils.sim_types import ConfigDict
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__ = ["TOMLFileParser"]
@@ -42,13 +42,20 @@ class TOMLFileParser(FileParser):
     def parse(self) -> ConfigDict:
         """
         No Need for Lark grammar, "tomllib" works just fine =)
+
+        The result only holds what is written in the file. In particular
+        'parameters' has no default value: they are applied when the
+        simulation environment is built, so that a file that does not
+        mention a parameter does not erase the one of its includes.
+        Relative paths of the [includes] section are anchored to the
+        folder of the file (see FileParser.anchor_includes).
         """
         with open(self.path, mode="rb") as fb:
             config = tomllib.load(fb)
 
         # Produces a bare dict with all fields initiated
-        out = default_ConfigDict()
-        out["includes"] = config.get("includes", {})
+        out = blank_config()
+        out["includes"] = self.anchor_includes(config.get("includes", {}))
         out["parameters"] = config.get("parameters", {})
         out["beam"] = config.get("beam", {})
         with suppress(KeyError):  # in case "concentrations" does not exist

@@ -95,15 +95,50 @@ It is then, for example, possible to modify a rate constant of a given reaction 
 in an included file.
 
 ```toml
+[includes]
 toml = [
     "radiopyo/advanced_water_radiolysis.toml",
     "radiopyo/reactions_biology.toml",
 ]
 ```
 
-"radiopyo/" is referring to internal data (radiopyo/radiopyo/data) i.e. provided in the
-package. Of course, each entry can be an absolute path towards a valid configuration
-file. Files defined at the package level are the following:
+**Where the files are looked for**
+
+- An entry starting with exactly "radiopyo/" is referring to internal data
+  (radiopyo/radiopyo/data) i.e. provided in the package:
+  "radiopyo/reactions_biology.toml" is the "reactions_biology.toml" shipped with the
+  package. Any other entry is a plain path, even if it starts with "radiopyo"
+  (e.g. "radiopyo_extra.toml").
+- A relative path is resolved against the folder of the file containing the entry
+  (so nested includes keep working wherever the program is started from). If the file
+  is not there, the current working directory is tried.
+- An absolute path towards a valid configuration file is always possible.
+
+**Precedence**
+
+From the lowest to the highest: the included files, in the order of the list (a file
+listed later overrides the ones listed before it), then the file including them. Each
+included file may itself include other files.
+
+**How the sections are merged**
+
+- `[parameters]`, `[concentrations.fixed]`, `[concentrations.initial]` and
+  `[reactions.radiolytic]` are merged entry by entry: a name defined again takes the new
+  value, the others are kept.
+- Reactions (`k_reaction`, `constant`, `arrhenius`, `acid_base`, `equilibrium` and
+  `enzymatic`) are identified by their species on each side of the arrow, whatever their
+  order: "B + A -> C" redefines "A + B -> C", but "C -> A + B" is another reaction.
+  A redefinition updates the reaction field by field: only what is written is replaced,
+  the rest is kept. For example, writing `k_forward` alone for an acid/base reaction keeps
+  its `k_backward` and `pKa`, and writing `k_value` alone for an enzymatic reaction keeps
+  its `k_micha`. The only exception is an `equilibrium` giving at least two of
+  `k_forward`, `k_backward` and `k_equilibrium`: it is then fully defined by the new
+  entry and the constants of the included one are dropped. The values are never
+  rescaled (for "2 A -> B" the value to write is still 2k). Redefined reactions keep their
+  place, new ones are appended.
+- Beams: see "Possible beam definitions" below.
+
+Files defined at the package level are the following:
 
 - advanced_water_radiolysis.toml
    Contains all reactions related to the radiolysis of pure water.
