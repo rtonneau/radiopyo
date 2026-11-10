@@ -316,6 +316,54 @@
         "ticket": "10-beam-split",
         "commit": "cd77b2b"
       }
+    },
+    {
+      "at": "2026-11-09T23:31:42.760Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/11-beam-generic-matrix.md",
+        "03-implement/11-beam-generic-matrix/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "11-beam-generic-matrix"
+      }
+    },
+    {
+      "at": "2026-11-09T23:40:46.374Z",
+      "event": "ticket_blocked",
+      "phase": "ship",
+      "files": [
+        "03-implement/11-beam-generic-matrix/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "11-beam-generic-matrix",
+        "reason": "merged into ticket 15: generic make_matrix cannot reproduce Macro/Constant quirks bit-identically; done with ticket 15 golden regeneration"
+      }
+    },
+    {
+      "at": "2026-11-09T23:40:46.796Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/12-fix-run-burst.md",
+        "03-implement/12-fix-run-burst/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "12-fix-run-burst"
+      }
+    },
+    {
+      "at": "2026-11-10T06:05:59.030Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/12-fix-run-burst/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "12-fix-run-burst",
+        "commit": "af5b8ca"
+      }
     }
   ],
   "current_phase": "ship",
