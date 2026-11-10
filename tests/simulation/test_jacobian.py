@@ -3,11 +3,16 @@
 Tests of the analytic Jacobian of the ODE right hand side: compared with
 the central finite-difference Jacobian of ``derive`` on the bundled
 configs (beam on/off, enzymes, fixed species) and on toy
-environments (repeated reactant, active negative-product blocks).
+environments (repeated reactant, negative products).
 
-The Jacobian is piecewise (ADR 0003): the finite differences are taken
-with a relative step far smaller than the distance of the states to the
-depletion threshold, so both sides agree on every switch.
+The rates are smooth (depletion switch c / (c + eps), ADR 0005) except at
+the clipping kink c = 0 (ADR 0004): the finite differences are taken on
+states away from 0, with a relative step small enough for the curvature of
+the switch near eps.
+
+The bundled configs have no negative product: ``negative_cell`` is the
+Labarbe config plus a k-reaction with two negative products and an
+enzymatic reaction with one.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be)
@@ -27,9 +32,9 @@ from radiopyo.physics.beam import ConstantBeam
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import (
     DEPLETION_LIMIT,
+    depletion_switch,
     derive,
     jacobian,
-    negative_product_block,
 )
 from radiopyo.simulation.unit_cell import UnitCell
 
@@ -65,6 +70,36 @@ def cell(request: pytest.FixtureRequest) -> UnitCell:
 
 def toy_env(config: dict[str, tp.Any]) -> SimEnv:
     return SimEnv.from_dict(config, log=False)  # type: ignore[arg-type]
+
+
+NEGATIVE_CONFIG = """\
+[includes]
+toml = ["radiopyo/config_Labarbe.toml"]
+
+[[reactions.k_reaction]]
+reaction = "e_aq + O2 -> O2_r_minus - H2O2 - OH_minus"
+k_value = 1e9
+
+[[reactions.enzymatic]]
+reaction = "H2O2 -- SOD >> O2 - O2_r_minus"
+k_value = 1e5
+k_micha = 1e-3
+
+[concentrations.fixed]
+SOD = 1e-7
+"""
+
+
+@pytest.fixture(scope="module")
+def negative_cell(tmp_path_factory: pytest.TempPathFactory) -> UnitCell:
+    """Labarbe config with negative products (k: H2O2 and OH_minus,
+    enzymatic: O2_r_minus)."""
+    path = tmp_path_factory.mktemp("negative") / "negative.toml"
+    path.write_text(NEGATIVE_CONFIG, encoding="utf-8")
+    out = UnitCell.from_toml(path)
+    assert out.mat.k_reactions.negative_products.sum() == 2
+    assert out.mat.enzymatic.negative_products.sum() == 1
+    return out
 
 
 @pytest.fixture
@@ -241,7 +276,7 @@ def test_repeated_reactant_and_fixed_species(mass_action_env: SimEnv) -> None:
     assert analytic.shape == (n_dyn, n_dyn)
 
 
-def test_negative_product_block_active_k_reaction(mass_action_env: SimEnv) -> None:
+def test_negative_product_switch_k_reaction(mass_action_env: SimEnv) -> None:
     env = mass_action_env
     mat = env.build_all_matrices()
     a, b, c, d = (env.species[n].index for n in ("A", "B", "C", "D"))
@@ -250,33 +285,98 @@ def test_negative_product_block_active_k_reaction(mass_action_env: SimEnv) -> No
     free = jacobian(0.0, y, None, mat)
     assert free[c, a] != 0.0
     assert free[c, b] != 0.0  # A + B -> C - D is active
+    # the switch of D (~1 umol/L >> eps) is 1 up to 1e-6
+    free_switch = depletion_switch(mat.state.to_full_molar(y), mat.k_reactions).min()
+    assert free_switch == pytest.approx(1.0, abs=1e-5)
 
-    y[d] = DEPLETED  # D depleted: A + B -> C - D is blocked
-    assert negative_product_block(mat.state.to_full_molar(y), mat.k_reactions).any()
-    blocked = jacobian(0.0, y, None, mat)
-    assert_jacobian_matches(blocked, fd_jacobian(y, None, mat, 0.0))
-    # C is produced by A + B only (blocked): only its own decay remains
-    assert blocked[c, a] == 0.0
-    assert blocked[c, b] == 0.0
-    assert blocked[c, c] != 0.0
+    # D far below eps: A + B -> C - D is almost off but the Jacobian keeps the
+    # (tiny) smooth dependence, no longer a hard zero
+    y[d] = DEPLETED
+    y_full = mat.state.to_full_molar(y)
+    switch = depletion_switch(y_full, mat.k_reactions).min()
+    assert 0.0 < switch < 1e-2
+    slowed = jacobian(0.0, y, None, mat)
+    assert_jacobian_matches(slowed, fd_jacobian(y, None, mat, 0.0, rel_step=1e-4))
+    assert slowed[c, a] == pytest.approx(switch * free[c, a] / free_switch, rel=1e-12)
+    assert slowed[c, b] == pytest.approx(switch * free[c, b] / free_switch, rel=1e-12)
+    assert slowed[c, c] != 0.0
+    # product rule: the switch itself depends on D (dC/dt = ... + k A B s(D))
+    k_ab = 1e9
+    expected = (
+        k_ab * y_full[a] * y_full[b] * DEPLETION_LIMIT / (y_full[d] + DEPLETION_LIMIT) ** 2
+    )
+    assert slowed[c, d] == pytest.approx(expected, rel=1e-12)
 
 
-def test_negative_product_block_active_enzymatic(enzymatic_env: SimEnv) -> None:
+@pytest.mark.parametrize("factor", [0.1, 1.0, 3.0, 100.0])
+def test_switch_reactant_and_repeated_negative_product(factor: float) -> None:
+    """A species that is both a reactant and a negative product of the
+    same reaction, and a negative product of stoichiometry 2 next to a
+    second one: one switch factor per negative species, rate and Jacobian
+    consistent."""
+    env = toy_env(
+        {
+            "parameters": {"pH": 7.0},
+            "concentrations": {"initial": {"A": 1e-3, "B": 1e-6, "D": 1e-6}},
+            "reactions": {
+                "k_reaction": [
+                    {"reaction": "A + D -> C - D", "k_value": 1e9},
+                    {"reaction": "A -> C - 2 D - B", "k_value": 1e3},
+                ],
+                "radiolytic": {"A": 1.0},
+            },
+        }
+    )
+    mat = env.build_all_matrices()
+    d = env.species["D"].index
+    y = random_state(mat)
+    y[d] = factor * LIMIT_UMOL
+    y_full = mat.state.to_full_molar(y)
+    switch = depletion_switch(y_full, mat.k_reactions)
+    s_d = y_full[d] / (y_full[d] + DEPLETION_LIMIT)
+    b = env.species["B"].index
+    s_b = y_full[b] / (y_full[b] + DEPLETION_LIMIT)
+    r1, r2 = (r.get_index() for r in env.reactions.iter_all_kreactions())
+    assert switch[r1] == pytest.approx(s_d, rel=1e-12)
+    assert switch[r2] == pytest.approx(s_d * s_b, rel=1e-12)  # 2 D: one factor
+    analytic = jacobian(0.0, y, None, mat)
+    assert_jacobian_matches(analytic, fd_jacobian(y, None, mat, 0.0, rel_step=1e-4))
+
+
+@pytest.mark.parametrize("factor", [0.1, 1.0, 3.0, 100.0])
+def test_switch_derivative_near_the_limit_k_reaction(
+    mass_action_env: SimEnv, factor: float
+) -> None:
+    env = mass_action_env
+    mat = env.build_all_matrices()
+    d = env.species["D"].index
+    y = random_state(mat)
+    y[d] = factor * LIMIT_UMOL
+    analytic = jacobian(0.0, y, None, mat)
+    assert_jacobian_matches(analytic, fd_jacobian(y, None, mat, 0.0, rel_step=1e-4))
+
+
+@pytest.mark.parametrize("factor", [0.1, 1.0, 3.0, 100.0])
+def test_switch_derivative_near_the_limit_enzymatic(
+    enzymatic_env: SimEnv, factor: float
+) -> None:
     env = enzymatic_env
     mat = env.build_all_matrices()
     d, p, s, enz = (env.species[n].index for n in ("D", "P", "S", "enz"))
-
     y = random_state(mat)
-    free = jacobian(0.0, y, None, mat)
-    assert_jacobian_matches(free, fd_jacobian(y, None, mat, 0.0))
-    assert free[p, s] != 0.0
-    assert free[p, enz] != 0.0
+    y[d] = factor * LIMIT_UMOL
+    y_full = mat.state.to_full_molar(y)
+    jac = jacobian(0.0, y, None, mat)
+    assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0, rel_step=1e-4))
 
-    y[d] = DEPLETED
-    assert negative_product_block(mat.state.to_full_molar(y), mat.enzymatic).all()
-    blocked = jacobian(0.0, y, None, mat)
-    assert_jacobian_matches(blocked, fd_jacobian(y, None, mat, 0.0))
-    assert not blocked.any()  # the only reaction is blocked
+    k, km = mat.enzymatic.k_values[0], mat.enzymatic.k_michaelis[0]
+    law = k * y_full[enz] * y_full[s] / (km + y_full[s])
+    switch = y_full[d] / (y_full[d] + DEPLETION_LIMIT)
+    assert switch == pytest.approx(factor / (1 + factor), rel=1e-12)
+    # rate = law * switch: dP/dD = law * eps / (D + eps)^2 (product rule)
+    expected = law * DEPLETION_LIMIT / (y_full[d] + DEPLETION_LIMIT) ** 2
+    assert jac[p, d] == pytest.approx(expected, rel=1e-12)
+    assert jac[p, enz] == pytest.approx(switch * law / y_full[enz], rel=1e-12)
 
 
 def test_michaelis_menten_derivatives(enzymatic_env: SimEnv) -> None:
@@ -287,9 +387,14 @@ def test_michaelis_menten_derivatives(enzymatic_env: SimEnv) -> None:
     s, enz, p = (env.species[n].index for n in ("S", "enz", "P"))
     k, km = mat.enzymatic.k_values[0], mat.enzymatic.k_michaelis[0]
     jac = jacobian(0.0, y, None, mat)
-    assert jac[p, enz] == pytest.approx(k * y_full[s] / (km + y_full[s]), rel=1e-12)
+    # D (~1 umol/L) is far above eps: the depletion switch is 1 up to 1e-6
+    switch = depletion_switch(y_full, mat.enzymatic)[0]
+    assert switch == pytest.approx(1.0, abs=1e-5)
+    assert jac[p, enz] == pytest.approx(
+        switch * k * y_full[s] / (km + y_full[s]), rel=1e-12
+    )
     assert jac[p, s] == pytest.approx(
-        k * y_full[enz] * km / (km + y_full[s]) ** 2, rel=1e-12
+        switch * k * y_full[enz] * km / (km + y_full[s]) ** 2, rel=1e-12
     )
 
 
@@ -298,8 +403,7 @@ def test_depleted_consumed_species_keeps_row(mass_action_env: SimEnv) -> None:
     mat = env.build_all_matrices()
     b, c = env.species["B"].index, env.species["C"].index
     y = random_state(mat)
-    # B is depleted and consumed by A + B -> C - D (C -> B + A, its only
-    # source, is off since C is depleted too)
+    # B is depleted and consumed by A + B -> C - D
     y[[b, c]] = DEPLETED
 
     jac = jacobian(0.0, y, None, mat)
@@ -332,8 +436,9 @@ def test_zero_species_uses_positive_side(mass_action_env: SimEnv) -> None:
     y[a] = 0.0
     y_full = mat.state.to_full_molar(y)
     jac = jacobian(0.0, y, None, mat)
-    k_ab = 1e9  # A + B -> C - D: rate = k A B, d rate / dA = k B at A = 0
-    assert jac[c, a] == pytest.approx(k_ab * y_full[b], rel=1e-12)
+    k_ab = 1e9  # A + B -> C - D: rate = k A B s(D), d rate / dA = k B s(D) at A = 0
+    switch = depletion_switch(y_full, mat.k_reactions).min()
+    assert jac[c, a] == pytest.approx(k_ab * y_full[b] * switch, rel=1e-12)
     assert jac[c, b] == 0.0  # d rate / dB = k A = 0
     assert jac[e, a] == 0.0  # 2 A + F -> E: d rate / dA = 2 k A F = 0
 
@@ -363,5 +468,59 @@ def test_negative_enzymatic_species_contribute_zero(enzymatic_env: SimEnv) -> No
     y[s] = 0.0
     jac = jacobian(0.0, y, None, mat)
     y_full = mat.state.to_full_molar(y)
-    assert jac[p, s] == pytest.approx(k * y_full[enz] / km, rel=1e-12)
+    switch = depletion_switch(y_full, mat.enzymatic)[0]
+    assert jac[p, s] == pytest.approx(switch * k * y_full[enz] / km, rel=1e-12)
     assert jac[p, enz] == 0.0
+
+
+# --------------------------------------------------------------------------- #
+#               Negative products on a bundled config (ADR 0005)              #
+# --------------------------------------------------------------------------- #
+def _negative_species(cell: UnitCell) -> list[int]:
+    """Dynamic species that are negative products (k or enzymatic)."""
+    mat = cell.mat
+    n_dyn = mat.n_species - mat.state.n_cst
+    flags = mat.k_reactions.negative_products.any(axis=1)
+    flags |= mat.enzymatic.negative_products.any(axis=1)
+    return [int(i) for i in np.flatnonzero(flags) if i < n_dyn]
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_negative_cell_random_positive_states(
+    negative_cell: UnitCell, seed: int
+) -> None:
+    mat = negative_cell.mat
+    y = random_state(mat, seed=seed)
+    analytic = jacobian(T_BEAM_ON, y, negative_cell.beam, mat)
+    numeric = fd_jacobian(y, negative_cell.beam, mat, T_BEAM_ON)
+    assert_jacobian_matches(analytic, numeric)
+
+
+@pytest.mark.parametrize("factor", [0.1, 1.0, 3.0, 100.0])
+def test_negative_cell_negative_products_near_the_limit(
+    negative_cell: UnitCell, factor: float
+) -> None:
+    mat = negative_cell.mat
+    species = _negative_species(negative_cell)
+    assert len(species) == 3  # H2O2, OH_minus, O2_r_minus
+    y = random_state(mat, seed=7)
+    y[species] = factor * LIMIT_UMOL * np.array([1.0, 0.5, 2.0])
+    switches = depletion_switch(mat.state.to_full_molar(y), mat.k_reactions)
+    assert 0.0 < switches.min() < 1.0
+    analytic = jacobian(T_BEAM_OFF, y, negative_cell.beam, mat)
+    numeric = fd_jacobian(y, negative_cell.beam, mat, T_BEAM_OFF, rel_step=1e-4)
+    assert_jacobian_matches(analytic, numeric)
+
+
+def test_negative_cell_with_clipped_species(negative_cell: UnitCell) -> None:
+    mat = negative_cell.mat
+    rng = np.random.default_rng(11)
+    for _ in range(3):
+        y = random_state(mat, seed=int(rng.integers(1000)))
+        flip = rng.random(y.size) < 0.3
+        flip[_negative_species(negative_cell)[0]] = True  # a negative product
+        y[flip] *= -1.0
+        analytic = jacobian(T_BEAM_ON, y, negative_cell.beam, mat)
+        assert not analytic[:, flip].any()  # clipped: no dependence below 0
+        numeric = fd_jacobian(y, negative_cell.beam, mat, T_BEAM_ON)
+        assert_jacobian_matches(analytic, numeric)

@@ -8,21 +8,32 @@ Every reaction rate is computed by the single pure function
 ``ODEResult.reconstruct_reactions``). It is split in small steps that can
 be reused when differentiating the system:
     1. mass action law of the k-reactions        -> mass_action_rates
-    2. negative products blocking k-reactions     -> negative_product_block
-    3. Michaelis-Menten law of enzymatic reactions -> michaelis_menten_rates
-    4. radiolytic production (G values)           -> radiolytic_rates
+    2. Michaelis-Menten law of enzymatic reactions -> michaelis_menten_rates
+    3. radiolytic production (G values)           -> radiolytic_rates
+    4. depletion switch of the negative products   -> depletion_switch
+       (k-reactions and enzymatic reactions)
 The time derivative of the species is then the sum, over the reaction
 families, of stoichiometry @ rates (see ``species_rates``).
 
 ``jacobian`` is the analytic Jacobian of ``derive``: the same sum with the
 rates replaced by their derivatives with respect to the concentrations
-(mass_action_derivatives, michaelis_menten_derivatives). It is piecewise
-like ``derive`` (ADR 0003): a blocked reaction contributes 0.
+(mass_action_derivatives, michaelis_menten_derivatives,
+depletion_switch_derivatives).
+
+A k or enzymatic reaction with negative products (written ``- species`` on
+the product side) is slowed down while one of them runs out: its rate is
+multiplied, for each negative product, by the smooth depletion switch
+c / (c + eps), with c the clipped concentration and eps = DEPLETION_LIMIT
+(ADR 0005). The factor is 1/2 at c = eps and above 0.99 for c > 100 eps. It
+replaces the former hard block at DEPLETION_LIMIT: ``derive`` is
+continuous, and ``jacobian`` is no longer piecewise (it includes the
+derivative of the switch, eps / (c + eps)**2, by the product rule).
 
 Every rate law reads the clipped concentration max(c, 0) (ADR 0004): a
 species driven below 0 by a solver overshoot counts as absent, so it is
 not consumed further and cannot run a reaction backwards, and
-``derive`` stays exactly stoichiometry @ rates.
+``derive`` stays exactly stoichiometry @ rates. The Jacobian is only
+piecewise at the clipping kink c = 0 (ADR 0004).
 
 Units: the full molar state and all rates are in [mol/L] and [mol/L/s].
 Only ``derive`` deals with the [µmol/L] solver state, through
@@ -56,6 +67,8 @@ __all__ = [
     "DEPLETION_LIMIT",
     "ReactionRates",
     "ScipyODEResult",
+    "depletion_switch",
+    "depletion_switch_derivatives",
     "derive",
     "dose_rates",
     "jacobian",
@@ -63,7 +76,6 @@ __all__ = [
     "mass_action_rates",
     "michaelis_menten_derivatives",
     "michaelis_menten_rates",
-    "negative_product_block",
     "radiolytic_rates",
     "reaction_rates",
     "species_rates",
@@ -73,8 +85,8 @@ __all__ = [
 #                             FUNCTION DEFINITIONS                            #
 # --------------------------------------------------------------------------- #
 
-# A species whose concentration is at or below this value [mol/L] is
-# considered depleted.
+# Scale eps [mol/L] of the depletion switch c / (c + eps): a negative product
+# at this concentration halves the rate of its reaction.
 DEPLETION_LIMIT: float = 1e-12
 
 
@@ -106,8 +118,8 @@ def mass_action_rates(
     y_full: NDArray[np.float64],
     kmat: KMatrices,
 ) -> NDArray[np.float64]:
-    """Mass action law of every k-reaction, ignoring negative products.
-    Reads the clipped concentrations max(c, 0) (ADR 0004).
+    """Mass action law of every k-reaction, without the depletion switch of
+    the negative products (see ``depletion_switch``). Reads the clipped concentrations max(c, 0) (ADR 0004).
 
     Args:
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t).
@@ -126,31 +138,80 @@ def mass_action_rates(
     return np.prod(factors, axis=1) * k_values
 
 
-def negative_product_block(
+def depletion_switch(
     y_full: NDArray[np.float64],
     mat: KMatrices | EzMatrices,
-) -> NDArray[np.bool_]:
-    """Which reactions must not occur: the ones having at least one
-    negative product that is depleted (concentration <= DEPLETION_LIMIT).
+) -> NDArray[np.float64]:
+    """Depletion switch of every reaction: the product, over its negative
+    products, of c / (c + ε) with c = max(c, 0) the clipped concentration
+    and ε = DEPLETION_LIMIT (ADR 0005). 1 for a reaction without negative
+    product, tends to 0 as a negative product runs out.
 
     Args:
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t).
         mat: KMatrices or EzMatrices (both hold ``negative_products``).
 
     Returns:
-        NDArray[np.bool_]: True for blocked reactions, (n_r,) or
-        (n_r, n_t).
+        NDArray[np.float64]: factor in [0, 1] multiplying the rates,
+        (n_r,) or (n_r, n_t).
     """
-    depleted = y_full <= DEPLETION_LIMIT
-    return mat.negative_products.T @ depleted
+    negative = mat.negative_products
+    out = np.ones((negative.shape[1], *y_full.shape[1:]), dtype=np.float64)
+    columns = np.flatnonzero(negative.any(axis=0))
+    if columns.size == 0:
+        return out
+    clipped = np.maximum(y_full, 0.0)
+    per_species = clipped / (clipped + DEPLETION_LIMIT)
+    for col in columns:
+        out[col] = np.prod(per_species[negative[:, col]], axis=0)
+    return out
+
+
+def depletion_switch_derivatives(
+    y_full: NDArray[np.float64],
+    mat: KMatrices | EzMatrices,
+) -> NDArray[np.float64]:
+    """Derivative of the depletion switch of every reaction with respect to
+    every species (product rule over the negative products).
+
+    d/dc of c / (c + ε) is ε / (c + ε)² on the clipped concentration: 0 for
+    c < 0 (ADR 0004); at exactly c = 0 the derivative of the c > 0 side
+    (1 / ε) is used.
+
+    Args:
+        y_full: full molar state [mol/L], (n_species,).
+        mat: KMatrices or EzMatrices (both hold ``negative_products``).
+
+    Returns:
+        NDArray[np.float64]: (n_r, n_species) d switch / d concentration
+        [L/mol].
+    """
+    negative = mat.negative_products
+    out = np.zeros((negative.shape[1], y_full.shape[0]), dtype=np.float64)
+    columns = np.flatnonzero(negative.any(axis=0))
+    if columns.size == 0:
+        return out
+    clipped = np.maximum(y_full, 0.0)
+    per_species = clipped / (clipped + DEPLETION_LIMIT)
+    slope = np.where(
+        y_full < 0.0, 0.0, DEPLETION_LIMIT / (clipped + DEPLETION_LIMIT) ** 2
+    )
+    for col in columns:
+        species = np.flatnonzero(negative[:, col])
+        for pos, j in enumerate(species):
+            others = np.prod(np.delete(per_species[species], pos))
+            out[col, j] = others * slope[j]
+    return out
 
 
 def michaelis_menten_rates(
     y_full: NDArray[np.float64],
     ezmat: EzMatrices,
 ) -> NDArray[np.float64]:
-    """Michaelis-Menten law of every enzymatic reaction. Reads the clipped
-    concentrations max(c, 0) of the enzyme and the substrate (ADR 0004).
+    """Michaelis-Menten law of every enzymatic reaction, without the
+    depletion switch of the negative products (see ``depletion_switch``).
+    Reads the clipped concentrations max(c, 0) of the enzyme and the
+    substrate (ADR 0004).
 
     Args:
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t).
@@ -204,16 +265,12 @@ def reaction_rates(
     Returns:
         ReactionRates [mol/L/s]
     """
-    k_rates = mass_action_rates(y_full, mat.k_reactions)
-    k_rates = np.where(negative_product_block(y_full, mat.k_reactions), 0.0, k_rates)
     return ReactionRates(
-        k_reactions=k_rates,
+        k_reactions=mass_action_rates(y_full, mat.k_reactions)
+        * depletion_switch(y_full, mat.k_reactions),
         radiolytic=radiolytic_rates(dose_rates(t, beam), mat.radiolytic),
-        enzymatic=np.where(
-            negative_product_block(y_full, mat.enzymatic),
-            0.0,
-            michaelis_menten_rates(y_full, mat.enzymatic),
-        ),
+        enzymatic=michaelis_menten_rates(y_full, mat.enzymatic)
+        * depletion_switch(y_full, mat.enzymatic),
     )
 
 
@@ -236,7 +293,8 @@ def mass_action_derivatives(
     kmat: KMatrices,
 ) -> NDArray[np.float64]:
     """Derivative of the mass action rate of every k-reaction with respect
-    to every species, ignoring negative products.
+    to every species, without the depletion switch of the negative products
+    (see ``depletion_switch_derivatives``).
 
     Product rule on the reactant slots: d/dy_s of k * prod(slots) is k times
     the product of the other slots, summed over the slots holding s (a
@@ -274,7 +332,8 @@ def michaelis_menten_derivatives(
     ezmat: EzMatrices,
 ) -> NDArray[np.float64]:
     """Derivative of the Michaelis-Menten rate of every enzymatic reaction
-    with respect to every species, ignoring negative products.
+    with respect to every species, without the depletion switch of the
+    negative products (see ``depletion_switch_derivatives``).
 
     The rate reads the clipped concentrations max(c, 0) (ADR 0004): a
     species with c < 0 contributes 0; at exactly c = 0 the derivative of
@@ -316,10 +375,10 @@ def jacobian(
     """Analytic Jacobian d(dy/dt)/dy of ``derive`` (the ``jac`` argument of
     scipy.integrate.solve_ivp).
 
-    Pure function. Piecewise like ``derive`` (ADR 0003): it is the
-    derivative on the current side of every on/off switch, i.e. a k or
-    enzymatic reaction blocked by a depleted negative product contributes
-    0. It follows the clipped concentrations of ``derive`` (ADR 0004): a
+    Pure function. The rate of a k or enzymatic reaction is the product of
+    its rate law and of its depletion switch (ADR 0005), so every entry
+    follows the product rule: d(law)/dc * switch + law * d(switch)/dc.
+    It follows the clipped concentrations of ``derive`` (ADR 0004): a
     species below 0 contributes 0 to every derivative it enters. Radiolytic
     reactions (they do not depend on the concentrations) and constant
     species (they are not solved) contribute nothing.
@@ -341,14 +400,35 @@ def jacobian(
     n_dyn = y_full.shape[0] - mat.state.n_cst
     kmat, ezmat = mat.k_reactions, mat.enzymatic
 
-    d_k = mass_action_derivatives(y_full, kmat)
-    d_k[negative_product_block(y_full, kmat)] = 0.0
-    d_ez = michaelis_menten_derivatives(y_full, ezmat)
-    d_ez[negative_product_block(y_full, ezmat)] = 0.0
+    d_k = _product_rule(
+        mass_action_rates(y_full, kmat),
+        mass_action_derivatives(y_full, kmat),
+        depletion_switch(y_full, kmat),
+        depletion_switch_derivatives(y_full, kmat),
+    )
+    d_ez = _product_rule(
+        michaelis_menten_rates(y_full, ezmat),
+        michaelis_menten_derivatives(y_full, ezmat),
+        depletion_switch(y_full, ezmat),
+        depletion_switch_derivatives(y_full, ezmat),
+    )
 
     jac = kmat.stoichiometry[:n_dyn] @ d_k[:, :n_dyn]
     jac += ezmat.stoichiometry[:n_dyn] @ d_ez[:, :n_dyn]
     return jac
+
+
+def _product_rule(
+    law: NDArray[np.float64],
+    law_derivatives: NDArray[np.float64],
+    switch: NDArray[np.float64],
+    switch_derivatives: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Derivatives (n_r, n_species) of the rates law * switch."""
+    return (
+        law_derivatives * switch[:, np.newaxis]
+        + law[:, np.newaxis] * switch_derivatives
+    )
 
 
 def derive(

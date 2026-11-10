@@ -27,11 +27,11 @@ from radiopyo.physics.beam import ConstantBeam
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import (
     DEPLETION_LIMIT,
+    depletion_switch,
     derive,
     dose_rates,
     mass_action_rates,
     michaelis_menten_rates,
-    negative_product_block,
     reaction_rates,
     species_rates,
 )
@@ -360,9 +360,9 @@ def test_reconstruct_reactions_without_time_points(labarbe_cell: UnitCell) -> No
 
 
 # --------------------------------------------------------------------------- #
-#                     Negative products / forced positivity                   #
+#                    Negative products / depletion switch                     #
 # --------------------------------------------------------------------------- #
-def test_negative_product_blocks_reaction(negative_product_env: SimEnv) -> None:
+def test_negative_product_depletion_switch(negative_product_env: SimEnv) -> None:
     env = negative_product_env
     mat = env.build_all_matrices()
     kmat = mat.k_reactions
@@ -381,27 +381,46 @@ def test_negative_product_blocks_reaction(negative_product_env: SimEnv) -> None:
         y_full[idx["D"]] = d
         return y_full
 
-    for d, blocked in [
-        (DEPLETION_LIMIT, True),
-        (0.0, True),
-        (2 * DEPLETION_LIMIT, False),
+    # Switch c / (c + eps): 0 at 0 (and below), 1/2 at eps, ~1 well above
+    for d, switch in [
+        (0.0, 0.0),
+        (-1e-9, 0.0),
+        (DEPLETION_LIMIT, 0.5),
+        (2 * DEPLETION_LIMIT, 2 / 3),
+        (1e-10, 1e-10 / (1e-10 + DEPLETION_LIMIT)),
+        (1e-6, 1e-6 / (1e-6 + DEPLETION_LIMIT)),
     ]:
         y_full = state(d)
-        assert negative_product_block(y_full, kmat)[r_neg.get_index()] == blocked
+        factors = depletion_switch(y_full, kmat)
+        assert factors[r_neg.get_index()] == pytest.approx(switch, rel=1e-14)
+        assert factors[r_cst.get_index()] == 1.0  # no negative product
         rates = reaction_rates(0.0, y_full, mat, None).k_reactions
-        expected_neg = 0.0 if blocked else 1e9 * 1e-4 * 1e-4
+        expected_neg = switch * 1e9 * 1e-4 * 1e-4
         assert rates[r_neg.get_index()] == pytest.approx(expected_neg, rel=1e-14)
-        # The other reaction (with a fixed reactant F) is never blocked
+        # The other reaction (with a fixed reactant F) is never slowed down
         expected_cst = (
             2e8 * 1e-4 * 1e-4 * mat.cst_sp[idx["F"] - (mat.n_species - mat.state.n_cst)]
         )
         assert rates[r_cst.get_index()] == pytest.approx(expected_cst, rel=1e-14)
 
-    # Vectorised over time points: same decisions column by column
-    states = np.stack([state(d) for d in (0.0, 2 * DEPLETION_LIMIT)], axis=1)
-    np.testing.assert_array_equal(
-        negative_product_block(states, kmat)[r_neg.get_index()], [True, False]
+    # Almost no slowdown at 1e-6 mol/L (< 1e-5 relative), under 1 % at 1e-10
+    assert depletion_switch(state(1e-6), kmat)[r_neg.get_index()] > 1 - 1e-5
+    assert depletion_switch(state(1e-10), kmat)[r_neg.get_index()] > 0.99
+
+    # Vectorised over time points: same factors column by column
+    ds = (0.0, DEPLETION_LIMIT, 1e-6)
+    states = np.stack([state(d) for d in ds], axis=1)
+    np.testing.assert_allclose(
+        depletion_switch(states, kmat)[r_neg.get_index()],
+        [0.0, 0.5, 1e-6 / (1e-6 + DEPLETION_LIMIT)],
+        rtol=1e-14,
     )
+    np.testing.assert_array_equal(depletion_switch(states, kmat)[r_cst.get_index()], 1.0)
+    vec = reaction_rates(np.zeros(3), states, mat, None).k_reactions
+    for col, d in enumerate(ds):
+        np.testing.assert_array_equal(
+            vec[:, col], reaction_rates(0.0, state(d), mat, None).k_reactions
+        )
 
 
 # --------------------------------------------------------------------------- #

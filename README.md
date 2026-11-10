@@ -316,7 +316,9 @@ k_micha = 1.1 #  [mol/l]
 The same grammar as for "k_reactions" applies. For enzymatic reactions, the enzyme name
 must be specified in the operator arrow (-- 'enzyme name' >>). It is a plain name, in any
 case (`catalase`, `SOD`, `GPx`), never read as a chemical formula. As for k-reactions,
-an enzymatic reaction is blocked while one of its "negative" products is depleted.
+the rate of an enzymatic reaction is multiplied, for each of its "negative" products, by
+c / (c + 1e-12 mol/L) (c = concentration of the product): it is halved at 1e-12 mol/L and
+vanishes as the product is depleted.
 
 ps: note the double "\[\[" and "\]\]", mandatory for each entry!
 
