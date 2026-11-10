@@ -111,6 +111,30 @@
         "ticket": "02-jacobian-function",
         "commit": "694616c"
       }
+    },
+    {
+      "at": "2026-11-10T11:15:22.827Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-wire-use-jac.md",
+        "03-implement/03-wire-use-jac/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-wire-use-jac"
+      }
+    },
+    {
+      "at": "2026-11-10T11:22:11.446Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-wire-use-jac/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-wire-use-jac",
+        "commit": "d37c2f8"
+      }
     }
   ],
   "current_phase": "ship",
