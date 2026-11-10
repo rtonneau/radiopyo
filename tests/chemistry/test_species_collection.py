@@ -333,3 +333,35 @@ class TestListSpecies:
         dyn_sp[0] = next(iter(list_species.cst_sp))
         with pytest.raises(TypeError):
             list_species.sort(inplace=True, starter=dyn_sp[:2])
+
+
+_ORDER_SNIPPET = """
+import radiopyo as rp
+from radiopyo.simulation.unit_cell import UnitCell
+
+env = UnitCell.from_toml(rp.LABARBE_CONFIG_FILE).env
+print("@@START")
+print(chr(10).join(env.species.to_pandas().tolist()))
+print("---")
+print(chr(10).join(str(r) for r in env.reactions.iter_all()))
+"""
+
+
+def test_species_and_reaction_order_independent_of_hash_seed():
+    import os
+    import subprocess
+    import sys
+
+    outputs = []
+    for seed in ("0", "1", "12345"):
+        proc = subprocess.run(
+            [sys.executable, "-c", _ORDER_SNIPPET],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr
+        outputs.append(proc.stdout.partition("@@START")[2])
+    assert len(outputs[0].splitlines()) > 10
+    assert outputs[0] == outputs[1] == outputs[2]

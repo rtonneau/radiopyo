@@ -6,6 +6,12 @@ All notable changes to this project. Versions follow [semantic versioning](https
 
 ### Fixed
 
+- Species indices (and the summation order in the solver) depended on `PYTHONHASHSEED`:
+  `ListSpecies.sort` numbered the non-starter dynamic species by iterating a `set`. It now keeps the
+  insertion order (order of appearance in the config file), so indices, matrices and the solver step
+  sequence are reproducible from one process to the next. Results change only at round-off level
+  (max relative difference 1.3e-7 on R_r, the Labarbe run now always gives 2432 solver points instead
+  of 2294 to 2448 depending on the seed).
 - `UnitCell.run`: the arguments were forwarded to the solver by position, so `force_positive`
   never reached it and was used as the "beam ON" flag instead. The initial radiolytic burst
   (first `T_ZERO` seconds of a beam ON phase, added analytically to `y0`) is now applied by

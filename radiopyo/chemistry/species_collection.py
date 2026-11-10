@@ -413,7 +413,10 @@ class ListSpecies:
         out = self.copy() if not inplace else self
         if starter is None:
             starter = []
-        all_dyn = {elt.label for elt in out.iter_dyn_species()}
+        # Insertion order (i.e. order of appearance in the config file) is
+        # kept: iterating a set would depend on PYTHONHASHSEED.
+        all_dyn = list(out.dyn_sp)
+        starter_set = set(starter)  # membership test only, never iterated
 
         for idx, label in enumerate(starter):
             if self.is_cst_species(label):
@@ -423,7 +426,8 @@ class ListSpecies:
                 )
             out[label].index = idx
 
-        for idx, label in enumerate(all_dyn - set(starter), start=len(starter)):
+        others = (label for label in all_dyn if label not in starter_set)
+        for idx, label in enumerate(others, start=len(starter)):
             out[label].index = idx
 
         for idx, species in enumerate(
