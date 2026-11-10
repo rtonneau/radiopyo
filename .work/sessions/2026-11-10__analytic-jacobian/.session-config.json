@@ -159,9 +159,33 @@
         "ticket": "04-benchmark-and-default",
         "commit": "cb75447"
       }
+    },
+    {
+      "at": "2026-11-10T12:08:59.147Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/05-docs.md",
+        "03-implement/05-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-docs"
+      }
+    },
+    {
+      "at": "2026-11-10T12:11:47.537Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/05-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-docs",
+        "commit": "8750a82"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "feat/analytic-jacobian",
     "base_branch": "main",
