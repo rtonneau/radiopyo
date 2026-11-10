@@ -115,21 +115,21 @@ def mass_action_rates(
 
 def negative_product_block(
     y_full: NDArray[np.float64],
-    kmat: KMatrices,
+    mat: KMatrices | EzMatrices,
 ) -> NDArray[np.bool_]:
-    """Which k-reactions must not occur: the ones having at least one
+    """Which reactions must not occur: the ones having at least one
     negative product that is depleted (concentration <= DEPLETION_LIMIT).
 
     Args:
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t).
-        kmat: KMatrices
+        mat: KMatrices or EzMatrices (both hold ``negative_products``).
 
     Returns:
-        NDArray[np.bool_]: True for blocked reactions, (n_kr,) or
-        (n_kr, n_t).
+        NDArray[np.bool_]: True for blocked reactions, (n_r,) or
+        (n_r, n_t).
     """
     depleted = y_full <= DEPLETION_LIMIT
-    return kmat.negative_products.T @ depleted
+    return mat.negative_products.T @ depleted
 
 
 def michaelis_menten_rates(
@@ -195,7 +195,11 @@ def reaction_rates(
     return ReactionRates(
         k_reactions=k_rates,
         radiolytic=radiolytic_rates(dose_rates(t, beam), mat.radiolytic),
-        enzymatic=michaelis_menten_rates(y_full, mat.enzymatic),
+        enzymatic=np.where(
+            negative_product_block(y_full, mat.enzymatic),
+            0.0,
+            michaelis_menten_rates(y_full, mat.enzymatic),
+        ),
     )
 
 

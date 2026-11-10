@@ -268,6 +268,10 @@ class EzMatrices:
             state.
         enzyme_index: (n_ez,) intp, index of the enzyme in the full state.
         stoichiometry: (n_species, n_ez) float64 stoichiometry matrix.
+            Negative products count as consumed.
+        negative_products: (n_species, n_ez) bool, True when the species
+            is a negative product of the reaction. Such a reaction does
+            not occur while that species is depleted.
     """
 
     k_values: NDArray[np.float64]
@@ -275,6 +279,7 @@ class EzMatrices:
     substrate_index: NDArray[np.intp]
     enzyme_index: NDArray[np.intp]
     stoichiometry: NDArray[np.float64]
+    negative_products: NDArray[np.bool_]
 
     def __post_init__(self) -> None:
         _lock_arrays(self)

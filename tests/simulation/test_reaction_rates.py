@@ -210,6 +210,7 @@ def test_derive_with_zero_fixed_species() -> None:
             substrate_index=np.zeros(0, dtype=np.intp),
             enzyme_index=np.zeros(0, dtype=np.intp),
             stoichiometry=np.zeros((2, 0)),
+            negative_products=np.zeros((2, 0), dtype=np.bool_),
         ),
         state=StateLayout(cst_sp=np.zeros(0)),
     )
