@@ -12,8 +12,9 @@ in equilibrium.
 The classes defined here are:
 
 - `EReaction`: This class represents a chemical reaction with
- equilibrium.It inherits from the `BasicReaction` class and provides
- additional methods to work with these types of reactions.
+ equilibrium. It inherits from the `BiReaction` class (a forward and a
+ backward KReaction) and provides additional methods to work with these
+ types of reactions.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 13/12/2023
@@ -27,7 +28,6 @@ import typing as tp
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.chemistry.generics import revert_reaction
 from radiopyo.chemistry.k_reactions import (
     BiReaction,
 )
@@ -59,6 +59,10 @@ class EReaction(BiReaction):
     <=> log(K_e) = log(K_f) - log(K_b)
 
     For polynomial form, log(K) = a0 + a1 (1/T) + a2 (1/T)**2 + ...
+
+    The forward and backward rate constants are owned by the forward and
+    backward KReactions; they are used as given (no n·k division, see
+    ADR 0001).
     """
 
     _k_equilibrium: np.polynomial.Polynomial
@@ -90,18 +94,18 @@ class EReaction(BiReaction):
         # Check whether enough information is provided to compute all K's.
         if constant is None:
             try:
-                self._k_forward = polynomial_factory(
+                k_forward = polynomial_factory(
                     reaction["constants"]["k_forward"],
                     log10=True,
                 )
-                self._k_backward = polynomial_factory(
+                k_backward = polynomial_factory(
                     reaction["constants"]["k_backward"],
                     log10=True,
                 )
-                if not np.isinf(self._k_forward.coef[0]) and not np.isinf(
-                    self._k_backward.coef[0]
+                if not np.isinf(k_forward.coef[0]) and not np.isinf(
+                    k_backward.coef[0]
                 ):
-                    self._k_equilibrium = self._k_forward - self._k_backward
+                    self._k_equilibrium = k_forward - k_backward
             except KeyError as err:
                 raise ValueError(
                     "EReaction needs 2 out of the 3 (K_equilibrium, K_forward, K_backward)"
@@ -112,7 +116,7 @@ class EReaction(BiReaction):
             "k_backward" in reaction["constants"]
             and reaction["constants"]["k_backward"] is not None
         ):
-            self._k_backward = polynomial_factory(
+            k_backward = polynomial_factory(
                 reaction["constants"]["k_backward"],
                 log10=True,
             )
@@ -120,12 +124,12 @@ class EReaction(BiReaction):
                 constant,
                 log10=True,
             )
-            self._k_forward = self._k_equilibrium + self._k_backward
+            k_forward = self._k_equilibrium + k_backward
         elif (
             "k_forward" in reaction["constants"]
             and reaction["constants"]["k_forward"] is not None
         ):
-            self._k_forward = polynomial_factory(
+            k_forward = polynomial_factory(
                 reaction["constants"]["k_forward"],
                 log10=True,
             )
@@ -133,18 +137,14 @@ class EReaction(BiReaction):
                 constant,
                 log10=True,
             )
-            self._k_backward = self._k_forward - self._k_equilibrium
+            k_backward = k_forward - self._k_equilibrium
         else:
             raise ValueError(
                 "EReaction needs 2 out of the 3 (K_equilibrium, K_forward, K_backward)"
                 f"{reaction} & constant: {constant}"
             )
 
-        self.add_forward_reaction(reaction, list_sp)
-        self.forward.set_k_value(self._k_forward)  # type: ignore [arg-type]
-
-        self.add_backward_reaction(revert_reaction(reaction), list_sp)
-        self.backward.set_k_value(self._k_backward)  # type: ignore [arg-type]
+        self._add_reaction_pair(reaction, k_forward, k_backward, list_sp)
 
     def k_equilibrium(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
@@ -159,37 +159,7 @@ class EReaction(BiReaction):
             float: The equilibrium constant at the given temperature.
         """
         _T = Temperature(T)
-        return 10 ** self._k_equilibrium(1 / _T.kelvin)
-
-    def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
-        """
-        Compute the forward reaction constant of the reaction at a given
-        temperature.
-
-        Args:
-            T (Optional[Temperature | float]): The temperature in
-                °C (optional, default:None)
-
-        Returns:
-            float: The forward reaction constant at the given
-                temperature.
-        """
-        return self.forward.k_value(T)
-
-    def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
-        """
-        Compute the backward reaction constant of the reaction at a
-            given temperature.
-
-        Args:
-            T (Optional[Temperature | float]): The temperature in
-                °C (optional, default:None)
-
-        Returns:
-            float: The backward reaction constant at the
-                given temperature.
-        """
-        return self.backward.k_value(T)
+        return tp.cast(float, 10 ** self._k_equilibrium(1 / _T.kelvin))
 
     def to_dict(self) -> tp.Dict[str, tp.Any]:
         """

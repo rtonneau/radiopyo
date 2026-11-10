@@ -4,8 +4,6 @@
 Sub-Module containing all parsers used in the radiopyo module.
     - file_parser.py:
         BackBone definition for a general config file parser.
-    - ron.py:
-        FileParser subclass for ron syntax.
     - toml.py:
         FileParser subclass for toml syntax.
     - utils.py:

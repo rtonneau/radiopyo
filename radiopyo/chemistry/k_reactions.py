@@ -9,16 +9,17 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import hashlib
 import operator
 import typing as tp
 import uuid
 from abc import ABC, abstractmethod
 
 import numpy as np
+from scipy.constants import R as GAS_CONSTANT  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.basic_reaction import BasicReaction
+from radiopyo.chemistry.generics import revert_reaction
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.factories import polynomial_factory
 from radiopyo.chemistry.utils.units import Temperature
@@ -49,19 +50,26 @@ KValType: tp.TypeAlias = tp.Union[float, tp.List[float], np.polynomial.Polynomia
 
 class KReaction(BasicReaction):
     """
-    Almost all the logic is already included in the BaseChemicalReaction
-    class. Add the reaction rate as attribute.For reactions where only
-    one reactant is involved e.g.
-        2 H_r -> H2
-    in that case, 2k is usually given/measured instead of
-    k (reaction constant). User should simply pass the 2k value at
-    construction and then it will be accounted for during calculation of
-    reaction rate.
+    Almost all the logic is already included in the BasicReaction
+    class. Add the reaction rate constant as attribute. It is stored as
+    a polynomial of log10(k) in 1/T [1/K]:
+        log10(k) = a0 + a1 (1/T) + a2 (1/T)**2 + ...
+    so a single value k is stored as [log10(k)].
+
+    n·k convention (ADR 0001):
+        For reactions with a single reactant species, e.g.
+            2 H_r -> H2
+        2k is usually given/measured instead of k (reaction constant).
+        When such a reaction is built from a config ('from_generic'),
+        the configured value is divided by the stoichiometry n of the
+        reactant ONLY IF k is a single number (scalar k). Polynomial
+        k(T), Arrhenius and equilibrium (acid/base, EReaction) k are used
+        as given. 'raw_k_value()' gives back the configured (n·k) value.
+        The constructor and 'set_k_value' never divide.
 
     Attributes:
-        k_value: float | List[float] | np.polynomial.Polynomial
-            Reaction rate
-        T: Temperature in °C (optional, default:25).
+        _k_value: np.polynomial.Polynomial | None
+            log10 of the reaction rate constant, polynomial of 1/T[K].
     """
 
     _k_value: tp.Optional[np.polynomial.Polynomial]
@@ -99,9 +107,19 @@ class KReaction(BasicReaction):
         _T = Temperature(T)
         return np.power(10, self._k_value(1.0 / _T.kelvin))
 
+    @property
+    def k_polynomial(self) -> tp.Optional[np.polynomial.Polynomial]:
+        """
+        The stored log10(k) polynomial (of 1/T [1/K]), None if no rate
+        constant is defined.
+        """
+        return self._k_value
+
     def set_k_value(self, value: KValType) -> None:
         """
-        Set the reaction constant value.
+        Set the reaction constant value. A float is a k value, a list
+        of floats or a polynomial are log10(k) coefficients (see class
+        docstring). No n·k division is applied here.
 
         Args:
             value (KValType): The new reaction constant value.
@@ -110,6 +128,19 @@ class KReaction(BasicReaction):
             None
         """
         self._k_value = polynomial_factory(value, log10=True)
+
+    def _apply_nk_convention(self) -> None:
+        """
+        n·k convention (ADR 0001): for n A -> ..., the configured scalar
+        k is n·k, divide it by n. Polynomial k are kept as given.
+        """
+        if (
+            self._k_value is not None
+            and len(self.reactants) == 1
+            and len(self._k_value) == 1
+        ):
+            reactant = next(iter(self.reactants))
+            self.set_k_value(self.k_value() / reactant.stoi)
 
     def to_dict(self) -> tp.Dict[str, tp.Any]:
         """
@@ -124,20 +155,6 @@ class KReaction(BasicReaction):
             "k_value": self.raw_k_value(),
         }
 
-    def make_hash(self, method: str = "sha256") -> str:
-        """
-        Produce a unique identifier (content based) for easy comparison.
-
-        Args:
-            method (str): Hash method to use (default: "sha256").
-
-        Returns:
-            str: A hash value representing the object.
-        """
-        hasher = hashlib.new(method, usedforsecurity=False)
-        hasher.update(repr(self).encode())
-        return hasher.hexdigest()
-
     def as_label(self) -> str:
         """
         This method generates a short label for the reaction based on
@@ -150,10 +167,7 @@ class KReaction(BasicReaction):
         Raises:
             KeyError: If the index is None or invalid.
         """
-        if self.index is not None and self.index >= 0:
-            return f"KR_{self.index}"
-
-        raise KeyError("Unknown reaction index. Cannot make a label without index.")
+        return self._index_label("KR")
 
     def raw_k_value(self) -> float | tp.List[float] | None:
         """
@@ -166,9 +180,9 @@ class KReaction(BasicReaction):
         if self._k_value is None:
             return None
         if len(self._k_value) > 1:
-            return self._k_value.coef
+            return tp.cast("list[float]", self._k_value.coef)  # ndarray at runtime
 
-        # Case of n*A -> B, then n*k is measured/given
+        # n·k convention (ADR 0001): give back the configured n·k value
         if len(self.reactants) == 1:
             sp = next(iter(self.reactants))
             return self.k_value() * sp.stoi
@@ -194,79 +208,9 @@ class KReaction(BasicReaction):
             KReaction: An instance of KReaction.
         """
         reaction = cls(generic["constants"].get("k_value", None))
-        list_sp = ListSpecies() if list_sp is None else list_sp
-
-        for _, (sp, stoi, ope) in generic["reactants"].items():
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
-            reaction.add_as_reactant(sim_sp, stoi, ope)
-
-        # Case of n*A -> B, then n*k is measured/given
-        if (
-            reaction._k_value is not None
-            and len(reaction.reactants) == 1
-            and len(reaction._k_value) == 1
-        ):
-            # Compute k: divide by reactant's stoichio
-            reaction.set_k_value(
-                reaction.k_value() / reaction.reactants.stoichiometry_of(sp)
-            )
-
-        for _, (sp, stoi, ope) in generic["products"].items():
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
-            reaction.add_as_product(sim_sp, stoi, ope)
-
+        reaction._add_species_from_generic(generic, list_sp)
+        reaction._apply_nk_convention()
         return reaction
-
-    @classmethod
-    def from_dict(
-        cls,
-        reactants: tp.List[str],
-        products: tp.List[str],
-        k_value: None | float | tp.List[float],
-        list_sp: tp.Optional[ListSpecies] = None,
-    ) -> tp.Self:
-        """
-        Create a KReaction from a dictionary (via destructuring).
-
-        Args:
-            reactants: List[str]
-                List of reactants
-            products: List[str]
-                List of products
-            k_value: float | tp.List[float]
-                k value of the reactions or the coefficients of the
-                    poly version
-            list_sp: ListSpecies
-                Collection of species already involved in the
-                simulation. This collection will grow if some reactants
-                and/or products do not exist yet.
-
-        Returns:
-            KReaction
-                An instance of KReaction.
-        """
-        raise NotImplementedError
-        if isinstance(k_value, (float, int)):
-            k_value = [k_value]
-
-        new = cls(k_value)
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        for sp in reactants:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_reactant(sim_sp)
-
-        # Case of n*A -> B, then n*k is measured/given
-        if k_value is not None and len(new.reactants) == 1 and len(k_value) == 1:
-            # Compute k: divide by reactant's stoichio
-            new.set_k_value(k_value[0] / new.get_stoi_of(sp))
-
-        for sp in products:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_product(sim_sp)
-        return new
 
     def __str__(self) -> str:
         """
@@ -290,7 +234,10 @@ class KReaction(BasicReaction):
 
 class Arrhenius(KReaction):
     """
-    Class representing an Arrhenius reaction.
+    Class representing an Arrhenius reaction:
+        k(T) = A * exp(-Ea / (R * T))
+    with T the simulation temperature in K and R the gas constant
+    (8.314 J/mol/K). Ea is given in kJ/mol (converted to J/mol here).
 
     Args:
         A: float
@@ -334,7 +281,10 @@ class Arrhenius(KReaction):
                 temperature.
         """
         T = Temperature(T)
-        return self._pre_exp * np.exp(-self._activation_energy / T.kelvin)
+        return float(
+            self._pre_exp
+            * np.exp(-self._activation_energy * 1e3 / (GAS_CONSTANT * T.kelvin))
+        )
 
     def raw_k_value(self) -> tp.List[float]:
         """
@@ -383,59 +333,8 @@ class Arrhenius(KReaction):
             generic["constants"]["A"],  # type: ignore[arg-type]
             generic["constants"]["Ea"],  # type: ignore[arg-type]
         )
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        for _, (sp, stoi, ope) in generic["reactants"].items():
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
-            reaction.add_as_reactant(sim_sp, stoi, ope)
-
-        for _, (sp, stoi, ope) in generic["products"].items():
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
-            reaction.add_as_product(sim_sp, stoi, ope)
+        reaction._add_species_from_generic(generic, list_sp)
         return reaction
-
-    @classmethod
-    def from_dict(
-        cls,
-        reactants: tp.List[str],
-        products: tp.List[str],
-        k_value: None | float | tp.List[float],
-        list_sp: tp.Optional[ListSpecies] = None,
-    ) -> tp.Self:
-        """
-        Create an Arrhenius from a dictionary (via destructuring).
-
-        Args:
-            reactants (List[str]): List of reactants
-            products (List[str]): List of products
-            k_value (float | List[float]): k value of the reactions or
-                the coefficients of the poly version
-            list_sp (ListSpecies): Collection of species already
-                involved in the simulation. This collection will grow if
-                some reactants and/or products do not exist yet.
-
-        Returns:
-            Arrhenius: An instance of Arrhenius.
-        """
-        raise NotImplementedError
-        if k_value is None or isinstance(k_value, float):
-            raise TypeError
-        new = cls(k_value[0], k_value[1])
-
-        # Allow shallow creation (outside of a simulation env)
-        if list_sp is None:
-            list_sp = ListSpecies()
-
-        for sp in reactants:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_reactant(sim_sp)
-
-        for sp in products:
-            sim_sp = list_sp.get_or_create_dyn_species(sp.strip())
-            new.add_as_product(sim_sp)
-        return new
 
 
 class CstReaction(KReaction):
@@ -453,10 +352,7 @@ class CstReaction(KReaction):
         Raises:
             KeyError: If the index is None or invalid.
         """
-        if self.index is not None and self.index >= 0:
-            return f"CR_{self.index}"
-
-        raise KeyError("Unknown reaction index. Cannot make a label without index.")
+        return self._index_label("CR")
 
     @classmethod
     def from_generic(
@@ -478,12 +374,7 @@ class CstReaction(KReaction):
             CstReaction: An instance of CstReaction.
         """
         reaction = cls(generic["constants"].get("k_value", None))
-        list_sp = ListSpecies() if list_sp is None else list_sp
-
-        for _, (sp, stoi, ope) in generic["products"].items():
-            sim_sp = list_sp.get_or_create_dyn_species(sp)
-            reaction.add_as_product(sim_sp, stoi, ope)
-
+        reaction._add_species_from_generic(generic, list_sp, reactants=False)
         return reaction
 
     def __str__(self) -> str:
@@ -539,7 +430,8 @@ class KReactionCollection:
             manipulate the reaction instance.
         _indexer (tp.Dict[str, int]):
             A dictionary mapping each label to its index in the
-            _reactions list.
+            _reactions list. It is rebuilt whenever _reactions is
+            reordered (see '_reindex').
     """
 
     _reactions: tp.List[tp.Tuple[str, KReaction]]
@@ -582,6 +474,10 @@ class KReactionCollection:
         """
         return self._reactions[index][1]
 
+    def _reindex(self) -> None:
+        """Rebuild the label -> position mapping after a reordering."""
+        self._indexer = {label: idx for idx, (label, _) in enumerate(self._reactions)}
+
     @property
     def last(self) -> KReaction:
         """
@@ -614,7 +510,8 @@ class KReactionCollection:
 
     def update_label(self, current: str, new: str) -> tp.Self:
         """
-        Updates the label of a reaction in the collection.
+        Updates the label of a reaction in the collection. The reaction
+        keeps its position in the collection.
 
         Args:
             current (str): The current label of the reaction.
@@ -637,11 +534,9 @@ class KReactionCollection:
         if new in self._indexer:
             raise KeyError(f"Reaction label: {new} already in KReactionCollection")
 
+        self._reactions[idx] = (new, self._reactions[idx][1])
         del self._indexer[current]
         self._indexer[new] = idx
-        reaction = self._reactions[idx][1]
-        self._reactions.append((new, reaction))
-        del self._reactions[idx]
         return self
 
     def sort_by_label(self) -> tp.Self:
@@ -653,6 +548,7 @@ class KReactionCollection:
                 instance.
         """
         self._reactions = sorted(self._reactions, key=operator.itemgetter(0))
+        self._reindex()
         return self
 
     def sort_by_reaction_index(self) -> tp.Self:
@@ -664,6 +560,7 @@ class KReactionCollection:
                 instance.
         """
         self._reactions = sorted(self._reactions, key=lambda x: x[1].get_index())
+        self._reindex()
         return self
 
     def iter_labels_and_reactions(self) -> tp.Iterator[tp.Tuple[str, KReaction]]:
@@ -779,20 +676,16 @@ class BiReaction(KReactionCollection, ABC):
     Subclasses should implement the specific behavior of the reaction.
 
     A BiReaction always defines a couple of forward and backward
-    reactions.
+    reactions. Both are KReactions owning their rate constant: the
+    forward/backward k are always read from them (no copy is kept by
+    the BiReaction).
 
     Attributes:
         _OPE_STRING (str): The string representing the operation of
             the reaction.
-        _k_backward (Optional[np.polynomial.Polynomial]): The backward
-            rate constant of the reaction.
-        _k_forward (Optional[np.polynomial.Polynomial]): The forward
-            rate constant of the reaction.
     """
 
     _OPE_STRING: str = "<->"
-    _k_backward: tp.Optional[np.polynomial.Polynomial]
-    _k_forward: tp.Optional[np.polynomial.Polynomial]
 
     def __contains__(self, species: object) -> bool:
         """
@@ -872,8 +765,8 @@ class BiReaction(KReactionCollection, ABC):
             Tuple[str, KReaction, float]: A tuple containing the label,
                 the KReaction instance and its k value.
         """
-        yield "forward", self.get_reaction("forward"), self.k_forward(T)
-        yield "backward", self.get_reaction("backward"), self.k_backward(T)
+        yield "forward", self.forward, self.k_forward(T)
+        yield "backward", self.backward, self.k_backward(T)
 
     def __str__(self) -> str:
         """
@@ -933,6 +826,30 @@ class BiReaction(KReactionCollection, ABC):
         self.backward._OPE_STRING = "<->"
         return self
 
+    def _add_reaction_pair(
+        self,
+        reaction: GenericReaction,
+        k_forward: KValType,
+        k_backward: KValType,
+        list_sp: tp.Optional[ListSpecies] = None,
+    ) -> None:
+        """
+        Build the forward reaction from 'reaction' and the backward one
+        from its reverse, and set their rate constants (log10
+        polynomials, see KReaction). No n·k division is applied.
+
+        Args:
+            reaction (GenericReaction): The forward reaction.
+            k_forward (KValType): The forward rate constant.
+            k_backward (KValType): The backward rate constant.
+            list_sp (Optional[ListSpecies]): The list of species to use
+                for the reactions. Defaults to None.
+        """
+        self.add_forward_reaction(reaction, list_sp=list_sp)
+        self.forward.set_k_value(k_forward)
+        self.add_backward_reaction(revert_reaction(reaction), list_sp=list_sp)
+        self.backward.set_k_value(k_backward)
+
     @abstractmethod
     def to_dict(self) -> tp.Dict[str, tp.Any]:
         """
@@ -956,11 +873,10 @@ class BiReaction(KReactionCollection, ABC):
             float: The equilibrium constant at the given temperature.
         """
 
-    @abstractmethod
     def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Abstract method to compute the forward reaction constant of
-        the reaction.
+        Compute the forward reaction constant of the reaction at a given
+        temperature (read from the forward KReaction).
 
         Args:
             T (Optional[Temperature | float]): The temperature in
@@ -970,12 +886,12 @@ class BiReaction(KReactionCollection, ABC):
             float: The forward reaction constant at the given
                 temperature.
         """
+        return self.forward.k_value(T)
 
-    @abstractmethod
     def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
         """
-        Abstract method to compute the backward reaction constant of
-        the reaction.
+        Compute the backward reaction constant of the reaction at a
+        given temperature (read from the backward KReaction).
 
         Args:
             T (Optional[Temperature | float]): The temperature in
@@ -985,3 +901,4 @@ class BiReaction(KReactionCollection, ABC):
             float: The backward reaction constant at the given
                 temperature.
         """
+        return self.backward.k_value(T)

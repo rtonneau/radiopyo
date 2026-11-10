@@ -23,10 +23,9 @@ import pandas as pd
 from scipy.integrate import trapezoid  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.physics.beam import BeamCollection
 from radiopyo.simulation.environment_build import SimEnv
-from radiopyo.simulation.ode_functions_solver import ScipyODEResult, jacobian
+from radiopyo.simulation.ode_functions_solver import ScipyODEResult, reaction_rates
 from radiopyo.utils.sim_types import ConfigDict
 
 # -------------------------- Type checking ONLY import----------------------- #
@@ -36,7 +35,7 @@ if tp.TYPE_CHECKING:
     from radiopyo.chemistry.k_reactions import BiReaction
     from radiopyo.chemistry.species import SimSpecies
     from radiopyo.physics.beam import ParticleBeam
-    from radiopyo.simulation.utils import H5Manager
+    from radiopyo.simulation.persistence import H5Manager
     from radiopyo.utils.sim_types import SimMatrices
 
     T = tp.TypeVar("T", bound="ODEResult")
@@ -83,6 +82,15 @@ class ODEResult(object):
     Collection storing the results from scipy.integrate.solve_ivp in
     order to easily append together the results from several integration
     steps.
+
+    Attributes (besides the scipy ones):
+        burst_dose_rates: list of float, optional
+            Dose rate [Gy/s] of every initial radiolytic burst (first
+            t_zero_pulse seconds of a beam ON phase) added to the initial
+            concentrations of the integration steps, [] if none was
+            applied. None when unknown (results read from a file): the
+            bursts are then assumed to be one per beam pulse, at the peak
+            dose rate (see integrate_production_of).
     """
 
     # Keep track of the original sim env
@@ -92,6 +100,7 @@ class ODEResult(object):
     LET: tp.Optional[float]
     t_zero_pulse: float
     date: datetime.datetime
+    burst_dose_rates: tp.Optional[tp.List[float]]
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -126,6 +135,7 @@ class ODEResult(object):
         self.mat = copy.deepcopy(mat)
         self.LET = let
         self.t_zero_pulse = t_zero_pulse
+        self.burst_dose_rates = None
         self._default_init()
         if sol is not None:
             self.append_sol(sol)
@@ -143,13 +153,18 @@ class ODEResult(object):
         # Is it a constant species?
         if not self.env.species.is_dyn_species(sp):
             return pd.Series(
-                data=self.env.species[key].initial_cc() * 1e6, index=self.t, name=key
+                data=self.env.species[key].initial_cc(self.env.temperature) * 1e6,
+                index=self.t,
+                name=key,
             )
 
         return pd.Series(data=self.y[sp.index, :], index=self.t, name=sp.label)
 
     def __add__(self, other: tp.Any) -> ODEResult:
-        """ """
+        """
+        Concatenate two results in time. Returns a new ODEResult, both
+        operands are left unchanged.
+        """
         # Sanity checks
         if not isinstance(other, ODEResult):
             raise TypeError(f"Cannot add type: {type(other)}, to ODEResult")
@@ -163,24 +178,29 @@ class ODEResult(object):
                 "Trying to add ODEResults with different number of tracked species"
             )
 
-        # Combine all together
-        self.t = np.append(self.t, other.t)
-        self.y = np.hstack([self.y, other.y])
-        if other.sol is not None:
-            self.sol = self.sol + other.sol
-        if other.t_events is not None:
-            self.t_events += other.t_events
-        if other.y_events is not None:
-            self.y_events += other.y_events
-        self.nfev += other.nfev
-        self.njev += other.njev
-        self.nlu += other.nlu
-        self.status += other.status
-        self.message += other.message
-        self.success += other.success
-        self.n_points += other.n_points
-        self.exec_time += other.exec_time
-        return self
+        # Combine all together in a NEW object: neither operand is modified.
+        # The (read-only) env, beam and matrices are shared with 'self'.
+        out = copy.copy(self)
+        out.t = np.append(self.t, other.t)
+        out.y = np.hstack([self.y, other.y])
+        out.dydt = self.dydt.copy()
+        out.sol = [*self.sol, *other.sol]
+        out.t_events = [*self.t_events, *other.t_events]
+        out.y_events = [*self.y_events, *other.y_events]
+        out.nfev = [*self.nfev, *other.nfev]
+        out.njev = [*self.njev, *other.njev]
+        out.nlu = [*self.nlu, *other.nlu]
+        out.status = [*self.status, *other.status]
+        out.message = [*self.message, *other.message]
+        out.success = [*self.success, *other.success]
+        if self.burst_dose_rates is not None or other.burst_dose_rates is not None:
+            out.burst_dose_rates = [
+                *(self.burst_dose_rates or []),
+                *(other.burst_dose_rates or []),
+            ]
+        out.n_points = [*self.n_points, *other.n_points]
+        out.exec_time = [*self.exec_time, *other.exec_time]
+        return out
 
     @property
     def time(self) -> NDArray[np.float64]:
@@ -203,28 +223,13 @@ class ODEResult(object):
     def to_hdf(
         self, file: str | Path, name: str, group: tp.Optional[str] = None
     ) -> H5Manager:
-        """ """
-        from .utils import H5Manager
+        """Store this result in ``file`` (delegates to ``H5Manager.push_ODEResult``)."""
+        from .persistence import H5Manager
 
         h5file = H5Manager.from_path(file)
-        with h5file:
-            grp = h5file.create_group(group)
-            data = self.to_pandas().reset_index()
-            ds = h5file.insert_dataset(grp, name, data.values)
-            labels = [str(_) for _ in data.columns]
-            labels[0] = "time"
-            ds.attrs["columns"] = labels
-            ds.attrs["sol"] = self.sol
-            ds.attrs["t_events"] = self.t_events
-            ds.attrs["y_events"] = self.y_events
-            ds.attrs["nfev"] = self.nfev
-            ds.attrs["njev"] = self.njev
-            ds.attrs["nlu"] = self.nlu
-            ds.attrs["status"] = self.status
-            ds.attrs["message"] = self.message
-            ds.attrs["success"] = self.success
-            ds.attrs["n_points"] = self.n_points
-            ds.attrs["exec_time"] = self.exec_time
+        h5file.push_ODEResult(
+            name, self, keys=[group] if group is not None else None
+        )
         return h5file
 
     def _default_init(self) -> None:
@@ -241,7 +246,23 @@ class ODEResult(object):
         self,
         sol: ScipyODEResult,
         exec_time: tp.Optional[float] = None,
+        bursts: tp.Optional[tp.Sequence[float]] = None,
     ) -> None:
+        """
+        Append an integration step.
+
+        Args:
+            sol: ScipyODEResult
+                Solution of the step
+            exec_time: float, optional
+                Wall time of the step [s]
+            bursts: Sequence[float], optional
+                Dose rates [Gy/s] of the initial radiolytic bursts added
+                to the initial concentrations of this step (empty if
+                none). None if unknown (see burst_dose_rates).
+        """
+        if bursts is not None:
+            self.burst_dose_rates = [*(self.burst_dose_rates or []), *bursts]
         self.t = np.append(self.t, sol.t)
         if len(self.y) == 0:
             self.y = sol.y
@@ -285,122 +306,71 @@ class ODEResult(object):
         )
         for sp_cst in self.env.species.iter_cst_species():
             df_cst.loc[:, sp_cst.label] = (
-                sp_cst.initial_cc() * 1e6
-            )  # TODO include temperature!
+                sp_cst.initial_cc(self.env.temperature) * 1e6
+            )
 
         return pd.concat([df_sp, df_cst], axis=1)
 
-    def reconstruct_jacobian(self) -> pd.DataFrame:
-        raise NotImplementedError
-        if self.beam is None:
-            raise TypeError("Beam is None, unable to compute jacobian")
-
-        sp_label = [elt.label for elt in self.env.species.iter_dyn_species()]
-        dsp_label = ["".join(["d", elt]) for elt in sp_label]
-
-        out = pd.DataFrame(
-            index=self.t,
-            columns=pd.MultiIndex.from_product(
-                [sp_label, dsp_label], names=["sp", "dsp"]
-            ),
-            dtype=np.float64,
-        )
-
-        for idx, t_val in enumerate(self.t):
-            jac = jacobian(
-                t_val,
-                self.y[:, idx],
-                self.beam,
-                self.env.species["H_plus"].index,
-                **self.mat,
-            )
-            out.iloc[idx, :] = jac.flatten()
-        return out
-
     def reconstruct_reactions(self, recompute: bool = False) -> pd.DataFrame:
         """
+        Rate of every reaction at every time point, computed with the
+        same rate function as the ODE solver (ode_functions_solver.
+        reaction_rates). The result is cached in self.dydt (and stored
+        in HDF5 files); use recompute=True to ignore the cache.
+
+        Columns are ordered: k-reactions (acid/base and equilibrium
+        forward/backward first), radiolytic, then enzymatic reactions.
+        /!\\ This is NOT the global reaction index order (k-reactions,
+        enzymatic, radiolytic, see ReactionsList): the column order is
+        kept as is for the rates already stored in HDF5 files.
+
         returns:
             dataframe [mol/l/s]
         Rem: to integrate df
             >>> df.apply(lambda x: trapezoid(y=x.values, x=x.index))
         """
-        # Compute column names and Pre compute slices to ease access in
-        # the dataframe columns
-        cols_kr = [kr.as_label() for kr in self.env.reactions.iter_all_kreactions()]
-        idx_kr = slice(0, len(cols_kr))
-
-        cols_gi = [gr.as_label() for gr in self.env.reactions.radiolytic]
-        idx_gi = slice(idx_kr.stop, idx_kr.stop + len(cols_gi))
-
-        if self.mat["Ez_mat"] is not None:
-            cols_ez = [er.as_label() for er in self.env.reactions.enzymatic]
-            idx_ez = slice(idx_gi.stop, idx_gi.stop + len(cols_ez))
-        else:
-            cols_ez = []
+        columns = list(
+            chain(
+                (kr.as_label() for kr in self.env.reactions.iter_all_kreactions()),
+                (gr.as_label() for gr in self.env.reactions.radiolytic),
+                (er.as_label() for er in self.env.reactions.enzymatic),
+            )
+        )
 
         if self.dydt.shape[-1] == self.y.shape[-1] > 0 and not recompute:
             return pd.DataFrame(
-                columns=list(chain.from_iterable([cols_kr, cols_gi, cols_ez])),
+                columns=columns,
                 index=self.t,
                 dtype=np.float64,
                 data=self.dydt.T,
             )
 
+        data = None
+        if self.t.size > 0:
+            y_full = self.mat.state.to_full_molar(self.y)
+            data = reaction_rates(self.t, y_full, self.mat, self.beam).stacked().T
+
         out = pd.DataFrame(
-            columns=list(chain.from_iterable([cols_kr, cols_gi, cols_ez])),
+            columns=columns,
             index=self.t,
             dtype=np.float64,
+            data=data,
         )
-
-        # Prefill values for radiolytic reactions
-        for label, reaction in zip(cols_gi, self.env.reactions.radiolytic):
-            out.loc[:, label] = reaction.kr()
-
-        for (idx, t_val), y in zip(enumerate(self.t), self.y.T):
-            y = y * 1.0e-6  # µmol/L => mol/l
-
-            y = np.append(y, self.mat["cst_sp"])
-
-            # K Reactions
-            Rki = np.nan_to_num(
-                np.einsum("j, jik -> ik ", y, self.mat["Ki_mat"][2]), nan=1
-            )
-
-            Rki = np.prod(Rki, axis=1) * self.mat["Ki_mat"][0]
-            _ = np.any(
-                (y <= 1e-12)[:, np.newaxis] * self.mat["Ki_mat"][1][:, :, 1], axis=0
-            )
-            Rki[_] = 0.0
-
-            # Sometimes, some species are < 0.0 for a very short while.
-            # It has no physical meaning. But it is necessary to give
-            # the ODE solver such possibility to ensure good quality
-            # results. The next line is then added only here
-            # (not in ODE solver) to give a more suitable meaning.
-            # Rki[np.where(Rki < 0)] = 0.0
-
-            out.iloc[idx, idx_kr] = Rki
-
-            # Radiolytic Reactions
-            dr = 0.0
-            if self.beam is not None:
-                dr = self.beam.at(t_val).dose_rate()
-            out.iloc[idx, idx_gi] *= dr
-
-            # Enzimatic reactions
-            if self.mat["Ez_mat"] is not None:
-                E = np.matmul(y, self.mat["Ez_mat"][1])
-                S = np.matmul(y, self.mat["Ez_mat"][0])
-                MM = (
-                    self.mat["Ez_mat"][2][1, :]
-                    * E
-                    * S
-                    / (self.mat["Ez_mat"][2][0, :] + S)
-                )
-                out.iloc[idx, idx_ez] = MM
-
         self.dydt = out.values.T
         return out
+
+    def _burst_dose_rates(self) -> tp.List[float]:
+        """
+        Dose rates [Gy/s] of the initial bursts to account for in the
+        production integrals: the recorded ones or, when unknown (result
+        read from a file), one per beam pulse at the peak dose rate.
+        """
+        if self.burst_dose_rates is not None:
+            return self.burst_dose_rates
+        n_pulse = self.beam.tot_pulses()
+        # The burst is linear in the dose rate: n_pulse bursts at the
+        # peak dose rate are one burst at n_pulse times that dose rate.
+        return [n_pulse * self.beam.dose_rate_peak]
 
     def integrate_production_of(
         self,
@@ -420,18 +390,14 @@ class ODEResult(object):
         )
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
-            _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
+            _ser.loc[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)  # type: ignore[call-overload]  # pandas-stubs: Hashable key
 
         if include_radiolytic:
-            n_pulse = self.beam.tot_pulses()
+            # Production over the t_zero_pulse skipped at every burst
             for _r in self.env.radiolytic_reaction_involving(species):
-                _ser.loc[_r.as_label()] = (
-                    _ser.loc[_r.as_label()]
-                    + n_pulse
-                    * _r.compute_initial_cc_before(
-                        self.t_zero_pulse, self.beam.dose_rate_peak
-                    )
-                    * 1e6
+                _ser.loc[_r.as_label()] = _ser.loc[_r.as_label()] + sum(
+                    _r.compute_initial_cc_before(self.t_zero_pulse, dose_rate) * 1e6
+                    for dose_rate in self._burst_dose_rates()
                 )
 
         return _ser.sort_values(ascending=reverse)
@@ -494,7 +460,7 @@ class ODEResult(object):
         )
         _ser = pd.Series(data=0.0, index=df.columns, dtype=np.float64)
         for _k, _s in df.items():
-            _ser[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)
+            _ser.loc[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)  # type: ignore[call-overload]  # pandas-stubs: Hashable key
         return _ser.sort_values(ascending=reverse)
 
     def detail_consumption_of(
@@ -568,7 +534,7 @@ class ODEResult(object):
                 r1, r2 = bi_r.forward.as_label(), bi_r.backward.as_label()
             else:
                 r2, r1 = bi_r.forward.as_label(), bi_r.backward.as_label()
-            _df = self.reconstruct_reactions().loc[:, (r1, r2)]  # type: ignore[index]
+            _df = self.reconstruct_reactions().loc[:, (r1, r2)]
             return _df[r1] - _df[r2]
 
         return self.reconstruct_reactions().loc[:, reaction]
@@ -617,7 +583,7 @@ class ODEResult(object):
 
         Therefore, the column names of the DataFrame will always be
         the label of the reaction producing the species.
-        /!\ Negative values are allowed. The meaning is a net consumption.
+        /!\\ Negative values are allowed. The meaning is a net consumption.
         """
         _slice = make_slice_from_time_boundaries(start, stop)
 
@@ -642,25 +608,38 @@ class ODEResult(object):
         start: tp.Optional[float | slice] = None,
         stop: tp.Optional[float] = None,
     ) -> pd.DataFrame:
-        """ """
+        """
+        Net rate of change [mol/L/s] of every dynamic species due to all
+        the reactions: k-reactions (including acid/base and equilibria),
+        radiolytic and enzymatic ones. It is the stoichiometry matrices
+        of the solver applied to the reaction rates.
+
+        Args:
+            start, stop: time boundaries [s] (or a slice) of the rows
+                to return, all the times by default.
+
+        Returns:
+            DataFrame indexed by time, one column per dynamic species.
+        """
         _slice = make_slice_from_time_boundaries(start, stop)
 
-        rr = self.reconstruct_reactions()  # if stored then no "heavy calculation"
-        out = pd.DataFrame(
-            index=self.t,
-            columns=[elt.label for elt in self.env.species.iter_dyn_species()],
+        # if stored then no "heavy calculation"
+        rr = self.reconstruct_reactions().loc[_slice, :]
+        n_k = self.mat.k_reactions.stoichiometry.shape[1]
+        n_g = self.mat.radiolytic.stoichiometry.shape[1]
+        rates = rr.to_numpy().T
+        balance = (
+            self.mat.k_reactions.stoichiometry @ rates[:n_k]
+            + self.mat.radiolytic.stoichiometry @ rates[n_k : n_k + n_g]
+            + self.mat.enzymatic.stoichiometry @ rates[n_k + n_g :]
+        )
+        species = list(self.env.species.iter_dyn_species())
+        return pd.DataFrame(
+            data=balance[[sp.index for sp in species], :].T,
+            index=rr.index,
+            columns=[sp.label for sp in species],
             dtype=np.float64,
         )
-        out.iloc[:, :] = 0
-
-        for species in self.env.species.iter_dyn_species():
-            for reaction, _ in self.env.reactions_involving_product(species):
-                stoi = reaction.products.stoichiometry_of(species)
-                out.loc[:, species.label] += rr[reaction.as_label()] * stoi
-            for reaction, _ in self.env.reactions_involving_reactant(species):
-                stoi = reaction.reactants.stoichiometry_of(species)
-                out.loc[:, species.label] -= rr[reaction.as_label()] * stoi
-        return out
 
     def integrate_species(
         self,

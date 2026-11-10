@@ -6,7 +6,7 @@ species => Production of radicals and charged species. These reactions
 are defined using so called "G-values" -> radiolytic yields i.e.
 [#radical / 100eV / incident particle].
 
-/!\ Here, the solvent density is assumed to be the same as Water,
+/!\\ Here, the solvent density is assumed to be the same as Water,
 thus a constant concentration of 1 kg/l.
 
 Classes:
@@ -24,7 +24,6 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import hashlib
 import typing as tp
 
 from scipy.constants import (  # type: ignore[import-untyped]
@@ -48,7 +47,6 @@ __all__ = [
     "RadiolyticReaction",
     "RadiolyticReactionDict",
     "ge_to_kr",
-    "umol_per_joule_to_ge",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -58,23 +56,6 @@ __all__ = [
 # Kr units => mol/l/Gy
 
 # Define some functions for unit conversion:
-
-
-def umol_per_joule_to_ge(value: float) -> float:
-    """
-    Converts a given value from umol/J to Ge units.
-
-    Args:
-        value (float): The value to be converted.
-
-    Returns:
-        float: The converted value in Ge units.
-
-    Note:
-        Unused and probably wrong function.
-    """
-    raise NotImplementedError
-    return value * 1e-6 * Avogadro / elementary_charge * 100
 
 
 def ge_to_kr(ge: float) -> float:
@@ -108,6 +89,17 @@ def kr_to_ge(kr: float) -> float:
 # --------------------------------------------------------------------------- #
 #                               CLASS DEFINITIONS                             #
 # --------------------------------------------------------------------------- #
+class _CallableLabel(str):
+    """
+    A str which can also be called (returning the plain str). It keeps
+    the historical call form `reaction.label()` working now that
+    `RadiolyticReaction.label` is a property (as `label` of species).
+    """
+
+    __slots__ = ()
+
+    def __call__(self) -> str:
+        return str(self)
 
 
 class RadiolyticReaction(BasicReaction):
@@ -119,7 +111,7 @@ class RadiolyticReaction(BasicReaction):
 
     The reaction consists of a list of products and a reaction constant
     (G value). A radiolytic reaction is constructed from the
-    BaseChemicalReaction. Here no reactant should be involved.
+    BasicReaction. Here no reactant should be involved.
     Moreover, the production rate only depends on the nature and energy
     of incident radiation ==> LET and whether or not beam is ON.
     ==> Only the list of products and the reaction cst (G value) are
@@ -136,66 +128,43 @@ class RadiolyticReaction(BasicReaction):
         super().__init__()
         self._reaction_cst = reaction_cst  # [mol/l/Gy]
 
-    def make_hash(self, method: str = "sha256") -> str:
-        """
-        Generate a hash for the reaction. The G value is not included
-        in the hash because two radiolytic reactions of the same species
-        can have different G values. The hash is intended to be used to
-        identify the reaction uniquely, without the need to store the
-        G value. When the reaction is to be used, the actual G value
-        should be provided. The hash is computed from the reaction's
-        index and the list of products.
-
-        Args:
-            method (str): The hashing algorithm to use. Defaults to
-                "sha256".
-
-        Returns:
-            str: The hash of the instance as a hexadecimal string.
-
-        Raises:
-            ValueError: If the hashing algorithm is not supported.
-        """
-        hasher = hashlib.new(method, usedforsecurity=False)
-        hasher.update(repr(self).encode())
-        return hasher.hexdigest()
-
     def as_label(self) -> str:
         """
-        Returns a string label for the reaction based on its index.
+        Returns a string label for the reaction based on its product.
 
         Returns:
             str
-                A string label in the format "G_{index}" if index is
-                valid.
+                A string label in the format "G_{product label}".
 
         Raises:
-            KeyError
-                If the index is None or invalid.
+            StopIteration
+                If the reaction has no product.
         """
         return f"G_{self.species().label}"
 
     def species(self) -> SimSpecies:
         """
-        Returns the ChemSpecies instance associated with this reaction.
+        Returns the SimSpecies instance produced by this reaction.
 
         Returns:
-            ChemSpecies
-                The ChemSpecies instance.
+            SimSpecies
+                The SimSpecies instance.
         """
-        return self.products[self.label()].species
+        return self.products[self.label].species
 
-    def label(self) -> str:
+    @property
+    def label(self) -> _CallableLabel:
         """
-        Method to generate a string representation of the label of the
-        reaction.
+        The label of the reaction, i.e. the label of its product. Can be
+        used as an attribute (`reaction.label`, like species labels) or,
+        as historically, called (`reaction.label()`).
 
         Returns:
             str
                 A string label of the reaction.
         """
         sp = next(iter(self.products))
-        return sp.label
+        return _CallableLabel(sp.label)
 
     def kr(self) -> float:
         """
@@ -299,7 +268,7 @@ class RadiolyticReaction(BasicReaction):
         Returns a string representation of the RadiolyticReaction
         instance.
         """
-        return f"RadiolyticReaction('{self.label()}')"
+        return f"RadiolyticReaction('{self.label}')"
 
     def __repr__(self) -> str:
         """

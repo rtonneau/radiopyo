@@ -14,7 +14,6 @@ import typing as tp
 import numpy as np
 
 # ---------------------------- Internal imports ----------------------------- #
-from radiopyo.chemistry.generics import GenericReaction, revert_reaction
 from radiopyo.chemistry.k_reactions import (
     BiReaction,
     KReaction,
@@ -24,6 +23,11 @@ from radiopyo.chemistry.utils.units import Temperature
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
+    from radiopyo.chemistry.basic_reaction import (
+        ReactionSpecies,
+        ReactionSpeciesCollection,
+    )
+    from radiopyo.chemistry.generics import GenericReaction
     from radiopyo.chemistry.species import SimSpecies
     from radiopyo.chemistry.species_collection import ListSpecies
 
@@ -43,8 +47,8 @@ class ABCouple(tp.NamedTuple):
     Represents an acid-base couple.
 
     Attributes:
-        species (ChemSpecies): The acid or base species.
-        conjugate (ChemSpecies): The conjugate base of the acid or
+        species (SimSpecies): The acid or base species.
+        conjugate (SimSpecies): The conjugate base of the acid or
             conjugate acid of the base.
         pKa (float): The acid dissociation constant (pKa) of the couple.
         k_forward (float): The forward reaction rate constant
@@ -74,28 +78,23 @@ class AcidBase(BiReaction):
 
     This class is a subclass of BiReaction and manages the
     temperature-dependent reaction constants for acid-base reactions.
+    The forward and backward rate constants are owned by the forward
+    and backward KReactions.
 
     Attributes:
         _pKa (np.polynomial.Polynomial): The polynomial form of the pKa.
-        _k_backward (np.polynomial.Polynomial): The polynomial form of
-            the backward reaction rate constant.
-        _k_forward (np.polynomial.Polynomial): The polynomial form of
-            the forward reaction rate constant.
-        _HA (ChemSpecies): The acid species.
-        _A (ChemSpecies): The conjugate base species.
+        _HA (SimSpecies): The acid species.
+        _A (SimSpecies): The conjugate base species.
 
     Notes:
-        The reaction constants are calculated using the polynomial forms
-        of the pKa and reaction rate constants:
-            pKa = a0 + a1 T + a2 T**2 + ...
-            log(K) = a0 + a1 (1/T) + a2 (1/T)**2 + ...
-        Therefore, the calculation of reaction constants cannot be left
-        to the respective KReactions as these are not aware of it.
-        The temperature is assumed to be in Kelvin.
+        The constants are calculated using the polynomial forms of the
+        pKa and of the reaction rate constants:
+            pKa = a0 + a1 T + a2 T**2 + ...      (T in °C)
+            log(K) = a0 + a1 (1/T) + a2 (1/T)**2 + ...   (T in Kelvin)
+        The configured k_forward/k_backward are used as given (no n·k
+        division, see ADR 0001).
     """
 
-    _k_backward: np.polynomial.Polynomial
-    _k_forward: np.polynomial.Polynomial
     _pKa: np.polynomial.Polynomial
     _A: SimSpecies
     _HA: SimSpecies
@@ -108,25 +107,23 @@ class AcidBase(BiReaction):
     ):
         """ """
         super().__init__()
-        self._pKa = np.polynomial.Polynomial(pKa)
+        self._pKa = np.polynomial.Polynomial(tp.cast("list[float]", pKa))
 
         if reaction["constants"].get("k_backward", None) is None:
             raise ValueError("For A/B reaction, k_backward must be defined")
         if reaction["constants"].get("k_forward", None) is None:
             raise ValueError("For A/B reaction, k_forward must be defined")
 
-        self._k_backward = polynomial_factory(
-            reaction["constants"]["k_backward"],
-            log10=True,
+        self._add_reaction_pair(
+            reaction,
+            k_forward=polynomial_factory(
+                reaction["constants"]["k_forward"], log10=True
+            ),
+            k_backward=polynomial_factory(
+                reaction["constants"]["k_backward"], log10=True
+            ),
+            list_sp=list_sp,
         )
-        self._k_forward = polynomial_factory(
-            reaction["constants"]["k_forward"],
-            log10=True,
-        )
-
-        # Need to add forward and backward reactions via the superclass
-        self.add_forward_reaction(reaction, list_sp=list_sp)
-        self.add_backward_reaction(revert_reaction(reaction), list_sp=list_sp)
 
         _ = self.get_couple()
         self._HA = _.species
@@ -138,7 +135,7 @@ class AcidBase(BiReaction):
         A property to return the acid species.
 
         Returns:
-            ChemSpecies: The acid species.
+            SimSpecies: The acid species.
         """
         return self._HA
 
@@ -148,7 +145,7 @@ class AcidBase(BiReaction):
         A property to return the base species.
 
         Returns:
-            ChemSpecies: The base species.
+            SimSpecies: The base species.
         """
         return self._A
 
@@ -165,7 +162,7 @@ class AcidBase(BiReaction):
             float: The pKa value at the given temperature.
         """
         _T = Temperature(T)
-        return self._pKa(_T.celsius)
+        return tp.cast(float, self._pKa(_T.celsius))
 
     def k_equilibrium(
         self,
@@ -183,42 +180,7 @@ class AcidBase(BiReaction):
             float: The equilibrium constant at the given temperature.
         """
         _T = Temperature(T)
-        return 10 ** (-self._pKa(_T.celsius))
-
-    def k_forward(self, T: tp.Optional[Temperature | float] = None) -> float:
-        """
-        Returns the forward reaction constant at a given temperature.
-
-        Args:
-            T (Temperature | float, optional): Temperature in °C.
-                Defaults to None.
-
-        Returns:
-            float: The forward reaction constant at the
-                given temperature.
-        """
-        _T = Temperature(T)
-        if self.forward.has_reactant("H2O"):
-            return 10 ** self._k_forward(1.0 / _T.kelvin)  # / 55.5
-        return 10 ** self._k_forward(1.0 / _T.kelvin)
-
-    def k_backward(self, T: tp.Optional[Temperature | float] = None) -> float:
-        """
-        Returns the backward reaction constant at a given temperature.
-
-        Args:
-            T (Temperature | float, optional): Temperature in °C.
-                Defaults to None.
-
-        Returns:
-            float: The backward reaction constant at the
-                given temperature.
-        """
-
-        _T = Temperature(T)
-        if self.backward.has_reactant("H2O"):
-            return 10 ** self._k_backward(1.0 / _T.kelvin)  # / 55.5
-        return 10 ** self._k_backward(1.0 / _T.kelvin)
+        return tp.cast(float, 10 ** (-self._pKa(_T.celsius)))
 
     def is_acid(self) -> bool:
         """
@@ -284,103 +246,21 @@ class AcidBase(BiReaction):
             ABCouple: The acid/base couple.
 
         Raises:
-            ValueError: If the reaction is neither an acid nor a base.
-
-        Notes:
-            To refactor
+            ValueError: If the reaction is neither an acid nor a base, or
+                if the couple cannot be identified.
         """
         r = self.get_deprotonation_reaction()
 
         if self.is_acid():
-            _l = len(r.reactants)
-            if _l > 2:
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more "
-                    f"than 2 different reactants ({_l} reactants)"
-                )
-            if _l == 2 and not r.has_reactant("H2O"):
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more "
-                    "than 1 reactant but none of them is H2O."
-                )
-
-            species = None
-            for sp in r.reactants:
-                if sp.label == "H2O":
-                    continue
-                species = sp
-            else:
-                species = sp if species is None else species
-
-            _l = len(r.products)
-            if _l > 2:
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more "
-                    f"than 2 different products ({_l} products)"
-                )
-            if (_l == 2) and (
-                not (r.has_product("H3O_plus") or r.has_product("H_plus"))
-            ):
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more than 1 product but none "
-                    "of them is H3O_plus or H_plus."
-                )
-
-            conjugate = None
-            for sp in r.products:
-                if sp.label == "H3O_plus" or sp.label == "H_plus":
-                    continue
-                conjugate = sp
-            else:
-                conjugate = sp if conjugate is None else conjugate
+            # HA (+ H2O) -> A (+ H3O_plus | H_plus)
+            species = self._couple_member(r, r.reactants, "reactant", ("H2O",))
+            conjugate = self._couple_member(
+                r, r.products, "product", ("H3O_plus", "H_plus")
+            )
         else:
-            _l = len(r.products)
-            if _l > 2:
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more "
-                    f"than 2 different products ({_l} products)"
-                )
-            if _l == 2 and not r.has_product("H2O"):
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more "
-                    "than 1 product but none of them is H2O."
-                )
-
-            conjugate = None
-            for sp in r.products:
-                if sp.label == "H2O":
-                    continue
-                conjugate = sp
-            else:
-                conjugate = sp if conjugate is None else conjugate
-
-            _l = len(r.reactants)
-            if _l > 2:
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more "
-                    f"than 2 different reactants ({_l} reactants)"
-                )
-            if _l == 2 and not r.has_reactant("OH_minus"):
-                raise ValueError(
-                    f"Unable to identify acid/base couple of {r}. "
-                    "The reaction has more "
-                    "than 1 reactant but none of them is OH_minus."
-                )
-
-            species = None
-            for sp in r.reactants:
-                if sp.label == "OH_minus":
-                    continue
-                species = sp
-            else:
-                species = sp if species is None else species
+            # HA (+ OH_minus) -> A (+ H2O)
+            conjugate = self._couple_member(r, r.products, "product", ("H2O",))
+            species = self._couple_member(r, r.reactants, "reactant", ("OH_minus",))
 
         return ABCouple(
             species=species.species,
@@ -390,6 +270,48 @@ class AcidBase(BiReaction):
             k_backward=self.k_backward(T),
             temperature=(Temperature(T).celsius if T is not None else None),
         )
+
+    @staticmethod
+    def _couple_member(
+        r: KReaction,
+        collection: ReactionSpeciesCollection,
+        kind: str,
+        partners: tp.Tuple[str, ...],
+    ) -> ReactionSpecies:
+        """
+        Find the member of the acid/base couple on one side of the
+        deprotonation reaction 'r': the side holds at most 2 species,
+        and if 2, one of them is a partner (H2O, H3O_plus, ...). The
+        member is the (last) non-partner species.
+
+        Args:
+            r (KReaction): The deprotonation reaction (error messages).
+            collection (ReactionSpeciesCollection): r.reactants or
+                r.products.
+            kind (str): "reactant" or "product" (error messages).
+            partners (Tuple[str, ...]): Labels of the partner species.
+
+        Returns:
+            ReactionSpecies: The couple member.
+
+        Raises:
+            ValueError: If the couple member cannot be identified.
+        """
+        _l = len(collection)
+        if _l > 2:
+            raise ValueError(
+                f"Unable to identify acid/base couple of {r}. "
+                "The reaction has more "
+                f"than 2 different {kind}s ({_l} {kind}s)"
+            )
+        if _l == 2 and not any(label in collection for label in partners):
+            raise ValueError(
+                f"Unable to identify acid/base couple of {r}. "
+                f"The reaction has more than 1 {kind} but none "
+                f"of them is {' or '.join(partners)}."
+            )
+        members = [sp for sp in collection if sp.label not in partners]
+        return members[-1] if members else list(collection)[-1]
 
     def to_dict(self) -> tp.Dict[str, tp.Any]:
         """
@@ -401,14 +323,20 @@ class AcidBase(BiReaction):
         return {
             "reaction": self.__str__(),
             "pKa": self.pKa(),
-            "k_forward": (
-                self._k_forward.coef.tolist()
-                if len(self._k_forward) > 1
-                else self.k_forward()
-            ),
-            "k_backward": (
-                self._k_backward.coef.tolist()
-                if len(self._k_backward) > 1
-                else self.k_backward()
-            ),
+            "k_forward": self._raw_k(self.forward, self.k_forward),
+            "k_backward": self._raw_k(self.backward, self.k_backward),
         }
+
+    @staticmethod
+    def _raw_k(
+        reaction: KReaction,
+        k_at: tp.Callable[[], float],
+    ) -> float | tp.List[float]:
+        """
+        The rate constant as configured: the log10 polynomial
+        coefficients if temperature dependent, else the k value.
+        """
+        poly = reaction.k_polynomial
+        if poly is not None and len(poly) > 1:
+            return tp.cast("list[float]", poly.coef.tolist())
+        return k_at()

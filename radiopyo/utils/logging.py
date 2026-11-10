@@ -20,11 +20,12 @@ if TYPE_CHECKING:
     from pathlib import Path
 # -------------------------- Expose importable stuffs ----------------------- #
 __all__ = [
-    "logConfig_from_pyproject",
-    "InfoWarning",
     "InfoHandler",
+    "InfoWarning",
     "disable_logging",
     "enable_logging",
+    "logConfig_from_pyproject",
+    "set_logging_level",
 ]
 # --------------------------------------------------------------------------- #
 

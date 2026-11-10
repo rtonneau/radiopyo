@@ -7,7 +7,7 @@ Author:
 """
 # --------------------------------- External imports --------------------------------- #
 # --------------------------------- Internal imports --------------------------------- #
-from radiopyo.simulation.exceptions import RadioPyoError
+from radiopyo.exceptions import RadioPyoError
 
 # ----------------------------- Type checking ONLY imports---------------------------- #
 # ------------------------------------------------------------------------------------ #
@@ -15,8 +15,8 @@ from radiopyo.simulation.exceptions import RadioPyoError
 __all__ = [
     "IsConstantSpeciesError",
     "IsSimSpeciesError",
-    "NotReactionReactant",
     "NotReactionProduct",
+    "NotReactionReactant",
     "UnknownSpeciesError",
 ]
 

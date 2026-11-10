@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 """
+Tools used to assemble a simulation config out of several config files
+(the ``[includes]`` mechanism): resolution of the include paths and merge
+of two ConfigDict.
+
+The merge only works on the dict structures (reactions are identified by
+a key computed from their string, no reaction object is built), so that
+this module does not depend on the simulation layer.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 26/07/2023
@@ -7,27 +14,63 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import copy
+import logging
+import pathlib
 import typing as tp
 
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.parser import RPARSER
 from radiopyo.physics.beam import BeamCollection
-from radiopyo.simulation.environment_build import (
-    acid_base_from_dict,
-    arrhenius_from_dict,
-    cst_reaction_from_dict,
-    eq_reaction_from_dict,
-    kreaction_from_dict,
-    michaelis_from_dict,
-)
+from radiopyo.utils import PACKAGE_DATA_PATH
+from radiopyo.utils.sim_types import deep_update, default_ConfigDict
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
     from radiopyo.utils.sim_types import ConfigDict
 
 # ------------------------- Expose importable stuffs ------------------------ #
-__all__: tp.List = []
+__all__: tp.List[str] = [
+    "PACKAGE_PREFIX",
+    "ReactionKey",
+    "blank_config",
+    "combine_config",
+    "include_path",
+    "reaction_key",
+]
 
 # ---------------------------------- Logging -------------------------------- #
+logger = logging.getLogger("radiopyo")
+
+# An include entry starting with this exact prefix refers to the data
+# shipped with the package (PACKAGE_DATA_PATH).
+PACKAGE_PREFIX = "radiopyo/"
+
+# Identity of a reaction, whatever the order of its species: reactants
+# {(label, stoichiometry)}, products {(label, stoichiometry, operation)},
+# enzyme label (None if not enzymatic).
+ReactionKey: tp.TypeAlias = tp.Tuple[
+    tp.FrozenSet[tp.Tuple[str, int]],
+    tp.FrozenSet[tp.Tuple[str, int, str]],
+    tp.Optional[str],
+]
+
+# Sections of the config holding a list of reactions (one dict each)
+_REACTION_LISTS: tp.Tuple[str, ...] = (
+    "acid_base",
+    "equilibrium",
+    "k_reaction",
+    "constant",
+    "arrhenius",
+    "enzymatic",
+)
+
+# An equilibrium is defined by 2 out of these 3 constants.
+_EQUILIBRIUM_CONSTANTS: tp.Tuple[str, ...] = (
+    "k_forward",
+    "k_backward",
+    "k_equilibrium",
+)
 
 # --------------------------------------------------------------------------- #
 #                            DECORATOR DEFINITIONS                            #
@@ -38,216 +81,163 @@ __all__: tp.List = []
 # --------------------------------------------------------------------------- #
 
 
-def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
-    """ "
-    Function for config files assembly. It allows to define the
-    environment in several independent config file. Convenient for
-    reuse. General behavior:
-        Keep 'root', erase entries from 'root' when 'other' has it
-        and add entries from 'other' not included in 'root'
+def blank_config() -> ConfigDict:
     """
-    # Easy part
-    root["parameters"] |= other["parameters"]
-    root["concentrations"]["fixed"] |= other["concentrations"]["fixed"]
-    root["concentrations"]["initial"] |= other["concentrations"]["initial"]
+    A ConfigDict with all its sections but nothing defined in it. In
+    particular 'parameters' is empty (no default value): a config file
+    only holds what the user wrote, defaults are applied when the
+    simulation environment is built. Otherwise the defaults of an
+    including file would erase the values of the files it includes.
+    """
+    config = default_ConfigDict()
+    config["parameters"] = {}
+    return config
 
-    # Update beam definition
-    # Make sure to keep only the latest beam definition if multiple beam types
-    root_beams = BeamCollection.from_config_dict(root["beam"], verbose=False)
-    other_beams = BeamCollection.from_config_dict(other["beam"], verbose=False)
+
+def include_path(entry: str) -> pathlib.Path:
+    """
+    Absolute path designated by an entry of the [includes] section.
+
+    - An entry starting with exactly 'radiopyo/' refers to the data
+      shipped with the package: 'radiopyo/<file>' is
+      PACKAGE_DATA_PATH / '<file>'.
+    - Any other entry is a path, absolute or relative to the current
+      working directory. (Relative paths written in a config file are
+      anchored to that file when it is parsed, see
+      FileParser.anchor_includes, so that the working directory is only
+      a fallback.)
+    """
+    entry = entry.strip()
+    if entry.startswith(PACKAGE_PREFIX):
+        return PACKAGE_DATA_PATH / entry[len(PACKAGE_PREFIX) :]
+    return pathlib.Path(entry).absolute()
+
+
+def reaction_key(reaction: str) -> ReactionKey:
+    """
+    Identity of a reaction written as a string: the same for 'A + B -> C',
+    'B + A -> C' and 'A+B->C', but not for 'C -> A + B'. Only the reaction
+    string is parsed, no reaction object is built.
+
+    Args:
+        reaction: reaction string, as written in a config file.
+
+    Raises:
+        lark.LarkError: if the string is not a valid reaction.
+    """
+    generic = RPARSER.parse_reaction(reaction)
+    enzyme = generic["enzyme"]
+    return (
+        frozenset(
+            (label, stoi) for label, (_, stoi, _) in generic["reactants"].items()
+        ),
+        frozenset(
+            (label, stoi, ope.name)
+            for label, (_, stoi, ope) in generic["products"].items()
+        ),
+        None if enzyme is None else enzyme.label,
+    )
+
+
+def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
+    """
+    Merge two config dicts; 'other' has the precedence over 'root'.
+    Neither of them is modified, a new config is returned.
+
+    - parameters, fixed/initial concentrations and radiolytic yields:
+      the entries of 'other' replace those of 'root' with the same name,
+      the others are added.
+    - reactions (all the sections holding a list of reactions): two
+      reactions are the same if they have the same species on each side
+      whatever their order (see reaction_key), the arrow direction
+      matters. A reaction of 'other' also in 'root' updates it in place
+      field by field: the fields written in 'other' replace those of
+      'root' (the reaction string too), the ones not written are kept.
+      So a rate constant can be tweaked alone (e.g. only 'k_forward' of
+      an acid/base keeps its 'k_backward' and 'pKa'). The exception is
+      an equilibrium giving 2 or more of k_forward, k_backward and
+      k_equilibrium: it is then fully defined by 'other', the constants
+      of 'root' are dropped. New reactions are appended after those of
+      'root'.
+    - beam: see BeamCollection.merge. A 'default' beam of 'root' is
+      dropped if 'other' defines any beam.
+    - includes: not resolved here, the result has none.
+
+    Args:
+        root: lowest precedence config
+        other: highest precedence config
+
+    Returns:
+        ConfigDict: the merged config.
+    """
+    out = _complete(root)
+    new = _complete(other)
+
+    out["includes"] = {}
+    out["parameters"] |= new["parameters"]
+    out["concentrations"]["fixed"] |= new["concentrations"]["fixed"]
+    out["concentrations"]["initial"] |= new["concentrations"]["initial"]
+
+    # Beams: make sure to keep only the latest beam definition if
+    # multiple beam types
+    root_beams = BeamCollection.from_config_dict(out["beam"], verbose=False)
+    other_beams = BeamCollection.from_config_dict(new["beam"], verbose=False)
     if "default" in root_beams and len(other_beams) > 0:
         root_beams.remove_beam("default")
+    out["beam"] = root_beams.merge(other_beams, verbose=False).as_dict()
 
-    root["beam"] = root_beams.merge(other_beams, verbose=False).as_dict()
-
-    # Update reactions
-    #  => Radiolytic
-    root["reactions"]["radiolytic"] |= other["reactions"]["radiolytic"]
-
-    # For the following, Reactions are built from Dict and then their
-    # unique identifier (string version) are used to compare them.
-    # First, all reaction from 'root' are read and stored in a Dict
-    # whose keys are the strings. Then each entries of 'other' are
-    # parsed to extract their string. if it exists in the dict, their
-    # constants are compared and updated accordingly.
-
-    ## => AcidBase Reactions ##
-    # First, let's make a set of the AB presents in root. Each one
-    # should have a unique ID ==> Make AcidBase and then use the str
-    # version of it!
-    r_root = {}
-    for idx, _ in enumerate(root["reactions"]["acid_base"]):
-        _ = acid_base_from_dict(_, list_sp=None)[0][0]
-        r_root[str(_)] = (_, idx)
-
-    # Loop over all KReaction in other and check whether it is also
-    # in root or not.
-    to_add = []  # List of all reaction to add to root afterward
-    for _ in other["reactions"]["acid_base"]:
-        ab = acid_base_from_dict(_, list_sp=None)[0][0]
-        # Same reaction in root => just make sur the kvalue comes from 'other'
-        if str(ab) in r_root:
-            idx = r_root[str(ab)][1]
-            root["reactions"]["acid_base"][idx]["pKa"] = _["pKa"]
-            if "k_forward" in _:
-                if "k_backward" in root["reactions"]["acid_base"][idx]:
-                    del root["reactions"]["acid_base"][idx]["k_backward"]
-                root["reactions"]["acid_base"][idx]["k_forward"] = _["k_forward"]
-            elif "k_backward" in _:
-                if "k_forward" in root["reactions"]["acid_base"][idx]:
-                    del root["reactions"]["acid_base"][idx]["k_forward"]
-                root["reactions"]["acid_base"][idx]["k_backward"] = _["backward"]
-            continue
-        # KReaction from 'other' not in 'root'. Make a copy of the dict
-        # version.
-        to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all
-    # new reactions
-    # from 'other' --> stored in 'to_add'
-    root["reactions"]["acid_base"] += to_add
-
-    ## => Equilibrium Reactions ##
-    # First, let's make a set of the AB presents in root. Each one
-    # should have a unique ID ==> Make AcidBase and then use the str
-    #  version of it!
-    r_root = {}
-    for idx, _ in enumerate(root["reactions"]["equilibrium"]):
-        _ = eq_reaction_from_dict(_, list_sp=None)[0][0]
-        r_root[str(_)] = (_, idx)
-
-    # Loop over all KReaction in other and check whether it is also in
-    # root or not.
-    to_add = []  # List of all reaction to add to root afterward
-    for _ in other["reactions"]["equilibrium"]:
-        eq = eq_reaction_from_dict(_, list_sp=None)[0][0]
-        # Same reaction in root => just make sur the kvalue comes from
-        # 'other'
-        if str(eq) in r_root:
-            idx = r_root[str(eq)][1]
-            for elt in ["k_forward", "k_backward", "k_value"]:
-                if elt in root["reactions"]["equilibrium"][idx]:
-                    del root["reactions"]["equilibrium"][idx][elt]
-                if elt in _:
-                    root["reactions"]["equilibrium"][idx][elt] = _[elt]
-            continue
-        # KReaction from 'other' not in 'root'. Make a copy of the
-        # dict version.
-        to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all
-    # new reactions from 'other' --> stored in 'to_add'
-    root["reactions"]["equilibrium"] += to_add
-
-    ## => k_reactions ##
-    # First, let's make a set of the kreaction presents in root.
-    # Each one should have a unique ID ==> Make kReaction and then use
-    # the str version of it!
-    r_root = {}
-    for idx, _ in enumerate(root["reactions"]["k_reaction"]):
-        _ = kreaction_from_dict(_, list_sp=None)[0][0]
-        r_root[str(_)] = (_, idx)
-
-    # Loop over all KReaction in other and check whether it is also in
-    # root or not.
-    to_add = []  # List of all reaction to add to root afterward
-    for _ in other["reactions"]["k_reaction"]:
-        kr = kreaction_from_dict(_, list_sp=None)[0][0]
-        # Same reaction in root => just make sur the kvalue comes from
-        # 'other'
-        if str(kr) in r_root:
-            idx = r_root[str(kr)][1]
-            # raw_k_value is necessary to avoid multiple divide for
-            # reactions like xA -> B + C
-            # (in this case, xk should be provided)
-            root["reactions"]["k_reaction"][idx]["k_value"] = kr.raw_k_value()
-            continue
-        # KReaction from 'other' not in 'root'. Make a copy of the dict
-        # version.
-        to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all
-    # new reactions from 'other' --> stored in 'to_add'
-    root["reactions"]["k_reaction"] += to_add
-
-    ## => Loop over all Constant Reactions ##
-    to_add = []  # List of all reaction to add to root afterward
-    for _ in other["reactions"]["constant"]:
-        kr = cst_reaction_from_dict(_, list_sp=None)[0][0]
-        # Same reaction in root => just make sur the kvalue comes from
-        # 'other'
-        if str(kr) in r_root:
-            idx = r_root[str(kr)][1]
-            # raw_k_value is necessary to avoid multiple divide for
-            # reactions like
-            # xA -> B + C (in this case, xk should be provided)
-            root["reactions"]["constant"][idx]["k_value"] = kr.raw_k_value()
-            continue
-        # KReaction from 'other' not in 'root'. Make a copy of the dict
-        # version.
-        to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all
-    # new reactions from 'other' --> stored in 'to_add'
-    root["reactions"]["constant"] += to_add
-
-    ## => Arrhenius Reactions ##
-    # First, let's make a set of the Arrhenius presents in root.
-    # Each one should have a unique ID ==> Make kReaction and then use
-    # the str version of it!
-    r_root = {}
-    for idx, _ in enumerate(root["reactions"]["arrhenius"]):
-        _ = arrhenius_from_dict(_, list_sp=None)[0][0]
-        r_root[str(_)] = (_, idx)
-
-    # Loop over all KReaction in other and check whether it is also in
-    # root or not.
-    to_add = []  # List of all reaction to add to root afterward
-    for _ in other["reactions"]["arrhenius"]:
-        ar = arrhenius_from_dict(_, list_sp=None)[0][0]
-        # Same reaction in root => just make sur the cst values comes
-        # from 'other'
-        if str(ar) in r_root:
-            idx = r_root[str(ar)][1]
-            root["reactions"]["arrhenius"][idx]["A"] = ar._pre_exp
-            root["reactions"]["arrhenius"][idx]["Ea"] = ar._activation_energy
-            continue
-        # arrhenius from 'other' not in 'root'. Make a copy of the
-        # dict version.
-        to_add.append(_.copy())
-    # All shared reactions are updated at this point. Now just add all
-    # new reactions from 'other' --> stored in 'to_add'
-    root["reactions"]["arrhenius"] += to_add
-
-    ## => Enzymatic ##
-    r_root = {}
-    for idx, _ in enumerate(root["reactions"]["enzymatic"]):
-        _ = michaelis_from_dict(_, list_sp=None)[0][0]
-        r_root[str(_)] = (_, idx)
-    to_add = []  # List of all reaction to add to root afterward
-    for _ in other["reactions"]["enzymatic"]:
-        er = michaelis_from_dict(_, list_sp=None)[0][0]
-        if str(er) in r_root:
-            idx = r_root[str(er)][1]
-            root["reactions"]["enzymatic"][idx]["k_value"] = er.raw_k_value()
-            root["reactions"]["enzymatic"][idx]["k_micha"] = er.k_micha
-            continue
-        to_add.append(_.copy())
-    root["reactions"]["enzymatic"] += to_add
-
-    return root
+    # Reactions
+    out["reactions"]["radiolytic"] |= new["reactions"]["radiolytic"]
+    reactions = tp.cast("tp.Dict[str, tp.Any]", out["reactions"])
+    new_reactions = tp.cast("tp.Dict[str, tp.Any]", new["reactions"])
+    for section in _REACTION_LISTS:
+        reactions[section] = _merge_reaction_list(
+            section,
+            _as_list(reactions[section]),
+            _as_list(new_reactions[section]),
+        )
+    return out
 
 
-def dict_compare(d1: tp.Dict, d2: tp.Dict) -> tp.Dict:
+def _complete(config: ConfigDict) -> ConfigDict:
+    """A deep copy of 'config' with all the sections of a ConfigDict."""
+    return deep_update(blank_config(), copy.deepcopy(config))  # type: ignore[type-var]
+
+
+def _as_list(reactions: tp.List[tp.Dict] | tp.Dict) -> tp.List[tp.Dict]:
+    """A single reaction given as a table is a list of one reaction."""
+    if isinstance(reactions, dict):
+        return [reactions] if reactions else []
+    return reactions
+
+
+def _merge_reaction_list(
+    section: str,
+    base: tp.List[tp.Dict],
+    override: tp.List[tp.Dict],
+) -> tp.List[tp.Dict]:
     """
-    Dictionary comparison, insightful.
-    From:
-    https://stackoverflow.com/questions/4527942
+    Merge the reactions of 'override' into those of 'base' (see
+    combine_config). The dicts of 'base' are updated in place.
     """
-    d1_keys = set(d1.keys())
-    d2_keys = set(d2.keys())
-    shared_keys = d1_keys.intersection(d2_keys)
-    removed = d1_keys - d2_keys
-    added = d2_keys - d1_keys
-    modified = {o: (d1[o], d2[o]) for o in shared_keys if d1[o] != d2[o]}
-    same = {o for o in shared_keys if d1[o] == d2[o]}
-    return {"added": added, "removed": removed, "modified": modified, "same": same}
+    position = {reaction_key(r["reaction"]): idx for idx, r in enumerate(base)}
+    merged = list(base)
+    for entry in override:
+        idx = position.get(reaction_key(entry["reaction"]))
+        if idx is None:  # a new reaction
+            merged.append(entry)
+            continue
+        logger.debug(
+            f"CONFIG::{section}: '{merged[idx]['reaction']}' redefined by "
+            f"'{entry['reaction']}'"
+        )
+        if section == "equilibrium":
+            given = [c for c in _EQUILIBRIUM_CONSTANTS if c in entry]
+            if len(given) >= 2:  # fully defined by the new entry
+                for constant in _EQUILIBRIUM_CONSTANTS:
+                    merged[idx].pop(constant, None)
+        merged[idx] |= entry
+    return merged
 
 
 # --------------------------------------------------------------------------- #

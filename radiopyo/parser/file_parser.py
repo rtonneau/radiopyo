@@ -20,7 +20,12 @@ import typing as tp
 from abc import ABC, abstractmethod
 
 # ------------------------------ Internal imports --------------------------- #
-from radiopyo.parser.utils import combine_config
+from radiopyo.parser.utils import (
+    PACKAGE_PREFIX,
+    blank_config,
+    combine_config,
+    include_path,
+)
 
 # -------------------------- Type checking ONLY imports---------------------- #
 if tp.TYPE_CHECKING:
@@ -60,27 +65,42 @@ def list_available_parsers() -> tp.Dict[str, tp.Type[FileParser]]:
     return {cls.ext: cls for cls in FileParser.__subclasses__()}  # type: ignore [type-abstract]
 
 
-def resolve_includes(config: ConfigDict) -> ConfigDict:
+def resolve_includes(
+    config: ConfigDict, _chain: tp.Tuple[pathlib.Path, ...] = ()
+) -> ConfigDict:
     """
     Resolves the includes in the given configuration dictionary.
 
+    The included files are loaded (recursively) and merged in the order
+    they are listed: when two of them define the same thing, the last one
+    wins. The config itself has the highest precedence, it overrides
+    everything coming from its includes (see combine_config for the
+    details of the merge).
+
     Args:
         config (ConfigDict): The configuration dictionary.
+        _chain (Tuple[pathlib.Path, ...]): internal, the files being resolved
+            (used to detect circular includes).
 
     Returns:
-        ConfigDict: The updated configuration dictionary.
+        ConfigDict: The configuration with all the includes merged in,
+            and none left in its 'includes' section. 'config' itself is
+            not modified. Without any include, 'config' is returned.
 
     Raises:
         FileNotFoundError: If the included file does not exist.
+        ValueError: If a file includes itself (directly or not).
 
     """
-    if len(config["includes"]) == 0:
+    includes = config["includes"]
+    if len(includes) == 0:
         return config  # Do nothing
     available_parsers = list_available_parsers()
-    includes = config["includes"].copy()
-    config["includes"] = {}
 
-    # Loop ovr all files in 'includes' section (sorted by extension)
+    # Lowest precedence first: each included file overrides the previous ones
+    merged = blank_config()
+
+    # Loop over all files in 'includes' section (sorted by extension)
     for ext, f_list in includes.items():
         # Check that it is a known extension
         if ("." + ext) not in available_parsers:
@@ -94,21 +114,20 @@ def resolve_includes(config: ConfigDict) -> ConfigDict:
 
         # Loop over all file with the same extension ('ext')
         for f in f_list:
-            # If ask to include "built-in" configuration
-            if f.startswith("radiopyo"):
-                path = pathlib.Path(__file__).parent.parent
-                path /= rf"data/{f.split('/')[-1].strip()}"
-            else:
-                path = pathlib.Path(f)
-
-            path = path.absolute()
+            path = include_path(f)
             if not path.exists():
                 raise FileNotFoundError(path)
+            resolved = path.resolve()
+            if resolved in _chain:
+                cycle = " -> ".join(str(p) for p in (*_chain, resolved))
+                raise ValueError(f"Circular include: {cycle}")
             logger.info(f"Resolving include: {path}")
-            _ = resolve_includes(available_parsers["." + ext](path).parse())
-            config = combine_config(_, config)
+            included = resolve_includes(
+                available_parsers["." + ext](path).parse(), (*_chain, resolved)
+            )
+            merged = combine_config(merged, included)
 
-    return config
+    return combine_config(merged, config)
 
 
 # --------------------------------------------------------------------------- #
@@ -165,6 +184,48 @@ class FileParser(ABC):
             ConfigDict: TypedDictionary use to build the simulation
                 Environment.
         """
+
+    def anchor_includes(
+        self,
+        includes: tp.Mapping[str, str | tp.Sequence[str]],
+    ) -> tp.Dict[str, tp.List[str]]:
+        """
+        The 'includes' section of the file being parsed, with its relative
+        paths anchored to the folder of the file: a relative path is
+        looked for next to the file first, so that a config does not
+        depend on the working directory. When there is nothing at that
+        place the path is kept as written, and it will be looked for in
+        the working directory (see resolve_includes).
+
+        Entries referring to the package data ('radiopyo/...') and
+        absolute paths are kept as written.
+
+        Parsers should use it to fill the 'includes' section of the
+        ConfigDict they produce.
+
+        Args:
+            includes: the section as read from the file, extensions as
+                keys, one path or a list of paths as values.
+
+        Returns:
+            Dict[str, List[str]]
+        """
+        base = pathlib.Path(self.path).absolute().parent
+        out: tp.Dict[str, tp.List[str]] = {}
+        for ext, entries in includes.items():
+            if isinstance(entries, str):
+                entries = [entries]
+            out[ext] = [self._anchored(entry, base) for entry in entries]
+        return out
+
+    @staticmethod
+    def _anchored(entry: str, base: pathlib.Path) -> str:
+        """'entry' as the path next to 'base' if it exists, 'entry' else."""
+        entry = entry.strip()
+        if entry.startswith(PACKAGE_PREFIX) or pathlib.Path(entry).is_absolute():
+            return entry
+        candidate = base / entry
+        return str(candidate) if candidate.exists() else entry
 
     def file_type(self) -> str:
         """

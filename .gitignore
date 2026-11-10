@@ -13,3 +13,6 @@ __pycache__
 /.ipynb_checkpoints
 
 .scratch/
+/dist
+.coverage
+/tests/output/

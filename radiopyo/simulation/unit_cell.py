@@ -12,7 +12,7 @@ Author:
 from __future__ import annotations
 
 import collections
-import copy
+import dataclasses
 import logging
 import time
 import typing as tp
@@ -24,15 +24,14 @@ from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
-from radiopyo.parser.ron import RonFileParser
 from radiopyo.parser.toml import TOMLFileParser
-from radiopyo.physics.beam import BeamCollection, ParticleBeam
+from radiopyo.physics.beam import ParticleBeam
+from radiopyo.physics.beam_collection import BeamCollection
 from radiopyo.simulation import exceptions as rp_excep
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import (
     ScipyODEResult,
     derive,
-    jacobian,
 )
 from radiopyo.simulation.ode_result import ODEResult
 from radiopyo.utils.g_values import GValuesBoscolo
@@ -47,6 +46,7 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__ = [
+    "RunOptions",
     "UnitCell",
 ]
 
@@ -54,8 +54,98 @@ __all__ = [
 logger = logging.getLogger("radiopyo")
 
 # --------------------------------------------------------------------------- #
+#                            FUNCTION DEFINITIONS                             #
+# --------------------------------------------------------------------------- #
+
+# Tolerances passed to solve_ivp when the user gives none.
+DEFAULT_ATOL: float = 1e-12
+DEFAULT_RTOL: float = 1e-10
+# Duration [s] of the ON -> OFF transition chunk of prepare_single_pulse.
+DEFAULT_TRANS_TIME: float = 100e-6
+
+
+def widen_empty_span(t_span: tp.Tuple[float, float]) -> tp.Tuple[float, float]:
+    """
+    solve_ivp needs a non empty integration interval. An empty span
+    [t, t] is therefore widened to [t/100, t]: the solver starts two
+    decades earlier and still ends at the requested time t. Any other
+    span is returned unchanged.
+
+    The trick only works for t > 0: [0, 0] stays empty.
+    """
+    if t_span[0] == t_span[1]:
+        return (t_span[0] / 1e2, t_span[1])
+    return t_span
+
+
+def _make_chunks(
+    boundaries: tp.Sequence[float] | NDArray[np.float64],
+    beam_on: tp.Sequence[bool] | NDArray[np.bool_],
+    max_steps: tp.Sequence[tp.Optional[float]],
+) -> tp.List[SimChunk]:
+    """
+    Build consecutive chunks: chunk i spans [boundaries[i],
+    boundaries[i+1]], with beam state beam_on[i] and max step size
+    max_steps[i] (len(boundaries) == len(beam_on) + 1 == len(max_steps) + 1).
+    """
+    return [
+        SimChunk(start=start, stop=stop, max_step_size=max_step, beam_on=on)
+        for start, stop, on, max_step in zip(
+            boundaries[:-1], boundaries[1:], beam_on, max_steps, strict=True
+        )
+    ]
+
+
+# --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
 # --------------------------------------------------------------------------- #
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class RunOptions:
+    """
+    Solver options shared by every ODE integration of a UnitCell (plain
+    run and every chunk of a chunked run). Built internally from the
+    keyword arguments of UnitCell.run / prepare_chunked_run /
+    prepare_single_pulse: users never need to create one.
+
+    Attributes:
+        atol: float, optional
+            Absolute tolerance of solve_ivp (None -> DEFAULT_ATOL = 1e-12)
+        rtol: float, optional
+            Relative tolerance of solve_ivp (None -> DEFAULT_RTOL = 1e-10)
+        method: str
+            solve_ivp integration method (default: "LSODA")
+        max_step: float, optional
+            Largest step allowed to solve_ivp (None -> inf). In a
+            chunked run, it is replaced by the max step of each chunk.
+        first_step: float, optional
+            Initial step of solve_ivp (None -> UnitCell.FIRST_STEP,
+            read on the cell at run time). It is reduced to max_step / 10
+            when it is not lower than max_step, then to span / 1000 when
+            it is larger than the integration span.
+        use_beam: bool
+            Whether the beam dose rate enters the ODE (default: True)
+        force_positive: bool
+            Whether derive() zeroes the consumption of depleted species
+            (default: False)
+        use_jac: bool
+            Analytical Jacobian: not available for the moment (being
+            rewritten), True raises NotImplementedError (default: False)
+        t_eval: NDArray[np.float64], optional
+            Times at which solve_ivp stores the solution (None -> solver
+            steps)
+    """
+
+    atol: tp.Optional[float] = None
+    rtol: tp.Optional[float] = None
+    method: str = "LSODA"
+    max_step: tp.Optional[float] = None
+    first_step: tp.Optional[float] = None
+    use_beam: bool = True
+    force_positive: bool = False
+    use_jac: bool = False
+    t_eval: tp.Optional[NDArray[np.float64]] = None
 
 
 class UnitCell(object):
@@ -66,9 +156,13 @@ class UnitCell(object):
     concentration over time.
 
     Attributes:
-        T: Temperature
-            Sets the values of chemical reaction constants (default=25).
-            Unit = °C.
+        T: float
+            Simulation temperature in °C (default=25, or the
+            "temperature" parameter of the config file). Read-only view
+            of env.parameters["temperature"], the single source of truth;
+            set it with set_temperature (or the T setter). It sets the
+            rate constants, the pKa and the concentrations of the
+            constant species (e.g. H2O).
         env: SimEnv
             SimEnv build from the input file
         mat: SimMatrices
@@ -77,24 +171,28 @@ class UnitCell(object):
             Radiation source to use for the simulation
         last_exec_time: float
             Time duration of last simulation step
+        last_burst_dose_rate: float, optional
+            Dose rate [Gy/s] used for the initial radiolytic burst of the
+            last integration step (None if no burst was applied)
         g_val: GValuesBoscolo
             GValues from the literature to possibly update the LET
         FIRST_STEP: float
-            Initial time step of all simulation (default=1e-12)
+            Initial time step of all simulation (default=1e-15 s)
         T_ZERO: float
-            Initial time after when switching to BEAM ON phase
-            (default=1e-7)
+            Duration skipped at the start of a BEAM ON phase; the
+            radiolytic production over it is added analytically to the
+            initial concentrations (default=1e-7 s)
 
     """
 
     FIRST_STEP: float = 1e-15
     T_ZERO: float = 1e-7
 
-    _T: Temperature
     env: SimEnv
     mat: SimMatrices
     beam_list: BeamCollection
     last_exec_time: float
+    last_burst_dose_rate: tp.Optional[float]
     g_val: GValuesBoscolo
 
     def __init__(
@@ -104,7 +202,6 @@ class UnitCell(object):
         init: bool = True,
     ) -> None:
         self.env = env
-        self._T = Temperature()
         self.g_val = GValuesBoscolo()  # To do before set_beam
 
         if init:
@@ -119,10 +216,20 @@ class UnitCell(object):
                 self.beam_list.add_beam(beam, beam.label)
 
         self.last_exec_time = -1
+        self.last_burst_dose_rate = None
 
     @property
     def T(self) -> float:
-        return self._T.celsius
+        """Simulation temperature in °C (see set_temperature)."""
+        return self.env.temperature.celsius
+
+    @T.setter
+    def T(self, value: float) -> None:
+        self.set_temperature(value)
+
+    @property
+    def _T(self) -> Temperature:
+        return self.env.temperature
 
     @property
     def beam(self) -> ParticleBeam:
@@ -197,30 +304,34 @@ class UnitCell(object):
         """
         return cls.from_parser(file, TOMLFileParser, init)
 
-    @classmethod
-    def from_ron(cls, file: str | Path) -> tp.Self:
-        """Create a Simulation Environment from a RON file:
-
-        Args:
-            file: str | pathlib.Path
-                Path to the RON file
-
-        Returns:
-            UnitCell
-        """
-        return cls.from_parser(file, RonFileParser)
-
     def update_env(self) -> None:
         """ """
         self._update_matrices()
 
     def _update_matrices(self) -> None:
         """ """
-        self.mat = self.env.build_all_matrices(self._T)
+        self.mat = self.env.build_all_matrices(self.env.temperature)
 
     def set_temperature(self, T: float, unit: str = "celsius") -> tp.Self:
-        """ """
-        self._T = Temperature(T, unit)
+        """
+        Set the simulation temperature (stored in
+        env.parameters["temperature"], in °C) and rebuild the matrices.
+
+        Units: T is given in `unit` ("celsius" default, or "kelvin").
+        Internally the k polynomials (Arrhenius/equilibria) use 1/K,
+        while the pKa and the initial concentrations (polynomials, e.g.
+        H2O) use °C: the conversion is done for you.
+
+        Args:
+            T: float
+                Temperature
+            unit: str
+                "celsius" (default) or "kelvin"
+
+        Returns:
+            Self
+        """
+        self.env.set_temperature(T, unit)
         self._update_matrices()
         return self
 
@@ -229,13 +340,20 @@ class UnitCell(object):
         beam: ParticleBeam | str,
         LET: tp.Optional[float] = None,
     ) -> tp.Self:
-        """Define Radiation Source structure/parameters
+        """Define Radiation Source structure/parameters, then update the
+        G values for the LET (see change_LET).
 
         Args:
-            beam: ParticleBeam
+            beam: ParticleBeam | str
+                New beam (added to the beam list and selected) or label
+                of a beam already in the beam list (selected).
+            LET: float, optional
+                LET [keV/µm] of the beam. If None, the LET of the beam
+                selected *before* this call is silently reused (current
+                behaviour, kept on purpose).
 
         Returns:
-            None
+            Self
         """
         LET = LET if LET is not None else self.beam_list.current_LET
         if isinstance(beam, str):
@@ -283,102 +401,211 @@ class UnitCell(object):
                 continue
             reaction.update_from_ge(self.g_val.values_at(sp.label, let, _dr))
 
-        # Recompute the Gi_mat accordingly
-        # self.mat["Gi_mat"] = self.env.make_radiolytic_vector()
+        # Recompute the radiolytic yields (mat.radiolytic) accordingly
         self._update_matrices()
 
         logger.debug("New G values [radical / 100eV / incident particle] are:")
         for reaction in self.env.reactions.radiolytic:
             logger.debug(f"-> {reaction.label()}: {reaction.ge():.3f}")
 
+    # ----------------------------- ODE integration ------------------------- #
     def _raw_run(
         self,
         t_span: tp.Tuple[float, float],
-        use_jac: bool,
-        method: str,
-        atol: tp.Optional[float] = None,
-        rtol: tp.Optional[float] = None,
-        max_step: tp.Optional[float] = None,
+        options: RunOptions,
         y0: tp.Optional[NDArray[np.float64]] = None,
-        t_eval: tp.Optional[NDArray[np.float64]] = None,
-        use_beam: bool = True,
-        beam_ON: bool = True,
-        force_positive: bool = False,
+        beam_on: bool = True,
     ) -> ScipyODEResult:
-        if len(self.beam_list) <= 0:
-            rp_excep.NoBeamDefinedError("Simulation aborted")
-        first_step = self.FIRST_STEP
+        """
+        Integrate the ODE system over t_span with solve_ivp.
 
-        if t_span[0] == t_span[1]:
-            t_span = (t_span[0] / 1e2, t_span[1])
+        Steps: check the options, widen an empty span (widen_empty_span),
+        build the solve_ivp keyword arguments (_solver_kwargs), apply the
+        initial radiolytic burst if the beam is switched ON at t_span[0]
+        (_apply_initial_burst), then solve and time (_timed_solve).
 
-        # Building kwargs for solve_ivp:
+        Args:
+            t_span: Tuple[float, float]
+                Start and stop times [s]
+            options: RunOptions
+                Solver options
+            y0: NDArray[np.float64], optional
+                Initial concentrations of the dynamic species [µmol/L].
+                If None, SimEnv.initial_values() is used. Never modified:
+                the integration starts from a copy.
+            beam_on: bool
+                Whether the beam is switched ON at t_span[0] (default:
+                True). The initial burst is applied only if the beam is
+                also used (options.use_beam), see _apply_initial_burst.
+
+        Returns:
+            ScipyODEResult: raw solve_ivp result
+
+        Raises:
+            NoBeamDefinedError: no beam is defined
+            NotImplementedError: options.use_jac is True
+        """
+        if options.use_jac:
+            raise NotImplementedError(
+                "The analytical Jacobian is being rewritten and is not "
+                "available for the moment: use use_jac=False."
+            )
+        self._require_beam()
+
+        t_span = widen_empty_span(t_span)
+        # First step is clamped against the span *before* the burst shift.
+        solver_kwargs = self._solver_kwargs(t_span, options)
+
+        # Always work on a copy: the burst must not alter the caller's y0
+        # (nor the last stored point of a previous chunk).
+        y_start = (
+            np.array(y0, dtype=np.float64, copy=True)
+            if y0 is not None
+            else self.env.initial_values()
+        )
+        beam = self.beam_list.current if options.use_beam else None
+
+        self.last_burst_dose_rate = None
+        if beam_on and options.use_beam:  # beam switched ON at t_span[0]
+            t_span = self._apply_initial_burst(t_span, y_start)
+            options = self._drop_skipped_t_eval(t_span, options)
+
+        return self._timed_solve(t_span, y_start, beam, options, solver_kwargs)
+
+    def _solver_kwargs(
+        self,
+        t_span: tp.Tuple[float, float],
+        options: RunOptions,
+    ) -> tp.Dict[str, tp.Any]:
+        """
+        Step tolerances of solve_ivp: rtol, atol (defaults DEFAULT_RTOL,
+        DEFAULT_ATOL), first_step (see RunOptions.first_step) and
+        max_step (omitted when None, i.e. solve_ivp's inf).
+        """
+        first_step = (
+            options.first_step if options.first_step is not None else self.FIRST_STEP
+        )
         kwargs: tp.Dict[str, tp.Any] = {}
-        kwargs["first_step"] = self.FIRST_STEP
-        kwargs["jac"] = jacobian if use_jac else None
-        kwargs["rtol"] = rtol if rtol is not None else 1e-10
-        kwargs["atol"] = atol if atol is not None else 1e-12
+        kwargs["first_step"] = first_step
+        kwargs["rtol"] = options.rtol if options.rtol is not None else DEFAULT_RTOL
+        kwargs["atol"] = options.atol if options.atol is not None else DEFAULT_ATOL
 
-        kwargs["y0"] = y0
-        if y0 is None:
-            kwargs["y0"] = self.env.initial_values()
+        if options.max_step is not None:
+            kwargs["max_step"] = options.max_step
+            # The first step must be lower than the max step
+            if first_step >= options.max_step:
+                kwargs["first_step"] = options.max_step / 10
 
-        if max_step is not None:
-            kwargs["max_step"] = max_step
-            # Check if first step is lower than the defined max_step
-            if first_step >= max_step:
-                kwargs["first_step"] = max_step / 10
-
+        # The first step must fit in the integration span
         if kwargs["first_step"] > t_span[1] - t_span[0]:
             kwargs["first_step"] = (t_span[1] - t_span[0]) / 1e3
+        return kwargs
 
-        beam = self.beam_list.current if use_beam else None
+    def _apply_initial_burst(
+        self,
+        t_span: tp.Tuple[float, float],
+        y0: NDArray[np.float64],
+    ) -> tp.Tuple[float, float]:
+        """
+        Beam switched ON at t_span[0]: skip the first T_ZERO seconds and
+        add *in place* to y0 [µmol/L] the radiolytic production of the
+        dynamic species over that interval (computed analytically from
+        the G values, at the dose rate of the beam at t_span[0] + T_ZERO,
+        stored in last_burst_dose_rate). Constant species are left
+        untouched.
 
-        # Check if beam_on, then skip the next 1e-7 s of sim and compute
-        # evolution of cc's according to Gvalues
-        if beam_ON:  # assume beam is switched ON at t_span[0]
-            t_span = (t_span[0] + self.T_ZERO, t_span[1])
-            if t_span[0] > t_span[1]:
-                raise ValueError(f"Too Short beam pulse {t_span}")
-            for r in self.env.reactions.radiolytic:
-                # If the species must be forced constant, skip it.
-                if self.env.species.is_cst_species(r.species()):
-                    continue
+        Returns:
+            Tuple[float, float]: (t_span[0] + T_ZERO, t_span[1])
 
-                # Keep initial value and increment
-                kwargs["y0"][r.species().index] += (
-                    r.compute_initial_cc_before(
-                        t0=self.T_ZERO, dose_rate=self.beam.at(t_span[0]).dose_rate()
-                    )
-                    * 1e6
-                )  # Units of initial cc are µM
+        Raises:
+            ValueError: the span is shorter than T_ZERO
+        """
+        t_span = (t_span[0] + self.T_ZERO, t_span[1])
+        if t_span[0] >= t_span[1]:
+            raise ValueError(f"Too Short beam pulse {t_span}")
+        dose_rate = self.beam.at(t_span[0]).dose_rate()
+        self.last_burst_dose_rate = dose_rate
+        for r in self.env.reactions.radiolytic:
+            # If the species must be forced constant, skip it.
+            if self.env.species.is_cst_species(r.species()):
+                continue
 
+            # Keep initial value and increment
+            y0[r.species().index] += (
+                r.compute_initial_cc_before(t0=self.T_ZERO, dose_rate=dose_rate)
+                * 1e6
+            )  # Units of initial cc are µM
+        return t_span
+
+    @staticmethod
+    def _drop_skipped_t_eval(
+        t_span: tp.Tuple[float, float],
+        options: RunOptions,
+    ) -> RunOptions:
+        """
+        The initial burst moves the start of the integration to
+        t_span[0] + T_ZERO: the t_eval times before it (inside the
+        skipped interval) cannot be evaluated by solve_ivp and are
+        dropped.
+        """
+        if options.t_eval is None:
+            return options
+        t_eval = np.asarray(options.t_eval)
+        kept = t_eval[t_eval >= t_span[0]]
+        if len(kept) == len(t_eval):
+            return options
+        logger.warning(
+            f"{len(t_eval) - len(kept)} t_eval time(s) before "
+            f"{t_span[0]} s (end of the skipped initial burst) dropped"
+        )
+        return dataclasses.replace(options, t_eval=kept)
+
+    def _timed_solve(
+        self,
+        t_span: tp.Tuple[float, float],
+        y0: NDArray[np.float64],
+        beam: tp.Optional[ParticleBeam],
+        options: RunOptions,
+        solver_kwargs: tp.Dict[str, tp.Any],
+    ) -> ScipyODEResult:
+        """Call solve_ivp on derive() and store its wall time in last_exec_time."""
         t0 = time.time()
         sol: ScipyODEResult = solve_ivp(
             derive,
             t_span,
-            args=(
-                beam,
-                self.mat["cst_sp"],
-                self.mat["Ki_mat"],
-                self.mat["Gi_mat"],
-                self.mat["Ez_mat"],
-                force_positive,
-            ),
-            t_eval=t_eval,
-            method=method,
-            **kwargs,
+            y0,
+            args=(beam, self.mat, options.force_positive),
+            t_eval=options.t_eval,
+            method=options.method,
+            **solver_kwargs,
         )
         t1 = time.time()
         self.last_exec_time = t1 - t0
         return sol
 
+    # ------------------------------ Public runs ---------------------------- #
     def run_till_max_dose(
         self,
         time_start: float = 1e-9,
         **kwargs: tp.Unpack[KwargsRun],
     ) -> ODEResult:
-        """ """
+        """
+        Run from time_start up to the time at which the current beam
+        reaches its max dose.
+
+        Args:
+            time_start: float
+                Start time [s] (default: 1e-9)
+            **kwargs: KwargsRun
+                Other keyword arguments of run(). A 't_span' given here
+                is overwritten.
+
+        Returns:
+            ODEResult
+
+        Raises:
+            ValueError: the beam has no max dose (time at max dose = inf)
+        """
         if self.beam_list.current.time_at_max_dose >= np.inf:
             raise ValueError(
                 "Unable to use 'run_till_max_dose', time at max dose "
@@ -401,6 +628,7 @@ class UnitCell(object):
         force_positive: bool = False,
     ) -> ODEResult:
         """Solve ODE over t_span
+
         Args:
             t_span: Tuple[float, float]
                 t_span[0] -> start time, in seconds
@@ -408,49 +636,69 @@ class UnitCell(object):
             t_eval: [NDArray[np.float64], optional
                 Force function evaluation on t_eval (default: None)
             use_jac: bool
-                Use the Jacobian ?
+                Use the analytical Jacobian? Not available for the
+                moment (being rewritten): True raises NotImplementedError.
             method: str
                 Which ODE solver to use? Define in
-                scipy.integrate.solve_ivp
+                scipy.integrate.solve_ivp (default: "LSODA")
             atol: float, optional
-                Absolute Tolerance of the ODE Solver (default: 1e-8)
+                Absolute Tolerance of the ODE Solver (default: 1e-12)
+            rtol: float, optional
+                Relative Tolerance of the ODE Solver (default: 1e-10)
             max_step: float, optional
                 Larger authorized time step for the ODE solver
                 (default: inf)
             y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None).
-                If None, calls EnvSim.initial_values()
+                Initial concentration of DynSpecies [µmol/L] (default:
+                None). If None, calls EnvSim.initial_values().
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
+            force_positive: bool, optional
+                Whether derive() zeroes the consumption of depleted
+                species (default: False).
+
+        The beam is assumed switched ON at t_span[0]: unless
+        use_beam=False, the first T_ZERO seconds are skipped and the
+        radiolytic production over them is added to y0 (a copy: the
+        given y0 is never modified).
 
         Returns:
-            ScipyODEResult: integration result provided by
-            scipy.integrate.solve_ivp
+            ODEResult: integration result (solve_ivp solution wrapped
+            with the environment, beam, matrices, LET and T_ZERO)
+
+        Raises:
+            NoBeamDefinedError: no beam is defined
+            ValueError: beam ON at t_span[0] and t_span not longer than
+                T_ZERO (the initial burst would cover the whole span)
         """
         logger.info(
             f"Starting simulation with t_span: {t_span} (jacobian use: {use_jac})"
         )
-        sol = self._raw_run(
-            t_span,
-            use_jac,
-            method,
-            atol,
-            rtol,
-            max_step,
-            y0,
-            t_eval,
-            use_beam,
-            force_positive,
+        options = RunOptions(
+            atol=atol,
+            rtol=rtol,
+            method=method,
+            max_step=max_step,
+            use_beam=use_beam,
+            force_positive=force_positive,
+            use_jac=use_jac,
+            t_eval=t_eval,
         )
+        sol = self._raw_run(t_span, options, y0=y0, beam_on=True)
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
-        return ODEResult(
+        res = ODEResult(
             self.env,
             self.beam_list.current,
             self.mat,
             self.beam_list.current_LET,
             self.T_ZERO,
-            sol,
         )
+        res.append_sol(
+            sol,
+            exec_time=self.last_exec_time,
+            bursts=self._last_bursts(),
+        )
+        return res
 
     def prepare_chunked_run(
         self,
@@ -466,19 +714,27 @@ class UnitCell(object):
         use_beam: bool = True,
         force_positive: bool = False,
     ) -> SimChunksIter:
-        """Method used to prepare a multi step ODE integration
+        """Method used to prepare a multi step ODE integration, one chunk
+        per beam ON / beam OFF interval of the current beam (from
+        beam.make_time_intervals). The initial radiolytic burst is applied
+        at the start of every beam ON chunk.
+
         Args:
             t_span: Tuple[float, float]
                 t_span[0] -> start time, in seconds
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
-                Whether to use the jacobian along with the ODE solver
-                (default:False)
+                Whether to use the analytical jacobian along with the ODE
+                solver (default:False). Not available for the moment
+                (being rewritten): True raises NotImplementedError when
+                the chunks are run.
             method: str, optional
                 Which ODE solver to use? Define in
-                scipy.integrate.solve_ivp
+                scipy.integrate.solve_ivp (default: "LSODA")
             atol: float, optional
-                Absolute Tolerance of the ODE Solver (default: 1e-10)
+                Absolute Tolerance of the ODE Solver (default: 1e-12)
+            rtol: float, optional
+                Relative Tolerance of the ODE Solver (default: 1e-10)
             max_step_size_on: float, optional
                 Larger authorized time step for the ODE solver while
                 beam is ON (default: inf)
@@ -491,8 +747,8 @@ class UnitCell(object):
                 sim time and few pulses). If None,
                 'max_step_size_off|on' is used instead (default: None).
             y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None).
-                If None, calls EnvSim.initial_values()
+                Initial concentration of DynSpecies [µmol/L] (default:
+                None). If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
             force_positive: bool, optional
@@ -502,56 +758,40 @@ class UnitCell(object):
         Returns:
             SimChunksIter: Iterable object performing the ODE
             integration.
+
+        Raises:
+            NoBeamDefinedError: no beam is defined
         """
-        if len(self.beam_list) <= 0:
-            logger.error("No beam is defined for the simulation")
-            raise rp_excep.NoBeamDefinedError
-        chunks = self.beam_list.current.make_time_intervals(
+        self._require_beam()
+        intervals = self.beam_list.current.make_time_intervals(
             start=t_span[0], stop=t_span[1]
         )
-        # chunks[np.where(chunks[:, 1] > 0)[0], 1] = max_step_size_on
-        # chunks[np.where(chunks[:, 1] == 0)[0], 1] = max_step_size_off
-        # if max_step_size_final is not None:
-        #    chunks[-2, 1] = max_step_size_final
-
-        chunk_list: tp.List[SimChunk] = []
-        for idx in range(len(chunks[0:-2, :])):
-            chunk = SimChunk(
-                start=chunks[idx, 0],
-                stop=chunks[idx + 1, 0],
-                max_step_size=(
-                    max_step_size_on if chunks[idx, 1] > 0 else max_step_size_off
-                ),
-                beam_on=chunks[idx, 1] > 0,
-            )
-            chunk_list.append(chunk)
-
-        # Make final chunk
+        # intervals: one row per boundary, [time, 1 if beam ON else 0];
+        # the last row only holds the stop time.
+        beam_on = intervals[:-1, 1] > 0
+        max_steps = [
+            max_step_size_on if on else max_step_size_off for on in beam_on[:-1]
+        ]
+        # Final chunk: max_step_size_final, if any, overrides on/off.
         max_step = max_step_size_final
         if max_step is None:
-            max_step = max_step_size_on if chunks[-2, 1] > 0 else max_step_size_off
-        chunk_list.append(
-            SimChunk(
-                start=chunks[-2, 0],
-                stop=chunks[-1, 0],
-                max_step_size=max_step,
-                beam_on=chunks[-2, 1] > 0,
-            )
-        )
+            max_step = max_step_size_on if intervals[-2, 1] > 0 else max_step_size_off
+        max_steps.append(max_step)
 
-        logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
-        logger.info(f"From beam chunks ==> {len(chunks)}")
-        logger.info(f"Simulation divided in {len(chunk_list)} chunks")
-        return SimChunksIter(
-            sim=self,
-            chunks=chunk_list,
-            atol=atol,
-            rtol=rtol,
-            use_jac=use_jac,
-            method=method,
-            y0=y0,
-            use_beam=use_beam,
-            force_positive=force_positive,
+        chunk_list = _make_chunks(intervals[:, 0], beam_on, max_steps)
+        return self._chunks_iter(
+            t_span,
+            chunk_list,
+            RunOptions(
+                atol=atol,
+                rtol=rtol,
+                method=method,
+                use_beam=use_beam,
+                force_positive=force_positive,
+                use_jac=use_jac,
+            ),
+            y0,
+            n_beam_intervals=len(intervals),
         )
 
     def prepare_single_pulse(
@@ -569,33 +809,44 @@ class UnitCell(object):
         use_beam: bool = True,
         force_positive: bool = False,
     ) -> SimChunksIter:
-        """Method used to prepare a multi step ODE integration
+        """Method used to prepare a three step ODE integration of a
+        single pulse (tm = time at max dose of the current beam):
+            1. beam ON over [t_span[0], tm] (initial burst applied);
+            2. ON -> OFF transition over [tm, tm + trans_time];
+            3. beam OFF over [tm + trans_time, t_span[1]].
+
         Args:
             t_span: Tuple[float, float]
                 t_span[0] -> start time, in seconds
                 t_span[1] -> End time, in seconds
             use_jac: bool, optional
-                Whether to use the jacobian along with the ODE solver
-                (default:False)
+                Whether to use the analytical jacobian along with the ODE
+                solver (default:False). Not available for the moment
+                (being rewritten): True raises NotImplementedError when
+                the chunks are run.
             method: str, optional
                 Which ODE solver to use? Define in
-                scipy.integrate.solve_ivp
+                scipy.integrate.solve_ivp (default: "LSODA")
             atol: float, optional
-                Absolute Tolerance of the ODE Solver (default: 1e-10)
+                Absolute Tolerance of the ODE Solver (default: 1e-12)
+            rtol: float, optional
+                Relative Tolerance of the ODE Solver (default: 1e-10)
             max_step_size_on: float, optional
                 Larger authorized time step for the ODE solver while
                 beam is ON (default: inf)
-            max_step_size_off: float, optional
-                Larger authorized time step for the ODE solver while
-                beam is OFF (default: inf)
+            max_step_size_trans: float, optional
+                Larger authorized time step for the ODE solver during
+                the ON -> OFF transition (default: inf)
             max_step_size_final: float, optional
                 Larger authorized time step for the ODE solver for the
-                very last integration step (can be the larger if long
-                sim time and few pulses). If None,
-                'max_step_size_off|on' is used instead (default: None).
+                last (beam OFF) step (default: inf, no fallback to the
+                other max step sizes).
+            trans_time: float, optional
+                Duration of the ON -> OFF transition, in seconds
+                (default: 100e-6)
             y0: NDArray[np.float64], optional
-                Initial concentration of DynSpecies (default: None).
-                If None, calls EnvSim.initial_values()
+                Initial concentration of DynSpecies [µmol/L] (default:
+                None). If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
             force_positive: bool, optional
@@ -605,102 +856,59 @@ class UnitCell(object):
         Returns:
             SimChunksIter: Iterable object performing the ODE
             integration.
+
+        Raises:
+            NoBeamDefinedError: no beam is defined
         """
+        self._require_beam()
+        trans_time = trans_time if trans_time is not None else DEFAULT_TRANS_TIME
+        t_max_dose = self.beam_list.current.time_at_max_dose
+        t_beam_off = t_max_dose + trans_time
+
+        chunk_list = _make_chunks(
+            boundaries=[t_span[0], t_max_dose, t_beam_off, t_span[1]],
+            beam_on=[True, False, False],
+            max_steps=[max_step_size_on, max_step_size_trans, max_step_size_final],
+        )
+        return self._chunks_iter(
+            t_span,
+            chunk_list,
+            RunOptions(
+                atol=atol,
+                rtol=rtol,
+                method=method,
+                use_beam=use_beam,
+                force_positive=force_positive,
+                use_jac=use_jac,
+            ),
+            y0,
+        )
+
+    def _last_bursts(self) -> tp.List[float]:
+        """Dose rates of the bursts applied by the last integration step."""
+        rate = self.last_burst_dose_rate
+        return [] if rate is None else [rate]
+
+    def _require_beam(self) -> None:
+        """Raise NoBeamDefinedError (and log it) when no beam is defined."""
         if len(self.beam_list) <= 0:
             logger.error("No beam is defined for the simulation")
             raise rp_excep.NoBeamDefinedError
 
-        chunk_list: tp.List[SimChunk] = []
-
-        trans_time = trans_time if trans_time is not None else 100e-6
-
-        # Beam ON
-        chunk_list.append(
-            SimChunk(
-                start=t_span[0],
-                stop=self.beam_list.current.time_at_max_dose,
-                max_step_size=max_step_size_on,
-                beam_on=True,
-            )
-        )
-
-        # Beam ON -> Beam OFF transition
-        chunk_list.append(
-            SimChunk(
-                start=self.beam_list.current.time_at_max_dose,
-                stop=self.beam_list.current.time_at_max_dose + trans_time,
-                max_step_size=max_step_size_trans,
-                beam_on=False,
-            )
-        )
-
-        # Make final chunk
-        chunk_list.append(
-            SimChunk(
-                start=self.beam_list.current.time_at_max_dose + trans_time,
-                stop=t_span[1],
-                max_step_size=max_step_size_final,
-                beam_on=False,
-            )
-        )
-
-        logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
-        logger.info(f"Simulation divided in {len(chunk_list)} chunks")
-        return SimChunksIter(
-            sim=self,
-            chunks=chunk_list,
-            atol=atol,
-            rtol=rtol,
-            use_jac=use_jac,
-            method=method,
-            y0=y0,
-            use_beam=use_beam,
-            force_positive=force_positive,
-        )
-
-    def run_multi_doses(
+    def _chunks_iter(
         self,
         t_span: tp.Tuple[float, float],
-        doses: tp.Collection[float],
-        **kwargs: tp.Unpack[KwargsRun],
-    ) -> tp.Iterator[ODEResult]:
-        """ """
-        raise NotImplementedError
-        if len(doses) <= 0:
-            raise ValueError("No dose provided")
-        kwargs_beam_off = copy.deepcopy(kwargs)
-        kwargs_beam_off["use_beam"] = False
-
-        _doses = list(doses)
-
-        ## First run
-        self.beam.update_beam_param(max_dose=_doses.pop(0))
-        time_max = self.beam.time_at_max_dose
-        sim = self.prepare_chunked_run(t_span=(t_span[0], time_max), **kwargs)
-        acc_res = sim.run()  # To accumulate beam ON runs
-
-        res = self.run(
-            t_span=(time_max, t_span[1]),
-            y0=acc_res.final_cc,
-            **kwargs_beam_off,
-        )
-        yield copy.deepcopy(acc_res) + res
-
-        for dose in _doses:
-            self.beam.update_beam_param(max_dose=dose)
-            time_max = self.beam.time_at_max_dose
-            sim = self.prepare_chunked_run(
-                t_span=(acc_res.time[-1], time_max),
-                y0=acc_res.final_cc,
-                **kwargs,
-            )
-            acc_res = acc_res + sim.run()
-            res = self.run(
-                t_span=(time_max, t_span[1]),
-                y0=acc_res.final_cc,
-                **kwargs_beam_off,
-            )
-            yield copy.deepcopy(acc_res) + res
+        chunk_list: tp.List[SimChunk],
+        options: RunOptions,
+        y0: tp.Optional[NDArray[np.float64]],
+        n_beam_intervals: tp.Optional[int] = None,
+    ) -> SimChunksIter:
+        """Log the chunk layout and wrap the chunks in a SimChunksIter."""
+        logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
+        if n_beam_intervals is not None:
+            logger.info(f"From beam chunks ==> {n_beam_intervals}")
+        logger.info(f"Simulation divided in {len(chunk_list)} chunks")
+        return SimChunksIter(sim=self, chunks=chunk_list, options=options, y0=y0)
 
 
 # -------------------------- Chunked Simulation Run ------------------------- #
@@ -716,8 +924,12 @@ class SimChunk(tp.NamedTuple):
             Start time, in seconds
         stop: float
             Stop time, in seconds
-        max_step_size: float
-            Max step size allowed over this integration step
+        max_step_size: float, optional
+            Max step size allowed over this integration step (None ->
+            inf)
+        beam_on: bool
+            Whether the beam is switched ON at start (the initial
+            radiolytic burst is then applied)
     """
 
     start: float
@@ -732,48 +944,37 @@ class SimChunksIter:
     Attributes:
         sim: UniCell
             Simulation volume in which simulation takes place
-        chucks: List[SimChunk]
+        chunks: List[SimChunk]
             List of simulation steps/chunks
         sol: ODEResult
             Aggregate of ODE results from scipy.integrate.solve_ivp
         current: int
             Keeps tracks of the current integration step.
-        atol: float
-            Absolute tolerance used for scipy.integrate.solve_ivp
-        use_jac: bool
-            Whether jacobian is used with scipy.integrate.solve_ivp
-        method: str
-            Defines the ODE method used with scipy.integrate.solve_ivp
+        options: RunOptions
+            Solver options shared by every chunk (the max step of each
+            chunk replaces options.max_step). options.use_jac=True
+            raises NotImplementedError: the Jacobian is being rewritten.
         y0: NDArray[np.float64], optional
-            Initial concentration of DynSpecies (default: None).
-            If None, calls EnvSim.initial_values()
+            Initial concentration of DynSpecies [µmol/L] (default:
+            None). If None, calls EnvSim.initial_values(). Later chunks
+            start from the last point of the previous one.
     Usage:
-        >>>
+        >>> res = cell.prepare_chunked_run(t_span=(0, 1)).run()
     """
 
     sim: UnitCell
     chunks: tp.List[SimChunk]
     sol: ODEResult
     current: int
-    atol: tp.Optional[float]
-    rtol: tp.Optional[float]
-    use_jac: bool
-    method: str
+    options: RunOptions
     y0: tp.Optional[NDArray[np.float64]]
-    use_beam: bool
-    force_positive: bool
 
     def __init__(
         self,
         sim: UnitCell,
         chunks: tp.List[SimChunk],
-        atol: tp.Optional[float] = None,
-        rtol: tp.Optional[float] = None,
-        use_jac: bool = False,
-        method: str = "LSODA",
+        options: tp.Optional[RunOptions] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
-        use_beam: bool = True,
-        force_positive: bool = False,
     ):
         self.sim = sim
         self.chunks = chunks
@@ -784,14 +985,9 @@ class SimChunksIter:
             self.sim.beam_list.current_LET,
             self.sim.T_ZERO,
         )
-        self.atol = atol
-        self.rtol = rtol
-        self.use_jac = use_jac
-        self.method = method
+        self.options = options if options is not None else RunOptions()
         self.current = -1
         self.y0 = y0
-        self.use_beam = use_beam
-        self.force_positive = force_positive
 
     def __iter__(self) -> SimChunksIter:
         return self
@@ -804,18 +1000,17 @@ class SimChunksIter:
             raise StopIteration from None
 
         res = self.sim._raw_run(
-            t_span=(chunk.start, chunk.stop),
-            use_jac=self.use_jac,
-            method=self.method,
-            atol=self.atol,
-            rtol=self.rtol,
-            max_step=chunk.max_step_size,
+            (chunk.start, chunk.stop),
+            dataclasses.replace(self.options, max_step=chunk.max_step_size),
+            # _raw_run copies y0: the stored last point stays untouched
             y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
-            use_beam=self.use_beam,
-            beam_ON=chunk.beam_on,
-            force_positive=self.force_positive,
+            beam_on=chunk.beam_on,
         )
-        self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
+        self.sol.append_sol(
+            res,
+            exec_time=self.sim.last_exec_time,
+            bursts=self.sim._last_bursts(),
+        )
         return self.sol
 
     def __len__(self) -> int:

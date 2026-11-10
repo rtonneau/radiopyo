@@ -1,0 +1,606 @@
+{
+  "session_id": "2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian",
+  "feature_name": "review this repo to improve it. Keep all actual features. Jocobian will be one of the first next job. Just improve flow and readability. Don't break how code is used by user. Other things can be adapted if needed",
+  "scratch_dir": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian",
+  "created_at": "2026-11-09T20:05:46.317Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-09T20:05:46.317Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-09T20:25:06.924Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-09T20:25:07.097Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-09T20:54:42.401Z",
+      "event": "auto_started",
+      "phase": "plan",
+      "detail": {
+        "target": "finish",
+        "steps": "write:plan → ship → finish",
+        "shipMode": "delegate"
+      }
+    },
+    {
+      "at": "2026-11-09T20:54:47.004Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "refactor/readability-and-jacobian-prep",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-09T20:54:47.104Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-golden-outputs.md",
+        "02-plan/tickets/02-port-tests.md",
+        "02-plan/tickets/03-packaging-hygiene.md",
+        "02-plan/tickets/04-dead-code-lint-zero.md",
+        "02-plan/tickets/05-solver-core.md",
+        "02-plan/tickets/06-run-flow.md",
+        "02-plan/tickets/07-simenv-builders.md",
+        "02-plan/tickets/08-split-sim-utils.md",
+        "02-plan/tickets/09-chemistry-cleanup.md",
+        "02-plan/tickets/10-beam-split.md",
+        "02-plan/tickets/11-beam-generic-matrix.md",
+        "02-plan/tickets/12-fix-run-burst.md",
+        "02-plan/tickets/13-fix-temperature.md",
+        "02-plan/tickets/14-fix-include-merge.md",
+        "02-plan/tickets/15-fix-macro-beam.md",
+        "02-plan/tickets/16-fix-species-order.md",
+        "02-plan/tickets/17-fix-arrhenius-enzymes-add.md",
+        "02-plan/tickets/18-docs.md"
+      ],
+      "detail": {
+        "tickets": 18
+      }
+    },
+    {
+      "at": "2026-11-09T20:54:52.993Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-golden-outputs.md",
+        "03-implement/01-golden-outputs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-golden-outputs"
+      }
+    },
+    {
+      "at": "2026-11-09T21:31:50.640Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-golden-outputs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-golden-outputs",
+        "commit": "dba163a"
+      }
+    },
+    {
+      "at": "2026-11-09T21:31:58.718Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-port-tests.md",
+        "03-implement/02-port-tests/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-port-tests"
+      }
+    },
+    {
+      "at": "2026-11-09T21:38:59.646Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-port-tests/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-port-tests",
+        "commit": "9424c85"
+      }
+    },
+    {
+      "at": "2026-11-09T21:39:08.461Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-packaging-hygiene.md",
+        "03-implement/03-packaging-hygiene/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-packaging-hygiene"
+      }
+    },
+    {
+      "at": "2026-11-09T21:41:38.354Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-packaging-hygiene/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-packaging-hygiene",
+        "commit": "9a8e758"
+      }
+    },
+    {
+      "at": "2026-11-09T21:41:43.637Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-dead-code-lint-zero.md",
+        "03-implement/04-dead-code-lint-zero/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-dead-code-lint-zero"
+      }
+    },
+    {
+      "at": "2026-11-09T21:49:42.658Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/04-dead-code-lint-zero/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-dead-code-lint-zero",
+        "commit": "ad88152"
+      }
+    },
+    {
+      "at": "2026-11-09T21:49:48.092Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/05-solver-core.md",
+        "03-implement/05-solver-core/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-solver-core"
+      }
+    },
+    {
+      "at": "2026-11-09T22:24:39.967Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/05-solver-core/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-solver-core",
+        "commit": "f567a6f"
+      }
+    },
+    {
+      "at": "2026-11-09T22:24:44.894Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/06-run-flow.md",
+        "03-implement/06-run-flow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "06-run-flow"
+      }
+    },
+    {
+      "at": "2026-11-09T22:45:41.473Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/06-run-flow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "06-run-flow",
+        "commit": "d24bc92"
+      }
+    },
+    {
+      "at": "2026-11-09T22:45:42.676Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/07-simenv-builders.md",
+        "03-implement/07-simenv-builders/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "07-simenv-builders"
+      }
+    },
+    {
+      "at": "2026-11-09T22:56:52.909Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/07-simenv-builders/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "07-simenv-builders",
+        "commit": "3f8035f"
+      }
+    },
+    {
+      "at": "2026-11-09T22:56:53.959Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/08-split-sim-utils.md",
+        "03-implement/08-split-sim-utils/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "08-split-sim-utils"
+      }
+    },
+    {
+      "at": "2026-11-09T23:02:52.621Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/08-split-sim-utils/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "08-split-sim-utils",
+        "commit": "aefda6e"
+      }
+    },
+    {
+      "at": "2026-11-09T23:02:53.321Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/09-chemistry-cleanup.md",
+        "03-implement/09-chemistry-cleanup/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "09-chemistry-cleanup"
+      }
+    },
+    {
+      "at": "2026-11-09T23:22:56.676Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/09-chemistry-cleanup/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "09-chemistry-cleanup",
+        "commit": "a0bee93"
+      }
+    },
+    {
+      "at": "2026-11-09T23:22:57.395Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/10-beam-split.md",
+        "03-implement/10-beam-split/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "10-beam-split"
+      }
+    },
+    {
+      "at": "2026-11-09T23:31:41.948Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/10-beam-split/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "10-beam-split",
+        "commit": "cd77b2b"
+      }
+    },
+    {
+      "at": "2026-11-09T23:31:42.760Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/11-beam-generic-matrix.md",
+        "03-implement/11-beam-generic-matrix/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "11-beam-generic-matrix"
+      }
+    },
+    {
+      "at": "2026-11-09T23:40:46.374Z",
+      "event": "ticket_blocked",
+      "phase": "ship",
+      "files": [
+        "03-implement/11-beam-generic-matrix/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "11-beam-generic-matrix",
+        "reason": "merged into ticket 15: generic make_matrix cannot reproduce Macro/Constant quirks bit-identically; done with ticket 15 golden regeneration"
+      }
+    },
+    {
+      "at": "2026-11-09T23:40:46.796Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/12-fix-run-burst.md",
+        "03-implement/12-fix-run-burst/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "12-fix-run-burst"
+      }
+    },
+    {
+      "at": "2026-11-10T06:05:59.030Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/12-fix-run-burst/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "12-fix-run-burst",
+        "commit": "af5b8ca"
+      }
+    },
+    {
+      "at": "2026-11-10T06:06:03.865Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/13-fix-temperature.md",
+        "03-implement/13-fix-temperature/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "13-fix-temperature"
+      }
+    },
+    {
+      "at": "2026-11-10T06:16:07.597Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/13-fix-temperature/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "13-fix-temperature",
+        "commit": "bafa16f"
+      }
+    },
+    {
+      "at": "2026-11-10T06:16:08.279Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/14-fix-include-merge.md",
+        "03-implement/14-fix-include-merge/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "14-fix-include-merge"
+      }
+    },
+    {
+      "at": "2026-11-10T07:10:24.919Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/14-fix-include-merge/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "14-fix-include-merge",
+        "commit": "662277a"
+      }
+    },
+    {
+      "at": "2026-11-10T07:10:39.747Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/15-fix-macro-beam.md",
+        "03-implement/15-fix-macro-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "15-fix-macro-beam"
+      }
+    },
+    {
+      "at": "2026-11-10T08:01:28.131Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/15-fix-macro-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "15-fix-macro-beam",
+        "commit": "10978f3"
+      }
+    },
+    {
+      "at": "2026-11-10T08:01:39.809Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/11-beam-generic-matrix/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "11-beam-generic-matrix",
+        "commit": "10978f3"
+      }
+    },
+    {
+      "at": "2026-11-10T08:01:45.059Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/16-fix-species-order.md",
+        "03-implement/16-fix-species-order/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "16-fix-species-order"
+      }
+    },
+    {
+      "at": "2026-11-10T08:10:36.956Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/16-fix-species-order/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "16-fix-species-order",
+        "commit": "5b3b9e2"
+      }
+    },
+    {
+      "at": "2026-11-10T08:10:46.103Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/17-fix-arrhenius-enzymes-add.md",
+        "03-implement/17-fix-arrhenius-enzymes-add/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "17-fix-arrhenius-enzymes-add"
+      }
+    },
+    {
+      "at": "2026-11-10T09:10:18.862Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/17-fix-arrhenius-enzymes-add/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "17-fix-arrhenius-enzymes-add",
+        "commit": "2ad881e"
+      }
+    },
+    {
+      "at": "2026-11-10T09:10:44.295Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/18-docs.md",
+        "03-implement/18-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "18-docs"
+      }
+    },
+    {
+      "at": "2026-11-10T09:30:48.241Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/18-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "18-docs",
+        "commit": "4ea057d"
+      }
+    },
+    {
+      "at": "2026-11-10T09:31:14.062Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-10T09:31:26.357Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/1"
+      }
+    },
+    {
+      "at": "2026-11-10T09:31:19.755Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    },
+    {
+      "at": "2026-11-10T09:31:26.633Z",
+      "event": "scratch_cleaned",
+      "phase": "finished",
+      "detail": {
+        "policy": "build-artifacts",
+        "removed": [
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base06/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base15/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/base16/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/old_tree/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/__pycache__"
+        ],
+        "freedBytes": 1747449
+      }
+    }
+  ],
+  "current_phase": "finished",
+  "git": {
+    "branch": "refactor/readability-and-jacobian-prep",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-09T20:54:47.004Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/1"
+  },
+  "ship_mode": "delegate",
+  "changelog": {
+    "bump": "minor",
+    "floor": "patch",
+    "reason": "breaking removals (RON format, run_multi_doses, e_LET, use_jac) in a 0.x version",
+    "bullets": 8,
+    "path": ".work/changelog/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian.md",
+    "written_at": "2026-11-10T09:31:13.978Z"
+  },
+  "finished_at": "2026-11-10T09:31:19.755Z"
+}

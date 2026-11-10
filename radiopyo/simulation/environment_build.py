@@ -39,7 +39,11 @@ from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
 from radiopyo.utils.sim_types import (
+    EzMatrices,
+    GVector,
+    KMatrices,
     SimMatrices,
+    StateLayout,
     deep_update,
     default_ConfigDict,
     default_SimParameters,
@@ -50,6 +54,7 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.chemistry.basic_reaction import BasicReaction
+    from radiopyo.chemistry.generics import GenericReaction
     from radiopyo.utils.sim_types import ConfigDict, SimParameters
 
 # ------------------------- Expose importable stuffs ------------------------ #
@@ -59,6 +64,11 @@ __all__ = [
 
 # --------------------------------------------------------------------------- #
 logger = logging.getLogger("radiopyo")
+
+SpeciesQuery: tp.TypeAlias = str | SimSpecies | tp.Sequence[str | SimSpecies]
+Role: tp.TypeAlias = tp.Literal["any", "reactant", "product"]
+Kinds: tp.TypeAlias = tp.Literal["k_all", "k", "eq", "enzymatic", "radiolytic"]
+_ROLES: tuple[str, ...] = ("any", "reactant", "product")
 
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
@@ -209,7 +219,7 @@ class ReactionsList:
         for r in self.iter_radiolytic_reactions():
             if species in r:
                 return r
-        raise ValueError(f"Reaction {r} not related to any G values")
+        raise ValueError(f"Species {species} not related to any G values")
 
     def get_reaction_by_index(self, index: int) -> BasicReaction:
         """ """
@@ -230,7 +240,9 @@ class SimEnv:
         species: ListSpecies
             List of all species involved, cst and dyn
         parameters: Dict[str, float]
-            Dictionary with some biological parameter like pH
+            Dictionary with some biological parameter like pH. The key
+            "temperature" [°C] is the single source of truth of the
+            simulation temperature (see SimEnv.temperature).
         initial_cc: Dict[str, float]
             Dictionary with the initial concentration of some species
     """
@@ -240,22 +252,6 @@ class SimEnv:
     parameters: SimParameters
     initial_cc: tp.Dict[str, float]
     PH_SPECIES: str = field(init=False, repr=False, default="H3O_plus")
-
-    def pKw(self, T: tp.Optional[Temperature | float] = None) -> float:
-        """ """
-        _T = Temperature(T) if T is not None else Temperature(unit="celsius")
-        _poly = np.polynomial.Polynomial(
-            [14.947, -4.273e-2, 2.115e-4, -5.786e-7, 7.529e-10]
-        )
-        return _poly(_T.celsius)
-
-    def pKH2O(self, T: tp.Optional[Temperature | float] = None) -> float:
-        """ """
-        _T = Temperature(T) if T is not None else Temperature(unit="celsius")
-        _poly = np.polynomial.Polynomial(
-            [16.690, -4.262e-2, 2.071e-4, -5.594e-7, 7.161e-10]
-        )
-        return _poly(_T.celsius)
 
     def make_hash(self, method: str = "sha256") -> str:
         """ """
@@ -280,20 +276,40 @@ class SimEnv:
 
     @classmethod
     def from_dict(cls, config: ConfigDict, log: bool = True) -> SimEnv:
+        """Build the simulation environment from a config dictionary.
+
+        Args:
+            config: dictionary (see ConfigDict), it must at least contain
+                the 'concentrations' and 'parameters' sections.
+            log: if False, only errors are logged during the build.
+
+        Raises:
+            ValueError: if the 'concentrations' or 'parameters' section
+                is missing from the config.
+        """
+        for section in ("concentrations", "parameters"):
+            if section not in config:
+                raise ValueError(
+                    f"CONFIG::No '{section}' section found in the provided"
+                    f" configuration (sections found: {sorted(config)})."
+                    f" An empty '{section}' section is enough."
+                )
+
         _prev_log_lvl = logger.level
         if not log:
             logger.setLevel(logging.ERROR)
+        try:
+            return cls._from_validated_dict(config)
+        finally:
+            logger.setLevel(_prev_log_lvl)  # restore log level, even on error
+
+    @classmethod
+    def _from_validated_dict(cls, config: ConfigDict) -> SimEnv:
+        """from_dict() once the mandatory sections are known to exist."""
         parameters: SimParameters = default_SimParameters()
 
         logger.info("CONFIG::Configuring Simulation Environment")
         # Sanity checks
-        if "concentrations" not in config:
-            logger.warning(
-                "CONFIG::No concentration section found in config."
-                " It means, no species with constant concentration and all"
-                " initial set to 0."
-            )
-
         if len(config["concentrations"]) > 2:
             extra = [
                 elt
@@ -336,8 +352,6 @@ class SimEnv:
         logger.info(f"CONFIG::{out.species.len_dyn_species()} Dynamical Species added.")
         logger.info(f"CONFIG::{out.species.len_cst_species()} Constant Species added.")
         logger.info("CONFIG::Simulation Configuration done!")
-
-        logger.setLevel(_prev_log_lvl)  # restore log level
         return out
 
     @staticmethod
@@ -358,7 +372,10 @@ class SimEnv:
         list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
         # Copy initial cc and strip species name on the fly.
         initial_cc = {}
-        list_sp.add_cst_species(RPARSER.parse_species("H2O"), cc=H2O.cc_init.coef)
+        assert H2O.cc_init is not None  # module constant, always defined
+        list_sp.add_cst_species(
+            RPARSER.parse_species("H2O"), cc=tp.cast("list[float]", H2O.cc_init.coef)
+        )
         for key, cc in config["concentrations"].get("initial", {}).items():
             initial_cc[key.strip()] = cc
 
@@ -384,44 +401,21 @@ class SimEnv:
                 cc_init=10 ** (-14 + config["parameters"]["pH"]),
             )
 
-        # Read Acid/Base Reactions
-        ab, list_sp = acid_base_from_dict(
-            config["reactions"].get("acid_base", []), list_sp
-        )
-
-        # Read Equilibrium Reactions
-        er, list_sp = eq_reaction_from_dict(
-            config["reactions"].get("equilibrium", []), list_sp
-        )
-
-        # Read K-Reactions
-        kr, list_sp = kreaction_from_dict(
-            config["reactions"].get("k_reaction", []), list_sp
-        )
-
-        # Read ConstantReactions
-        cr, list_sp = cst_reaction_from_dict(
-            config["reactions"].get("constant", []), list_sp
-        )
-
-        # Read Arrhenius reactions
-        ar, list_sp = arrhenius_from_dict(
-            config["reactions"].get("arrhenius", []), list_sp
-        )
+        # Read the reactions. The order matters: species get created in
+        # list_sp as the reactions are parsed.
+        reactions = config["reactions"]
+        ab, list_sp = acid_base_from_dict(reactions.get("acid_base", []), list_sp)
+        er, list_sp = eq_reaction_from_dict(reactions.get("equilibrium", []), list_sp)
+        kr, list_sp = kreaction_from_dict(reactions.get("k_reaction", []), list_sp)
+        cr, list_sp = cst_reaction_from_dict(reactions.get("constant", []), list_sp)
+        ar, list_sp = arrhenius_from_dict(reactions.get("arrhenius", []), list_sp)
 
         # Merge Arrhenius & Constant with KReaction Collection
         for elt in chain(ar, cr):
             kr.add_reaction(elt)
 
-        # Read Enzymatic Reactions
-        enz, list_sp = michaelis_from_dict(
-            config["reactions"].get("enzymatic", []), list_sp
-        )
-
-        # Read Radiolytic Reactions
-        rad, list_sp = radiolytic_from_dict(
-            config["reactions"].get("radiolytic", {}), list_sp
-        )
+        enz, list_sp = michaelis_from_dict(reactions.get("enzymatic", []), list_sp)
+        rad, list_sp = radiolytic_from_dict(reactions.get("radiolytic", {}), list_sp)
 
         # Read and set initial concentrations
         for label, value in initial_cc.items():
@@ -458,18 +452,36 @@ class SimEnv:
             initial_cc,
         )
 
-    def update_temperature(self, T: Temperature | float) -> None:
-        """ """
-        if isinstance(T, (int, float)):
-            self.parameters["temperature"] = T
-        elif isinstance(T, Temperature):
-            self.parameters["temperature"] = T.celsius
-        else:
-            raise TypeError(f"Unknown type for temperature: {type(T)}")
+    @property
+    def temperature(self) -> Temperature:
+        """
+        Simulation temperature (parameters["temperature"], in °C, default
+        25). It is the single source of truth: the rate constants, the pKa
+        and the concentrations of the species all derive from it.
+        """
+        return Temperature(
+            self.parameters.get("temperature", Temperature._DEFAULT), "celsius"
+        )
 
-    def update_flag_positive(self, force_positive: bool) -> None:
-        """ """
-        self.parameters["force_positive"] = force_positive
+    def set_temperature(self, T: float | Temperature, unit: str = "celsius") -> None:
+        """
+        Set the simulation temperature (stored in °C in
+        parameters["temperature"]).
+
+        WARNING: matrices already built (SimMatrices, e.g. UnitCell.mat) are
+        not updated: rebuild them with build_all_matrices() (or use
+        UnitCell.set_temperature which does it).
+
+        Args:
+            T: temperature value, or Temperature object (unit ignored)
+            unit: "celsius" (default) or "kelvin"
+        """
+        if isinstance(T, Temperature):
+            celsius = T.celsius
+        else:
+            celsius = Temperature(T, unit).celsius if unit.lower() != "celsius" else T
+            Temperature(celsius)  # validates (raises ValueError if absurd)
+        self.parameters["temperature"] = float(celsius)
 
     def update_flag_GValues(self, variable_GValues: bool) -> None:
         """ """
@@ -483,7 +495,7 @@ class SimEnv:
         """ """
         if self.parameters["force_cst_pH"] != force_cst_pH:
             _config = self.convert_to_config_dict()
-            _config["parameters"]["pH"] = pH or self.parameters["pH"]
+            _config["parameters"]["pH"] = self.parameters["pH"] if pH is None else pH
             _config["parameters"]["force_cst_pH"] = force_cst_pH
             self.reactions, self.species, self.parameters, self.initial_cc = (
                 SimEnv._chemistry_builder(_config)
@@ -509,6 +521,9 @@ class SimEnv:
         values of species
 
         Args:
+            T: Temperature object or float in °C (the initial
+                concentrations are polynomials of the temperature in °C).
+                Default: None -> the simulation temperature (self.temperature).
             all: bool, optional
                 if False, vector only contains initial cc of DynSpecies
                 (default=False)
@@ -517,6 +532,7 @@ class SimEnv:
             NDArray[np.float64]: vector with initial concentrations
             in [µmol/l]
         """
+        T = self.temperature if T is None else T
         out_dyn = np.zeros(self.species.len_dyn_species(), dtype=np.float64)
         for species in self.species.iter_dyn_species():
             out_dyn[species.index] = species.initial_cc(T) * 1e6
@@ -542,173 +558,142 @@ class SimEnv:
         self,
         T: tp.Optional[Temperature | float] = None,
     ) -> SimMatrices:
-        """ """
+        """Build every (immutable) matrix used by the ODE solver.
+
+        Args:
+            T: Temperature object or float in °C, sets the k values (as
+                1/K polynomials, converted internally), the pKa and the
+                concentrations of the constant species (°C polynomials).
+                Default: None -> the simulation temperature
+                (self.temperature).
+        Returns:
+            SimMatrices
+        """
+        T = self.temperature if T is None else T
         return SimMatrices(
-            Ki_mat=self.make_kreaction_matrix(T),
-            Gi_mat=self.make_radiolytic_vector(),
-            Ez_mat=self.make_enzymatic_matrix(),
-            cst_sp=self.make_cst_species_vector(),
+            k_reactions=self.make_kreaction_matrix(T),
+            radiolytic=self.make_radiolytic_vector(),
+            enzymatic=self.make_enzymatic_matrix(),
+            state=StateLayout(cst_sp=self.make_cst_species_vector(T)),
         )
 
     def make_kreaction_matrix(
         self,
         T: tp.Optional[Temperature | float] = None,
-    ) -> tp.Tuple[
-        NDArray[np.float64],
-        NDArray[np.int8],
-        NDArray[np.float32],
-        NDArray[np.float32],
-    ]:
+    ) -> KMatrices:
         """
         Construct all matrices necessary to compute the variation of
-        the species concentrations due to all k reactions.
+        the species concentrations due to all k reactions (column r is
+        the k-reaction of global index r). See KMatrices.
+
+        Args:
+            T: Temperature object or float in °C (None -> the simulation
+                temperature).
         """
-        # Step 1 -> Find the highest species's stoichio
-        max_reactants = 0
-        for reaction in self.reactions.iter_all_kreactions():
-            max_reactants = max(max_reactants, reaction.tot_number_reactants())
+        T = self.temperature if T is None else T
+        n_species = len(self.species)
+        n_kr = self.reactions.total_kreactions()
 
-        Ki = np.zeros(self.reactions.total_kreactions(), dtype=np.float64)
-
-        # 0 for reactants, 1 for products
-        Riy = np.zeros(
-            [len(self.species), self.reactions.total_kreactions(), 2],
-            dtype=np.int8,
+        # Highest number of reactant molecules in a single reaction
+        max_reactants = max(
+            (r.tot_number_reactants() for r in self.reactions.iter_all_kreactions()),
+            default=0,
         )
 
-        Rki = np.full(
-            [
-                len(self.species),
-                self.reactions.total_kreactions(),
-                max_reactants,
-            ],
-            fill_value=np.nan,
-            dtype=np.float32,
+        k_values = np.zeros(n_kr, dtype=np.float64)
+        # Unused slots point to the extra 1.0 appended by the rate law
+        reactant_index = np.full(
+            [n_kr, max_reactants],
+            fill_value=n_species,
+            dtype=np.intp,
         )
-
-        JRki = np.full(
-            [
-                len(self.species),
-                self.reactions.total_kreactions(),
-                max_reactants,
-                len(self.species),
-            ],
-            fill_value=np.nan,
-            dtype=np.float32,
-        )
+        stoichiometry = np.zeros([n_species, n_kr], dtype=np.float64)
+        negative_products = np.zeros([n_species, n_kr], dtype=np.bool_)
 
         for _, reaction, k_value in self.reactions.iter_all_kreactions_and_kvalues(T):
             idx_r: int = reaction.get_index()
-            Ki[idx_r] = k_value
+            k_values[idx_r] = k_value
             # Loop over all reaction's reactants
-            idx_reactant: int = 0
+            slot: int = 0
             for r_sp in reaction.reactants:
                 # If declared as cst, keep it 0
                 if not self.species.is_cst_species(r_sp.species):
-                    Riy[r_sp.species.index, idx_r, 0] -= r_sp.stoi
+                    stoichiometry[r_sp.species.index, idx_r] -= r_sp.stoi
                 for _ in range(r_sp.stoi):
-                    Rki[:, idx_r, idx_reactant] = 0
-                    Rki[r_sp.species.index, idx_r, idx_reactant] = 1
-                    idx_reactant += 1
+                    reactant_index[idx_r, slot] = r_sp.species.index
+                    slot += 1
 
             # Loop over all reaction's products
             for r_sp in reaction.products:
                 # If declared as cst, keep it 0
-                if not self.species.is_cst_species(r_sp.species):
-                    if r_sp.ope is Operation.ADD:
-                        Riy[r_sp.species.index, idx_r, 0] += r_sp.stoi
-                    else:
-                        Riy[r_sp.species.index, idx_r, 0] -= r_sp.stoi
-                        Riy[r_sp.species.index, idx_r, 1] += r_sp.stoi
-
-            # Jacobian related loops:
-            for sp in self.species:
-                # sp not involved in reaction => derivative = 0
-                if not reaction.has_reactant(sp) or self.species.is_cst_species(sp):
-                    JRki[:, idx_r, :, sp.index] = 0
+                if self.species.is_cst_species(r_sp.species):
                     continue
+                if r_sp.ope is Operation.ADD:
+                    stoichiometry[r_sp.species.index, idx_r] += r_sp.stoi
+                else:
+                    stoichiometry[r_sp.species.index, idx_r] -= r_sp.stoi
+                    negative_products[r_sp.species.index, idx_r] = True
 
-                idx_reactant = 0
-                for r_sp in reaction.reactants:
-                    if r_sp.species != sp:
-                        for _ in range(r_sp.stoi):
-                            JRki[:, idx_r, idx_reactant, sp.index] = 0
-                            JRki[r_sp.species.index, idx_r, idx_reactant, sp.index] = 1
-                            idx_reactant += 1
-                        continue
-                    derive = r_sp.stoi - 1
-                    for _ in range(derive):
-                        JRki[:, idx_r, idx_reactant, sp.index] = 0
-                        index = (r_sp.species.index, idx_r, idx_reactant, sp.index)
-                        JRki[index] = 1
-                        if _ == 0:
-                            JRki[index] = r_sp.stoi
-                        idx_reactant += 1
+        return KMatrices(
+            k_values=k_values,
+            reactant_index=reactant_index,
+            stoichiometry=stoichiometry,
+            negative_products=negative_products,
+        )
 
-        return (Ki, Riy, Rki, JRki)
-
-    def make_radiolytic_vector(self) -> NDArray:
+    def make_radiolytic_vector(self) -> GVector:
         """
         Construct matrix necessary to compute the variation of the
-        species concentrations due irradiation via GValues.
+        species concentrations due irradiation via GValues (column r is
+        ReactionsList.radiolytic[r]). See GVector.
         """
-        Gi = np.zeros(
-            [len(self.species), len(self.reactions.radiolytic)],
-            dtype=np.float64,
-        )
+        n_g = len(self.reactions.radiolytic)
+        yields = np.zeros(n_g, dtype=np.float64)
+        stoichiometry = np.zeros([len(self.species), n_g], dtype=np.float64)
         for col, radiolytic in enumerate(self.reactions.radiolytic):
-            Gi[radiolytic.species().index, col] = radiolytic.kr()
-        return Gi.sum(axis=1)
+            yields[col] = radiolytic.kr()
+            species = radiolytic.species()
+            # If declared as cst, keep it 0
+            if not self.species.is_cst_species(species):
+                stoichiometry[species.index, col] = 1.0
+        return GVector(yields=yields, stoichiometry=stoichiometry)
 
-    def make_enzymatic_matrix(
-        self,
-    ) -> tp.Optional[
-        tp.Tuple[
-            NDArray[np.float32],
-            NDArray[np.float32],
-            NDArray[np.float64],
-            NDArray[np.int8],
-        ]
-    ]:
+    def make_enzymatic_matrix(self) -> EzMatrices:
         """
         Construct all matrices necessary to compute the variation of
-        the species concentrations due enzymatic reactions.
-        Tricks to keep in mind:
-            => Invert x. where x=0 -> result=0 as well
+        the species concentrations due enzymatic reactions (column r is
+        ReactionsList.enzymatic[r]). See EzMatrices. Without enzymatic
+        reactions, the matrices have 0 columns.
         """
-        if len(self.reactions.enzymatic) == 0:
-            return None
-
-        Ez_substrate = np.full(
-            [len(self.species), len(self.reactions.enzymatic)],
-            fill_value=0,
-            dtype=np.float32,
-        )
-        Ez_enzyme = np.full(
-            [len(self.species), len(self.reactions.enzymatic)],
-            fill_value=0,
-            dtype=np.float32,
-        )
-
-        Ez_kmki = np.zeros([2, len(self.reactions.enzymatic)], dtype=np.float64)
-
-        Ez_iy = np.zeros(
-            [len(self.species), len(self.reactions.enzymatic)],
-            dtype=np.int8,
-        )
+        n_ez = len(self.reactions.enzymatic)
+        k_values = np.zeros(n_ez, dtype=np.float64)
+        k_michaelis = np.zeros(n_ez, dtype=np.float64)
+        substrate_index = np.zeros(n_ez, dtype=np.intp)
+        enzyme_index = np.zeros(n_ez, dtype=np.intp)
+        stoichiometry = np.zeros([len(self.species), n_ez], dtype=np.float64)
 
         for col, enzymatic in enumerate(self.reactions.enzymatic):
-            Ez_substrate[enzymatic.substrate.index, col] = 1
-            Ez_enzyme[enzymatic.enzyme.index, col] = 1
-            Ez_kmki[0, col] = enzymatic.k_micha
-            Ez_kmki[1, col] = enzymatic.k_value
+            substrate_index[col] = enzymatic.substrate.index
+            enzyme_index[col] = enzymatic.enzyme.index
+            k_michaelis[col] = enzymatic.k_micha
+            k_values[col] = enzymatic.k_value
+            # Net stoichiometry: a species on both sides of the reaction
+            # gets product - reactant. NOTE: negative products ('ope') are
+            # not handled here (unlike the k-reactions), deferred.
             for r_sp in enzymatic.reactants:
                 if not self.species.is_cst_species(r_sp.species):
-                    Ez_iy[r_sp.species.index, col] = -r_sp.stoi
+                    stoichiometry[r_sp.species.index, col] -= r_sp.stoi
             for r_sp in enzymatic.products:
                 if not self.species.is_cst_species(r_sp.species):
-                    Ez_iy[r_sp.species.index, col] = r_sp.stoi
-        return Ez_substrate, Ez_enzyme, Ez_kmki, Ez_iy
+                    stoichiometry[r_sp.species.index, col] += r_sp.stoi
+
+        return EzMatrices(
+            k_values=k_values,
+            k_michaelis=k_michaelis,
+            substrate_index=substrate_index,
+            enzyme_index=enzyme_index,
+            stoichiometry=stoichiometry,
+        )
 
     def make_cst_species_vector(
         self,
@@ -717,115 +702,177 @@ class SimEnv:
         """Create cc vector of Cst Species
 
         Args:
-            T Temperature object or float
+            T: Temperature object or float in °C (None -> the simulation
+                temperature).
         Returns:
-            NDArray[np.float64]
+            NDArray[np.float64]: concentrations in [mol/L]
         """
+        T = self.temperature if T is None else T
         out = np.zeros(self.species.len_cst_species(), dtype=np.float64)
         len_dyn = self.species.len_dyn_species()
         for sp in self.species.iter_cst_species():
             out[sp.index - len_dyn] = sp.initial_cc(T)
         return out
 
+    @tp.overload
+    def reactions_involving(
+        self,
+        species: SpeciesQuery,
+        role: Role = ...,
+        kinds: tp.Literal["k_all"] = ...,
+    ) -> tp.List[tp.Tuple[BasicReaction, float]]: ...
+
+    @tp.overload
+    def reactions_involving(
+        self,
+        species: SpeciesQuery,
+        role: Role = ...,
+        *,
+        kinds: tp.Literal["k"],
+    ) -> tp.List[KReaction]: ...
+
+    @tp.overload
+    def reactions_involving(
+        self,
+        species: SpeciesQuery,
+        role: Role = ...,
+        *,
+        kinds: tp.Literal["eq"],
+    ) -> tp.List[BiReaction]: ...
+
+    @tp.overload
+    def reactions_involving(
+        self,
+        species: SpeciesQuery,
+        role: Role = ...,
+        *,
+        kinds: tp.Literal["enzymatic"],
+    ) -> tp.List[MichaelisMenten]: ...
+
+    @tp.overload
+    def reactions_involving(
+        self,
+        species: SpeciesQuery,
+        role: Role = ...,
+        *,
+        kinds: tp.Literal["radiolytic"],
+    ) -> tp.List[RadiolyticReaction]: ...
+
+    def reactions_involving(
+        self,
+        species: SpeciesQuery,
+        role: Role = "any",
+        kinds: Kinds = "k_all",
+    ) -> tp.Any:
+        """Reactions involving some species (all of them if a list is given).
+
+        Args:
+            species: species (label or object), or list of species. With a
+                list, a reaction is kept only if it involves every species.
+            role: where the species must be found in the reaction:
+                "any" (default), "reactant" or "product". The "eq" kind only
+                supports "any".
+            kinds: which reactions are searched, in this order of iteration:
+                - "k_all" (default): every k-reaction, i.e. including the
+                    forward/backward reactions of acid/base and equilibria,
+                    returned as (reaction, k value at default temperature)
+                    tuples;
+                - "k": the k-reactions of the `k_reaction` section only;
+                - "eq": the acid/base and equilibrium pairs (BiReaction);
+                - "enzymatic": the Michaelis-Menten reactions;
+                - "radiolytic": the radiolytic (G value) reactions.
+
+        Returns:
+            The list of selected reactions (a list of tuples for "k_all").
+
+        Raises:
+            ValueError: for an unknown `role` or `kinds`, or a `role` other
+                than "any" with the "eq" kind.
+        """
+        if role not in _ROLES:
+            raise ValueError(f"Unknown role: {role!r}. Expected one of {_ROLES}")
+        if isinstance(species, (str, SimSpecies)):
+            species = [species]
+        # Labels only: `species in reaction` does not accept a SimSpecies
+        wanted = [elt if isinstance(elt, str) else elt.label for elt in species]
+
+        if kinds == "k_all":
+            return [
+                (reaction, k_val)
+                for _, reaction, k_val in self.reactions.iter_all_kreactions_and_kvalues()
+                if _involves(reaction, wanted, role)
+            ]
+        candidates: tp.Iterable[tp.Any]
+        if kinds == "k":
+            candidates = self.reactions.iter_kreactions()
+        elif kinds == "eq":
+            if role != "any":
+                raise ValueError(
+                    "Equilibrium reactions can only be searched with role='any'."
+                )
+            candidates = self.reactions.iter_eq_reactions()
+        elif kinds == "enzymatic":
+            candidates = self.reactions.iter_enzymatic()
+        elif kinds == "radiolytic":
+            candidates = self.reactions.iter_radiolytic_reactions()
+        else:
+            raise ValueError(f"Unknown kinds: {kinds!r}.")
+        return [r for r in candidates if _involves(r, wanted, role)]
+
+    # Historical names, thin aliases of reactions_involving().
     def radiolytic_reaction_involving(
         self,
         species: str | SimSpecies,
     ) -> tp.List[RadiolyticReaction]:
-        return [r for r in self.reactions.iter_radiolytic_reactions() if species in r]
+        return self.reactions_involving(species, kinds="radiolytic")
 
     def kreactions_involving(
         self,
         species: str | SimSpecies,
     ) -> tp.List[KReaction]:
-        return [r for r in self.reactions.iter_kreactions() if species in r]
+        return self.reactions_involving(species, kinds="k")
 
     def kreactions_involving_reactant(
         self,
-        species: str | SimSpecies | tp.List[str | SimSpecies],
+        species: SpeciesQuery,
     ) -> tp.List[KReaction]:
-        out: tp.List[KReaction] = []
-        if isinstance(species, (str | SimSpecies)):
-            species = [species]
-
-        for r in self.reactions.iter_kreactions():
-            if all(r.has_reactant(elt) for elt in species):
-                out.append(r)
-        return out
-
-    def enzymatic_involving_reactant(
-        self,
-        species: str | SimSpecies | tp.List[str | SimSpecies],
-    ) -> tp.List[MichaelisMenten]:
-        out: tp.List[MichaelisMenten] = []
-        if isinstance(species, (str | SimSpecies)):
-            species = [species]
-
-        for r in self.reactions.iter_enzymatic():
-            if all(r.has_reactant(elt) for elt in species):
-                out.append(r)
-        return out
-
-    def enzymatic_involving_product(
-        self,
-        species: str | SimSpecies | tp.List[str | SimSpecies],
-    ) -> tp.List[MichaelisMenten]:
-        out: tp.List[MichaelisMenten] = []
-        if isinstance(species, (str | SimSpecies)):
-            species = [species]
-
-        for r in self.reactions.iter_enzymatic():
-            if all(r.has_product(elt) for elt in species):
-                out.append(r)
-        return out
+        return self.reactions_involving(species, "reactant", kinds="k")
 
     def kreactions_involving_product(
         self,
-        species: str | SimSpecies,
+        species: SpeciesQuery,
     ) -> tp.List[KReaction]:
-        return [r for r in self.reactions.iter_kreactions() if r.has_product(species)]
+        return self.reactions_involving(species, "product", kinds="k")
+
+    def enzymatic_involving_reactant(
+        self,
+        species: SpeciesQuery,
+    ) -> tp.List[MichaelisMenten]:
+        return self.reactions_involving(species, "reactant", kinds="enzymatic")
+
+    def enzymatic_involving_product(
+        self,
+        species: SpeciesQuery,
+    ) -> tp.List[MichaelisMenten]:
+        return self.reactions_involving(species, "product", kinds="enzymatic")
 
     def eq_reactions_involving(
         self,
-        species: str | SimSpecies | tp.List[str | SimSpecies],
+        species: SpeciesQuery,
     ) -> tp.List[BiReaction]:
-        out: tp.List[BiReaction] = []
-        if isinstance(species, (str | SimSpecies)):
-            species = [species]
-
-        for r in self.reactions.iter_eq_reactions():
-            if all(elt in r for elt in species):
-                out.append(r)
-        return out
-
-    def reactions_involving(
-        self,
-        species: str | SimSpecies,
-    ) -> tp.List[tp.Tuple[BasicReaction, float]]:
-        out: tp.List[tp.Tuple[BasicReaction, float]] = []
-        for _, reaction, k_val in self.reactions.iter_all_kreactions_and_kvalues():
-            if species in reaction:
-                out.append((reaction, k_val))
-        return out
+        return self.reactions_involving(species, kinds="eq")
 
     def reactions_involving_reactant(
         self,
-        species: str | SimSpecies,
+        species: SpeciesQuery,
     ) -> tp.List[tp.Tuple[BasicReaction, float]]:
-        out: tp.List[tp.Tuple[BasicReaction, float]] = []
-        for _, reaction, k_val in self.reactions.iter_all_kreactions_and_kvalues():
-            if reaction.has_reactant(species):
-                out.append((reaction, k_val))
-        return out
+        return self.reactions_involving(species, "reactant")
 
     def reactions_involving_product(
         self,
-        species: str | SimSpecies,
+        species: SpeciesQuery,
     ) -> tp.List[tp.Tuple[BasicReaction, float]]:
-        out: tp.List[tp.Tuple[BasicReaction, float]] = []
-        for _, reaction, k_val in self.reactions.iter_all_kreactions_and_kvalues():
-            if reaction.has_product(species):
-                out.append((reaction, k_val))
-        return out
+        return self.reactions_involving(species, "product")
 
     def convert_to_config_dict(self, include_species_order: bool = False) -> ConfigDict:
         """ """
@@ -861,8 +908,8 @@ class SimEnv:
         for elt in self.species.iter_dyn_species():
             if elt.label in ["H3O_plus", "OH_minus"]:
                 continue
-            if len(elt.cc_init) > 1:
-                out["concentrations"]["initial"][elt.label] = elt.cc_init.coef.tolist()
+            if elt.cc_init is not None and len(elt.cc_init) > 1:
+                out["concentrations"]["initial"][elt.label] = elt.cc_init.coef.tolist()  # type: ignore[assignment]  # poly coeffs; TypedDict says float
             elif elt.initial_cc() <= 0:
                 continue
             else:
@@ -870,8 +917,8 @@ class SimEnv:
         for elt in self.species.iter_cst_species():
             if elt.label in ["H2O", "H3O_plus", "OH_minus"]:
                 continue
-            if len(elt.cc_init) > 1:
-                out["concentrations"]["fixed"][elt.label] = elt.cc_init.coef.tolist()
+            if elt.cc_init is not None and len(elt.cc_init) > 1:
+                out["concentrations"]["fixed"][elt.label] = elt.cc_init.coef.tolist()  # type: ignore[assignment]  # poly coeffs; TypedDict says float
             else:
                 out["concentrations"]["fixed"][elt.label] = elt.initial_cc()
 
@@ -893,162 +940,169 @@ class SimEnv:
 # --------------------------------------------------------------------------- #
 
 
+def _involves(
+    reaction: tp.Any, species: tp.Sequence[str | SimSpecies], role: str
+) -> bool:
+    """True if the reaction involves every species of `species` as `role`."""
+    if role == "reactant":
+        return all(reaction.has_reactant(elt) for elt in species)
+    if role == "product":
+        return all(reaction.has_product(elt) for elt in species)
+    return all(elt in reaction for elt in species)
+
+
+def _only_one_reaction_as_list(
+    reactions: tp.List[tp.Dict] | tp.Dict,
+) -> tp.List[tp.Dict]:
+    """A single reaction given as a dict is wrapped in a list (an empty
+    dict, like an empty list, means no reaction)."""
+    if isinstance(reactions, dict):
+        return [reactions] if reactions else []
+    return reactions
+
+
+def _with_k_constants(
+    r: tp.Dict,
+    keys: tp.Sequence[str],
+) -> GenericReaction:
+    """Parse the reaction string of `r` and copy `keys` as its constants."""
+    gen = RPARSER.parse_reaction(r["reaction"])
+    for key in keys:
+        gen["constants"][key] = r[key]
+    return gen
+
+
+def _copy_optional_k_constants(gen: GenericReaction, r: tp.Dict) -> None:
+    """Copy k_forward/k_backward of `r`, if any, as constants of `gen`."""
+    with suppress(KeyError):
+        gen["constants"]["k_forward"] = r["k_forward"]
+    with suppress(KeyError):
+        gen["constants"]["k_backward"] = r["k_backward"]
+
+
+def _build_acid_base(r: tp.Dict, list_sp: ListSpecies) -> AcidBase:
+    try:
+        gen = RPARSER.parse_reaction(r["reaction"])
+        pKa = r["pKa"]
+    except KeyError as err:
+        raise AttributeError(
+            "Need a reaction string AND a pKa to create an Acid Base rel."
+        ) from err
+    if "k_value" in r:
+        raise AttributeError(
+            "'k_value' is ambiguous for an AcidBase reaction. "
+            "Use k_forward or k_backward instead."
+        )
+    _copy_optional_k_constants(gen, r)
+    return AcidBase(gen, pKa=pKa, list_sp=list_sp)
+
+
+def _build_equilibrium(r: tp.Dict, list_sp: ListSpecies) -> EReaction:
+    if "k_value" in r:
+        raise AttributeError(
+            "'k_value' is ambiguous for an Equilibrium Reaction. "
+            "Use k_forward or k_backward instead."
+        )
+    gen = RPARSER.parse_reaction(r["reaction"])
+    _copy_optional_k_constants(gen, r)
+    return EReaction(gen, constant=r.get("k_equilibrium"), list_sp=list_sp)
+
+
+def _from_generic_builder(
+    cls: tp.Any,
+    keys: tp.Sequence[str] = ("k_value",),
+) -> tp.Callable[[tp.Dict, ListSpecies], tp.Any]:
+    """Builder of reactions made with `cls.from_generic` and mandatory `keys`."""
+
+    def build(r: tp.Dict, list_sp: ListSpecies) -> tp.Any:
+        return cls.from_generic(_with_k_constants(r, keys), list_sp=list_sp)
+
+    return build
+
+
+# One builder per reaction section of the config, each one making a single
+# reaction from its dict. This table is the only place to touch to add a
+# section; the global reaction index order lives in ReactionsList.
+_REACTION_BUILDERS: tp.Dict[str, tp.Callable[[tp.Dict, ListSpecies], tp.Any]] = {
+    "acid_base": _build_acid_base,
+    "equilibrium": _build_equilibrium,
+    "arrhenius": _from_generic_builder(Arrhenius, ("A", "Ea")),
+    "k_reaction": _from_generic_builder(KReaction),
+    "constant": _from_generic_builder(CstReaction),
+    "enzymatic": _from_generic_builder(MichaelisMenten, ("k_value", "k_micha")),
+}
+
+
+def reactions_from_dict(
+    section: str,
+    reactions: tp.List[tp.Dict] | tp.Dict,
+    list_sp: tp.Optional[ListSpecies] = None,
+) -> tp.Tuple[tp.List[tp.Any], ListSpecies]:
+    """Make the reactions of one config section ("acid_base", "equilibrium",
+    "arrhenius", "k_reaction", "constant" or "enzymatic").
+
+    Args:
+        section: name of the config section (key of _REACTION_BUILDERS)
+        reactions: list of reaction dicts, or a single reaction dict
+        list_sp: species collection to fill (default: a new one)
+
+    Returns:
+        The list of reactions and the species collection.
+    """
+    build = _REACTION_BUILDERS[section]
+    list_sp = ListSpecies() if list_sp is None else list_sp
+    return [build(r, list_sp) for r in _only_one_reaction_as_list(reactions)], list_sp
+
+
 def acid_base_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
     list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[AcidBase], ListSpecies]:
-
-    list_sp = ListSpecies() if list_sp is None else list_sp
-
-    if len(reactions) == 0:  # -> Nothing to do
-        return ([], list_sp)
-
-    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
-        reactions = [
-            reactions,
-        ]  # Need a list to loop over
-
-    out = []
-    for r in reactions:
-        try:
-            gen = RPARSER.parse_reaction(r["reaction"])
-            pKa = r["pKa"]
-        except KeyError as err:
-            raise AttributeError(
-                "Need a reaction string AND a pKa to create an Acid Base rel."
-            ) from err
-        if "k_value" in r:
-            raise AttributeError(
-                "'k_value' is ambiguous for an AcidBase reaction. "
-                "Use k_forward or k_backward instead."
-            )
-        with suppress(KeyError):
-            gen["constants"]["k_forward"] = r["k_forward"]
-        with suppress(KeyError):
-            gen["constants"]["k_backward"] = r["k_backward"]
-        out.append(AcidBase(gen, pKa=pKa, list_sp=list_sp))
-
-    return out, list_sp
+    return reactions_from_dict("acid_base", reactions, list_sp)
 
 
 def eq_reaction_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
     list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[EReaction], ListSpecies]:
-    list_sp = ListSpecies() if list_sp is None else list_sp
-
-    if len(reactions) == 0:  # -> Nothing to do
-        return ([], list_sp)
-
-    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
-        reactions = [
-            reactions,
-        ]  # Need a list to loop over
-
-    out = []
-    for r in reactions:
-        if "k_value" in r:
-            raise AttributeError(
-                "'k_value' is ambiguous for an Equilibrium Reaction. "
-                "Use k_forward or k_backward instead."
-            )
-        gen = RPARSER.parse_reaction(r["reaction"])
-        with suppress(KeyError):
-            gen["constants"]["k_forward"] = r["k_forward"]
-        with suppress(KeyError):
-            gen["constants"]["k_backward"] = r["k_backward"]
-
-        constant = r.get("k_equilibrium", None)
-        out.append(EReaction(gen, constant=constant, list_sp=list_sp))
-
-    return out, list_sp
+    return reactions_from_dict("equilibrium", reactions, list_sp)
 
 
 def arrhenius_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
     list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[Arrhenius], ListSpecies]:
-    list_sp = ListSpecies() if list_sp is None else list_sp
-
-    if len(reactions) == 0:  # -> Nothing to do
-        return ([], list_sp)
-
-    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
-        reactions = [
-            reactions,
-        ]  # Need a list to loop over
-
-    out = []
-    for r in reactions:
-        gen = RPARSER.parse_reaction(r["reaction"])
-        gen["constants"]["k_value"] = r["k_value"]
-        out.append(Arrhenius.from_generic(gen, list_sp=list_sp))
-
-    return out, list_sp
-
-
-def kreaction_from_dict(
-    reactions: tp.List[tp.Dict] | tp.Dict,
-    list_sp: tp.Optional[ListSpecies] = None,
-) -> tp.Tuple[KReactionCollection, ListSpecies]:
-    list_sp = ListSpecies() if list_sp is None else list_sp
-
-    if len(reactions) == 0:  # -> Nothing to do
-        return (KReactionCollection(), list_sp)
-
-    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
-        reactions = [
-            reactions,
-        ]  # Need a list to loop over
-
-    out = KReactionCollection()
-    for r in reactions:
-        gen = RPARSER.parse_reaction(r["reaction"])
-        gen["constants"]["k_value"] = r["k_value"]
-        out.add_reaction(KReaction.from_generic(gen, list_sp=list_sp))
-    return (out, list_sp)
-
-
-def cst_reaction_from_dict(
-    reactions: tp.List[tp.Dict] | tp.Dict,
-    list_sp: tp.Optional[ListSpecies] = None,
-) -> tp.Tuple[KReactionCollection, ListSpecies]:
-    list_sp = ListSpecies() if list_sp is None else list_sp
-
-    if len(reactions) == 0:  # -> Nothing to do
-        return (KReactionCollection(), list_sp)
-
-    if isinstance(reactions, dict):  # -> i.e. only one reaction to add
-        reactions = [
-            reactions,
-        ]  # Need a list to loop over
-
-    out = KReactionCollection()
-    for r in reactions:
-        gen = RPARSER.parse_reaction(r["reaction"])
-        gen["constants"]["k_value"] = r["k_value"]
-        out.add_reaction(CstReaction.from_generic(gen, list_sp=list_sp))
-    return (out, list_sp)
+    return reactions_from_dict("arrhenius", reactions, list_sp)
 
 
 def michaelis_from_dict(
     reactions: tp.List[tp.Dict] | tp.Dict,
     list_sp: tp.Optional[ListSpecies] = None,
 ) -> tp.Tuple[tp.List[MichaelisMenten], ListSpecies]:
-    list_sp = ListSpecies() if list_sp is None else list_sp
+    return reactions_from_dict("enzymatic", reactions, list_sp)
 
-    if isinstance(reactions, dict):
-        reactions = [
-            reactions,
-        ]
 
-    out = []
+def kreaction_from_dict(
+    reactions: tp.List[tp.Dict] | tp.Dict,
+    list_sp: tp.Optional[ListSpecies] = None,
+) -> tp.Tuple[KReactionCollection, ListSpecies]:
+    return _as_collection(*reactions_from_dict("k_reaction", reactions, list_sp))
+
+
+def cst_reaction_from_dict(
+    reactions: tp.List[tp.Dict] | tp.Dict,
+    list_sp: tp.Optional[ListSpecies] = None,
+) -> tp.Tuple[KReactionCollection, ListSpecies]:
+    return _as_collection(*reactions_from_dict("constant", reactions, list_sp))
+
+
+def _as_collection(
+    reactions: tp.List[KReaction],
+    list_sp: ListSpecies,
+) -> tp.Tuple[KReactionCollection, ListSpecies]:
+    out = KReactionCollection()
     for r in reactions:
-        gen = RPARSER.parse_reaction(r["reaction"])
-        gen["constants"]["k_value"] = r["k_value"]
-        gen["constants"]["k_micha"] = r["k_micha"]
-        out.append(MichaelisMenten.from_generic(gen, list_sp=list_sp))
-
+        out.add_reaction(r)
     return out, list_sp
 
 

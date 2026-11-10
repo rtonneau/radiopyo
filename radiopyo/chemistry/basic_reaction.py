@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-The base_chemistry submodule contains all class definitions and
+The basic_reaction submodule contains all class definitions and
 protocols to build some more advanced chemistry ==> building blocks of
 basic chemistry.
 
@@ -11,6 +11,7 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import hashlib
 import typing as tp
 from abc import ABC, abstractmethod
 from contextlib import suppress
@@ -24,9 +25,7 @@ from radiopyo.parser import RPARSER
 
 from .generics import GenericReaction, Operation, dict_to_generic_reaction
 from .species import BasicSpecies, ChemicalSpecies, SimSpecies
-
-if tp.TYPE_CHECKING:
-    from .species_collection import ListSpecies
+from .species_collection import ListSpecies
 
 # ------------------------- Type checking ONLY imports----------------------- #
 # --------------------------------------------------------------------------- #
@@ -175,22 +174,12 @@ class BasicReaction(ABC):
     refer to it.
 
     Attributes:
-    reactants : tp.Dict[str, ChemSpecies]
-        A dictionary of reactants in the reaction, where each key is a
-        reactant name and each value is a ChemSpecies object
-        representing the reactant.
-    products : tp.Dict[str, ChemSpecies]
-        A dictionary of products in the reaction, where each key is a
-        product name and each value is a ChemSpecies object representing
-        the product.
-    stoi_reactants : tp.Dict[str, int]
-        A dictionary of stoichiometric coefficients for reactants, where
-        each key is a reactant name and each value is the corresponding
-        stoichiometric coefficient.
-    stoi_products : tp.Dict[str, int]
-        A dictionary of stoichiometric coefficients for products, where
-        each key is a product name and each value is the corresponding
-        stoichiometric coefficient.
+    reactants : ReactionSpeciesCollection
+        The reactants of the reaction (SimSpecies with their
+        stoichiometric coefficient and operation), keyed by label.
+    products : ReactionSpeciesCollection
+        The products of the reaction (SimSpecies with their
+        stoichiometric coefficient and operation), keyed by label.
     index : tp.Optional[int]
         An optional index for the reaction, which can be used to
         identify the reaction in a collection of reactions.
@@ -273,10 +262,11 @@ class BasicReaction(ABC):
             dict    A dictionary representation of the reaction.
         """
 
-    @abstractmethod
     def make_hash(self, method: str = "sha256") -> str:
         """
         Produce a unique identifier (content based) for easy comparison.
+        The hash is computed from `_hash_source()` (by default the repr
+        of the reaction).
 
         Args:
             method (str): Hash method to use (default: "sha256").
@@ -284,6 +274,75 @@ class BasicReaction(ABC):
         Returns:
             str: A hash value representing the object.
         """
+        hasher = hashlib.new(method, usedforsecurity=False)
+        hasher.update(self._hash_source().encode())
+        return hasher.hexdigest()
+
+    def _hash_source(self) -> str:
+        """
+        The string make_hash() digests. Child classes may override it to
+        keep their historical hashes stable.
+
+        Returns:
+            str
+        """
+        return repr(self)
+
+    def _index_label(self, prefix: str) -> str:
+        """
+        Shared implementation of index based labels: "{prefix}_{index}".
+
+        Args:
+            prefix (str): The prefix of the label (e.g. "KR").
+
+        Returns:
+            str: The label.
+
+        Raises:
+            KeyError: If the index is None or negative.
+        """
+        if self.index is not None and self.index >= 0:
+            return f"{prefix}_{self.index}"
+
+        raise KeyError("Unknown reaction index. Cannot make a label without index.")
+
+    def _add_species_from_generic(
+        self,
+        generic: GenericReaction,
+        list_sp: tp.Optional[ListSpecies] = None,
+        reactants: bool = True,
+        products: bool = True,
+    ) -> ListSpecies:
+        """
+        Add the reactants and/or products of a 'GenericReaction' to the
+        reaction. Species are fetched from (or created as dynamic species
+        in) 'list_sp'; reactants are processed before products.
+
+        Args:
+            generic (GenericReaction): Typed-Dict structure holding the
+                reaction metadata.
+            list_sp (ListSpecies, optional): Collection of species
+                already involved in the simulation. Defaults to None,
+                i.e. a new (shallow) collection outside of any
+                simulation env.
+            reactants (bool): Whether to add the reactants.
+                Defaults to True.
+            products (bool): Whether to add the products.
+                Defaults to True.
+
+        Returns:
+            ListSpecies: The collection of species used.
+        """
+        if list_sp is None:
+            list_sp = ListSpecies()
+
+        if reactants:
+            for sp, stoi, ope in generic["reactants"].values():
+                self.add_as_reactant(list_sp.get_or_create_dyn_species(sp), stoi, ope)
+        if products:
+            for sp, stoi, ope in generic["products"].values():
+                self.add_as_product(list_sp.get_or_create_dyn_species(sp), stoi, ope)
+        return list_sp
 
     @abstractmethod
     def as_label(self) -> str:
@@ -346,7 +405,7 @@ class BasicReaction(ABC):
         regardless if the species is a reactant or a product.
 
         Arguments:
-            species: ChemSpecies | str
+            species: SimSpecies | ChemicalSpecies | str
 
         Returns:
             float the stoichiometric coefficient of species
@@ -390,7 +449,7 @@ class BasicReaction(ABC):
         including both reactants and products.
 
         Returns:
-            Iterable[ChemSpecies]: An iterator over all the species
+            Iterable[ReactionSpecies]: An iterator over all the species
                 involved in the reaction.
         """
         return chain(iter(self.reactants), iter(self.products))
@@ -445,8 +504,8 @@ class BasicReaction(ABC):
         Checks if the reaction involves a specific product.
 
         Args:
-            product (ChemSpecies | str): The product to be checked. Can
-            be either a ChemSpecies object or a string.
+            product (SimSpecies | ChemicalSpecies | str): The product to be checked. Can
+            be either a species object or a string.
 
         Returns:
             bool: True if the reaction involves the product,
@@ -459,8 +518,8 @@ class BasicReaction(ABC):
         Checks if a given reactant is involved in the reaction.
 
         Args:
-            reactant (ChemSpecies | str): The reactant to be checked.
-            Can be either a ChemSpecies object or a string.
+            reactant (SimSpecies | ChemicalSpecies | str): The reactant to be checked.
+            Can be either a species object or a string.
 
         Returns:
             int: 1 if the reactant is part of the reaction, 0 otherwise.

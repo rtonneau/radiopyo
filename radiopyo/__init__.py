@@ -11,7 +11,12 @@ import typing as tp
 from pathlib import Path
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.physics.beam import ConstantBeam, PulsedBeam, SinglePulseBeam
+from radiopyo.physics.beam import (
+    ConstantBeam,
+    MacroPulsedBeam,
+    PulsedBeam,
+    SinglePulseBeam,
+)
 from radiopyo.simulation.unit_cell import UnitCell
 from radiopyo.utils import (
     LABARBE_CONFIG_FILE,
@@ -31,28 +36,22 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List = [
+    "LABARBE_CONFIG_FILE",
+    "PACKAGE_DATA_PATH",
+    "PURE_WATER_CONFIG_FILE",
     "ConstantBeam",
+    "MacroPulsedBeam",
     "PulsedBeam",
     "SinglePulseBeam",
     "UnitCell",
     "disable_logging",
     "enable_logging",
     "set_logging_level",
-    "PACKAGE_DATA_PATH",
-    "LABARBE_CONFIG_FILE",
-    "PURE_WATER_CONFIG_FILE",
-    "enable_logging",
-    "set_logging_level",
-    "enable_logging",
-    "set_logging_level",
 ]
 
 
 # ---------------------------------- Logging -------------------------------- #
-file = Path(__file__).parent.parent / "pyproject.toml"
-if not file.exists():
-    file = Path(__file__).parent / "utils/default_log_config.toml"
-logConfig_from_pyproject(file)
+logConfig_from_pyproject(Path(__file__).parent / "utils/default_log_config.toml")
 
 # --------------------------------------------------------------------------- #
 #                            DECORATOR DEFINITIONS                            #

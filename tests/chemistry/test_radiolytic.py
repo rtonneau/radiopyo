@@ -1,7 +1,7 @@
 import pytest
 
 from radiopyo.chemistry import radiolytic
-from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry.species import BasicSpecies, SimSpecies
 from tests.chemistry.test_basic_chemistry import TestBasicReaction
 
 
@@ -20,7 +20,7 @@ class TestConversion:
 class TestRadiolyticReaction(TestBasicReaction):
     @pytest.fixture
     def products(self):
-        return [ChemSpecies("e_aq")]
+        return [SimSpecies(BasicSpecies("e_aq"))]
 
     @pytest.fixture
     def reactants(self):
@@ -42,7 +42,7 @@ class TestRadiolyticReaction(TestBasicReaction):
             empty_reaction.add_as_reactant(fake_species)
 
     def test_reactants_as_string(self, reaction):
-        assert reaction.reactants_as_string() == ""
+        assert reaction.reactants.as_string() == ""
 
     def test_tot_number_reactants(self, reaction):
         assert reaction.tot_number_reactants() == 0
@@ -53,12 +53,14 @@ class TestRadiolyticReaction(TestBasicReaction):
 
     # End overrides
 
-    def test_from_dict(self, products):
-        reaction = radiolytic.RadiolyticReaction.from_dict(products[0].label, 1.5)
+    def test_from_product(self, products):
+        reaction = radiolytic.RadiolyticReaction.from_product(
+            products[0].raw_species, 1.5
+        )
         assert reaction._reaction_cst == radiolytic.ge_to_kr(1.5)
         assert len(reaction.products) == 1
         assert products[0].label in reaction.products
-        assert reaction.stoi_products[products[0].label] == 1
+        assert reaction.products.stoichiometry_of(products[0].label) == 1
         assert len(reaction.reactants) == 0
 
     def test_kr(self, reaction):

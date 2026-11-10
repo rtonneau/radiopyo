@@ -3,7 +3,7 @@ import pytest
 from random import shuffle
 
 from radiopyo.chemistry.species_collection import ListSpecies
-from radiopyo.chemistry.species import ChemSpecies
+from radiopyo.chemistry.species import BasicSpecies, SimSpecies
 
 
 @pytest.fixture
@@ -13,9 +13,9 @@ def ordered_list_species(dyn_species, cst_species):
     """
     list_species = ListSpecies()
     for sp in dyn_species:
-        list_species.add_dyn_species(sp.label)
+        list_species.add_dyn_species(sp.raw_species)
     for sp in cst_species:
-        list_species.add_cst_species(sp.label, 0)
+        list_species.add_cst_species(sp.raw_species, 0)
     list_species.sorted = True
     return list_species
 
@@ -27,9 +27,20 @@ class TestListSpecies_empty:
         assert empty_list_species.next_index == 0
         assert empty_list_species.sorted is False
 
+    def test_sort_empty(self, empty_list_species):
+        out = empty_list_species.sort(inplace=False)
+        assert len(out) == 0
+        assert out.next_index == 0
+        assert out.sorted is True
+
+    def test_set_order_empty(self, empty_list_species):
+        empty_list_species.set_order([], [])
+        assert empty_list_species.next_index == 0
+        assert empty_list_species.sorted is True
+
     def test_add_dyn_species(self, empty_list_species):
         # From empty list
-        empty_list_species.add_dyn_species("H2O2")
+        empty_list_species.add_dyn_species(BasicSpecies("H2O2"))
         assert len(empty_list_species.dyn_sp) == 1
         assert empty_list_species.next_index == 1
         assert len(empty_list_species.cst_sp) == 0
@@ -37,27 +48,27 @@ class TestListSpecies_empty:
 
     def test_add_dyn_species_twice(self, empty_list_species):
         # From empty list
-        empty_list_species.add_dyn_species("H2O2")
+        empty_list_species.add_dyn_species(BasicSpecies("H2O2"))
         # From non empty list
         with pytest.raises(KeyError):
-            empty_list_species.add_dyn_species("H2O2")
+            empty_list_species.add_dyn_species(BasicSpecies("H2O2"))
 
     def test_add_cst_species(self, empty_list_species):
-        empty_list_species.add_cst_species("H2O", 0)
+        empty_list_species.add_cst_species(BasicSpecies("H2O"), 0)
         assert len(empty_list_species.cst_sp) == 1
         assert empty_list_species.next_index == 1
         assert len(empty_list_species.dyn_sp) == 0
         assert empty_list_species.sorted is False
 
     def test_add_dyn_species_existing_cst_species(self, empty_list_species):
-        empty_list_species.add_cst_species("H2O", 0)
+        empty_list_species.add_cst_species(BasicSpecies("H2O"), 0)
         with pytest.raises(KeyError):
-            empty_list_species.add_dyn_species("H2O")
+            empty_list_species.add_dyn_species(BasicSpecies("H2O"))
 
     def test_add_cst_species_existing_dyn_species(self, empty_list_species):
-        empty_list_species.add_dyn_species("H2O")
+        empty_list_species.add_dyn_species(BasicSpecies("H2O"))
         with pytest.raises(KeyError):
-            empty_list_species.add_cst_species("H2O", 0)
+            empty_list_species.add_cst_species(BasicSpecies("H2O"), 0)
 
 
 class TestListSpecies:
@@ -78,7 +89,7 @@ class TestListSpecies:
 
     def test_iter(self, list_species):
         for elt in list_species:
-            assert isinstance(elt, ChemSpecies)
+            assert isinstance(elt, SimSpecies)
             assert elt in list_species
 
     def test_len(self, list_species, dyn_species, cst_species):
@@ -86,11 +97,11 @@ class TestListSpecies:
 
     def test_getitem_with_existing_dyn(self, list_species, dyn_species):
         # test for dynamical species
-        assert isinstance(list_species[dyn_species[0].label], ChemSpecies)
+        assert isinstance(list_species[dyn_species[0].label], SimSpecies)
 
     def test_getitem_with_existing_cst(self, list_species, cst_species):
         # test for constant species
-        assert isinstance(list_species[cst_species[0].label], ChemSpecies)
+        assert isinstance(list_species[cst_species[0].label], SimSpecies)
 
     def test_getitem_with_non_existing_species(
         self, list_species, non_existing_species
@@ -106,10 +117,10 @@ class TestListSpecies:
         assert list_species.len_dyn_species() == len(dyn_species)
 
     def test_get_with_existing_dyn(self, list_species, dyn_species):
-        assert list_species.get(dyn_species[0].label) == dyn_species[0]
+        assert list_species.get(dyn_species[0].label).label == dyn_species[0].label
 
     def test_get_with_existing_cst(self, list_species, cst_species):
-        assert list_species.get(cst_species[0].label) == cst_species[0]
+        assert list_species.get(cst_species[0].label).label == cst_species[0].label
 
     def test_get_non_existing_with_no_default(self, list_species, non_existing_species):
         assert list_species.get(non_existing_species.label) is None
@@ -117,17 +128,18 @@ class TestListSpecies:
     def test_get_non_existing_with_default_str(
         self, list_species, non_existing_species
     ):
+        # The default is returned untouched (here, the str itself)
         assert (
             list_species.get(non_existing_species.label, non_existing_species.label)
-            == non_existing_species
+            == non_existing_species.label
         )
 
-    def test_get_non_existing_with_default_ChemSpecies(
+    def test_get_non_existing_with_default_SimSpecies(
         self, list_species, non_existing_species
     ):
         assert (
             list_species.get(non_existing_species.label, non_existing_species)
-            == non_existing_species
+            is non_existing_species
         )
 
     def test_remove_species_with_existing_dyn(self, list_species, dyn_species):
@@ -151,48 +163,48 @@ class TestListSpecies:
         self, list_species, dyn_species
     ):
         assert (
-            list_species.get_or_create_dyn_species(dyn_species[0].label)
-            == dyn_species[0]
+            list_species.get_or_create_dyn_species(dyn_species[0].raw_species).label
+            == dyn_species[0].label
         )
 
     def test_get_or_create_dyn_species_with_existing_cst(
         self, list_species, cst_species
     ):
         assert (
-            list_species.get_or_create_dyn_species(cst_species[0].label)
-            == cst_species[0]
+            list_species.get_or_create_dyn_species(cst_species[0].raw_species).label
+            == cst_species[0].label
         )
 
     def test_get_or_create_dyn_species_with_non_existing_species(
         self, list_species, non_existing_species
     ):
         assert (
-            list_species.get_or_create_dyn_species(non_existing_species.label)
-            == non_existing_species
+            list_species.get_or_create_dyn_species(non_existing_species.raw_species).label
+            == non_existing_species.label
         )
 
     def test_get_or_create_cst_species_with_existing_dyn(
         self, list_species, dyn_species
     ):
         assert (
-            list_species.get_or_create_cst_species(dyn_species[0].label)
-            == dyn_species[0]
+            list_species.get_or_create_cst_species(dyn_species[0].raw_species).label
+            == dyn_species[0].label
         )
 
     def test_get_or_create_cst_species_with_existing_cst(
         self, list_species, cst_species
     ):
         assert (
-            list_species.get_or_create_cst_species(cst_species[0].label)
-            == cst_species[0]
+            list_species.get_or_create_cst_species(cst_species[0].raw_species).label
+            == cst_species[0].label
         )
 
     def test_get_or_create_cst_species_with_non_existing_species(
         self, list_species, non_existing_species
     ):
         assert (
-            list_species.get_or_create_cst_species(non_existing_species.label)
-            == non_existing_species
+            list_species.get_or_create_cst_species(non_existing_species.raw_species).label
+            == non_existing_species.label
         )
 
     def test_sorted_iter_cst_species(self, ordered_list_species):
@@ -209,12 +221,12 @@ class TestListSpecies:
 
     def test_iter_cst_species(self, list_species):
         for elt in list_species.iter_cst_species():
-            assert isinstance(elt, ChemSpecies)
+            assert isinstance(elt, SimSpecies)
             assert elt.label in list_species.cst_sp
 
     def test_iter_dyn_species(self, list_species):
         for elt in list_species.iter_dyn_species():
-            assert isinstance(elt, ChemSpecies)
+            assert isinstance(elt, SimSpecies)
             assert elt.label in list_species.dyn_sp
 
     def test_is_dyn_species_with_existing_dyn(self, list_species, dyn_species):
@@ -249,9 +261,9 @@ class TestListSpecies:
             [elt.label for elt in cst_species],
         )
         for from_ref, elt in zip(dyn_species, list_species.sorted_iter_dyn_species()):
-            assert elt == from_ref
+            assert elt.label == from_ref.label
         for from_ref, elt in zip(cst_species, list_species.sorted_iter_cst_species()):
-            assert elt == from_ref
+            assert elt.label == from_ref.label
         assert list_species.sorted is True
 
     def test_set_order_wrong_arguments(self, list_species, dyn_species, cst_species):
@@ -263,21 +275,28 @@ class TestListSpecies:
     def test_copy_with_no_change(self, list_species):
         copy = list_species.copy()
         assert copy is not list_species
-        # dict should be strictly equal as the ChemSpecies object have to be
-        # the same
-        assert copy.dyn_sp == list_species.dyn_sp
-        assert copy.cst_sp == list_species.cst_sp
+        # SimSpecies are re-created by copy(): same labels, distinct objects
+        assert list(copy.dyn_sp) == list(list_species.dyn_sp)
+        assert list(copy.cst_sp) == list(list_species.cst_sp)
+        for label, sim_sp in copy.dyn_sp.items():
+            assert sim_sp is not list_species.dyn_sp[label]
+            assert sim_sp.raw_species is list_species.dyn_sp[label].raw_species
         assert copy.sorted == list_species.sorted
         assert copy.next_index == list_species.next_index
+
+    def test_copy_keeps_indices(self, list_species):
+        list_species.sort(inplace=True)
+        copy = list_species.copy()
+        for sim_sp in list_species:
+            assert copy[sim_sp.label].index == sim_sp.index
+            assert copy[sim_sp.label].initial_cc() == sim_sp.initial_cc()
 
     def test_copy_with_changes(self, list_species, non_existing_species):
         copy = list_species.copy()
         assert copy is not list_species
-        copy.add_dyn_species(non_existing_species.label)
-        # dict should be strictly equal as the ChemSpecies object have to be
-        # the same
-        assert copy.dyn_sp != list_species.dyn_sp
-        assert copy.cst_sp == list_species.cst_sp
+        copy.add_dyn_species(non_existing_species.raw_species)
+        assert list(copy.dyn_sp) != list(list_species.dyn_sp)
+        assert list(copy.cst_sp) == list(list_species.cst_sp)
         assert copy.sorted == list_species.sorted
         assert copy.next_index != list_species.next_index
 
@@ -314,3 +333,35 @@ class TestListSpecies:
         dyn_sp[0] = next(iter(list_species.cst_sp))
         with pytest.raises(TypeError):
             list_species.sort(inplace=True, starter=dyn_sp[:2])
+
+
+_ORDER_SNIPPET = """
+import radiopyo as rp
+from radiopyo.simulation.unit_cell import UnitCell
+
+env = UnitCell.from_toml(rp.LABARBE_CONFIG_FILE).env
+print("@@START")
+print(chr(10).join(env.species.to_pandas().tolist()))
+print("---")
+print(chr(10).join(str(r) for r in env.reactions.iter_all()))
+"""
+
+
+def test_species_and_reaction_order_independent_of_hash_seed():
+    import os
+    import subprocess
+    import sys
+
+    outputs = []
+    for seed in ("0", "1", "12345"):
+        proc = subprocess.run(
+            [sys.executable, "-c", _ORDER_SNIPPET],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr
+        outputs.append(proc.stdout.partition("@@START")[2])
+    assert len(outputs[0].splitlines()) > 10
+    assert outputs[0] == outputs[1] == outputs[2]

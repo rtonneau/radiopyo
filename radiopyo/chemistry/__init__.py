@@ -5,8 +5,10 @@ Chemistry Module:
     (species, reactions,...)
     - acid_base.py:
         you guessed it!
-    - base_chemistry.py:
+    - basic_reaction.py:
         Base building block for chemical reactions
+    - e_reactions.py:
+        Defines equilibrium reactions (forward/backward KReactions)
     - exceptions.py:
         Exceptions which can be encountered
     - k_reactions.py:
@@ -18,6 +20,8 @@ Chemistry Module:
     - species.py:
         Defines simple species as either dynamical or constant
         concentration
+    - species_collection.py:
+        Defines ListSpecies, the collection of species of a simulation
 
     - utils:
         Submodule for atomic weights (species' mass can be computed)
