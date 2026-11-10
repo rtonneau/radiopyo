@@ -388,6 +388,30 @@
         "ticket": "13-fix-temperature",
         "commit": "bafa16f"
       }
+    },
+    {
+      "at": "2026-11-10T06:16:08.279Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/14-fix-include-merge.md",
+        "03-implement/14-fix-include-merge/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "14-fix-include-merge"
+      }
+    },
+    {
+      "at": "2026-11-10T07:10:24.919Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/14-fix-include-merge/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "14-fix-include-merge",
+        "commit": "662277a"
+      }
     }
   ],
   "current_phase": "ship",
