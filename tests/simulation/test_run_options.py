@@ -5,9 +5,9 @@ Tests of the UnitCell run flow: RunOptions, the named steps of _raw_run
 prepare_chunked_run / prepare_single_pulse, SimChunksIter, and the
 public keyword arguments and defaults of the run methods.
 
-The current run() behaviour (initial burst driven by force_positive,
-force_positive never reaching the solver) is pinned here on purpose;
-ticket 12 changes it.
+run() applies the initial radiolytic burst on beam ON (unless the beam
+is not used), forwards force_positive to the solver, never modifies the
+y0 it is given and raises NoBeamDefinedError without beam.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be)
@@ -26,8 +26,10 @@ import pytest
 
 # ----------------------------- Internal imports ---------------------------- #
 import radiopyo as rp
+import radiopyo.simulation.unit_cell as unit_cell_module
 from radiopyo.physics.beam import PulsedBeam, SinglePulseBeam
 from radiopyo.simulation.exceptions import NoBeamDefinedError
+from radiopyo.simulation.ode_result import ODEResult
 from radiopyo.simulation.unit_cell import (
     DEFAULT_ATOL,
     DEFAULT_RTOL,
@@ -222,15 +224,25 @@ def test_raw_run_uses_options(
         return "sol"
 
     monkeypatch.setattr(labarbe_cell, "_timed_solve", fake_solve)
-    opts = RunOptions(max_step=1e-3, use_beam=False)
+    opts = RunOptions(max_step=1e-3)
     y0 = labarbe_cell.env.initial_values()
+    y0_ref = y0.copy()
     assert labarbe_cell._raw_run((1e-6, 1e-6), opts, y0=y0, beam_on=True) == "sol"
     # empty span widened, then shifted by T_ZERO (burst)
     assert seen["t_span"] == (1e-8 + labarbe_cell.T_ZERO, 1e-6)
-    assert seen["y0"] is y0
-    assert seen["beam"] is None  # use_beam=False
+    assert seen["y0"] is not y0  # a copy carries the burst
+    np.testing.assert_array_equal(y0, y0_ref)
+    assert np.any(seen["y0"] != y0_ref)
+    assert seen["beam"] is labarbe_cell.beam
     assert seen["options"] is opts
     assert seen["kwargs"]["max_step"] == 1e-3
+
+    # beam not used: no burst, no beam
+    labarbe_cell._raw_run((1e-7, 1.0), RunOptions(use_beam=False), y0=y0, beam_on=True)
+    assert seen["t_span"] == (1e-7, 1.0)
+    assert seen["beam"] is None
+    np.testing.assert_array_equal(seen["y0"], y0_ref)
+    assert labarbe_cell.last_burst_dose_rate is None
 
     labarbe_cell._raw_run((1e-7, 1.0), RunOptions(), beam_on=False)
     assert seen["t_span"] == (1e-7, 1.0)
@@ -275,27 +287,116 @@ def test_run_forwards_options(
 
 
 @pytest.mark.parametrize("force_positive", [False, True])
-def test_run_reproduces_argument_order_bug(
+def test_run_forwards_force_positive_to_options(
     labarbe_cell: UnitCell, monkeypatch: pytest.MonkeyPatch, force_positive: bool
 ) -> None:
-    """
-    TODO(ticket 12): run() historically passed force_positive in the
-    beam_ON slot of _raw_run. The burst follows force_positive and the
-    solver never forces positivity.
-    """
+    """force_positive lands in RunOptions, whatever the burst does."""
     calls = _spy_raw_run(monkeypatch, labarbe_cell)
     with pytest.raises(_Captured):
         labarbe_cell.run(t_span=(1e-7, 1.0), force_positive=force_positive)
     (call,) = calls
-    assert call["beam_on"] is force_positive
-    assert call["options"].force_positive is False
+    assert call["options"].force_positive is force_positive
+    assert call["beam_on"] is True  # independent of force_positive
 
 
-def test_run_default_skips_burst(labarbe_cell: UnitCell) -> None:
-    """End to end: with the defaults, y0 is the plain initial state."""
-    res = labarbe_cell.run(t_span=(1e-7, 1e-6))
-    np.testing.assert_array_equal(res.y[:, 0], labarbe_cell.env.initial_values())
+@pytest.mark.parametrize("force_positive", [False, True])
+def test_force_positive_reaches_derive(
+    labarbe_cell: UnitCell, monkeypatch: pytest.MonkeyPatch, force_positive: bool
+) -> None:
+    """The args given by solve_ivp to derive() carry force_positive."""
+    seen: tp.Dict[str, tp.Any] = {}
+
+    def fake_solve_ivp(
+        fun: tp.Any, t_span: tp.Any, y0: tp.Any, **kwargs: tp.Any
+    ) -> str:
+        seen["args"] = kwargs["args"]
+        return "sol"
+
+    monkeypatch.setattr(unit_cell_module, "solve_ivp", fake_solve_ivp)
+    labarbe_cell._raw_run(
+        (1e-7, 1.0), RunOptions(force_positive=force_positive), beam_on=True
+    )
+    beam, mat, forced = seen["args"]
+    assert beam is labarbe_cell.beam
+    assert mat is labarbe_cell.mat
+    assert forced is force_positive
+
+
+def test_run_applies_burst_by_default(labarbe_cell: UnitCell) -> None:
+    """End to end: the first stored point is the burst shifted state."""
+    cell = labarbe_cell
+    res = cell.run(t_span=(1e-7, 1e-6))
+    y_burst = cell.env.initial_values()
+    cell._apply_initial_burst((1e-7, 1e-6), y_burst)
+    np.testing.assert_array_equal(res.y[:, 0], y_burst)
+    assert res.t[0] == 1e-7 + cell.T_ZERO
+    assert res.burst_dose_rates == [cell.beam.dose_rate_peak]
+
+
+def test_run_without_beam_use_has_no_burst(labarbe_cell: UnitCell) -> None:
+    cell = labarbe_cell
+    res = cell.run(t_span=(1e-7, 1e-6), use_beam=False)
+    np.testing.assert_array_equal(res.y[:, 0], cell.env.initial_values())
     assert res.t[0] == 1e-7
+    assert res.burst_dose_rates == []
+
+
+def test_run_never_mutates_y0(labarbe_cell: UnitCell) -> None:
+    y0 = labarbe_cell.env.initial_values()
+    y0_ref = y0.copy()
+    res = labarbe_cell.run(t_span=(1e-7, 1e-6), y0=y0)
+    np.testing.assert_array_equal(y0, y0_ref)
+    assert np.any(res.y[:, 0] != y0_ref)  # the burst was applied to a copy
+
+
+def test_run_drops_t_eval_inside_skipped_interval(labarbe_cell: UnitCell) -> None:
+    t_eval = np.array([1e-7, 1.5e-7, 2e-7, 5e-7])
+    res = labarbe_cell.run(t_span=(1e-7, 1e-6), t_eval=t_eval)
+    np.testing.assert_array_equal(res.t, t_eval[2:])
+    # beam not used: nothing is skipped
+    res = labarbe_cell.run(t_span=(1e-7, 1e-6), t_eval=t_eval, use_beam=False)
+    np.testing.assert_array_equal(res.t, t_eval)
+
+
+def test_run_without_beam_raises(no_beam_cell: UnitCell) -> None:
+    with pytest.raises(NoBeamDefinedError):
+        no_beam_cell.run(t_span=(1e-7, 1.0))
+    with pytest.raises(NoBeamDefinedError):
+        no_beam_cell.run(t_span=(1e-7, 1.0), use_beam=False)
+    with pytest.raises(NoBeamDefinedError):
+        no_beam_cell._raw_run((1e-7, 1.0), RunOptions())
+
+
+def test_integrate_production_follows_applied_burst(labarbe_cell: UnitCell) -> None:
+    """The burst term of the production integrals exists only if the burst
+    was applied to the initial concentrations."""
+    cell = labarbe_cell
+    with_burst = cell.run(t_span=(1e-7, 1e-6))
+    without = cell.run(t_span=(1e-7, 1e-6), use_beam=False)
+    (reaction,) = cell.env.radiolytic_reaction_involving("e_aq")
+    label = reaction.as_label()
+    burst = (
+        reaction.compute_initial_cc_before(cell.T_ZERO, cell.beam.dose_rate_peak) * 1e6
+    )
+
+    def simulated(res: ODEResult) -> float:
+        rate = res.reconstruct_reactions()[label]
+        return float(np.trapezoid(rate.to_numpy() * 1e6, x=rate.index))
+
+    # Burst applied: integral of the rate over the simulated part + burst
+    prod = with_burst.integrate_production_of("e_aq")[label]
+    assert prod == pytest.approx(simulated(with_burst) + burst)
+    # Not applied (use_beam=False): the rate integral only
+    prod_without = without.integrate_production_of("e_aq")[label]
+    assert prod_without == pytest.approx(simulated(without))
+
+    # Unknown burst information (result read from a file): one burst
+    # per beam pulse at the peak dose rate.
+    with_burst.burst_dose_rates = None
+    legacy = with_burst.integrate_production_of("e_aq")[label]
+    assert legacy == pytest.approx(
+        simulated(with_burst) + burst * cell.beam.tot_pulses()
+    )
 
 
 def test_run_till_max_dose_forwards_kwargs(
@@ -312,6 +413,7 @@ def test_run_till_max_dose_forwards_kwargs(
     (call,) = calls
     assert call["t_span"] == (1e-8, labarbe_cell.beam.time_at_max_dose)
     assert call["options"].max_step == 1e-9
+    assert call["options"].force_positive is True
     assert call["beam_on"] is True
 
 
@@ -539,3 +641,39 @@ def test_sim_chunks_iter_default_options(labarbe_cell: UnitCell) -> None:
     assert it.options == RunOptions()
     assert it.y0 is None
     assert len(it) == 0
+
+
+def test_sim_chunks_iter_keeps_previous_last_point(pulsed_cell: UnitCell) -> None:
+    """The burst of an ON chunk starts from a copy of the previous last
+    point: the stored value is not overwritten. Chunks are ON, OFF, ON."""
+    cell = pulsed_cell
+    it = cell.prepare_chunked_run(
+        t_span=(0.0, 1e-2 + 2e-6),
+        max_step_size_on=1e-7,
+        max_step_size_off=1e-3,
+    )
+    assert [c.beam_on for c in it.chunks] == [True, False, True]
+    next(it)
+    res = next(it)
+    n_stored = res.y.shape[1]
+    last_off = res.y[:, -1].copy()
+    res = next(it)
+    np.testing.assert_array_equal(res.y[:, n_stored - 1], last_off)
+    # ... and the burst really was added to the next chunk's first point
+    assert cell.last_burst_dose_rate == cell.beam.dose_rate_peak
+    assert np.any(res.y[:, n_stored] != last_off)
+    assert res.burst_dose_rates == [cell.beam.dose_rate_peak] * 2
+
+
+def test_sim_chunks_iter_never_mutates_y0(pulsed_cell: UnitCell) -> None:
+    y0 = pulsed_cell.env.initial_values()
+    y0_ref = y0.copy()
+    pulsed_cell.prepare_chunked_run(t_span=(0.0, 3e-6), y0=y0).run()
+    np.testing.assert_array_equal(y0, y0_ref)
+
+
+def test_chunked_run_without_beam_use_has_no_burst(pulsed_cell: UnitCell) -> None:
+    res = pulsed_cell.prepare_chunked_run(t_span=(0.0, 3e-6), use_beam=False).run()
+    assert res.burst_dose_rates == []
+    assert res.t[0] == 0.0
+    np.testing.assert_array_equal(res.y[:, 0], pulsed_cell.env.initial_values())

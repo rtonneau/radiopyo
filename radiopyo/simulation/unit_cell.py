@@ -167,6 +167,9 @@ class UnitCell(object):
             Radiation source to use for the simulation
         last_exec_time: float
             Time duration of last simulation step
+        last_burst_dose_rate: float, optional
+            Dose rate [Gy/s] used for the initial radiolytic burst of the
+            last integration step (None if no burst was applied)
         g_val: GValuesBoscolo
             GValues from the literature to possibly update the LET
         FIRST_STEP: float
@@ -186,6 +189,7 @@ class UnitCell(object):
     mat: SimMatrices
     beam_list: BeamCollection
     last_exec_time: float
+    last_burst_dose_rate: tp.Optional[float]
     g_val: GValuesBoscolo
 
     def __init__(
@@ -210,6 +214,7 @@ class UnitCell(object):
                 self.beam_list.add_beam(beam, beam.label)
 
         self.last_exec_time = -1
+        self.last_burst_dose_rate = None
 
     @property
     def T(self) -> float:
@@ -398,34 +403,44 @@ class UnitCell(object):
                 Solver options
             y0: NDArray[np.float64], optional
                 Initial concentrations of the dynamic species [µmol/L].
-                If None, SimEnv.initial_values() is used. NOTE: the
-                initial burst is added to this array *in place*.
+                If None, SimEnv.initial_values() is used. Never modified:
+                the integration starts from a copy.
             beam_on: bool
                 Whether the beam is switched ON at t_span[0] (default:
-                True), see _apply_initial_burst.
+                True). The initial burst is applied only if the beam is
+                also used (options.use_beam), see _apply_initial_burst.
 
         Returns:
             ScipyODEResult: raw solve_ivp result
+
+        Raises:
+            NoBeamDefinedError: no beam is defined
+            NotImplementedError: options.use_jac is True
         """
         if options.use_jac:
             raise NotImplementedError(
                 "The analytical Jacobian is being rewritten and is not "
                 "available for the moment: use use_jac=False."
             )
-        if len(self.beam_list) <= 0:
-            # NOTE: the exception is created but not raised (current
-            # behaviour, fixed by ticket 12).
-            rp_excep.NoBeamDefinedError("Simulation aborted")
+        self._require_beam()
 
         t_span = widen_empty_span(t_span)
         # First step is clamped against the span *before* the burst shift.
         solver_kwargs = self._solver_kwargs(t_span, options)
 
-        y_start = y0 if y0 is not None else self.env.initial_values()
+        # Always work on a copy: the burst must not alter the caller's y0
+        # (nor the last stored point of a previous chunk).
+        y_start = (
+            np.array(y0, dtype=np.float64, copy=True)
+            if y0 is not None
+            else self.env.initial_values()
+        )
         beam = self.beam_list.current if options.use_beam else None
 
-        if beam_on:  # assume beam is switched ON at t_span[0]
+        self.last_burst_dose_rate = None
+        if beam_on and options.use_beam:  # beam switched ON at t_span[0]
             t_span = self._apply_initial_burst(t_span, y_start)
+            options = self._drop_skipped_t_eval(t_span, options)
 
         return self._timed_solve(t_span, y_start, beam, options, solver_kwargs)
 
@@ -467,8 +482,9 @@ class UnitCell(object):
         Beam switched ON at t_span[0]: skip the first T_ZERO seconds and
         add *in place* to y0 [µmol/L] the radiolytic production of the
         dynamic species over that interval (computed analytically from
-        the G values, at the dose rate of the beam at t_span[0] + T_ZERO).
-        Constant species are left untouched.
+        the G values, at the dose rate of the beam at t_span[0] + T_ZERO,
+        stored in last_burst_dose_rate). Constant species are left
+        untouched.
 
         Returns:
             Tuple[float, float]: (t_span[0] + T_ZERO, t_span[1])
@@ -477,8 +493,10 @@ class UnitCell(object):
             ValueError: the span is shorter than T_ZERO
         """
         t_span = (t_span[0] + self.T_ZERO, t_span[1])
-        if t_span[0] > t_span[1]:
+        if t_span[0] >= t_span[1]:
             raise ValueError(f"Too Short beam pulse {t_span}")
+        dose_rate = self.beam.at(t_span[0]).dose_rate()
+        self.last_burst_dose_rate = dose_rate
         for r in self.env.reactions.radiolytic:
             # If the species must be forced constant, skip it.
             if self.env.species.is_cst_species(r.species()):
@@ -486,12 +504,33 @@ class UnitCell(object):
 
             # Keep initial value and increment
             y0[r.species().index] += (
-                r.compute_initial_cc_before(
-                    t0=self.T_ZERO, dose_rate=self.beam.at(t_span[0]).dose_rate()
-                )
+                r.compute_initial_cc_before(t0=self.T_ZERO, dose_rate=dose_rate)
                 * 1e6
             )  # Units of initial cc are µM
         return t_span
+
+    @staticmethod
+    def _drop_skipped_t_eval(
+        t_span: tp.Tuple[float, float],
+        options: RunOptions,
+    ) -> RunOptions:
+        """
+        The initial burst moves the start of the integration to
+        t_span[0] + T_ZERO: the t_eval times before it (inside the
+        skipped interval) cannot be evaluated by solve_ivp and are
+        dropped.
+        """
+        if options.t_eval is None:
+            return options
+        t_eval = np.asarray(options.t_eval)
+        kept = t_eval[t_eval >= t_span[0]]
+        if len(kept) == len(t_eval):
+            return options
+        logger.warning(
+            f"{len(t_eval) - len(kept)} t_eval time(s) before "
+            f"{t_span[0]} s (end of the skipped initial burst) dropped"
+        )
+        return dataclasses.replace(options, t_eval=kept)
 
     def _timed_solve(
         self,
@@ -587,15 +626,22 @@ class UnitCell(object):
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
             force_positive: bool, optional
-                CURRENT BEHAVIOUR (see ticket 12): this flag does NOT
-                reach the solver (derive always gets False). Instead,
-                True applies the initial radiolytic burst (beam assumed
-                switched ON at t_span[0], first T_ZERO skipped, y0
-                modified in place) and False (default) skips it.
+                Whether derive() zeroes the consumption of depleted
+                species (default: False).
+
+        The beam is assumed switched ON at t_span[0]: unless
+        use_beam=False, the first T_ZERO seconds are skipped and the
+        radiolytic production over them is added to y0 (a copy: the
+        given y0 is never modified).
 
         Returns:
             ODEResult: integration result (solve_ivp solution wrapped
             with the environment, beam, matrices, LET and T_ZERO)
+
+        Raises:
+            NoBeamDefinedError: no beam is defined
+            ValueError: beam ON at t_span[0] and t_span not longer than
+                T_ZERO (the initial burst would cover the whole span)
         """
         logger.info(
             f"Starting simulation with t_span: {t_span} (jacobian use: {use_jac})"
@@ -606,25 +652,25 @@ class UnitCell(object):
             method=method,
             max_step=max_step,
             use_beam=use_beam,
-            # TODO(ticket 12): historically run() called _raw_run
-            # positionally and its 'force_positive' landed in the
-            # 'beam_ON' slot, leaving the solver's force_positive at its
-            # default False. Reproduced explicitly: the solver never
-            # forces positivity and the burst follows force_positive.
-            force_positive=False,
+            force_positive=force_positive,
             use_jac=use_jac,
             t_eval=t_eval,
         )
-        sol = self._raw_run(t_span, options, y0=y0, beam_on=force_positive)
+        sol = self._raw_run(t_span, options, y0=y0, beam_on=True)
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
-        return ODEResult(
+        res = ODEResult(
             self.env,
             self.beam_list.current,
             self.mat,
             self.beam_list.current_LET,
             self.T_ZERO,
-            sol,
         )
+        res.append_sol(
+            sol,
+            exec_time=self.last_exec_time,
+            bursts=self._last_bursts(),
+        )
+        return res
 
     def prepare_chunked_run(
         self,
@@ -810,6 +856,11 @@ class UnitCell(object):
             y0,
         )
 
+    def _last_bursts(self) -> tp.List[float]:
+        """Dose rates of the bursts applied by the last integration step."""
+        rate = self.last_burst_dose_rate
+        return [] if rate is None else [rate]
+
     def _require_beam(self) -> None:
         """Raise NoBeamDefinedError (and log it) when no beam is defined."""
         if len(self.beam_list) <= 0:
@@ -923,10 +974,15 @@ class SimChunksIter:
         res = self.sim._raw_run(
             (chunk.start, chunk.stop),
             dataclasses.replace(self.options, max_step=chunk.max_step_size),
+            # _raw_run copies y0: the stored last point stays untouched
             y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
             beam_on=chunk.beam_on,
         )
-        self.sol.append_sol(res, exec_time=self.sim.last_exec_time)
+        self.sol.append_sol(
+            res,
+            exec_time=self.sim.last_exec_time,
+            bursts=self.sim._last_bursts(),
+        )
         return self.sol
 
     def __len__(self) -> int:

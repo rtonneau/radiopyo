@@ -82,6 +82,15 @@ class ODEResult(object):
     Collection storing the results from scipy.integrate.solve_ivp in
     order to easily append together the results from several integration
     steps.
+
+    Attributes (besides the scipy ones):
+        burst_dose_rates: list of float, optional
+            Dose rate [Gy/s] of every initial radiolytic burst (first
+            t_zero_pulse seconds of a beam ON phase) added to the initial
+            concentrations of the integration steps, [] if none was
+            applied. None when unknown (results read from a file): the
+            bursts are then assumed to be one per beam pulse, at the peak
+            dose rate (see integrate_production_of).
     """
 
     # Keep track of the original sim env
@@ -91,6 +100,7 @@ class ODEResult(object):
     LET: tp.Optional[float]
     t_zero_pulse: float
     date: datetime.datetime
+    burst_dose_rates: tp.Optional[tp.List[float]]
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -125,6 +135,7 @@ class ODEResult(object):
         self.mat = copy.deepcopy(mat)
         self.LET = let
         self.t_zero_pulse = t_zero_pulse
+        self.burst_dose_rates = None
         self._default_init()
         if sol is not None:
             self.append_sol(sol)
@@ -177,6 +188,11 @@ class ODEResult(object):
         self.status += other.status
         self.message += other.message
         self.success += other.success
+        if self.burst_dose_rates is not None or other.burst_dose_rates is not None:
+            self.burst_dose_rates = [
+                *(self.burst_dose_rates or []),
+                *(other.burst_dose_rates or []),
+            ]
         self.n_points += other.n_points
         self.exec_time += other.exec_time
         return self
@@ -225,7 +241,23 @@ class ODEResult(object):
         self,
         sol: ScipyODEResult,
         exec_time: tp.Optional[float] = None,
+        bursts: tp.Optional[tp.Sequence[float]] = None,
     ) -> None:
+        """
+        Append an integration step.
+
+        Args:
+            sol: ScipyODEResult
+                Solution of the step
+            exec_time: float, optional
+                Wall time of the step [s]
+            bursts: Sequence[float], optional
+                Dose rates [Gy/s] of the initial radiolytic bursts added
+                to the initial concentrations of this step (empty if
+                none). None if unknown (see burst_dose_rates).
+        """
+        if bursts is not None:
+            self.burst_dose_rates = [*(self.burst_dose_rates or []), *bursts]
         self.t = np.append(self.t, sol.t)
         if len(self.y) == 0:
             self.y = sol.y
@@ -322,6 +354,19 @@ class ODEResult(object):
         self.dydt = out.values.T
         return out
 
+    def _burst_dose_rates(self) -> tp.List[float]:
+        """
+        Dose rates [Gy/s] of the initial bursts to account for in the
+        production integrals: the recorded ones or, when unknown (result
+        read from a file), one per beam pulse at the peak dose rate.
+        """
+        if self.burst_dose_rates is not None:
+            return self.burst_dose_rates
+        n_pulse = self.beam.tot_pulses()
+        # The burst is linear in the dose rate: n_pulse bursts at the
+        # peak dose rate are one burst at n_pulse times that dose rate.
+        return [n_pulse * self.beam.dose_rate_peak]
+
     def integrate_production_of(
         self,
         species: str | SimSpecies,
@@ -343,15 +388,11 @@ class ODEResult(object):
             _ser.loc[_k] = trapezoid(_s.to_numpy() * 1e6, x=_s.index)  # type: ignore[call-overload]  # pandas-stubs: Hashable key
 
         if include_radiolytic:
-            n_pulse = self.beam.tot_pulses()
+            # Production over the t_zero_pulse skipped at every burst
             for _r in self.env.radiolytic_reaction_involving(species):
-                _ser.loc[_r.as_label()] = (
-                    _ser.loc[_r.as_label()]
-                    + n_pulse
-                    * _r.compute_initial_cc_before(
-                        self.t_zero_pulse, self.beam.dose_rate_peak
-                    )
-                    * 1e6
+                _ser.loc[_r.as_label()] = _ser.loc[_r.as_label()] + sum(
+                    _r.compute_initial_cc_before(self.t_zero_pulse, dose_rate) * 1e6
+                    for dose_rate in self._burst_dose_rates()
                 )
 
         return _ser.sort_values(ascending=reverse)

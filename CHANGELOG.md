@@ -4,6 +4,24 @@ All notable changes to this project. Versions follow [semantic versioning](https
 
 ## [Unreleased]
 
+### Fixed
+
+- `UnitCell.run`: the arguments were forwarded to the solver by position, so `force_positive`
+  never reached it and was used as the "beam ON" flag instead. The initial radiolytic burst
+  (first `T_ZERO` seconds of a beam ON phase, added analytically to `y0`) is now applied by
+  default (unless `use_beam=False`) and `force_positive` reaches `derive()`. Results of `run()`
+  change: the trajectory starts at `t_span[0] + T_ZERO`, and `t_eval` times inside the skipped
+  interval are dropped (with a warning). A beam ON span not longer than `T_ZERO` now raises
+  `ValueError`.
+- A `y0` given to `run` / `prepare_chunked_run` / `prepare_single_pulse` is never modified.
+  In chunked runs the burst of a beam ON chunk no longer overwrites the last stored point of
+  the previous chunk (it changed the reconstructed rates and production integrals).
+- `run(use_beam=False)` / `prepare_*(use_beam=False)` add no initial burst. `ODEResult.integrate_production_of`
+  accounts for the bursts actually applied (`ODEResult.burst_dose_rates`) instead of assuming one
+  per beam pulse; results read from a file keep the former assumption
+  (`burst_dose_rates` is not persisted).
+- A missing beam now raises `NoBeamDefinedError` in `run` (the exception was created but not raised).
+
 ### Removed (breaking)
 
 - RON config format: `radiopyo.parser.ron`, its grammar and `UnitCell.from_ron`. Use TOML.

@@ -13,7 +13,16 @@ The scenarios (and the code producing the numbers) live in
 path; this script only dumps their output.
 
 Usage:
-    python tests/golden/record_golden.py [--force]
+    python tests/golden/record_golden.py [--force] [--only PART ...]
+
+``--only`` re-records some parts (derive, runs, beams, hdf) and leaves the
+others untouched. Keep ``hdf`` out of it unless the stored format itself
+changes on purpose: golden_results.h5 was written by the original code and
+is what proves that files written by older versions still load.
+
+Re-recorded since the original recording (result-changing fixes approved
+by the user):
+    runs   ticket 12 (initial burst applied by run(), y0 never mutated)
 
 Files written in tests/golden/data:
     derive.json          dydt keyed by species label (+ radiolytic yields)
@@ -53,45 +62,62 @@ def _load_test_module():  # type: ignore[no-untyped-def]
     return module
 
 
+PARTS = ("derive", "runs", "beams", "hdf")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
         "--force", action="store_true", help="overwrite existing golden files"
     )
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        choices=PARTS,
+        default=list(PARTS),
+        help="parts to (re)record (default: all)",
+    )
     args = parser.parse_args()
+    only = set(args.only)
 
     g = _load_test_module()
     g.DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    existing = [
-        p
-        for p in (g.DERIVE_FILE, g.RUNS_FILE, g.BEAMS_FILE, g.HDF_FILE)
-        if p.exists()
-    ]
+    files = {
+        "derive": g.DERIVE_FILE,
+        "runs": g.RUNS_FILE,
+        "beams": g.BEAMS_FILE,
+        "hdf": g.HDF_FILE,
+    }
+    existing = [files[part] for part in PARTS if part in only and files[part].exists()]
     if existing and not args.force:
         sys.exit(f"Golden files already exist ({existing[0]}...): use --force")
 
-    print("derive ...")
-    derive = g.compute_derive()
-    g.DERIVE_FILE.write_text(json.dumps(derive, indent=1, sort_keys=True))
+    if "derive" in only:
+        print("derive ...")
+        derive = g.compute_derive()
+        g.DERIVE_FILE.write_text(json.dumps(derive, indent=1, sort_keys=True))
 
-    print("labarbe run ...")
-    runs = g.compute_labarbe_run()
-    print("chunked pulsed run ...")
-    runs.update(g.compute_chunked_run())
-    np.savez_compressed(g.RUNS_FILE, **runs)
+    if "runs" in only:
+        print("labarbe run ...")
+        runs = g.compute_labarbe_run()
+        print("chunked pulsed run ...")
+        runs.update(g.compute_chunked_run())
+        np.savez_compressed(g.RUNS_FILE, **runs)
 
-    print("beams ...")
-    np.savez_compressed(g.BEAMS_FILE, **g.compute_beams())
+    if "beams" in only:
+        print("beams ...")
+        np.savez_compressed(g.BEAMS_FILE, **g.compute_beams())
 
-    print("hdf5 ...")
-    store = g.DATA_DIR / f".{g.HDF_FILE.stem}"
-    if g.HDF_FILE.exists():
-        g.HDF_FILE.unlink()
-    if store.exists():
-        shutil.rmtree(store)
-    expected = g.compute_hdf(g.HDF_FILE)
-    np.savez_compressed(g.HDF_EXPECTED_FILE, **expected)
+    if "hdf" in only:
+        print("hdf5 ...")
+        store = g.DATA_DIR / f".{g.HDF_FILE.stem}"
+        if g.HDF_FILE.exists():
+            g.HDF_FILE.unlink()
+        if store.exists():
+            shutil.rmtree(store)
+        expected = g.compute_hdf(g.HDF_FILE)
+        np.savez_compressed(g.HDF_EXPECTED_FILE, **expected)
 
     for path in sorted(g.DATA_DIR.rglob("*")):
         if path.is_file():
