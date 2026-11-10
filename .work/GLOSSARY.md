@@ -42,3 +42,15 @@ _Avoid_: snapshot, baseline
 **Result-changing fix**:
 A bug fix that changes numerical simulation output; delivered as its own ticket with before/after numbers for approval.
 _Avoid_: behaviour fix
+
+**Negative product**:
+A species written `- species` on the product side of a reaction: the reaction consumes it, and the reaction cannot occur while that species is depleted (at or below `DEPLETION_LIMIT`).
+_Avoid_: ope, negative species
+
+**Depletion block**:
+Forcing to 0 the rate of a reaction (k-reaction or enzymatic) while one of its negative products is depleted.
+_Avoid_: negative-product blocking, zeroing
+
+**Analytic Jacobian**:
+The matrix d(dy/dt)/dy of the dynamic species computed in closed form from the reaction matrices, given to the stiff solvers in place of a finite-difference estimate.
+_Avoid_: jac, exact Jacobian
