@@ -125,6 +125,42 @@
         "ticket": "02-overshoot-relaxation",
         "commit": "d82357a"
       }
+    },
+    {
+      "at": "2026-11-11T08:00:29.538Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-chunks-follow-beam.md",
+        "03-implement/03-chunks-follow-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunks-follow-beam"
+      }
+    },
+    {
+      "at": "2026-11-11T08:23:24.294Z",
+      "event": "ticket_blocked",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-chunks-follow-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunks-follow-beam",
+        "reason": "re-review after the one allowed correction pass: prepare_single_pulse gives a wrong constant dose rate for multi-pulse beams (3.5x dose regression) and for MacroPulsedBeam starting after t_span[0]"
+      }
+    },
+    {
+      "at": "2026-11-11T08:49:52.089Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-chunks-follow-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunks-follow-beam",
+        "commit": "93dfc06"
+      }
     }
   ],
   "kind": "issue",
