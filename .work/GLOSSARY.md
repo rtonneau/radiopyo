@@ -66,3 +66,7 @@ _Avoid_: failed chunk, silent failure
 **Analytic Jacobian**:
 The matrix d(dy/dt)/dy of the dynamic species computed in closed form from the reaction matrices, given to the stiff solvers in place of a finite-difference estimate.
 _Avoid_: jac, exact Jacobian
+
+**Short ON span**:
+A beam ON span shorter than `MIN_BEAM_ON_TIME` (1e-6 s) met at run time (last pulse cut by max_dose, pulse clipped by t_span); it is not integrated, its radiolytic yield is added analytically and it is recorded in `ODEResult.short_on_spans` (ADR 0008). A configured ON time that short raises `ShortBeamOnError` instead.
+_Avoid_: partial pulse, too short pulse, burst

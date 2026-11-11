@@ -108,9 +108,33 @@
         "ticket": "02-build-time-short-on-time-error",
         "commit": "0ce58c8"
       }
+    },
+    {
+      "at": "2026-11-11T10:43:05.021Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-runtime-short-on-spans-docs.md",
+        "03-implement/03-runtime-short-on-spans-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-runtime-short-on-spans-docs"
+      }
+    },
+    {
+      "at": "2026-11-11T10:56:12.394Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/03-runtime-short-on-spans-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-runtime-short-on-spans-docs",
+        "commit": "60c4aac"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "fix/min-beam-on-time-single-pulse-step",
     "base_branch": "main",
