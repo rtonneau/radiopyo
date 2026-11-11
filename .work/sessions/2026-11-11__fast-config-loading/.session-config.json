@@ -58,13 +58,38 @@
       "detail": {
         "tickets": 1
       }
+    },
+    {
+      "at": "2026-11-11T23:22:56.064Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-memoize-reaction-parser.md",
+        "03-implement/01-memoize-reaction-parser/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-memoize-reaction-parser"
+      }
+    },
+    {
+      "at": "2026-11-11T23:27:03.485Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/01-memoize-reaction-parser/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-memoize-reaction-parser",
+        "commit": "a163a82"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "perf/memoize-reaction-parser",
     "base_branch": "main",
     "branch_created_at": "2026-11-11T23:22:50.021Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "inline"
 }
