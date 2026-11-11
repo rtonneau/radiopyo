@@ -6,9 +6,6 @@ All notable changes to this project. Versions follow [semantic versioning](https
 
 ### Added
 
-- `SolverFailedError` (`radiopyo.simulation.exceptions`): `UnitCell` runs (`run`, chunked and single-pulse
-  runs) now raise it when `solve_ivp` returns `success=False`, with the span, the last reached t and scipy's
-  message, instead of silently returning a truncated solution.
 - `radiopyo.exceptions.RadioPyoError`, the root of the exception hierarchy (the `chemistry`, `physics`
   and `simulation` exceptions derive from it; `radiopyo.simulation.exceptions.RadioPyoError` still works).
 - `RunOptions` (`radiopyo.simulation.unit_cell`): the solver options (`atol`, `rtol`, `method`,
@@ -23,14 +20,6 @@ All notable changes to this project. Versions follow [semantic versioning](https
 - README: `[[beam.macro_pulsed]]`, `[[reactions.equilibrium]]`, the `[parameters]` keys, the n*k convention,
   `variable_GValues` and H3O_plus = e_aq (G(H3O+) is taken equal to G(e_aq), the `H3O_plus` column of the
   Boscolo data is not used).
-- Benchmark `examples/bench_fenton_stall.py` (Fenton reproduction grid, every point must succeed in under 60 s
-  and agree on ROOH within 1e-6 with BDF / LSODA atol 1e-10 references) and the regression test
-  `tests/simulation/test_fenton_stall.py`.
-- `ODEResult.step_dose_rates` (one entry per integration step, as `n_points`): the dose rate a chunk of a
-  chunked run was integrated with (None for a step that read the beam). `reconstruct_reactions` uses it, so
-  the rates of the last point of an ON chunk (on the pulse end) match what was integrated. Not stored in
-  HDF5 files (results read from a file keep reading the beam). New `ConstantDoseRate` and `DoseRateSource`
-  in `radiopyo.physics.beam`; `SimChunk.dose_rate`.
 
 ### Changed
 
@@ -71,20 +60,6 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 - `ruff check radiopyo` and `mypy radiopyo` report no error.
 - README brought in line with the code (version badge, `from_toml`, `max_dose=` keyword in
   `PulsedBeam.from_dose_rate_peak`, bundled files, acid/base keys, dependencies, GitHub URL).
-- Chunks follow the beam exactly (ADR 0007): `ParticleBeam.make_time_intervals` no longer extends the end of
-  a pulse by `GROWTH_TIME` (the class attribute is removed), so an ON chunk ends exactly at the pulse end (or
-  at the time of max dose) and the refined max step of the first microsecond after a pulse is gone. A beam
-  discontinuity inside an integration interval stalled LSODA.
-- Overshoot relaxation (ADR 0007, amends ADR 0004): a dynamic species below 0 is continued linearly from
-  c = 0+ in its own balance (`dc/dt += J_jj(0+) * c`, included in `jacobian`) while every other species still
-  reads it as 0. `derive` is therefore no longer exactly `S . r` for a state with a species below 0 (identical
-  when all c >= 0). With clipping alone, a stiff radical near 0 (e.g. OH_r with RH = 1 M) held LSODA at steps
-  of ~1e-8 s for minutes.
-- In `prepare_chunked_run` and `prepare_single_pulse` the solver holds the dose rate of each chunk constant
-  (the beam dose rate inside the chunk), and the initial burst uses it. `run()` still reads the beam at every
-  time. `prepare_single_pulse` builds its chunks before the time of max dose from `make_time_intervals` (leading
-  OFF chunk when the beam starts after `t_span[0]`, one chunk per pulse, also for pulsed and macro-pulsed
-  beams; the OFF chunks use `max_step_size_final`) and clips every chunk to `t_span[1]`.
 
 ### Known issues (not fixed in this release)
 
@@ -99,16 +74,6 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
   stored in HDF5 files; `ODEResult.reconstruct_reactions` uses the beam of the result even for a run made with
   `use_beam=False`.
 - No golden output for a chunked run with a `MacroPulsedBeam`.
-- Pulses shorter than `UnitCell.T_ZERO` (1e-7 s) now raise `ValueError("Too Short beam pulse")` in chunked
-  runs: the extension of the ON chunk by `GROWTH_TIME` used to hide it. Behaviour not changed here (to be
-  handled separately; follow-up recorded).
-- Cost of the overshoot relaxation: `derive` is about 17 times slower (about 1.1 ms instead of 63 us on the
-  Labarbe + Fe + RH model with 9 species below 0) and `jacobian` about 15 times slower on a state with a
-  species below 0; states with all c >= 0 are unchanged. A Fenton benchmark point that stalled for more than
-  80 s now runs in about 1 s.
-- Golden data not re-recorded for the chunk-boundary change: `test_beam_matrices_match_golden` and
-  `test_chunked_pulsed_run_matches_golden` fail on the time grid only until `tests/golden/data` is re-recorded
-  (`record_golden.py --force --only beams runs`).
 
 ### Fixed
 
