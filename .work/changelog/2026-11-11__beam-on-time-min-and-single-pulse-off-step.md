@@ -1,6 +1,7 @@
 ---
 bump: major
 floor: minor
+reason: beams with a configured ON time below 1e-6 s, accepted before, now raise ShortBeamOnError
 ---
 ### Changed
 
