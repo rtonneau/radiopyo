@@ -9,6 +9,7 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
+import copy
 import logging
 import typing as tp
 from pathlib import Path
@@ -209,17 +210,34 @@ class ReactionParser(object):
 
     parser: lark.Lark
     atomix: Atomix
+    _cache: tp.Dict[str, tp.Any]
 
     def __init__(self) -> None:
         with open(self.GRAMMAR, "r") as f:
             self.parser = lark.Lark(f.read())
         self.atomix = Atomix()
+        self._cache = {}
+
+    def clear_cache(self) -> None:
+        """Forget every string parsed so far."""
+        self._cache.clear()
 
     def _parse(self, value: str) -> GenericReaction | Atom | Molecule:
-        """ """
-        # Parse and then transform the output.
-        tree = self.parser.parse(value.strip())
-        return TreeToReaction().transform(tree)
+        """
+        Parse and transform 'value'. The result is remembered per (stripped)
+        string, so a string is parsed by Lark only once; every call returns
+        a deep copy, since callers modify what they get (constants, species
+        attached to a ListSpecies). A string that fails to parse is not
+        remembered.
+        """
+        key = value.strip()
+        try:
+            cached = self._cache[key]
+        except KeyError:
+            tree = self.parser.parse(key)
+            cached = TreeToReaction().transform(tree)
+            self._cache[key] = cached
+        return copy.deepcopy(cached)
 
     def parse_reaction(self, reaction: str) -> GenericReaction:
         """

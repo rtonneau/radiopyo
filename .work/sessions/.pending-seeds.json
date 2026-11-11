@@ -119,5 +119,152 @@
     "sourceReport": "scout-reports/review-18-followups-2026-11-10T09-29-18-858Z.md",
     "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
     "createdAt": "2026-11-10T09:29:18.858Z"
+  },
+  "overshoot-path-precompute": {
+    "strength": "Strong",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/ode_functions_solver.py",
+      "radiopyo/utils/sim_types.py",
+      "radiopyo/simulation/environment_build.py"
+    ],
+    "problem": "In a pulsed chunked run (200 chunks, 7.5 s), _k_relaxation_terms takes 38% of the time. With a species below 0, every derive/jacobian call rebuilds per-species sub-matrices with dataclasses.replace (23,640 _lock_arrays calls) and loops over np.delete (22,872 calls); depletion_switch_derivatives and mass_action_derivatives are Python loops.",
+    "solution": "Precompute the per-species reaction subsets and slot masks once, when SimMatrices is built (cached on the frozen dataclass), and vectorise the derivative helpers. Check the result against the existing Jacobian finite-difference tests and the Fenton stall regression.",
+    "benefits": "Pulsed and UHDR runs become faster where the solver spends most of its time.",
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "rhs-call-overhead": {
+    "strength": "Worth exploring",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/ode_functions_solver.py",
+      "radiopyo/utils/sim_types.py"
+    ],
+    "problem": "derive costs 108 us per call and jacobian 349 us (Labarbe: 30 species, 85 k-reactions). The cost is NumPy call overhead (np.ones, concatenate, flatnonzero, broadcast_to, the to_full_molar allocation), not arithmetic; the stoichiometry is only 11% non-zero.",
+    "solution": "Precompute index arrays and constant buffers in SimMatrices (depletion columns, the ones row), avoid per-call allocations, try sparse stoichiometry, and benchmark an opt-in compiled backend (numba) behind the same derive/jacobian interface.",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "chunked-run-scaling": {
+    "strength": "Worth exploring",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/ode_result.py",
+      "radiopyo/simulation/unit_cell.py",
+      "radiopyo/simulation/ode_functions_solver.py",
+      "radiopyo/physics/beam.py"
+    ],
+    "problem": "Each chunk has a fixed cost of about 37 ms. ODEResult.append_sol copies the whole history on every chunk (np.append/hstack, so the cost is quadratic in the number of chunks). dose_rates loops in Python over every time point when the rates are reconstructed, and every ODEResult deep-copies env, beam and matrices. A conventional pulsed linac (~1e4 pulses, 2e4 chunks) runs for minutes.",
+    "solution": "Accumulate the chunk arrays in lists and concatenate them lazily, vectorise beam.at for an array of times, share the read-only matrices instead of deep-copying them, and consider merging OFF chunks or capping the points stored per chunk.",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "notebook-rich-display": {
+    "strength": "Strong",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/unit_cell.py",
+      "radiopyo/simulation/ode_result.py",
+      "radiopyo/simulation/environment_build.py",
+      "radiopyo/physics/beam.py"
+    ],
+    "problem": "In JupyterLab, UnitCell and ODEResult display as '<... object at 0x...>' and SimEnv as a raw dataclass dump: the notebook gives no view of the species, reactions, beam, LET, temperature or run status.",
+    "solution": "Add a short __repr__ and a _repr_html_ summary for UnitCell, ODEResult (time span, points, chunks, exec time, success, burst count), SimEnv (species and reaction counts by family) and the beams (dose rate, pulses, max dose, time at max dose).",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "notebook-quiet-logging": {
+    "strength": "Strong",
+    "severity": null,
+    "files": [
+      "radiopyo/utils/default_log_config.toml",
+      "radiopyo/utils/logging.py",
+      "radiopyo/__init__.py",
+      "radiopyo/simulation/unit_cell.py"
+    ],
+    "problem": "The bundled notebook flow prints 18 INFO lines to stdout, each prefixed with a timestamp and 'radiopyo::INFO::'. tqdm is detected by hand through get_ipython, and a plain run() shows no progress at all.",
+    "solution": "Open decision: should notebooks default to WARNING, or keep INFO with a concise format? Also add a quiet flag or context manager for a run, switch to tqdm.auto, and document rp.set_logging_level in the notebook.",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "notebook-plot-helpers": {
+    "strength": "Worth exploring",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/ode_result.py",
+      "radiopyo/physics/beam.py",
+      "pyproject.toml"
+    ],
+    "problem": "Every notebook re-codes the log-time plot, the pH from H3O_plus (in uM) and the unit labels. Neither the beams nor ODEResult offer the cumulative dose versus time, which is needed to plot against dose.",
+    "solution": "Add res.plot(species, ax=None, logx=True), res.pH and res.dose (from a new beam.dose_at(t)), with matplotlib as an optional extra. Open decision: which plot defaults to provide.",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "simpler-setup-api": {
+    "strength": "Strong",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/unit_cell.py",
+      "radiopyo/physics/beam.py",
+      "radiopyo/chemistry/species.py",
+      "radiopyo/simulation/ode_result.py"
+    ],
+    "problem": "Setup traps: (a) the bundled notebook calls PulsedBeam.from_dose_rate_peak(peak, period, on_time, max_dose), so the 4th positional argument is n_pulse; it only works because 1000 x 1e-3 x 10 = 10 Gy. (b) sp.set_initial_cc (mol/L) needs a manual uc.update_env(), or the fixed-species vector is stale. (c) Units are mixed: config in mol/L, results, y0 and atol in uM. (d) set_beam(LET=None) silently reuses the previous LET. (e) res['o2'] raises KeyError without suggestions.",
+    "solution": "Add uc.set_initial_concentration(label, value, unit=...), which rebuilds the matrices; make the beam factory arguments after on_time keyword-only (with a deprecation warning); warn when the LET is reused; suggest close species labels (difflib) in the KeyError; state units in the docstrings and the repr. Open decision: how long to keep positional compatibility.",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "parameter-sweep-helper": {
+    "strength": "Worth exploring",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/unit_cell.py",
+      "radiopyo/simulation/result_collection.py",
+      "radiopyo/simulation/persistence.py"
+    ],
+    "problem": "The typical notebook task is a sweep over dose rate, O2, LET or pulse structure, but each new UnitCell costs seconds (see fast-config-loading), and ResCollection / SimCollection have no driver that fills them.",
+    "solution": "Add uc.copy() (a cheap clone of a parsed cell) and a sweep(param_grid, run_kwargs) that returns a ResCollection plus a tidy DataFrame of chosen outputs (final concentrations, integrals), optionally in parallel with joblib. Open decision: the parameter vocabulary of the grid.",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "notebook-example-ci": {
+    "strength": "Worth exploring",
+    "severity": null,
+    "files": [
+      "examples/notebook_basic_usage.ipynb",
+      "tests/",
+      "pyproject.toml"
+    ],
+    "problem": "examples/notebook_basic_usage.ipynb is not executed by the tests. It passes max_dose positionally (as n_pulse), uses the old alias names (reactions_involving_product), and has a comment claiming reactions_involving returns tuples, so it can drift without anyone noticing.",
+    "solution": "Execute the notebook in pytest (nbmake or nbclient, with a short t_span) under a marker, and refresh it to show the recommended API once the other seeds land.",
+    "benefits": null,
+    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
+    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
+    "sourcePath": null,
+    "createdAt": "2026-11-11T13:37:44.572Z"
   }
 }
