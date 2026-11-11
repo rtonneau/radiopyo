@@ -77,6 +77,30 @@
       "detail": {
         "tickets": 4
       }
+    },
+    {
+      "at": "2026-11-11T07:43:00.550Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-solver-failure-error.md",
+        "03-implement/01-solver-failure-error/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-solver-failure-error"
+      }
+    },
+    {
+      "at": "2026-11-11T07:48:59.341Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-solver-failure-error/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-solver-failure-error",
+        "commit": "5804aa1"
+      }
     }
   ],
   "kind": "issue",
@@ -91,5 +115,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-11T07:42:52.562Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "delegate"
 }
