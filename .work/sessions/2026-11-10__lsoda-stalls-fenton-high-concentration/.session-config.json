@@ -161,10 +161,34 @@
         "ticket": "03-chunks-follow-beam",
         "commit": "93dfc06"
       }
+    },
+    {
+      "at": "2026-11-11T08:49:53.055Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-benchmark-golden-docs.md",
+        "03-implement/04-benchmark-golden-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-golden-docs"
+      }
+    },
+    {
+      "at": "2026-11-11T09:57:36.759Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-benchmark-golden-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-golden-docs",
+        "commit": "c087ebd"
+      }
     }
   ],
   "kind": "issue",
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "issue": {
     "number": 4,
     "url": "https://github.com/rtonneau/radiopyo/issues/4",
