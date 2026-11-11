@@ -1,0 +1,95 @@
+{
+  "session_id": "2026-11-10__lsoda-stalls-fenton-high-concentration",
+  "feature_name": "lsoda-stalls-fenton-high-concentration",
+  "scratch_dir": ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration",
+  "created_at": "2026-11-10T21:30:13.840Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-10T21:30:13.840Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ],
+      "detail": {
+        "kind": "issue"
+      }
+    },
+    {
+      "at": "2026-11-11T07:41:03.611Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish",
+        "shipMode": "delegate"
+      }
+    },
+    {
+      "at": "2026-11-11T07:41:39.558Z",
+      "event": "issue_created",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ],
+      "detail": {
+        "number": 4,
+        "url": "https://github.com/rtonneau/radiopyo/issues/4"
+      }
+    },
+    {
+      "at": "2026-11-11T07:41:39.581Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T07:41:39.808Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T07:42:52.562Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "fix/lsoda-stall-overshoot-relaxation",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-11T07:42:52.602Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-solver-failure-error.md",
+        "02-plan/tickets/02-overshoot-relaxation.md",
+        "02-plan/tickets/03-chunks-follow-beam.md",
+        "02-plan/tickets/04-benchmark-golden-docs.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
+    }
+  ],
+  "kind": "issue",
+  "current_phase": "ship",
+  "issue": {
+    "number": 4,
+    "url": "https://github.com/rtonneau/radiopyo/issues/4",
+    "created_at": "2026-11-11T07:41:39.558Z"
+  },
+  "git": {
+    "branch": "fix/lsoda-stall-overshoot-relaxation",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-11T07:42:52.562Z",
+    "pr_url": null
+  }
+}
