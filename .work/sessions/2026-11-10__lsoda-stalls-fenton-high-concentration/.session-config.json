@@ -101,6 +101,30 @@
         "ticket": "01-solver-failure-error",
         "commit": "5804aa1"
       }
+    },
+    {
+      "at": "2026-11-11T07:49:00.234Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-overshoot-relaxation.md",
+        "03-implement/02-overshoot-relaxation/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-relaxation"
+      }
+    },
+    {
+      "at": "2026-11-11T08:00:28.867Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-overshoot-relaxation/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-relaxation",
+        "commit": "d82357a"
+      }
     }
   ],
   "kind": "issue",
