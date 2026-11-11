@@ -1,0 +1,72 @@
+{
+  "session_id": "2026-11-12__overshoot-path-precompute",
+  "feature_name": "overshoot-path-precompute",
+  "scratch_dir": ".scratch/tests/2026-11-12__overshoot-path-precompute",
+  "created_at": "2026-11-11T23:31:37.726Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-11T23:31:37.726Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T23:33:33.418Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-11T23:33:54.913Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T23:33:55.130Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T23:34:23.496Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "perf/overshoot-path-precompute",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-11T23:34:23.537Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-bench-and-reference.md",
+        "02-plan/tickets/02-overshoot-tables.md",
+        "02-plan/tickets/03-vectorise-helpers.md"
+      ],
+      "detail": {
+        "tickets": 3
+      }
+    }
+  ],
+  "current_phase": "ship",
+  "git": {
+    "branch": "perf/overshoot-path-precompute",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-11T23:34:23.496Z",
+    "pr_url": null
+  }
+}
