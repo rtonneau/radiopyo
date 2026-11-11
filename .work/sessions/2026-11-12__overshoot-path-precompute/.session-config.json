@@ -108,9 +108,33 @@
         "ticket": "02-overshoot-tables",
         "commit": "806b2b2"
       }
+    },
+    {
+      "at": "2026-11-11T23:46:49.688Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-vectorise-helpers.md",
+        "03-implement/03-vectorise-helpers/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-vectorise-helpers"
+      }
+    },
+    {
+      "at": "2026-11-11T23:51:16.068Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/03-vectorise-helpers/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-vectorise-helpers",
+        "commit": "0cb3ab9"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "perf/overshoot-path-precompute",
     "base_branch": "main",
