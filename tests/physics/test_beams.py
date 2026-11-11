@@ -312,11 +312,11 @@ def test_make_time_intervals_state_column_is_zero_or_one():
     beam = ConstantBeam(dose_rate=1e3, max_dose=5.0, start_time=0.2)
     intervals = beam.make_time_intervals(stop=0.204, start=0.0)
     np.testing.assert_array_equal(intervals[:, 1], [0.0, 1.0, 0.0])
-    # The ON to OFF transition of a pulse is expanded by GROWTH_TIME
+    # The ON to OFF transition of a pulse is not expanded (ADR 0007)
     beam = PulsedBeam(1e6, 1e-2, 2e-6, max_dose=7.0)
     intervals = beam.make_time_intervals(stop=0.05)
     assert set(intervals[:, 1].tolist()) == {0.0, 1.0}
-    assert intervals[1, 0] == pytest.approx(2e-6 + beam.GROWTH_TIME)
+    assert intervals[1, 0] == 2e-6
 
 
 # --------------------------------------------------------------------------- #

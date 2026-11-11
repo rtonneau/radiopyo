@@ -17,6 +17,7 @@ Author:
 from __future__ import annotations
 
 import copy
+import types
 import dataclasses
 import inspect
 import typing as tp
@@ -92,6 +93,7 @@ def _spy_raw_run(
         options: RunOptions,
         y0: tp.Any = None,
         beam_on: bool = True,
+        dose_rate: tp.Optional[float] = None,
     ) -> tp.Any:
         calls.append(
             {"t_span": t_span, "options": options, "y0": y0, "beam_on": beam_on}
@@ -216,17 +218,18 @@ def test_raw_run_uses_options(
         beam: tp.Any,
         options: RunOptions,
         solver_kwargs: tp.Dict[str, tp.Any],
-    ) -> str:
+    ) -> tp.Any:
         seen.update(
             t_span=t_span, y0=y0, beam=beam, options=options, kwargs=solver_kwargs
         )
-        return "sol"
+        return sol
 
+    sol = types.SimpleNamespace(success=True)
     monkeypatch.setattr(labarbe_cell, "_timed_solve", fake_solve)
     opts = RunOptions(max_step=1e-3)
     y0 = labarbe_cell.env.initial_values()
     y0_ref = y0.copy()
-    assert labarbe_cell._raw_run((1e-6, 1e-6), opts, y0=y0, beam_on=True) == "sol"
+    assert labarbe_cell._raw_run((1e-6, 1e-6), opts, y0=y0, beam_on=True) is sol
     # empty span widened, then shifted by T_ZERO (burst)
     assert seen["t_span"] == (1e-8 + labarbe_cell.T_ZERO, 1e-6)
     assert seen["y0"] is not y0  # a copy carries the burst
@@ -307,9 +310,9 @@ def test_raw_run_passes_beam_and_matrices_to_solver(
 
     def fake_solve_ivp(
         fun: tp.Any, t_span: tp.Any, y0: tp.Any, **kwargs: tp.Any
-    ) -> str:
+    ) -> tp.Any:
         seen["args"] = kwargs["args"]
-        return "sol"
+        return types.SimpleNamespace(success=True)
 
     monkeypatch.setattr(unit_cell_module, "solve_ivp", fake_solve_ivp)
     labarbe_cell._raw_run((1e-7, 1.0), RunOptions(), beam_on=True)
@@ -587,6 +590,7 @@ def test_sim_chunks_iter_calls(
         options: RunOptions,
         y0: tp.Any = None,
         beam_on: bool = True,
+        dose_rate: tp.Optional[float] = None,
     ) -> tp.Any:
         calls.append(
             {
@@ -596,7 +600,9 @@ def test_sim_chunks_iter_calls(
                 "beam_on": beam_on,
             }
         )
-        return real_raw_run(t_span, options, y0=y0, beam_on=beam_on)
+        return real_raw_run(
+            t_span, options, y0=y0, beam_on=beam_on, dose_rate=dose_rate
+        )
 
     monkeypatch.setattr(cell, "_raw_run", spy)
     chunks = [

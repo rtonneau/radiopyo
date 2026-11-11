@@ -8,7 +8,10 @@ environments (repeated reactant, negative products).
 The rates are smooth (depletion switch c / (c + eps), ADR 0005) except at
 the clipping kink c = 0 (ADR 0004): the finite differences are taken on
 states away from 0, with a relative step small enough for the curvature of
-the switch near eps.
+the switch near eps. A species below 0 adds the overshoot relaxation term
+of ADR 0007 on its own row (its slope on the diagonal, the derivative of the
+slope on the row): checked by finite differences on states with negative
+species, and entry by entry on toy environments.
 
 The bundled configs have no negative product: ``negative_cell`` is the
 Labarbe config plus a k-reaction with two negative products and an
@@ -422,7 +425,13 @@ def test_negative_species_contributes_zero(mass_action_env: SimEnv) -> None:
     y = random_state(mat)
     y[a] = -y[a]  # a solver overshoot below 0
     jac = jacobian(0.0, y, None, mat)
-    assert not jac[:, a].any()  # no derivative depends on A (also 2 A + F -> E)
+    # no other row depends on A (also 2 A + F -> E); its own row has the
+    # relaxation slope J_AA(0+) = -k B s(D) of A + B -> C - D (ADR 0007)
+    assert not np.delete(jac[:, a], a).any()
+    b = env.species["B"].index
+    y_full = mat.state.to_full_molar(y)
+    switch = depletion_switch(y_full, mat.k_reactions).min()
+    assert jac[a, a] == pytest.approx(-1e9 * y_full[b] * switch, rel=1e-12)
     assert jac[:, c].any()  # C -> B + A is unaffected
     assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0))
 
@@ -452,7 +461,11 @@ def test_negative_enzymatic_species_contribute_zero(enzymatic_env: SimEnv) -> No
     y = random_state(mat)
     y[s] = -y[s]
     jac = jacobian(0.0, y, None, mat)
-    assert not jac[:, s].any()
+    assert not np.delete(jac[:, s], s).any()
+    # relaxation slope of the substrate: -k E / K (rate slope at S = 0+)
+    y_full_neg = mat.state.to_full_molar(y)
+    switch_neg = depletion_switch(y_full_neg, mat.enzymatic)[0]
+    assert jac[s, s] == pytest.approx(-switch_neg * k * y_full_neg[enz] / km, rel=1e-12)
     assert jac[p, enz] == 0.0  # clipped substrate = 0: no rate
     assert_jacobian_matches(jac, fd_jacobian(y, None, mat, 0.0))
 
@@ -521,6 +534,67 @@ def test_negative_cell_with_clipped_species(negative_cell: UnitCell) -> None:
         flip[_negative_species(negative_cell)[0]] = True  # a negative product
         y[flip] *= -1.0
         analytic = jacobian(T_BEAM_ON, y, negative_cell.beam, mat)
-        assert not analytic[:, flip].any()  # clipped: no dependence below 0
+        off_diagonal = analytic.copy()
+        off_diagonal[flip, flip] = 0.0  # own relaxation slope (ADR 0007)
+        assert not off_diagonal[:, flip].any()  # clipped: no other dependence
         numeric = fd_jacobian(y, negative_cell.beam, mat, T_BEAM_ON)
         assert_jacobian_matches(analytic, numeric)
+
+
+# --------------------------------------------------------------------------- #
+#                 Overshoot relaxation of species below 0 (ADR 0007)          #
+# --------------------------------------------------------------------------- #
+def _flip(
+    mat: SimMatrices, env: SimEnv, labels: tuple[str, ...], seed: int = 0
+) -> NDArray[np.float64]:
+    y = random_state(mat, seed=seed)
+    for label in labels:
+        y[env.species[label].index] *= -1.0
+    return y
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [("A",), ("B",), ("C",), ("D",), ("A", "B"), ("A", "D"), ("B", "C", "D")],
+)
+def test_overshoot_relaxation_k_reactions(
+    mass_action_env: SimEnv, labels: tuple[str, ...]
+) -> None:
+    """Row j gets J_jj(0+) c_j: matches finite differences, including the
+    c_j dJ_jj/dc_k terms (D is a negative product, A a repeated reactant)."""
+    env = mass_action_env
+    mat = env.build_all_matrices()
+    y = _flip(mat, env, labels)
+    analytic = jacobian(0.0, y, None, mat)
+    assert_jacobian_matches(analytic, fd_jacobian(y, None, mat, 0.0, rel_step=1e-4))
+
+
+@pytest.mark.parametrize(
+    "labels", [("S",), ("enz",), ("D",), ("P",), ("S", "enz"), ("S", "D")]
+)
+def test_overshoot_relaxation_enzymatic(
+    enzymatic_env: SimEnv, labels: tuple[str, ...]
+) -> None:
+    env = enzymatic_env
+    mat = env.build_all_matrices()
+    y = _flip(mat, env, labels)
+    analytic = jacobian(0.0, y, None, mat)
+    assert_jacobian_matches(analytic, fd_jacobian(y, None, mat, 0.0, rel_step=1e-4))
+
+
+def test_overshoot_relaxation_cross_derivative_value(mass_action_env: SimEnv) -> None:
+    """A < 0: J_AA(0+) = -k B s(D) for A + B -> C - D, so the entry (A, B) is
+    c_A * (-k s(D)) and the entry (A, D) is c_A * (-k B) * ds/dD."""
+    env = mass_action_env
+    mat = env.build_all_matrices()
+    a, b, d = (env.species[n].index for n in ("A", "B", "D"))
+    y = _flip(mat, env, ("A",))
+    y_full = mat.state.to_full_molar(y)
+    k = 1e9
+    switch = y_full[d] / (y_full[d] + DEPLETION_LIMIT)
+    d_switch = DEPLETION_LIMIT / (y_full[d] + DEPLETION_LIMIT) ** 2
+    jac = jacobian(0.0, y, None, mat)
+    assert jac[a, a] == pytest.approx(-k * y_full[b] * switch, rel=1e-12)
+    assert jac[a, b] == pytest.approx(y_full[a] * -k * switch, rel=1e-12)
+    assert jac[a, d] == pytest.approx(y_full[a] * -k * y_full[b] * d_switch, rel=1e-12)
+

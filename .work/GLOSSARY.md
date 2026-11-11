@@ -55,6 +55,14 @@ _Avoid_: depletion block, negative-product blocking, zeroing
 The concentration a rate law reads, max(c, 0): a species driven below 0 by a solver overshoot counts as absent, so it can neither be consumed further nor run a reaction backwards.
 _Avoid_: positive part, clamped state
 
+**Overshoot relaxation**:
+The term J_jj(0⁺)·c added to the own rate of a dynamic species driven below 0, pulling it back to 0 at the rate it would be consumed at c = 0⁺; the other species still read it as 0 (ADR 0007).
+_Avoid_: restoring force, negative correction, rappel
+
+**Solver failure**:
+A solve_ivp call that ends with success False; it raises `SolverFailedError` instead of letting the next chunk start from the truncated point.
+_Avoid_: failed chunk, silent failure
+
 **Analytic Jacobian**:
 The matrix d(dy/dt)/dy of the dynamic species computed in closed form from the reaction matrices, given to the stiff solvers in place of a finite-difference estimate.
 _Avoid_: jac, exact Jacobian

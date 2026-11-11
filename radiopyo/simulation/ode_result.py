@@ -23,7 +23,7 @@ import pandas as pd
 from scipy.integrate import trapezoid  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
-from radiopyo.physics.beam import BeamCollection
+from radiopyo.physics.beam import BeamCollection, ConstantDoseRate
 from radiopyo.simulation.environment_build import SimEnv
 from radiopyo.simulation.ode_functions_solver import ScipyODEResult, reaction_rates
 from radiopyo.utils.sim_types import ConfigDict
@@ -91,6 +91,12 @@ class ODEResult(object):
             applied. None when unknown (results read from a file): the
             bursts are then assumed to be one per beam pulse, at the peak
             dose rate (see integrate_production_of).
+        step_dose_rates: list of float or None
+            One per integration step (as n_points): the dose rate [Gy/s]
+            the solver held constant over that step (chunk of a chunked
+            run), None when it read the beam at every time. The rates are
+            reconstructed with the same dose rate (reconstruct_reactions).
+            Empty for results read from a file (the beam is read).
     """
 
     # Keep track of the original sim env
@@ -101,6 +107,7 @@ class ODEResult(object):
     t_zero_pulse: float
     date: datetime.datetime
     burst_dose_rates: tp.Optional[tp.List[float]]
+    step_dose_rates: tp.List[tp.Optional[float]]
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -198,6 +205,7 @@ class ODEResult(object):
                 *(self.burst_dose_rates or []),
                 *(other.burst_dose_rates or []),
             ]
+        out.step_dose_rates = [*self.step_dose_rates, *other.step_dose_rates]
         out.n_points = [*self.n_points, *other.n_points]
         out.exec_time = [*self.exec_time, *other.exec_time]
         return out
@@ -241,12 +249,14 @@ class ODEResult(object):
         self.nfev, self.njev, self.nlu = [], [], []
         self.status, self.message, self.success = [], [], []
         self.n_points, self.exec_time = [], []
+        self.step_dose_rates = []
 
     def append_sol(
         self,
         sol: ScipyODEResult,
         exec_time: tp.Optional[float] = None,
         bursts: tp.Optional[tp.Sequence[float]] = None,
+        dose_rate: tp.Optional[float] = None,
     ) -> None:
         """
         Append an integration step.
@@ -260,6 +270,10 @@ class ODEResult(object):
                 Dose rates [Gy/s] of the initial radiolytic bursts added
                 to the initial concentrations of this step (empty if
                 none). None if unknown (see burst_dose_rates).
+            dose_rate: float, optional
+                Dose rate [Gy/s] held constant by the solver over this
+                step. None if the solver read the beam at every time
+                (see step_dose_rates).
         """
         if bursts is not None:
             self.burst_dose_rates = [*(self.burst_dose_rates or []), *bursts]
@@ -281,6 +295,7 @@ class ODEResult(object):
         self.message.append(sol.message)
         self.success.append(sol.success)
         self.n_points.append(len(sol.t))
+        self.step_dose_rates.append(dose_rate)
         self.exec_time.append(exec_time)
 
     # ---------------------------- Utils methods ---------------------------- #
@@ -348,7 +363,7 @@ class ODEResult(object):
         data = None
         if self.t.size > 0:
             y_full = self.mat.state.to_full_molar(self.y)
-            data = reaction_rates(self.t, y_full, self.mat, self.beam).stacked().T
+            data = self._stacked_rates(y_full).T
 
         out = pd.DataFrame(
             columns=columns,
@@ -358,6 +373,32 @@ class ODEResult(object):
         )
         self.dydt = out.values.T
         return out
+
+    def _stacked_rates(self, y_full: NDArray[np.float64]) -> NDArray[np.float64]:
+        """
+        Rates of every reaction at every time point, (n_reactions, n_t).
+        A step integrated with a constant dose rate (chunk of a chunked
+        run) is reconstructed with that dose rate, not with the beam read
+        at its time points: the last point of a beam ON chunk lies on the
+        beam transition, where the beam is already OFF.
+        """
+        consistent = (
+            len(self.step_dose_rates) == len(self.n_points)
+            and sum(self.n_points) == self.t.size
+        )
+        if not consistent or all(dr is None for dr in self.step_dose_rates):
+            return reaction_rates(self.t, y_full, self.mat, self.beam).stacked()
+        parts = []
+        first = 0
+        for n_points, dose_rate in zip(self.n_points, self.step_dose_rates):
+            step = slice(first, first + n_points)
+            first += n_points
+            if n_points == 0:
+                continue
+            beam = self.beam if dose_rate is None else ConstantDoseRate(dose_rate)
+            rates = reaction_rates(self.t[step], y_full[:, step], self.mat, beam)
+            parts.append(rates.stacked())
+        return np.hstack(parts)
 
     def _burst_dose_rates(self) -> tp.List[float]:
         """

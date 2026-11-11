@@ -1,0 +1,262 @@
+{
+  "session_id": "2026-11-10__lsoda-stalls-fenton-high-concentration",
+  "feature_name": "lsoda-stalls-fenton-high-concentration",
+  "scratch_dir": ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration",
+  "created_at": "2026-11-10T21:30:13.840Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-10T21:30:13.840Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ],
+      "detail": {
+        "kind": "issue"
+      }
+    },
+    {
+      "at": "2026-11-11T07:41:03.611Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish",
+        "shipMode": "delegate"
+      }
+    },
+    {
+      "at": "2026-11-11T07:41:39.558Z",
+      "event": "issue_created",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ],
+      "detail": {
+        "number": 4,
+        "url": "https://github.com/rtonneau/radiopyo/issues/4"
+      }
+    },
+    {
+      "at": "2026-11-11T07:41:39.581Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T07:41:39.808Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T07:42:52.562Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "fix/lsoda-stall-overshoot-relaxation",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-11T07:42:52.602Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-solver-failure-error.md",
+        "02-plan/tickets/02-overshoot-relaxation.md",
+        "02-plan/tickets/03-chunks-follow-beam.md",
+        "02-plan/tickets/04-benchmark-golden-docs.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
+    },
+    {
+      "at": "2026-11-11T07:43:00.550Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-solver-failure-error.md",
+        "03-implement/01-solver-failure-error/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-solver-failure-error"
+      }
+    },
+    {
+      "at": "2026-11-11T07:48:59.341Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-solver-failure-error/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-solver-failure-error",
+        "commit": "5804aa1"
+      }
+    },
+    {
+      "at": "2026-11-11T07:49:00.234Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-overshoot-relaxation.md",
+        "03-implement/02-overshoot-relaxation/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-relaxation"
+      }
+    },
+    {
+      "at": "2026-11-11T08:00:28.867Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-overshoot-relaxation/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-relaxation",
+        "commit": "d82357a"
+      }
+    },
+    {
+      "at": "2026-11-11T08:00:29.538Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-chunks-follow-beam.md",
+        "03-implement/03-chunks-follow-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunks-follow-beam"
+      }
+    },
+    {
+      "at": "2026-11-11T08:23:24.294Z",
+      "event": "ticket_blocked",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-chunks-follow-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunks-follow-beam",
+        "reason": "re-review after the one allowed correction pass: prepare_single_pulse gives a wrong constant dose rate for multi-pulse beams (3.5x dose regression) and for MacroPulsedBeam starting after t_span[0]"
+      }
+    },
+    {
+      "at": "2026-11-11T08:49:52.089Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-chunks-follow-beam/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunks-follow-beam",
+        "commit": "93dfc06"
+      }
+    },
+    {
+      "at": "2026-11-11T08:49:53.055Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-benchmark-golden-docs.md",
+        "03-implement/04-benchmark-golden-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-golden-docs"
+      }
+    },
+    {
+      "at": "2026-11-11T09:57:36.759Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-benchmark-golden-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-benchmark-golden-docs",
+        "commit": "c087ebd"
+      }
+    },
+    {
+      "at": "2026-11-11T09:58:13.568Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-11T09:58:20.272Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/5"
+      }
+    },
+    {
+      "at": "2026-11-11T09:58:14.020Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T09:58:20.395Z",
+      "event": "scratch_cleaned",
+      "phase": "finished",
+      "detail": {
+        "policy": "build-artifacts",
+        "removed": [
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/old/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/old/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/old/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/old/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/old/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/old/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/old/radiopyo/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/review03r2/base/radiopyo/chemistry/utils/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/review03r2/base/radiopyo/chemistry/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/review03r2/base/radiopyo/parser/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/review03r2/base/radiopyo/physics/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/review03r2/base/radiopyo/simulation/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/review03r2/base/radiopyo/utils/__pycache__",
+          ".scratch/tests/2026-11-10__lsoda-stalls-fenton-high-concentration/review03r2/base/radiopyo/__pycache__"
+        ],
+        "freedBytes": 895505
+      }
+    }
+  ],
+  "kind": "issue",
+  "current_phase": "finished",
+  "issue": {
+    "number": 4,
+    "url": "https://github.com/rtonneau/radiopyo/issues/4",
+    "created_at": "2026-11-11T07:41:39.558Z"
+  },
+  "git": {
+    "branch": "fix/lsoda-stall-overshoot-relaxation",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-11T07:42:52.562Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/5"
+  },
+  "ship_mode": "delegate",
+  "changelog": {
+    "bump": "minor",
+    "floor": "minor",
+    "reason": null,
+    "bullets": 8,
+    "path": ".work/changelog/2026-11-10__lsoda-stalls-fenton-high-concentration.md",
+    "written_at": "2026-11-11T09:58:13.560Z"
+  },
+  "finished_at": "2026-11-11T09:58:14.020Z"
+}
