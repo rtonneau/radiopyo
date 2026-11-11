@@ -875,12 +875,12 @@ class UnitCell(object):
                 beam is ON before tm (default: inf)
             max_step_size_trans: float, optional
                 Larger authorized time step for the ODE solver during
-                the ON -> OFF transition (default: inf)
+                the ON -> OFF transition and the beam OFF chunks before
+                tm (default: inf)
             max_step_size_final: float, optional
                 Larger authorized time step for the ODE solver for the
-                last (beam OFF) step, and for the beam OFF chunks before
-                tm (default: inf, no fallback to the other max step
-                sizes).
+                last (beam OFF) step only (default: inf, no fallback to
+                the other max step sizes).
             trans_time: float, optional
                 Duration of the ON -> OFF transition, in seconds
                 (default: 100e-6)
@@ -917,7 +917,7 @@ class UnitCell(object):
             boundaries = intervals[:, 0].tolist()
             beam_on = (intervals[:-1, 1] > 0).tolist()
             max_steps = [
-                max_step_size_on if on else max_step_size_final for on in beam_on
+                max_step_size_on if on else max_step_size_trans for on in beam_on
             ]
         # Then the ON -> OFF transition and the final OFF chunk, clipped to
         # t_span[1] (a chunk beyond it, or empty, is dropped).

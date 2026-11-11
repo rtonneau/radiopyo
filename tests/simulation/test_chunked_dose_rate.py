@@ -377,3 +377,26 @@ def test_single_pulse_chunks_are_clipped_to_t_span(cell: UnitCell):
     # t_span ends exactly at tm: no empty transition chunk
     chunks = cell.prepare_single_pulse(t_span=(0.0, 1e-3)).chunks
     assert [(c.start, c.stop) for c in chunks] == [(0.0, 1e-3)]
+
+
+def test_single_pulse_off_chunks_before_tm_use_the_transition_max_step(
+    cell: UnitCell,
+):
+    beam = _multi_pulse_beams()["pulsed_start_time"]
+    cell = _cell_with(cell, beam)
+    on, trans, final = 1e-8, 2e-7, 3e-6
+    chunks = cell.prepare_single_pulse(
+        t_span=(0.0, 3e-3),
+        max_step_size_on=on,
+        max_step_size_trans=trans,
+        max_step_size_final=final,
+    ).chunks
+    t_max = beam.time_at_max_dose
+    pre = [c for c in chunks if c.stop <= t_max]
+    # leading OFF chunk, ON pulses and the OFF gaps between them
+    assert not pre[0].beam_on and pre[0].start == 0.0
+    assert any(not c.beam_on for c in pre[1:])
+    for c in pre:
+        assert c.max_step_size == (on if c.beam_on else trans), c
+    # ON -> OFF transition, then the final OFF chunk
+    assert [c.max_step_size for c in chunks[len(pre) :]] == [trans, final]
