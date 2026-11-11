@@ -462,6 +462,20 @@ The module currently supports 2 ways of running simulations:
 
    ```
 
+   The chunks are cut exactly where the beam switches (pulse start and end, time of
+   the maximum dose) and the solver holds the dose rate of each chunk constant. A
+   pulse must be longer than `UnitCell.T_ZERO` (1e-7 s), otherwise a `ValueError`
+   ("Too Short beam pulse") is raised.
+
+   If `scipy.integrate.solve_ivp` fails on a chunk, `SolverFailedError`
+   (`radiopyo.simulation.exceptions`) is raised with the span, the last time reached and
+   the message of scipy, instead of returning a truncated solution.
+
+   A species slightly below 0 (a solver overshoot) is read as 0 by every
+   reaction; only its own balance is continued linearly from 0 (overshoot relaxation,
+   `.work/adr/0007-overshoot-relaxation.md`), which keeps LSODA from stalling on stiff
+   radicals such as OH_r in a high-RH medium.
+
 ## Acknowledgement
 
 - This module was originally inspired by R. Labarbe
