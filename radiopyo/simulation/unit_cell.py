@@ -34,7 +34,7 @@ from radiopyo.simulation.ode_functions_solver import (
     derive,
     jacobian,
 )
-from radiopyo.simulation.ode_result import ODEResult
+from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult, ShortOnSpan
 from radiopyo.utils.g_values import GValuesBoscolo
 
 # ------------------------- Type checking ONLY imports------------------------ #
@@ -80,6 +80,21 @@ def widen_empty_span(t_span: tp.Tuple[float, float]) -> tp.Tuple[float, float]:
     if t_span[0] == t_span[1]:
         return (t_span[0] / 1e2, t_span[1])
     return t_span
+
+
+def is_short_on_span(
+    t_span: tp.Tuple[float, float], min_on_time: float = MIN_BEAM_ON_TIME
+) -> bool:
+    """
+    Whether a beam ON span is shorter than min_on_time (a short ON span,
+    see ShortOnSpan). The slack covers the rounding of a span computed
+    from chunk boundaries (stop - start, large start times): a full pulse
+    of exactly min_on_time is not short.
+    """
+    slack = min_on_time * 1e-9 + 4 * float(np.finfo(np.float64).eps) * max(
+        abs(t_span[0]), abs(t_span[1])
+    )
+    return bool(t_span[1] - t_span[0] < min_on_time - slack)
 
 
 def chunk_dose_rate(beam: ParticleBeam, start: float, stop: float) -> float:
@@ -195,6 +210,9 @@ class UnitCell(object):
         last_burst_dose_rate: float, optional
             Dose rate [Gy/s] used for the initial radiolytic burst of the
             last integration step (None if no burst was applied)
+        last_short_on_span: ShortOnSpan, optional
+            The last integration step was a short ON span (not
+            integrated, see _short_on_span_step), None otherwise
         g_val: GValuesBoscolo
             GValues from the literature to possibly update the LET
         FIRST_STEP: float
@@ -206,7 +224,10 @@ class UnitCell(object):
         MIN_BEAM_ON_TIME: float
             Shortest configured beam ON time accepted (default=1e-6 s,
             same value as radiopyo.physics.beam.MIN_BEAM_ON_TIME, checked
-            when a beam is built: ShortBeamOnError)
+            when a beam is built: ShortBeamOnError). A beam ON span
+            shorter than it at run time (pulse cut by max_dose or
+            clipped by t_span) is a short ON span: not integrated, its
+            radiolytic yield is added analytically, with a warning
 
     """
 
@@ -219,6 +240,7 @@ class UnitCell(object):
     beam_list: BeamCollection
     last_exec_time: float
     last_burst_dose_rate: tp.Optional[float]
+    last_short_on_span: tp.Optional[ShortOnSpan]
     g_val: GValuesBoscolo
 
     def __init__(
@@ -243,6 +265,7 @@ class UnitCell(object):
 
         self.last_exec_time = -1
         self.last_burst_dose_rate = None
+        self.last_short_on_span = None
 
     @property
     def T(self) -> float:
@@ -449,7 +472,9 @@ class UnitCell(object):
         Steps: check the options, widen an empty span (widen_empty_span),
         build the solve_ivp keyword arguments (_solver_kwargs), apply the
         initial radiolytic burst if the beam is switched ON at t_span[0]
-        (_apply_initial_burst), then solve and time (_timed_solve).
+        (_apply_initial_burst), then solve and time (_timed_solve). A
+        beam ON span shorter than MIN_BEAM_ON_TIME is not integrated
+        (_short_on_span_step).
 
         Args:
             t_span: Tuple[float, float]
@@ -498,7 +523,10 @@ class UnitCell(object):
             )
 
         self.last_burst_dose_rate = None
+        self.last_short_on_span = None
         if beam_on and options.use_beam:  # beam switched ON at t_span[0]
+            if is_short_on_span(t_span, self.MIN_BEAM_ON_TIME):
+                return self._short_on_span_step(t_span, y_start, dose_rate, options)
             t_span = self._apply_initial_burst(t_span, y_start, dose_rate)
             options = self._drop_skipped_t_eval(t_span, options)
 
@@ -566,17 +594,68 @@ class UnitCell(object):
         if dose_rate is None:
             dose_rate = self.beam.at(t_span[0]).dose_rate()
         self.last_burst_dose_rate = dose_rate
+        self._add_radiolytic_yield(y0, self.T_ZERO, dose_rate)
+        return t_span
+
+    def _add_radiolytic_yield(
+        self, y: NDArray[np.float64], duration: float, dose_rate: float
+    ) -> None:
+        """
+        Add *in place* to y [µmol/L] the radiolytic production of the
+        dynamic species over `duration` seconds at `dose_rate` (computed
+        analytically from the G values). Constant species are left
+        untouched.
+        """
         for r in self.env.reactions.radiolytic:
             # If the species must be forced constant, skip it.
             if self.env.species.is_cst_species(r.species()):
                 continue
 
             # Keep initial value and increment
-            y0[r.species().index] += (
-                r.compute_initial_cc_before(t0=self.T_ZERO, dose_rate=dose_rate)
-                * 1e6
+            y[r.species().index] += (
+                r.compute_initial_cc_before(t0=duration, dose_rate=dose_rate) * 1e6
             )  # Units of initial cc are µM
-        return t_span
+
+    def _short_on_span_step(
+        self,
+        t_span: tp.Tuple[float, float],
+        y_start: NDArray[np.float64],
+        dose_rate: tp.Optional[float],
+        options: RunOptions,
+    ) -> DummyScipyOdeResult:
+        """
+        A beam ON span shorter than MIN_BEAM_ON_TIME (last pulse cut by
+        max_dose, micro pulse cut by its train end, pulse clipped by
+        t_span) cannot be integrated correctly: it is not integrated. The
+        radiolytic yield over the whole span (at `dose_rate` or, when
+        None, at the beam dose rate in the middle of the span) is added
+        *in place* to y_start, and the result is one point at t_span[1].
+        The span is logged as a warning and stored in last_short_on_span
+        (ODEResult.short_on_spans); no burst is recorded for it.
+        """
+        start, stop = t_span
+        if dose_rate is None:
+            dose_rate = chunk_dose_rate(self.beam_list.current, start, stop)
+        duration = stop - start
+        self._add_radiolytic_yield(y_start, duration, dose_rate)
+        self.last_short_on_span = ShortOnSpan(float(start), float(stop), float(dose_rate))
+        self.last_exec_time = 0.0
+        logger.warning(
+            f"Beam ON span [{start:.6g}, {stop:.6g}] s ({duration:.3g} s) is shorter "
+            f"than MIN_BEAM_ON_TIME={self.MIN_BEAM_ON_TIME:.3g} s: not integrated, "
+            f"its radiolytic yield at {dose_rate:.3g} Gy/s is added analytically "
+            "(chemistry inside the span not resolved)"
+        )
+        if options.t_eval is not None and len(options.t_eval) > 0:
+            logger.warning(
+                f"t_eval ignored on the short ON span: one point stored at {stop:.6g} s"
+            )
+        return DummyScipyOdeResult(
+            t=np.array([stop], dtype=np.float64),
+            y=y_start.reshape(-1, 1),
+            sol=None,
+            message="short ON span: radiolytic yield added analytically",
+        )
 
     @staticmethod
     def _drop_skipped_t_eval(
@@ -741,6 +820,7 @@ class UnitCell(object):
             sol,
             exec_time=self.last_exec_time,
             bursts=self._last_bursts(),
+            short_on_span=self.last_short_on_span,
         )
         return res
 
@@ -1081,11 +1161,18 @@ class SimChunksIter:
             beam_on=chunk.beam_on,
             dose_rate=chunk.dose_rate,
         )
+        short = self.sim.last_short_on_span
+        dose_rate = chunk.dose_rate if self.options.use_beam else None
+        if short is not None:
+            # Its yield is added analytically: no radiolytic rate at the
+            # stored point (the trapezoid would count it twice)
+            dose_rate = 0.0
         self.sol.append_sol(
             res,
             exec_time=self.sim.last_exec_time,
             bursts=self.sim._last_bursts(),
-            dose_rate=chunk.dose_rate if self.options.use_beam else None,
+            dose_rate=dose_rate,
+            short_on_span=short,
         )
         return self.sol
 
