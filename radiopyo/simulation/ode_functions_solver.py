@@ -61,7 +61,6 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import dataclasses
 import typing as tp
 
 import numpy as np
@@ -74,8 +73,10 @@ if tp.TYPE_CHECKING:
     from radiopyo.physics.beam import DoseRateSource
     from radiopyo.utils.sim_types import (
         EzMatrices,
+        EzOvershootTable,
         GVector,
         KMatrices,
+        KOvershootTable,
         SimMatrices,
     )
 
@@ -147,13 +148,23 @@ def mass_action_rates(
     Returns:
         NDArray[np.float64]: rates [mol/L/s], (n_kr,) or (n_kr, n_t).
     """
+    return _mass_action(y_full, kmat.k_values, kmat.reactant_index)
+
+
+def _mass_action(
+    y_full: NDArray[np.float64],
+    k_values: NDArray[np.float64],
+    reactant_index: NDArray[np.intp],
+) -> NDArray[np.float64]:
+    """``mass_action_rates`` on the raw arrays of KMatrices."""
     # Unused reactant slots point to this extra row of 1.0
     ones = np.ones((1, *y_full.shape[1:]), dtype=np.float64)
     y_ext = np.concatenate([np.maximum(y_full, 0.0), ones], axis=0)
 
     # (n_kr, max_reactants[, n_t]): concentration of each reactant molecule
-    factors = y_ext[kmat.reactant_index]
-    k_values = kmat.k_values if y_full.ndim == 1 else kmat.k_values[:, np.newaxis]
+    factors = y_ext[reactant_index]
+    if y_full.ndim > 1:
+        k_values = k_values[:, np.newaxis]
     return np.prod(factors, axis=1) * k_values
 
 
@@ -174,7 +185,14 @@ def depletion_switch(
         NDArray[np.float64]: factor in [0, 1] multiplying the rates,
         (n_r,) or (n_r, n_t).
     """
-    negative = mat.negative_products
+    return _switch(y_full, mat.negative_products)
+
+
+def _switch(
+    y_full: NDArray[np.float64],
+    negative: NDArray[np.bool_],
+) -> NDArray[np.float64]:
+    """``depletion_switch`` on a raw (n_species, n_r) negative-products mask."""
     out = np.ones((negative.shape[1], *y_full.shape[1:]), dtype=np.float64)
     columns = np.flatnonzero(negative.any(axis=0))
     if columns.size == 0:
@@ -205,7 +223,14 @@ def depletion_switch_derivatives(
         NDArray[np.float64]: (n_r, n_species) d switch / d concentration
         [L/mol].
     """
-    negative = mat.negative_products
+    return _switch_derivatives(y_full, mat.negative_products)
+
+
+def _switch_derivatives(
+    y_full: NDArray[np.float64],
+    negative: NDArray[np.bool_],
+) -> NDArray[np.float64]:
+    """``depletion_switch_derivatives`` on a raw negative-products mask."""
     out = np.zeros((negative.shape[1], y_full.shape[0]), dtype=np.float64)
     columns = np.flatnonzero(negative.any(axis=0))
     if columns.size == 0:
@@ -331,17 +356,26 @@ def mass_action_derivatives(
         NDArray[np.float64]: (n_kr, n_species) d rate / d concentration
         [1/s].
     """
+    return _mass_action_derivatives(y_full, kmat.k_values, kmat.reactant_index)
+
+
+def _mass_action_derivatives(
+    y_full: NDArray[np.float64],
+    k_values: NDArray[np.float64],
+    reactant_index: NDArray[np.intp],
+) -> NDArray[np.float64]:
+    """``mass_action_derivatives`` on the raw arrays of KMatrices."""
     n_species = y_full.shape[0]
-    n_kr, n_slots = kmat.reactant_index.shape
+    n_kr, n_slots = reactant_index.shape
     # unused slots point to the extra 1.0
     y_ext = np.append(np.maximum(y_full, 0.0), 1.0)
-    factors = y_ext[kmat.reactant_index]  # (n_kr, n_slots)
+    factors = y_ext[reactant_index]  # (n_kr, n_slots)
 
     rows = np.arange(n_kr)
     out = np.zeros((n_kr, n_species + 1), dtype=np.float64)
     for slot in range(n_slots):
-        others = np.prod(np.delete(factors, slot, axis=1), axis=1) * kmat.k_values
-        np.add.at(out, (rows, kmat.reactant_index[:, slot]), others)
+        others = np.prod(np.delete(factors, slot, axis=1), axis=1) * k_values
+        np.add.at(out, (rows, reactant_index[:, slot]), others)
     out[:, :n_species][:, y_full < 0.0] = 0.0  # clipped: no dependence below 0
     return out[:, :n_species]  # drop the extra column of the unused slots
 
@@ -423,8 +457,8 @@ def _overshoot(
         y0 = y_full.copy()
         y0[j] = 0.0
         for terms in (
-            _k_relaxation_terms(y0, int(j), mat.k_reactions, derivatives),
-            _ez_relaxation_terms(y0, int(j), mat.enzymatic, derivatives),
+            _k_relaxation_terms(y0, mat.overshoot.k[j], derivatives),
+            _ez_relaxation_terms(y0, mat.overshoot.ez[j], derivatives),
         ):
             if terms is None:
                 continue
@@ -437,80 +471,60 @@ def _overshoot(
 
 def _k_relaxation_terms(
     y0: NDArray[np.float64],
-    j: int,
-    kmat: KMatrices,
+    table: tp.Optional[KOvershootTable],
     derivatives: bool,
 ) -> tuple[float, tp.Optional[NDArray[np.float64]]] | None:
     """k-reactions part of ``_overshoot`` for species j: None when no
-    k-reaction changes it. y0 is the state with c_j = 0."""
-    cols = np.flatnonzero(kmat.stoichiometry[j])
-    if cols.size == 0:
+    k-reaction changes it (no table). y0 is the state with c_j = 0.
+
+    d law / d c_j at c_j = 0+ is the mass action law with the table's
+    ``k_values_dj`` / ``reactant_index_dj``: only a reactant held once
+    counts (k times the product of the other slots); held twice (2 A) it
+    is 0, not held it is 0.
+    """
+    if table is None:
         return None
-    sub = dataclasses.replace(
-        kmat,
-        k_values=kmat.k_values[cols],
-        reactant_index=kmat.reactant_index[cols],
-        stoichiometry=kmat.stoichiometry[:, cols],
-        negative_products=kmat.negative_products[:, cols],
-    )
-    # d law / d c_j at c_j = 0+: only a reactant held once (k * product of the
-    # other slots); held twice (2 A) it is 0, not held it is 0.
-    slots = sub.reactant_index
-    once = np.count_nonzero(slots == j, axis=1) == 1
-    d_law = dataclasses.replace(
-        sub,
-        k_values=np.where(once, sub.k_values, 0.0),
-        reactant_index=np.where(slots == j, y0.shape[0], slots),
-    )
+    k, slots = table.k_values, table.reactant_index
+    k_dj, slots_dj = table.k_values_dj, table.reactant_index_dj
     return _relaxation_sum(
         y0,
-        j,
-        sub,
-        law=mass_action_rates(y0, sub),
-        law_j=mass_action_rates(y0, d_law),
-        law_d=mass_action_derivatives(y0, sub) if derivatives else None,
-        law_j_d=mass_action_derivatives(y0, d_law) if derivatives else None,
+        table.weight,
+        table.flag,
+        table.negative_without_j,
+        law=_mass_action(y0, k, slots),
+        law_j=_mass_action(y0, k_dj, slots_dj),
+        law_d=_mass_action_derivatives(y0, k, slots) if derivatives else None,
+        law_j_d=_mass_action_derivatives(y0, k_dj, slots_dj) if derivatives else None,
     )
 
 
 def _ez_relaxation_terms(
     y0: NDArray[np.float64],
-    j: int,
-    ezmat: EzMatrices,
+    table: tp.Optional[EzOvershootTable],
     derivatives: bool,
 ) -> tuple[float, tp.Optional[NDArray[np.float64]]] | None:
     """Enzymatic part of ``_overshoot`` for species j: None when no
-    enzymatic reaction changes it. y0 is the state with c_j = 0."""
-    cols = np.flatnonzero(ezmat.stoichiometry[j])
-    if cols.size == 0:
+    enzymatic reaction changes it (no table). y0 is the state with c_j = 0."""
+    if table is None:
         return None
-    sub = dataclasses.replace(
-        ezmat,
-        k_values=ezmat.k_values[cols],
-        k_michaelis=ezmat.k_michaelis[cols],
-        substrate_index=ezmat.substrate_index[cols],
-        enzyme_index=ezmat.enzyme_index[cols],
-        stoichiometry=ezmat.stoichiometry[:, cols],
-        negative_products=ezmat.negative_products[:, cols],
-    )
     # law = k E S / (K + S) on the clipped E and S
-    k, km = sub.k_values, sub.k_michaelis
-    enzyme_slot, substrate_slot = sub.enzyme_index, sub.substrate_index
+    k, km = table.k_values, table.k_michaelis
+    enzyme_slot, substrate_slot = table.enzyme_index, table.substrate_index
     enzyme = np.maximum(y0[enzyme_slot], 0.0)
     substrate = np.maximum(y0[substrate_slot], 0.0)
     denominator = km + substrate
     d_enzyme = k * substrate / denominator  # d law / d E
     d_substrate = k * enzyme * km / denominator**2  # d law / d S
-    is_enzyme = enzyme_slot == j
-    is_substrate = substrate_slot == j
+    is_enzyme, is_substrate = table.is_enzyme, table.is_substrate
     law_j = np.where(is_enzyme, d_enzyme, 0.0) + np.where(is_substrate, d_substrate, 0.0)
 
     law_d = law_j_d = None
     if derivatives:
-        rows = np.arange(cols.size)
+        n_sub = k.shape[0]
+        rows = np.arange(n_sub)
         d_es = k * km / denominator**2  # d2 law / dE dS
         d_ss = -2.0 * k * enzyme * km / denominator**3  # d2 law / dS2
-        law_d = np.zeros((cols.size, y0.shape[0]), dtype=np.float64)
+        law_d = np.zeros((n_sub, y0.shape[0]), dtype=np.float64)
         np.add.at(law_d, (rows, enzyme_slot), d_enzyme)
         np.add.at(law_d, (rows, substrate_slot), d_substrate)
         law_j_d = np.zeros_like(law_d)
@@ -524,8 +538,9 @@ def _ez_relaxation_terms(
         law_j_d[:, y0 < 0.0] = 0.0
     return _relaxation_sum(
         y0,
-        j,
-        sub,
+        table.weight,
+        table.flag,
+        table.negative_without_j,
         law=k * enzyme * substrate / denominator,
         law_j=law_j,
         law_d=law_d,
@@ -535,15 +550,17 @@ def _ez_relaxation_terms(
 
 def _relaxation_sum(
     y0: NDArray[np.float64],
-    j: int,
-    sub: KMatrices | EzMatrices,
+    weight: NDArray[np.float64],
+    flag: NDArray[np.bool_],
+    negative_without_j: NDArray[np.bool_],
     law: NDArray[np.float64],
     law_j: NDArray[np.float64],
     law_d: tp.Optional[NDArray[np.float64]],
     law_j_d: tp.Optional[NDArray[np.float64]],
 ) -> tuple[float, tp.Optional[NDArray[np.float64]]]:
-    """J_jj(0+) and its gradient from the reactions of ``sub`` (those that
-    change species j), at the state y0 with c_j = 0.
+    """J_jj(0+) and its gradient from the reactions that change species j
+    (those of one KOvershootTable or EzOvershootTable), at the state y0
+    with c_j = 0.
 
     Rate of reaction i is law_i * switch_i. Its derivative with respect to
     c_j at 0+ is (product rule), with U_i the switch without the factor of
@@ -558,8 +575,10 @@ def _relaxation_sum(
 
     Args:
         y0: (n_species,) full molar state with c_j = 0.
-        j: species index.
-        sub: the reactions of the family with S_ji != 0.
+        weight: (n_sub,) stoichiometry S_ji of j in each reaction.
+        flag: (n_sub,) True when j is a negative product of the reaction.
+        negative_without_j: (n_species, n_sub) negative products of the
+            reactions, without the row of j.
         law: (n_sub,) rate laws without switch.
         law_j: (n_sub,) d law / d c_j at 0+.
         law_d: (n_sub, n_species) d law / d c_k, or None (no gradient).
@@ -568,18 +587,13 @@ def _relaxation_sum(
     Returns:
         (J_jj(0+), its (n_species,) gradient or None).
     """
-    flag = sub.negative_products[j]
-    without_j = sub.negative_products.copy()
-    without_j[j] = False
-    reduced = dataclasses.replace(sub, negative_products=without_j)
-    switch = depletion_switch(y0, reduced)
-    weight = sub.stoichiometry[j]
+    switch = _switch(y0, negative_without_j)
     effective = np.where(flag, law / DEPLETION_LIMIT, law_j)
     slope = float(np.sum(weight * effective * switch))
     if law_d is None or law_j_d is None:
         return slope, None
     effective_d = np.where(flag[:, np.newaxis], law_d / DEPLETION_LIMIT, law_j_d)
-    switch_d = depletion_switch_derivatives(y0, reduced)
+    switch_d = _switch_derivatives(y0, negative_without_j)
     gradient = (weight * switch) @ effective_d + (weight * effective) @ switch_d
     return slope, gradient
 
