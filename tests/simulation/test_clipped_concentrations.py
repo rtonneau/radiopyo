@@ -3,7 +3,10 @@
 Tests of the clipped concentrations of the rate laws (ADR 0004): every
 rate law reads max(c, 0), so a species driven below 0 by a solver
 overshoot is neither consumed further nor produced backwards, and the
-ODE right hand side stays exactly stoichiometry @ rates (mass balance).
+ODE right hand side stays exactly stoichiometry @ rates (mass balance)
+for a state without species below 0. A species below 0 only gets, on its own
+row, the overshoot relaxation term of ADR 0007 (tests/simulation/
+test_overshoot_relaxation.py); the other rows do not see it.
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be)
@@ -142,13 +145,17 @@ def test_run_started_slightly_negative_stays_bounded(dimerization_env: SimEnv) -
 
 
 def test_reverse_reaction_not_run_backwards(balance_env: SimEnv) -> None:
-    """C -> B + A with C < 0 must not produce A and B (nor consume C)."""
+    """C -> B + A with C < 0 must not produce A and B; C only relaxes back
+    to 0 (J_CC(0+) * C = -k * C, ADR 0007)."""
     env = balance_env
     mat = env.build_all_matrices()
+    c = env.species["C"].index
     y = np.zeros(mat.n_species - mat.state.n_cst)
-    y[env.species["C"].index] = -1.0
+    y[c] = -1.0
     y[env.species["D"].index] = 1.0
-    np.testing.assert_array_equal(derive(0.0, y, None, mat), 0.0)
+    expected = np.zeros_like(y)
+    expected[c] = 3e2  # -k * C, k = 3e2 1/s
+    np.testing.assert_allclose(derive(0.0, y, None, mat), expected, rtol=1e-12)
 
 
 # --------------------------------------------------------------------------- #
@@ -199,10 +206,16 @@ def test_derive_is_stoichiometry_times_full_rate_vector(
         ]
     )
     expected = (stoichiometry @ rates.stacked())[: y.size] * 1e6
+    # a species below 0 adds its relaxation term J_jj(0+) * y_j to its own row
+    # (ADR 0007); J_jj(0+) here is the forward difference of the row at y_j = 0
+    for j in np.flatnonzero(y < 0.0):
+        row_at = lambda value: derive(0.0, np.where(np.arange(y.size) == j, value, y), beam, mat)[j]  # noqa: E731
+        slope = (row_at(1e-6) - row_at(0.0)) / 1e-6
+        expected[j] += slope * y[j]
     np.testing.assert_allclose(
         derive(0.0, y, beam, mat),
         expected,
-        rtol=1e-12,
+        rtol=1e-12 if (y >= 0.0).all() else 1e-5,  # forward difference slope
         atol=1e-12 * np.abs(expected).max(),
     )
 
@@ -219,10 +232,16 @@ def test_conserved_combinations_have_zero_derivative(
     dydt = derive(0.0, y, None, mat)
     assert np.abs(dydt).max() > 0.0  # the state does evolve (not vacuous)
 
+    negative = {label for label, i in idx.items() if y[i] < 0.0}
+    checked = 0
     for weights in (
         {"A": 1.0, "C": 1.0, "E": 2.0},
         {"B": 1.0, "C": 1.0},
         {"S": 1.0, "P": 1.0},
     ):
+        if negative & set(weights):
+            continue  # a species below 0 relaxes towards 0 (ADR 0007)
+        checked += 1
         terms = [w * dydt[idx[label]] for label, w in weights.items()]
         assert abs(sum(terms)) <= 1e-12 * sum(abs(t) for t in terms), weights
+    assert checked >= 1
