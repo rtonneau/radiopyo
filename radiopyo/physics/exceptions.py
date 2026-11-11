@@ -15,6 +15,7 @@ from radiopyo.exceptions import RadioPyoError
 __all__ = [
     "BeamError",
     "ParameterError",
+    "ShortBeamOnError",
 ]
 
 
@@ -27,3 +28,12 @@ class BeamError(RadioPyoError):
 
 class ParameterError(BeamError):
     """"""
+
+
+class ShortBeamOnError(BeamError, ValueError):
+    """
+    A beam whose configured ON time (pulse on_time, micro or train
+    on_time, or the single ON span of a constant / single pulse beam
+    with a max dose) is shorter than MIN_BEAM_ON_TIME: it cannot be
+    integrated correctly (the initial burst covers most of it).
+    """

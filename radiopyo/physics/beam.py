@@ -19,7 +19,7 @@ from math import floor, isclose, isinf
 import numpy as np
 
 # ----------------------------- Internal imports ---------------------------- #
-from .exceptions import ParameterError
+from .exceptions import ParameterError, ShortBeamOnError
 from .timer import (
     COUNT_RTOL,
     BaseTimer,
@@ -36,6 +36,7 @@ if tp.TYPE_CHECKING:
 # -------------------------- Expose importable stuffs ----------------------- #
 __all__ = [
     "BEAM_TYPES",
+    "MIN_BEAM_ON_TIME",
     "BaseTimer",
     "BeamCollection",
     "ConstantBeam",
@@ -53,6 +54,16 @@ __all__ = [
 
 # ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
+
+# Shortest configured beam ON time [s] accepted by the beams: a shorter
+# pulse cannot be integrated correctly (UnitCell.T_ZERO = 1e-7 s is
+# skipped at the start of every beam ON interval). UnitCell exposes the
+# same value as UnitCell.MIN_BEAM_ON_TIME.
+MIN_BEAM_ON_TIME: float = 1e-6
+
+# Relative tolerance of the ON time check (an on_time computed as
+# pulse_dose / dose_rate_peak may land just below the threshold).
+_ON_TIME_RTOL: float = 1e-9
 
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
@@ -159,6 +170,35 @@ class ParticleBeam:
             )
         self.time_at_max_dose = self._compute_time_at_max_dose()
         self.dose_rate = self._compute_average_dose_rate()
+        self._check_on_times()
+
+    def _configured_on_times(self) -> tp.Dict[str, float]:
+        """
+        The configured beam ON durations [s] to check, by name: the
+        timer on_time of a pulsed beam; for a beam without repetition
+        (constant / single pulse) with a finite max dose, its single ON
+        span (time_at_max_dose - start_time). A pulse cut short by
+        max_dose is not a configured ON time (handled by the run).
+        """
+        timer = self.timer
+        if timer.period < float("inf"):
+            return {"on_time": timer.on_time}
+        if self.max_dose > 0 and not isinf(self.time_at_max_dose):
+            return {"on_time": self.time_at_max_dose - timer.start_time}
+        return {}
+
+    def _check_on_times(self) -> None:
+        """
+        Raise ShortBeamOnError when a configured ON time is shorter than
+        MIN_BEAM_ON_TIME.
+        """
+        threshold = MIN_BEAM_ON_TIME * (1.0 - _ON_TIME_RTOL)
+        for name, on_time in self._configured_on_times().items():
+            if on_time < threshold:
+                raise ShortBeamOnError(
+                    f"{type(self).__name__}: beam ON time {name}={on_time:.3g} s "
+                    f"is shorter than MIN_BEAM_ON_TIME={MIN_BEAM_ON_TIME:.3g} s"
+                )
 
     def set_name(self, name: str) -> None:
         """Gives the beam a name"""
@@ -865,6 +905,14 @@ class MacroPulsedBeam(PulsedBeam):
         )
         # One micro timer object, shared with the macro timer.
         self.timer = self.macro_timer.subtimer
+
+    def _configured_on_times(self) -> tp.Dict[str, float]:
+        """Micro pulse and train ON times (see ParticleBeam)."""
+        # macro_timer is set before ParticleBeam.__post_init__ runs
+        return {
+            "micro_on_time": self.timer.on_time,
+            "on_time": self.macro_timer.on_time,
+        }
 
     def beam_type(self) -> str:
         return "macro_pulsed"

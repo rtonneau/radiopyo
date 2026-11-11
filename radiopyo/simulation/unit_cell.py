@@ -25,7 +25,7 @@ from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.toml import TOMLFileParser
-from radiopyo.physics.beam import ConstantDoseRate, ParticleBeam
+from radiopyo.physics.beam import MIN_BEAM_ON_TIME, ConstantDoseRate, ParticleBeam
 from radiopyo.physics.beam_collection import BeamCollection
 from radiopyo.simulation import exceptions as rp_excep
 from radiopyo.simulation.environment_build import SimEnv
@@ -203,11 +203,16 @@ class UnitCell(object):
             Duration skipped at the start of a BEAM ON phase; the
             radiolytic production over it is added analytically to the
             initial concentrations (default=1e-7 s)
+        MIN_BEAM_ON_TIME: float
+            Shortest configured beam ON time accepted (default=1e-6 s,
+            same value as radiopyo.physics.beam.MIN_BEAM_ON_TIME, checked
+            when a beam is built: ShortBeamOnError)
 
     """
 
     FIRST_STEP: float = 1e-15
     T_ZERO: float = 1e-7
+    MIN_BEAM_ON_TIME: float = MIN_BEAM_ON_TIME
 
     env: SimEnv
     mat: SimMatrices
