@@ -84,6 +84,30 @@
         "ticket": "01-single-pulse-trans-step",
         "commit": "6a8670f"
       }
+    },
+    {
+      "at": "2026-11-11T10:39:02.721Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-build-time-short-on-time-error.md",
+        "03-implement/02-build-time-short-on-time-error/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-build-time-short-on-time-error"
+      }
+    },
+    {
+      "at": "2026-11-11T10:42:59.289Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-build-time-short-on-time-error/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-build-time-short-on-time-error",
+        "commit": "0ce58c8"
+      }
     }
   ],
   "current_phase": "ship",
