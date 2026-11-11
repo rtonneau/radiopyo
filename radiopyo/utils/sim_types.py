@@ -38,6 +38,7 @@ __all__ = [
     "StateLayout",
     "deep_update",
     "default_ConfigDict",
+    "pad_slots",
 ]
 # --------------------------------------------------------------------------- #
 
@@ -65,6 +66,25 @@ def deep_update(
         else:
             original[key] = value  # Replace value
     return original
+
+
+def pad_slots(mask: NDArray[np.bool_]) -> NDArray[np.intp]:
+    """Padded index table of a (n_species, n_r) bool mask: row r holds the
+    species of column r (in species order), the unused slots hold
+    n_species (they point to an extra entry appended by the caller, the
+    same trick as ``KMatrices.reactant_index``).
+
+    Returns:
+        NDArray[np.intp]: (n_r, max over r of the column count).
+    """
+    n_species, n_r = mask.shape
+    counts = mask.sum(axis=0)
+    width = int(counts.max()) if n_r else 0
+    out = np.full((n_r, width), n_species, dtype=np.intp)
+    for r in np.flatnonzero(counts):
+        species = np.flatnonzero(mask[:, r])
+        out[r, : species.size] = species
+    return out
 
 
 def _lock_arrays(container: tp.Any) -> None:
@@ -212,14 +232,19 @@ class KMatrices:
             is a negative product of the reaction (written '- species' on
             the product side). Such a reaction is slowed by the depletion
             switch as that species runs out (ADR 0005).
+        negative_index: (n_kr, max_negative_products) intp, derived from
+            negative_products when the instance is built (``pad_slots``,
+            unused slots hold n_species). Not a constructor argument.
     """
 
     k_values: NDArray[np.float64]
     reactant_index: NDArray[np.intp]
     stoichiometry: NDArray[np.float64]
     negative_products: NDArray[np.bool_]
+    negative_index: NDArray[np.intp] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "negative_index", pad_slots(self.negative_products))
         _lock_arrays(self)
 
     @property
@@ -275,6 +300,8 @@ class EzMatrices:
             is a negative product of the reaction. Such a reaction is
             slowed by the depletion switch as that species runs out
             (ADR 0005).
+        negative_index: (n_ez, max_negative_products) intp, derived from
+            negative_products (see KMatrices). Not a constructor argument.
     """
 
     k_values: NDArray[np.float64]
@@ -283,8 +310,10 @@ class EzMatrices:
     enzyme_index: NDArray[np.intp]
     stoichiometry: NDArray[np.float64]
     negative_products: NDArray[np.bool_]
+    negative_index: NDArray[np.intp] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "negative_index", pad_slots(self.negative_products))
         _lock_arrays(self)
 
     @property
@@ -309,8 +338,9 @@ class KOvershootTable:
             slots of j pointing to the extra 1.0 (index n_species).
         weight: (n_sub,) stoichiometry of j in each reaction.
         flag: (n_sub,) bool, True when j is a negative product.
-        negative_without_j: (n_species, n_sub) bool, negative products
-            of the reactions with the row of j cleared.
+        negative_without_j: (n_sub, width) intp, padded index
+            (``pad_slots``) of the negative products of the reactions
+            without species j.
     """
 
     k_values: NDArray[np.float64]
@@ -319,7 +349,7 @@ class KOvershootTable:
     reactant_index_dj: NDArray[np.intp]
     weight: NDArray[np.float64]
     flag: NDArray[np.bool_]
-    negative_without_j: NDArray[np.bool_]
+    negative_without_j: NDArray[np.intp]
 
     def __post_init__(self) -> None:
         _lock_arrays(self)
@@ -344,7 +374,7 @@ class KOvershootTable:
             ).astype(np.intp),
             weight=kmat.stoichiometry[j, cols],
             flag=kmat.negative_products[j, cols],
-            negative_without_j=negative,
+            negative_without_j=pad_slots(negative),
         )
 
 
@@ -363,8 +393,9 @@ class EzOvershootTable:
         is_substrate: (n_sub,) bool, True when j is the substrate.
         weight: (n_sub,) stoichiometry of j in each reaction.
         flag: (n_sub,) bool, True when j is a negative product.
-        negative_without_j: (n_species, n_sub) bool, negative products
-            of the reactions with the row of j cleared.
+        negative_without_j: (n_sub, width) intp, padded index
+            (``pad_slots``) of the negative products of the reactions
+            without species j.
     """
 
     k_values: NDArray[np.float64]
@@ -375,7 +406,7 @@ class EzOvershootTable:
     is_substrate: NDArray[np.bool_]
     weight: NDArray[np.float64]
     flag: NDArray[np.bool_]
-    negative_without_j: NDArray[np.bool_]
+    negative_without_j: NDArray[np.intp]
 
     def __post_init__(self) -> None:
         _lock_arrays(self)
@@ -397,7 +428,7 @@ class EzOvershootTable:
             is_substrate=ezmat.substrate_index[cols] == j,
             weight=ezmat.stoichiometry[j, cols],
             flag=ezmat.negative_products[j, cols],
-            negative_without_j=negative,
+            negative_without_j=pad_slots(negative),
         )
 
 

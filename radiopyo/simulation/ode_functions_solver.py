@@ -179,29 +179,27 @@ def depletion_switch(
 
     Args:
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t).
-        mat: KMatrices or EzMatrices (both hold ``negative_products``).
+        mat: KMatrices or EzMatrices (both hold ``negative_index``).
 
     Returns:
         NDArray[np.float64]: factor in [0, 1] multiplying the rates,
         (n_r,) or (n_r, n_t).
     """
-    return _switch(y_full, mat.negative_products)
+    return _switch(y_full, mat.negative_index)
 
 
 def _switch(
     y_full: NDArray[np.float64],
-    negative: NDArray[np.bool_],
+    negative_index: NDArray[np.intp],
 ) -> NDArray[np.float64]:
-    """``depletion_switch`` on a raw (n_species, n_r) negative-products mask."""
-    out = np.ones((negative.shape[1], *y_full.shape[1:]), dtype=np.float64)
-    columns = np.flatnonzero(negative.any(axis=0))
-    if columns.size == 0:
-        return out
+    """``depletion_switch`` on a padded (n_r, width) index of the negative
+    products (``pad_slots``; unused slots point to an extra factor 1.0)."""
+    if negative_index.shape[1] == 0:  # no negative product at all
+        return np.ones((negative_index.shape[0], *y_full.shape[1:]), dtype=np.float64)
     clipped = np.maximum(y_full, 0.0)
-    per_species = clipped / (clipped + DEPLETION_LIMIT)
-    for col in columns:
-        out[col] = np.prod(per_species[negative[:, col]], axis=0)
-    return out
+    ones = np.ones((1, *y_full.shape[1:]), dtype=np.float64)
+    per_species = np.concatenate([clipped / (clipped + DEPLETION_LIMIT), ones], axis=0)
+    return np.prod(per_species[negative_index], axis=1)
 
 
 def depletion_switch_derivatives(
@@ -217,35 +215,56 @@ def depletion_switch_derivatives(
 
     Args:
         y_full: full molar state [mol/L], (n_species,).
-        mat: KMatrices or EzMatrices (both hold ``negative_products``).
+        mat: KMatrices or EzMatrices (both hold ``negative_index``).
 
     Returns:
         NDArray[np.float64]: (n_r, n_species) d switch / d concentration
         [L/mol].
     """
-    return _switch_derivatives(y_full, mat.negative_products)
+    return _switch_derivatives(y_full, mat.negative_index)
 
 
 def _switch_derivatives(
     y_full: NDArray[np.float64],
-    negative: NDArray[np.bool_],
+    negative_index: NDArray[np.intp],
 ) -> NDArray[np.float64]:
-    """``depletion_switch_derivatives`` on a raw negative-products mask."""
-    out = np.zeros((negative.shape[1], y_full.shape[0]), dtype=np.float64)
-    columns = np.flatnonzero(negative.any(axis=0))
-    if columns.size == 0:
-        return out
+    """``depletion_switch_derivatives`` on a padded index of the negative
+    products (see ``_switch``)."""
+    n_species = y_full.shape[0]
+    n_r = negative_index.shape[0]
+    if negative_index.shape[1] == 0:
+        return np.zeros((n_r, n_species), dtype=np.float64)
     clipped = np.maximum(y_full, 0.0)
-    per_species = clipped / (clipped + DEPLETION_LIMIT)
-    slope = np.where(
-        y_full < 0.0, 0.0, DEPLETION_LIMIT / (clipped + DEPLETION_LIMIT) ** 2
+    per_species = np.append(clipped / (clipped + DEPLETION_LIMIT), 1.0)
+    slope = np.append(
+        np.where(y_full < 0.0, 0.0, DEPLETION_LIMIT / (clipped + DEPLETION_LIMIT) ** 2),
+        0.0,  # the padding factor 1.0 is a constant
     )
-    for col in columns:
-        species = np.flatnonzero(negative[:, col])
-        for pos, j in enumerate(species):
-            others = np.prod(np.delete(per_species[species], pos))
-            out[col, j] = others * slope[j]
-    return out
+    contributions = _others_product(per_species[negative_index]) * slope[negative_index]
+    return _scatter_slots(contributions, negative_index, n_species + 1)[:, :n_species]
+
+
+def _others_product(factors: NDArray[np.float64]) -> NDArray[np.float64]:
+    """For a (n_r, n_slots) array, the product of the other slots of each
+    slot (prefix * suffix cumulative products: no division, exact zeros
+    are safe)."""
+    ones = np.ones((factors.shape[0], 1), dtype=np.float64)
+    prefix = np.cumprod(np.concatenate([ones, factors[:, :-1]], axis=1), axis=1)
+    suffix = np.cumprod(np.concatenate([ones, factors[:, :0:-1]], axis=1), axis=1)
+    return prefix * suffix[:, ::-1]
+
+
+def _scatter_slots(
+    values: NDArray[np.float64],
+    index: NDArray[np.intp],
+    n_columns: int,
+) -> NDArray[np.float64]:
+    """(n_r, n_columns) array with values[r, s] summed into column
+    index[r, s] of row r."""
+    n_r = index.shape[0]
+    flat = (np.arange(n_r)[:, np.newaxis] * n_columns + index).ravel()
+    summed = np.bincount(flat, weights=values.ravel(), minlength=n_r * n_columns)
+    return summed.reshape(n_r, n_columns).astype(np.float64, copy=False)
 
 
 def michaelis_menten_rates(
@@ -366,18 +385,12 @@ def _mass_action_derivatives(
 ) -> NDArray[np.float64]:
     """``mass_action_derivatives`` on the raw arrays of KMatrices."""
     n_species = y_full.shape[0]
-    n_kr, n_slots = reactant_index.shape
     # unused slots point to the extra 1.0
     y_ext = np.append(np.maximum(y_full, 0.0), 1.0)
-    factors = y_ext[reactant_index]  # (n_kr, n_slots)
-
-    rows = np.arange(n_kr)
-    out = np.zeros((n_kr, n_species + 1), dtype=np.float64)
-    for slot in range(n_slots):
-        others = np.prod(np.delete(factors, slot, axis=1), axis=1) * k_values
-        np.add.at(out, (rows, reactant_index[:, slot]), others)
-    out[:, :n_species][:, y_full < 0.0] = 0.0  # clipped: no dependence below 0
-    return out[:, :n_species]  # drop the extra column of the unused slots
+    others = _others_product(y_ext[reactant_index]) * k_values[:, np.newaxis]
+    out = _scatter_slots(others, reactant_index, n_species + 1)[:, :n_species]
+    out[:, y_full < 0.0] = 0.0  # clipped: no dependence below 0
+    return out  # extra column of the unused slots dropped
 
 
 def michaelis_menten_derivatives(
@@ -552,7 +565,7 @@ def _relaxation_sum(
     y0: NDArray[np.float64],
     weight: NDArray[np.float64],
     flag: NDArray[np.bool_],
-    negative_without_j: NDArray[np.bool_],
+    negative_without_j: NDArray[np.intp],
     law: NDArray[np.float64],
     law_j: NDArray[np.float64],
     law_d: tp.Optional[NDArray[np.float64]],
@@ -577,8 +590,8 @@ def _relaxation_sum(
         y0: (n_species,) full molar state with c_j = 0.
         weight: (n_sub,) stoichiometry S_ji of j in each reaction.
         flag: (n_sub,) True when j is a negative product of the reaction.
-        negative_without_j: (n_species, n_sub) negative products of the
-            reactions, without the row of j.
+        negative_without_j: (n_sub, width) padded index of the negative
+            products of the reactions, without species j (``pad_slots``).
         law: (n_sub,) rate laws without switch.
         law_j: (n_sub,) d law / d c_j at 0+.
         law_d: (n_sub, n_species) d law / d c_k, or None (no gradient).
