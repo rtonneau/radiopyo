@@ -84,6 +84,30 @@
         "ticket": "01-bench-and-reference",
         "commit": "4729c77"
       }
+    },
+    {
+      "at": "2026-11-11T23:40:51.013Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-overshoot-tables.md",
+        "03-implement/02-overshoot-tables/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-tables"
+      }
+    },
+    {
+      "at": "2026-11-11T23:46:05.692Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-overshoot-tables/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-tables",
+        "commit": "806b2b2"
+      }
     }
   ],
   "current_phase": "ship",
