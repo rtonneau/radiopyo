@@ -229,9 +229,9 @@ def test_raw_run_uses_options(
     opts = RunOptions(max_step=1e-3)
     y0 = labarbe_cell.env.initial_values()
     y0_ref = y0.copy()
-    assert labarbe_cell._raw_run((1e-6, 1e-6), opts, y0=y0, beam_on=True) is sol
+    assert labarbe_cell._raw_run((2e-6, 2e-6), opts, y0=y0, beam_on=True) is sol
     # empty span widened, then shifted by T_ZERO (burst)
-    assert seen["t_span"] == (1e-8 + labarbe_cell.T_ZERO, 1e-6)
+    assert seen["t_span"] == (2e-8 + labarbe_cell.T_ZERO, 2e-6)
     assert seen["y0"] is not y0  # a copy carries the burst
     np.testing.assert_array_equal(y0, y0_ref)
     assert np.any(seen["y0"] != y0_ref)
@@ -324,9 +324,9 @@ def test_raw_run_passes_beam_and_matrices_to_solver(
 def test_run_applies_burst_by_default(labarbe_cell: UnitCell) -> None:
     """End to end: the first stored point is the burst shifted state."""
     cell = labarbe_cell
-    res = cell.run(t_span=(1e-7, 1e-6))
+    res = cell.run(t_span=(1e-7, 2e-6))
     y_burst = cell.env.initial_values()
-    cell._apply_initial_burst((1e-7, 1e-6), y_burst)
+    cell._apply_initial_burst((1e-7, 2e-6), y_burst)
     np.testing.assert_array_equal(res.y[:, 0], y_burst)
     assert res.t[0] == 1e-7 + cell.T_ZERO
     assert res.burst_dose_rates == [cell.beam.dose_rate_peak]
@@ -334,7 +334,7 @@ def test_run_applies_burst_by_default(labarbe_cell: UnitCell) -> None:
 
 def test_run_without_beam_use_has_no_burst(labarbe_cell: UnitCell) -> None:
     cell = labarbe_cell
-    res = cell.run(t_span=(1e-7, 1e-6), use_beam=False)
+    res = cell.run(t_span=(1e-7, 2e-6), use_beam=False)
     np.testing.assert_array_equal(res.y[:, 0], cell.env.initial_values())
     assert res.t[0] == 1e-7
     assert res.burst_dose_rates == []
@@ -343,17 +343,17 @@ def test_run_without_beam_use_has_no_burst(labarbe_cell: UnitCell) -> None:
 def test_run_never_mutates_y0(labarbe_cell: UnitCell) -> None:
     y0 = labarbe_cell.env.initial_values()
     y0_ref = y0.copy()
-    res = labarbe_cell.run(t_span=(1e-7, 1e-6), y0=y0)
+    res = labarbe_cell.run(t_span=(1e-7, 2e-6), y0=y0)
     np.testing.assert_array_equal(y0, y0_ref)
     assert np.any(res.y[:, 0] != y0_ref)  # the burst was applied to a copy
 
 
 def test_run_drops_t_eval_inside_skipped_interval(labarbe_cell: UnitCell) -> None:
     t_eval = np.array([1e-7, 1.5e-7, 2e-7, 5e-7])
-    res = labarbe_cell.run(t_span=(1e-7, 1e-6), t_eval=t_eval)
+    res = labarbe_cell.run(t_span=(1e-7, 2e-6), t_eval=t_eval)
     np.testing.assert_array_equal(res.t, t_eval[2:])
     # beam not used: nothing is skipped
-    res = labarbe_cell.run(t_span=(1e-7, 1e-6), t_eval=t_eval, use_beam=False)
+    res = labarbe_cell.run(t_span=(1e-7, 2e-6), t_eval=t_eval, use_beam=False)
     np.testing.assert_array_equal(res.t, t_eval)
 
 
@@ -370,8 +370,8 @@ def test_integrate_production_follows_applied_burst(labarbe_cell: UnitCell) -> N
     """The burst term of the production integrals exists only if the burst
     was applied to the initial concentrations."""
     cell = labarbe_cell
-    with_burst = cell.run(t_span=(1e-7, 1e-6))
-    without = cell.run(t_span=(1e-7, 1e-6), use_beam=False)
+    with_burst = cell.run(t_span=(1e-7, 2e-6))
+    without = cell.run(t_span=(1e-7, 2e-6), use_beam=False)
     (reaction,) = cell.env.radiolytic_reaction_involving("e_aq")
     label = reaction.as_label()
     burst = (

@@ -464,8 +464,11 @@ The module currently supports 2 ways of running simulations:
 
    The chunks are cut exactly where the beam switches (pulse start and end, time of
    the maximum dose) and the solver holds the dose rate of each chunk constant. A
-   pulse must be longer than `UnitCell.T_ZERO` (1e-7 s), otherwise a `ValueError`
-   ("Too Short beam pulse") is raised.
+   configured beam ON time (pulse `on_time`, `micro_on_time`, single pulse) shorter than
+   `UnitCell.MIN_BEAM_ON_TIME` (1e-6 s) raises `ShortBeamOnError` when the beam is built. An ON
+   span that becomes shorter at run time (last pulse cut by `max_dose`, pulse clipped by
+   `t_span`) is not integrated: its radiolytic yield is added analytically, a warning is
+   logged and the span is listed in `ODEResult.short_on_spans`.
 
    If `scipy.integrate.solve_ivp` fails on a chunk, `SolverFailedError`
    (`radiopyo.simulation.exceptions`) is raised with the span, the last time reached and

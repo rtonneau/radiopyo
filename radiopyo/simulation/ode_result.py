@@ -41,7 +41,7 @@ if tp.TYPE_CHECKING:
     T = tp.TypeVar("T", bound="ODEResult")
 
 # ------------------------- Expose importable stuffs ------------------------ #
-__all__: tp.List = []
+__all__: tp.List = ["ShortOnSpan"]
 
 # ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
@@ -77,6 +77,19 @@ def make_slice_from_time_boundaries(
 # --------------------------------------------------------------------------- #
 
 
+class ShortOnSpan(tp.NamedTuple):
+    """
+    A beam ON span shorter than UnitCell.MIN_BEAM_ON_TIME (last pulse cut
+    by max_dose, micro pulse cut by its train end, pulse clipped by
+    t_span): not integrated, its whole radiolytic yield at `dose_rate` is
+    added analytically and one point is stored at `stop`.
+    """
+
+    start: float
+    stop: float
+    dose_rate: float
+
+
 class ODEResult(object):
     """
     Collection storing the results from scipy.integrate.solve_ivp in
@@ -97,6 +110,12 @@ class ODEResult(object):
             run), None when it read the beam at every time. The rates are
             reconstructed with the same dose rate (reconstruct_reactions).
             Empty for results read from a file (the beam is read).
+        short_on_spans: list of ShortOnSpan
+            Beam ON spans shorter than UnitCell.MIN_BEAM_ON_TIME that were
+            not integrated: their radiolytic yield was added analytically
+            (one point at the end of the span). Counted by the production
+            integrals. In memory only (empty for results read from a
+            file).
     """
 
     # Keep track of the original sim env
@@ -108,6 +127,7 @@ class ODEResult(object):
     date: datetime.datetime
     burst_dose_rates: tp.Optional[tp.List[float]]
     step_dose_rates: tp.List[tp.Optional[float]]
+    short_on_spans: tp.List[ShortOnSpan]
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp
     t: NDArray[np.float64]
@@ -206,6 +226,7 @@ class ODEResult(object):
                 *(other.burst_dose_rates or []),
             ]
         out.step_dose_rates = [*self.step_dose_rates, *other.step_dose_rates]
+        out.short_on_spans = [*self.short_on_spans, *other.short_on_spans]
         out.n_points = [*self.n_points, *other.n_points]
         out.exec_time = [*self.exec_time, *other.exec_time]
         return out
@@ -250,6 +271,7 @@ class ODEResult(object):
         self.status, self.message, self.success = [], [], []
         self.n_points, self.exec_time = [], []
         self.step_dose_rates = []
+        self.short_on_spans = []
 
     def append_sol(
         self,
@@ -257,6 +279,7 @@ class ODEResult(object):
         exec_time: tp.Optional[float] = None,
         bursts: tp.Optional[tp.Sequence[float]] = None,
         dose_rate: tp.Optional[float] = None,
+        short_on_span: tp.Optional[ShortOnSpan] = None,
     ) -> None:
         """
         Append an integration step.
@@ -274,7 +297,12 @@ class ODEResult(object):
                 Dose rate [Gy/s] held constant by the solver over this
                 step. None if the solver read the beam at every time
                 (see step_dose_rates).
+            short_on_span: ShortOnSpan, optional
+                The step is a short ON span (not integrated, see
+                short_on_spans).
         """
+        if short_on_span is not None:
+            self.short_on_spans.append(short_on_span)
         if bursts is not None:
             self.burst_dose_rates = [*(self.burst_dose_rates or []), *bursts]
         self.t = np.append(self.t, sol.t)
@@ -439,6 +467,12 @@ class ODEResult(object):
                 _ser.loc[_r.as_label()] = _ser.loc[_r.as_label()] + sum(
                     _r.compute_initial_cc_before(self.t_zero_pulse, dose_rate) * 1e6
                     for dose_rate in self._burst_dose_rates()
+                )
+                # Short ON spans: their whole yield was added analytically
+                _ser.loc[_r.as_label()] = _ser.loc[_r.as_label()] + sum(
+                    _r.compute_initial_cc_before(span.stop - span.start, span.dose_rate)
+                    * 1e6
+                    for span in self.short_on_spans
                 )
 
         return _ser.sort_values(ascending=reverse)

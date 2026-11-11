@@ -5,8 +5,8 @@ Benchmark of the Fenton reproduction grid (LSODA stalls, ADR 0007).
 Chemistry: config_Labarbe + Fe2+ fixed (2.2e-8 M), O2 50 umol/L, RH = 1 M
 (reactions_biology); 10 Gy delivered as pulses of dose D every 0.1 s, each
 at the peak dose rate DR (LET 0.201 keV/um), then 2 s of relaxation. Grid:
-D in {0.1, 1, 2} Gy x DR in {1e3, 1e5, 1e7} Gy/s (points whose pulse is not longer than T_ZERO,
-i.e. 0.1 Gy and 1 Gy at 1e7 Gy/s, are skipped), plus Fe2+ = 8.9e-7 M at
+D in {0.1, 1, 2} Gy x DR in {1e3, 1e5, 1e7} Gy/s (points whose pulse is shorter than
+UnitCell.MIN_BEAM_ON_TIME = 1e-6 s, i.e. every point at 1e7 Gy/s, are skipped), plus Fe2+ = 8.9e-7 M at
 D = 1 Gy and DR in {1e3, 1e5}. Before the fix some of these points stalled
 for tens of minutes.
 
@@ -95,12 +95,12 @@ class BenchPoint:
 
 
 def grid() -> tp.List[BenchPoint]:
-    """The reproduction grid (pulses shorter than T_ZERO are left out)."""
+    """The reproduction grid (pulses shorter than MIN_BEAM_ON_TIME are left out)."""
     points = [
         BenchPoint(d, dr)
         for d in DOSES
         for dr in DOSE_RATES
-        if d / dr > UnitCell.T_ZERO
+        if d / dr >= UnitCell.MIN_BEAM_ON_TIME
     ]
     points += [BenchPoint(1.0, dr, fe=8.9e-7) for dr in (1e3, 1e5)]
     return points

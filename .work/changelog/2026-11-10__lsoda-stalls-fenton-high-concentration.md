@@ -17,4 +17,3 @@ floor: minor
 
 - LSODA stalled for minutes (and runs froze, then resumed) with a stiff radical near 0, e.g. Fenton with RH = 1 M and O2 = 50 µM; the dose-per-pulse × dose-rate maps of ROOH showed "islands". The Fenton benchmark now completes every point in under 30 s (a point that took 81 s takes 0.9 s).
 - `prepare_single_pulse` with several pulses before the max dose, or with a macro-pulsed beam, now delivers the right dose.
-- Known issue: pulses shorter than `UnitCell.T_ZERO` (1e-7 s) now raise `ValueError("Too Short beam pulse")` in chunked runs (previously hidden by `GROWTH_TIME`); a follow-up will handle them.
