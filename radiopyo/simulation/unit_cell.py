@@ -25,7 +25,7 @@ from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.toml import TOMLFileParser
-from radiopyo.physics.beam import ParticleBeam
+from radiopyo.physics.beam import ConstantDoseRate, ParticleBeam
 from radiopyo.physics.beam_collection import BeamCollection
 from radiopyo.simulation import exceptions as rp_excep
 from radiopyo.simulation.environment_build import SimEnv
@@ -43,6 +43,7 @@ if tp.TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
+    from radiopyo.physics.beam import DoseRateSource
     from radiopyo.utils.sim_types import ConfigDict, KwargsRun, SimMatrices
 
 # ------------------------- Expose importable stuffs ------------------------ #
@@ -81,18 +82,39 @@ def widen_empty_span(t_span: tp.Tuple[float, float]) -> tp.Tuple[float, float]:
     return t_span
 
 
+def chunk_dose_rate(beam: ParticleBeam, start: float, stop: float) -> float:
+    """
+    Dose rate [Gy/s] of the beam inside the chunk [start, stop], read at
+    its middle. The chunks are cut at the beam transitions, so the dose
+    rate is constant over a chunk. An unbounded chunk is read at its start.
+    """
+    time_in_chunk = 0.5 * (start + stop) if np.isfinite(stop) else start
+    return float(beam.at(time_in_chunk).dose_rate())
+
+
 def _make_chunks(
     boundaries: tp.Sequence[float] | NDArray[np.float64],
     beam_on: tp.Sequence[bool] | NDArray[np.bool_],
     max_steps: tp.Sequence[tp.Optional[float]],
+    beam: tp.Optional[ParticleBeam] = None,
 ) -> tp.List[SimChunk]:
     """
     Build consecutive chunks: chunk i spans [boundaries[i],
     boundaries[i+1]], with beam state beam_on[i] and max step size
     max_steps[i] (len(boundaries) == len(beam_on) + 1 == len(max_steps) + 1).
+    With a beam, every chunk holds the (constant) dose rate of the beam
+    inside it (see chunk_dose_rate).
     """
     return [
-        SimChunk(start=start, stop=stop, max_step_size=max_step, beam_on=on)
+        SimChunk(
+            start=start,
+            stop=stop,
+            max_step_size=max_step,
+            beam_on=on,
+            dose_rate=(
+                chunk_dose_rate(beam, start, stop) if beam is not None else None
+            ),
+        )
         for start, stop, on, max_step in zip(
             boundaries[:-1], boundaries[1:], beam_on, max_steps, strict=True
         )
@@ -414,6 +436,7 @@ class UnitCell(object):
         options: RunOptions,
         y0: tp.Optional[NDArray[np.float64]] = None,
         beam_on: bool = True,
+        dose_rate: tp.Optional[float] = None,
     ) -> ScipyODEResult:
         """
         Integrate the ODE system over t_span with solve_ivp.
@@ -436,6 +459,10 @@ class UnitCell(object):
                 Whether the beam is switched ON at t_span[0] (default:
                 True). The initial burst is applied only if the beam is
                 also used (options.use_beam), see _apply_initial_burst.
+            dose_rate: float, optional
+                Dose rate [Gy/s] held constant over t_span (chunk of a
+                chunked run, and of its initial burst). None -> the
+                solver reads the beam at every time (plain run).
 
         Returns:
             ScipyODEResult: raw solve_ivp result
@@ -457,11 +484,17 @@ class UnitCell(object):
             if y0 is not None
             else self.env.initial_values()
         )
-        beam = self.beam_list.current if options.use_beam else None
+        beam: tp.Optional[DoseRateSource] = None
+        if options.use_beam:
+            beam = (
+                self.beam_list.current
+                if dose_rate is None
+                else ConstantDoseRate(dose_rate)
+            )
 
         self.last_burst_dose_rate = None
         if beam_on and options.use_beam:  # beam switched ON at t_span[0]
-            t_span = self._apply_initial_burst(t_span, y_start)
+            t_span = self._apply_initial_burst(t_span, y_start, dose_rate)
             options = self._drop_skipped_t_eval(t_span, options)
 
         sol = self._timed_solve(t_span, y_start, beam, options, solver_kwargs)
@@ -506,14 +539,15 @@ class UnitCell(object):
         self,
         t_span: tp.Tuple[float, float],
         y0: NDArray[np.float64],
+        dose_rate: tp.Optional[float] = None,
     ) -> tp.Tuple[float, float]:
         """
         Beam switched ON at t_span[0]: skip the first T_ZERO seconds and
         add *in place* to y0 [µmol/L] the radiolytic production of the
         dynamic species over that interval (computed analytically from
-        the G values, at the dose rate of the beam at t_span[0] + T_ZERO,
-        stored in last_burst_dose_rate). Constant species are left
-        untouched.
+        the G values, at `dose_rate` or, when None, at the dose rate of
+        the beam at t_span[0] + T_ZERO; stored in last_burst_dose_rate).
+        Constant species are left untouched.
 
         Returns:
             Tuple[float, float]: (t_span[0] + T_ZERO, t_span[1])
@@ -524,7 +558,8 @@ class UnitCell(object):
         t_span = (t_span[0] + self.T_ZERO, t_span[1])
         if t_span[0] >= t_span[1]:
             raise ValueError(f"Too Short beam pulse {t_span}")
-        dose_rate = self.beam.at(t_span[0]).dose_rate()
+        if dose_rate is None:
+            dose_rate = self.beam.at(t_span[0]).dose_rate()
         self.last_burst_dose_rate = dose_rate
         for r in self.env.reactions.radiolytic:
             # If the species must be forced constant, skip it.
@@ -565,7 +600,7 @@ class UnitCell(object):
         self,
         t_span: tp.Tuple[float, float],
         y0: NDArray[np.float64],
-        beam: tp.Optional[ParticleBeam],
+        beam: tp.Optional[DoseRateSource],
         options: RunOptions,
         solver_kwargs: tp.Dict[str, tp.Any],
     ) -> ScipyODEResult:
@@ -777,7 +812,9 @@ class UnitCell(object):
             max_step = max_step_size_on if intervals[-2, 1] > 0 else max_step_size_off
         max_steps.append(max_step)
 
-        chunk_list = _make_chunks(intervals[:, 0], beam_on, max_steps)
+        chunk_list = _make_chunks(
+            intervals[:, 0], beam_on, max_steps, self.beam_list.current
+        )
         return self._chunks_iter(
             t_span,
             chunk_list,
@@ -806,11 +843,17 @@ class UnitCell(object):
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
     ) -> SimChunksIter:
-        """Method used to prepare a three step ODE integration of a
+        """Method used to prepare a multi step ODE integration of a
         single pulse (tm = time at max dose of the current beam):
-            1. beam ON over [t_span[0], tm] (initial burst applied);
+            1. the beam intervals over [t_span[0], tm] (beam.
+               make_time_intervals, as prepare_chunked_run: a leading
+               beam OFF chunk if the beam starts after t_span[0], one ON
+               chunk per pulse, OFF chunks in between; the initial burst
+               is applied at the start of every ON chunk);
             2. ON -> OFF transition over [tm, tm + trans_time];
             3. beam OFF over [tm + trans_time, t_span[1]].
+        Every boundary is clipped to t_span[1] (empty chunks dropped).
+        With a single pulse, 1. is one ON chunk.
 
         Args:
             t_span: Tuple[float, float]
@@ -829,14 +872,15 @@ class UnitCell(object):
                 Relative Tolerance of the ODE Solver (default: 1e-10)
             max_step_size_on: float, optional
                 Larger authorized time step for the ODE solver while
-                beam is ON (default: inf)
+                beam is ON before tm (default: inf)
             max_step_size_trans: float, optional
                 Larger authorized time step for the ODE solver during
                 the ON -> OFF transition (default: inf)
             max_step_size_final: float, optional
                 Larger authorized time step for the ODE solver for the
-                last (beam OFF) step (default: inf, no fallback to the
-                other max step sizes).
+                last (beam OFF) step, and for the beam OFF chunks before
+                tm (default: inf, no fallback to the other max step
+                sizes).
             trans_time: float, optional
                 Duration of the ON -> OFF transition, in seconds
                 (default: 100e-6)
@@ -858,10 +902,40 @@ class UnitCell(object):
         t_max_dose = self.beam_list.current.time_at_max_dose
         t_beam_off = t_max_dose + trans_time
 
+        t_start, t_stop = t_span
+        beam = self.beam_list.current
+
+        # Before tm: the beam intervals up to tm (or t_span[1]), exactly as
+        # prepare_chunked_run (leading OFF interval of a beam starting after
+        # t_span[0], several pulses, gaps between them).
+        boundaries = [t_start]
+        beam_on: tp.List[bool] = []
+        max_steps: tp.List[tp.Optional[float]] = []
+        t_pre = min(t_max_dose, t_stop)
+        if t_pre > t_start:
+            intervals = beam.make_time_intervals(start=t_start, stop=t_pre)
+            boundaries = intervals[:, 0].tolist()
+            beam_on = (intervals[:-1, 1] > 0).tolist()
+            max_steps = [
+                max_step_size_on if on else max_step_size_final for on in beam_on
+            ]
+        # Then the ON -> OFF transition and the final OFF chunk, clipped to
+        # t_span[1] (a chunk beyond it, or empty, is dropped).
+        for stop, max_step in (
+            (t_beam_off, max_step_size_trans),
+            (t_stop, max_step_size_final),
+        ):
+            stop = min(stop, t_stop)
+            if stop > boundaries[-1]:
+                boundaries.append(stop)
+                beam_on.append(False)
+                max_steps.append(max_step)
+
         chunk_list = _make_chunks(
-            boundaries=[t_span[0], t_max_dose, t_beam_off, t_span[1]],
-            beam_on=[True, False, False],
-            max_steps=[max_step_size_on, max_step_size_trans, max_step_size_final],
+            boundaries=boundaries,
+            beam_on=beam_on,
+            max_steps=max_steps,
+            beam=beam,
         )
         return self._chunks_iter(
             t_span,
@@ -922,12 +996,16 @@ class SimChunk(tp.NamedTuple):
         beam_on: bool
             Whether the beam is switched ON at start (the initial
             radiolytic burst is then applied)
+        dose_rate: float, optional
+            Dose rate [Gy/s] of the beam inside the chunk, held constant
+            by the solver (None -> the beam is read at every time)
     """
 
     start: float
     stop: float
     max_step_size: float | None
     beam_on: bool
+    dose_rate: float | None = None
 
 
 class SimChunksIter:
@@ -996,11 +1074,13 @@ class SimChunksIter:
             # _raw_run copies y0: the stored last point stays untouched
             y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
             beam_on=chunk.beam_on,
+            dose_rate=chunk.dose_rate,
         )
         self.sol.append_sol(
             res,
             exec_time=self.sim.last_exec_time,
             bursts=self.sim._last_bursts(),
+            dose_rate=chunk.dose_rate if self.options.use_beam else None,
         )
         return self.sol
 

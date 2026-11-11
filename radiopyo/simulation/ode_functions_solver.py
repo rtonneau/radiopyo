@@ -71,7 +71,7 @@ import numpy as np
 if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from radiopyo.physics.beam import ParticleBeam
+    from radiopyo.physics.beam import DoseRateSource
     from radiopyo.utils.sim_types import (
         EzMatrices,
         GVector,
@@ -110,13 +110,14 @@ DEPLETION_LIMIT: float = 1e-12
 
 def dose_rates(
     t: float | NDArray[np.float64],
-    beam: tp.Optional[ParticleBeam],
+    beam: tp.Optional[DoseRateSource],
 ) -> NDArray[np.float64]:
     """Dose rate [Gy/s] of the beam at time(s) t [s].
 
     Args:
         t: one time (scalar) or an array of times.
-        beam: ParticleBeam, or None for no irradiation (dose rate 0).
+        beam: ParticleBeam (or any DoseRateSource), or None for no
+            irradiation (dose rate 0).
 
     Returns:
         NDArray[np.float64]: same shape as t (0-d array for a scalar t).
@@ -267,7 +268,7 @@ def reaction_rates(
     t: float | NDArray[np.float64],
     y_full: NDArray[np.float64],
     mat: SimMatrices,
-    beam: tp.Optional[ParticleBeam],
+    beam: tp.Optional[DoseRateSource],
 ) -> ReactionRates:
     """Rate of every reaction, for one or several states.
 
@@ -278,7 +279,7 @@ def reaction_rates(
         y_full: full molar state [mol/L], (n_species,) or (n_species, n_t)
             (see StateLayout.to_full_molar).
         mat: SimMatrices
-        beam: ParticleBeam, or None for no irradiation.
+        beam: ParticleBeam (or any DoseRateSource), or None for no irradiation.
 
     Returns:
         ReactionRates [mol/L/s]
@@ -586,7 +587,7 @@ def _relaxation_sum(
 def jacobian(
     t: float,
     y: NDArray[np.float64],
-    beam: tp.Optional[ParticleBeam],
+    beam: tp.Optional[DoseRateSource],
     mat: SimMatrices,
 ) -> NDArray[np.float64]:
     """Analytic Jacobian d(dy/dt)/dy of ``derive`` (the ``jac`` argument of
@@ -608,7 +609,7 @@ def jacobian(
     Args:
         t: time [s]
         y: (n_dyn,) concentrations of the dynamical species [µmol/L]
-        beam: ParticleBeam, or None for no irradiation.
+        beam: ParticleBeam (or any DoseRateSource), or None for no irradiation.
         mat: SimMatrices
 
     Returns:
@@ -662,7 +663,7 @@ def _product_rule(
 def derive(
     t: float,
     y: NDArray[np.float64],
-    beam: tp.Optional[ParticleBeam],
+    beam: tp.Optional[DoseRateSource],
     mat: SimMatrices,
 ) -> NDArray[np.float64]:
     """Compute the time derivative of species concentration (right hand
@@ -675,7 +676,7 @@ def derive(
     Args:
         t: time [s]
         y: (n_dyn,) concentrations of the dynamical species [µmol/L]
-        beam: ParticleBeam, or None for no irradiation.
+        beam: ParticleBeam (or any DoseRateSource), or None for no irradiation.
         mat: SimMatrices
 
     Returns:

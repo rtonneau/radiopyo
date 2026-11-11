@@ -39,6 +39,8 @@ __all__ = [
     "BaseTimer",
     "BeamCollection",
     "ConstantBeam",
+    "ConstantDoseRate",
+    "DoseRateSource",
     "MacroPulsedBeam",
     "MacroTimer",
     "ParticleBeam",
@@ -55,6 +57,14 @@ logger = logging.getLogger("radiopyo")
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
 # --------------------------------------------------------------------------- #
+
+
+class DoseRateSource(tp.Protocol):
+    """What the ODE right hand side needs from a beam: its dose rate at a
+    given time (`at(t).dose_rate()`). A ParticleBeam is one; so is
+    ConstantDoseRate."""
+
+    def at(self, time: float) -> TimeMessage: ...
 
 
 class TimeMessage(tp.NamedTuple):
@@ -85,6 +95,31 @@ class TimeMessage(tp.NamedTuple):
         return self.current_dose_rate
 
 
+class ConstantDoseRate:
+    """
+    A dose rate held constant in time, with the `at(t).dose_rate()`
+    interface of a beam. A chunked run integrates each chunk with the dose
+    rate of the beam inside that chunk (the chunks are cut at the beam
+    transitions, see ParticleBeam.make_time_intervals).
+
+    Attributes:
+        value: float
+            Dose rate in Gy/s
+    """
+
+    __slots__ = ("value",)
+
+    def __init__(self, value: float) -> None:
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f"ConstantDoseRate({self.value})"
+
+    def at(self, time: float) -> TimeMessage:
+        """Dose rate message at `time` (always `value`)."""
+        return TimeMessage(time=time, current_dose_rate=self.value)
+
+
 @dataclass
 class ParticleBeam:
     """
@@ -112,7 +147,6 @@ class ParticleBeam:
     label: str = field(default="default")
     time_at_max_dose: float = field(init=False)
     dose_rate: float = field(init=False)
-    GROWTH_TIME: tp.ClassVar[float] = 1e-6
 
     def __post_init__(self) -> None:
         """
@@ -390,29 +424,20 @@ class ParticleBeam:
         make_matrix(stop, start) method. The major differences are:
             - takes into account max_dose in order to trim the matrix
             if needed.
-            - Symmetrically expand the 'on_time' so that it is possible
-            to define a refined ODE integration time step for beam
-            OFF-ON & ON-OFF transitions.
             - The first column is still time but the second is:
                 * 0 for beam OFF
                 * 1 for beam ON
 
+        The rows are the exact beam transitions (ADR 0007): an ON
+        interval ends exactly at the end of the pulse (or at the time of
+        max dose), it is not extended. A beam discontinuity inside an
+        integration interval would stall the ODE solver.
+
         Returns:
             NDArray[np.float64]: 2 cols matrix
         """
-        # Retrieve Time Structure Matrix
         out = self.make_matrix(stop, start)
-
-        # Shift every OFF row that is neither the first nor the last one
-        # (pulse ends) by GROWTH_TIME, unless the next row is closer:
-        # the beam ON time is expanded to refine the integration step
-        # at OFF transitions.
-        beam_on = out[:, 1] > 0.0
-        for idx in range(1, out.shape[0] - 1):
-            if not beam_on[idx] and (out[idx + 1, 0] - out[idx, 0]) > self.GROWTH_TIME:
-                out[idx, 0] += self.GROWTH_TIME
-
-        out[:, 1] = beam_on
+        out[:, 1] = out[:, 1] > 0.0
         return out
 
     def as_dict(self) -> tp.Dict:

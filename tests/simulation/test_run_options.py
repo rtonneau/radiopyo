@@ -93,6 +93,7 @@ def _spy_raw_run(
         options: RunOptions,
         y0: tp.Any = None,
         beam_on: bool = True,
+        dose_rate: tp.Optional[float] = None,
     ) -> tp.Any:
         calls.append(
             {"t_span": t_span, "options": options, "y0": y0, "beam_on": beam_on}
@@ -589,6 +590,7 @@ def test_sim_chunks_iter_calls(
         options: RunOptions,
         y0: tp.Any = None,
         beam_on: bool = True,
+        dose_rate: tp.Optional[float] = None,
     ) -> tp.Any:
         calls.append(
             {
@@ -598,7 +600,9 @@ def test_sim_chunks_iter_calls(
                 "beam_on": beam_on,
             }
         )
-        return real_raw_run(t_span, options, y0=y0, beam_on=beam_on)
+        return real_raw_run(
+            t_span, options, y0=y0, beam_on=beam_on, dose_rate=dose_rate
+        )
 
     monkeypatch.setattr(cell, "_raw_run", spy)
     chunks = [

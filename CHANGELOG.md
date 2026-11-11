@@ -23,6 +23,11 @@ All notable changes to this project. Versions follow [semantic versioning](https
 - README: `[[beam.macro_pulsed]]`, `[[reactions.equilibrium]]`, the `[parameters]` keys, the n*k convention,
   `variable_GValues` and H3O_plus = e_aq (G(H3O+) is taken equal to G(e_aq), the `H3O_plus` column of the
   Boscolo data is not used).
+- `ODEResult.step_dose_rates` (one entry per integration step, as `n_points`): the dose rate a chunk of a
+  chunked run was integrated with (None for a step that read the beam). `reconstruct_reactions` uses it, so
+  the rates of the last point of an ON chunk (on the pulse end) match what was integrated. Not stored in
+  HDF5 files (results read from a file keep reading the beam). New `ConstantDoseRate` and `DoseRateSource`
+  in `radiopyo.physics.beam`; `SimChunk.dose_rate`.
 
 ### Changed
 
@@ -63,6 +68,15 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 - `ruff check radiopyo` and `mypy radiopyo` report no error.
 - README brought in line with the code (version badge, `from_toml`, `max_dose=` keyword in
   `PulsedBeam.from_dose_rate_peak`, bundled files, acid/base keys, dependencies, GitHub URL).
+- Chunks follow the beam exactly (ADR 0007): `ParticleBeam.make_time_intervals` no longer extends the end of
+  a pulse by `GROWTH_TIME` (the class attribute is removed), so an ON chunk ends exactly at the pulse end (or
+  at the time of max dose) and the refined max step of the first microsecond after a pulse is gone. A beam
+  discontinuity inside an integration interval stalled LSODA.
+- In `prepare_chunked_run` and `prepare_single_pulse` the solver holds the dose rate of each chunk constant
+  (the beam dose rate inside the chunk), and the initial burst uses it. `run()` still reads the beam at every
+  time. `prepare_single_pulse` builds its chunks before the time of max dose from `make_time_intervals` (leading
+  OFF chunk when the beam starts after `t_span[0]`, one chunk per pulse, also for pulsed and macro-pulsed
+  beams; the OFF chunks use `max_step_size_final`) and clips every chunk to `t_span[1]`.
 
 ### Known issues (not fixed in this release)
 
@@ -77,6 +91,9 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
   stored in HDF5 files; `ODEResult.reconstruct_reactions` uses the beam of the result even for a run made with
   `use_beam=False`.
 - No golden output for a chunked run with a `MacroPulsedBeam`.
+- Pulses shorter than `UnitCell.T_ZERO` (1e-7 s) now raise `ValueError("Too Short beam pulse")` in chunked
+  runs: the extension of the ON chunk by `GROWTH_TIME` used to hide it. Behaviour not changed here (to be
+  handled separately).
 
 ### Fixed
 
