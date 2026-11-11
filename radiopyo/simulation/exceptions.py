@@ -16,6 +16,7 @@ __all__ = [
     "NoBeamDefinedError",
     "RadioPyoError",
     "SimulationError",
+    "SolverFailedError",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -29,3 +30,7 @@ class SimulationError(RadioPyoError):
 
 class NoBeamDefinedError(SimulationError):
     """"""
+
+
+class SolverFailedError(SimulationError):
+    """solve_ivp returned success=False (integration did not reach t_span[1])."""

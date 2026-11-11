@@ -6,6 +6,9 @@ All notable changes to this project. Versions follow [semantic versioning](https
 
 ### Added
 
+- `SolverFailedError` (`radiopyo.simulation.exceptions`): `UnitCell` runs (`run`, chunked and single-pulse
+  runs) now raise it when `solve_ivp` returns `success=False`, with the span, the last reached t and scipy's
+  message, instead of silently returning a truncated solution.
 - `radiopyo.exceptions.RadioPyoError`, the root of the exception hierarchy (the `chemistry`, `physics`
   and `simulation` exceptions derive from it; `radiopyo.simulation.exceptions.RadioPyoError` still works).
 - `RunOptions` (`radiopyo.simulation.unit_cell`): the solver options (`atol`, `rtol`, `method`,

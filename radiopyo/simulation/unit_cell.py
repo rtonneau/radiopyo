@@ -442,6 +442,7 @@ class UnitCell(object):
 
         Raises:
             NoBeamDefinedError: no beam is defined
+            SolverFailedError: solve_ivp did not reach t_span[1]
         """
         self._require_beam()
 
@@ -463,7 +464,14 @@ class UnitCell(object):
             t_span = self._apply_initial_burst(t_span, y_start)
             options = self._drop_skipped_t_eval(t_span, options)
 
-        return self._timed_solve(t_span, y_start, beam, options, solver_kwargs)
+        sol = self._timed_solve(t_span, y_start, beam, options, solver_kwargs)
+        if not sol.success:
+            t_last = float(sol.t[-1]) if len(sol.t) > 0 else t_span[0]
+            raise rp_excep.SolverFailedError(
+                f"solve_ivp ({options.method}) failed on t_span={t_span}: "
+                f"last reached t={t_last:.6e} s; scipy message: {sol.message}"
+            )
+        return sol
 
     def _solver_kwargs(
         self,
