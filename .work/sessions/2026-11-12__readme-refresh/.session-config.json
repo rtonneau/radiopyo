@@ -61,6 +61,30 @@
       "detail": {
         "tickets": 3
       }
+    },
+    {
+      "at": "2026-11-12T09:23:06.749Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-docs-and-logo.md",
+        "03-implement/01-docs-and-logo/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-docs-and-logo"
+      }
+    },
+    {
+      "at": "2026-11-12T09:24:00.860Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-docs-and-logo/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-docs-and-logo",
+        "commit": "57997c9"
+      }
     }
   ],
   "current_phase": "ship",
@@ -69,5 +93,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-12T09:23:06.220Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "delegate"
 }
