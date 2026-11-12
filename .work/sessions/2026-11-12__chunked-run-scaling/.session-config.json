@@ -85,6 +85,30 @@
         "ticket": "01-lazy-result-storage",
         "commit": "8f17682"
       }
+    },
+    {
+      "at": "2026-11-12T11:04:37.739Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-derive-overhead.md",
+        "03-implement/02-derive-overhead/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-derive-overhead"
+      }
+    },
+    {
+      "at": "2026-11-12T11:08:14.519Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-derive-overhead/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-derive-overhead",
+        "commit": "f0d13fe"
+      }
     }
   ],
   "current_phase": "ship",
