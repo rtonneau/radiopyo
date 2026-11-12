@@ -1,0 +1,179 @@
+{
+  "session_id": "2026-11-12__readme-refresh",
+  "feature_name": "readme-refresh",
+  "scratch_dir": ".scratch/tests/2026-11-12__readme-refresh",
+  "created_at": "2026-11-12T08:42:02.935Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-12T08:42:02.935Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-12T08:47:18.199Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-12T08:47:18.304Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-12T09:22:46.434Z",
+      "event": "auto_started",
+      "phase": "plan",
+      "detail": {
+        "target": "finish",
+        "steps": "write:plan → ship → finish",
+        "shipMode": "delegate"
+      }
+    },
+    {
+      "at": "2026-11-12T09:23:06.220Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "docs/readme-refresh",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-12T09:23:06.236Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-docs-and-logo.md",
+        "02-plan/tickets/02-ci-workflow.md",
+        "02-plan/tickets/03-readme-rewrite.md"
+      ],
+      "detail": {
+        "tickets": 3
+      }
+    },
+    {
+      "at": "2026-11-12T09:23:06.749Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-docs-and-logo.md",
+        "03-implement/01-docs-and-logo/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-docs-and-logo"
+      }
+    },
+    {
+      "at": "2026-11-12T09:24:00.860Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-docs-and-logo/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-docs-and-logo",
+        "commit": "57997c9"
+      }
+    },
+    {
+      "at": "2026-11-12T09:24:06.977Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-ci-workflow.md",
+        "03-implement/02-ci-workflow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-ci-workflow"
+      }
+    },
+    {
+      "at": "2026-11-12T09:32:54.236Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-ci-workflow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-ci-workflow",
+        "commit": "fc3e3ba"
+      }
+    },
+    {
+      "at": "2026-11-12T09:32:54.641Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-readme-rewrite.md",
+        "03-implement/03-readme-rewrite/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-readme-rewrite"
+      }
+    },
+    {
+      "at": "2026-11-12T09:34:46.805Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/03-readme-rewrite/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-readme-rewrite",
+        "commit": "0dbaace"
+      }
+    },
+    {
+      "at": "2026-11-12T09:34:57.862Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "patch"
+      }
+    },
+    {
+      "at": "2026-11-12T09:39:27.209Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/11"
+      }
+    },
+    {
+      "at": "2026-11-12T09:39:22.066Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    }
+  ],
+  "current_phase": "finished",
+  "git": {
+    "branch": "docs/readme-refresh",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-12T09:23:06.220Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/11"
+  },
+  "ship_mode": "delegate",
+  "changelog": {
+    "bump": "patch",
+    "floor": "patch",
+    "reason": null,
+    "bullets": 4,
+    "path": ".work/changelog/2026-11-12__readme-refresh.md",
+    "written_at": "2026-11-12T09:34:57.858Z"
+  },
+  "finished_at": "2026-11-12T09:39:22.066Z"
+}

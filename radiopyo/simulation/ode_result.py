@@ -9,7 +9,7 @@ Author:
 from __future__ import annotations
 
 import copy
-import datetime
+import datetime as dt
 import itertools as it
 import json
 import logging
@@ -131,7 +131,7 @@ class ODEResult(object):
     mat: SimMatrices
     LET: tp.Optional[float]
     t_zero_pulse: float
-    date: datetime.datetime
+    date: dt.datetime
     burst_dose_rates: tp.Optional[tp.List[float]]
     step_dose_rates: tp.List[tp.Optional[float]]
     short_on_spans: tp.List[ShortOnSpan]
@@ -166,7 +166,7 @@ class ODEResult(object):
         t_zero_pulse: float,
         sol: tp.Optional[ScipyODEResult] = None,
     ) -> None:
-        self.date = datetime.datetime.now()
+        self.date = dt.datetime.now()
         self.env = copy.deepcopy(env)
         self.beam = copy.deepcopy(beam)
         self.mat = copy.deepcopy(mat)
@@ -585,11 +585,14 @@ class ODEResult(object):
 
         if include_equilibrium:
             eq_r = self.compute_yields_of_eq_reactions_by_species(species, _slice)
-            for _k, _s in eq_r.items():
-                # If net value is consumption, remove it
-                if trapezoid(_s.values, x=_s.index) < 0:
-                    eq_r.drop(_k, axis=1, inplace=True)
-                    continue
+            # If net value is consumption, remove it (collect first: dropping
+            # while iterating breaks under pandas 3)
+            to_drop = [
+                _k
+                for _k, _s in eq_r.items()
+                if trapezoid(_s.values, x=_s.index) < 0
+            ]
+            eq_r = eq_r.drop(columns=to_drop)
             rdf = pd.concat([rdf, eq_r], axis=1)
         if include_radiolytic:
             _r = [
@@ -872,7 +875,7 @@ class ODEResult(object):
             LET,
             t_zero,
         )
-        out.date = datetime.datetime.fromtimestamp(config["parameters"]["timestamp"])
+        out.date = dt.datetime.fromtimestamp(config["parameters"]["timestamp"])
 
         return out
 

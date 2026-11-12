@@ -2,7 +2,7 @@
 
 All notable changes to this project. Versions follow [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## 0.7.0 (2026-11-12)
 
 ### Added
 
@@ -20,6 +20,14 @@ All notable changes to this project. Versions follow [semantic versioning](https
 - README: `[[beam.macro_pulsed]]`, `[[reactions.equilibrium]]`, the `[parameters]` keys, the n*k convention,
   `variable_GValues` and H3O_plus = e_aq (G(H3O+) is taken equal to G(e_aq), the `H3O_plus` column of the
   Boscolo data is not used).
+- `jacobian(t, y, beam, mat, force_positive=False)` (`radiopyo.simulation.ode_functions_solver`): the analytic Jacobian of the ODE system, used by the stiff solvers (blocked reactions and `force_positive` rows contribute 0).
+- `EzMatrices.negative_products`: negative-product flags of the enzymatic reactions.
+- Building `n A -> B` with n > 1 and a non-scalar k (polynomial, Arrhenius, equilibrium) logs a warning on the `radiopyo` logger: such a k is used as given, not divided by n (n*k convention).
+- `SolverFailedError` (`radiopyo.simulation.exceptions`): `run`, chunked and single-pulse runs raise it when `solve_ivp` returns `success=False` (with the span, the last reached t and scipy's message), instead of continuing silently from a truncated solution.
+- `ODEResult.step_dose_rates`: the dose rate each step of a chunked run was integrated with, used by `reconstruct_reactions` (not stored in HDF5; results read from a file keep reading the beam). New `ConstantDoseRate` / `DoseRateSource` in `radiopyo.physics.beam` and `SimChunk.dose_rate`.
+- Benchmark `examples/bench_fenton_stall.py` (Fenton reproduction grid) and the regression test `tests/simulation/test_fenton_stall.py`.
+- `docs/issues/fenton/Fenton_Fixed_Showcase.ipynb`: shows the Fenton runaway case running cleanly (time courses, frequency scan around 0.13 Hz) and maps ROOH over dose per pulse x average dose rate, at 10 Gy and at 1200 s (helper `fenton_map.py`, cached results).
+- Logo (`docs/logo.svg`), a citation section (Tonneau et al. 2025, Phys. Med. Biol. 70 235021, DOI 10.1088/1361-6560/ae1fcc, with BibTeX) and a GitHub Actions `Tests` workflow (ruff, mypy, pytest on Python 3.11).
 
 ### Changed
 
@@ -60,6 +68,20 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 - `ruff check radiopyo` and `mypy radiopyo` report no error.
 - README brought in line with the code (version badge, `from_toml`, `max_dose=` keyword in
   `PulsedBeam.from_dose_rate_peak`, bundled files, acid/base keys, dependencies, GitHub URL).
+- Internal refactoring for readability (solver matrices, run flow, config readers, beams, results); public names and call signatures are kept and results are unchanged unless listed under Fixed. See the Unreleased section for the details.
+- `use_jac` now defaults to `True` (`RunOptions`, `run`, `prepare_chunked_run`, `prepare_single_pulse`): LSODA, BDF and Radau get the analytic Jacobian, other methods ignore it without a warning. On the bundled configs LSODA runs 1.03-2.12x faster (BDF 0.97-1.49x); results agree with `use_jac=False` to about 1e-9 relative. Pass `use_jac=False` for the former finite-difference behaviour.
+- Enzymatic reactions are now blocked while one of their negative products is below `DEPLETION_LIMIT`, like k-reactions.
+- Rate laws (mass action and Michaelis-Menten) read the clipped concentration max(c, 0), always: a species overshooting below 0 is neither consumed further nor runs a reaction backwards. The analytic Jacobian column of a species with c < 0 is 0.
+- The hard depletion block of "negative" products (rate set to 0 below `DEPLETION_LIMIT`) is replaced by a smooth switch c+/(c+ + eps), eps = `DEPLETION_LIMIT` = 1e-12 mol/L, applied once per negative product to k-reactions and enzymatic reactions; the Jacobian is smooth except at c = 0. The bundled configs have no negative product, so their results do not change.
+- Bundled catalase k in `reactions_biology.toml`: 1.324e8 -> 6.62e7, the per-reaction value, used as given (Michaelis-Menten k is never divided by the stoichiometry). This reading of Labarbe's value is an assumption, not verified against his model. Results of configs including `reactions_biology.toml` change: in the Labarbe run the H2O2 plateau roughly doubles (e.g. 0.177 -> 0.334 umol/L).
+- Overshoot relaxation (ADR 0007, amends ADR 0004): a dynamic species driven below 0 is pulled back to 0 at the rate it would be consumed at c = 0+ (`dc/dt += J_jj(0+) * c`, included in `jacobian`); every other species still reads it as 0. Results are identical when all concentrations are >= 0. `derive`/`jacobian` are about 15x slower on states with species below 0.
+- Chunks follow the beam exactly: `make_time_intervals` no longer extends a pulse by `GROWTH_TIME` (removed), and chunked runs (`prepare_chunked_run`, `prepare_single_pulse`) hold the dose rate of each chunk constant. `prepare_single_pulse` now builds one chunk per pulse, adds a leading OFF chunk when the beam starts after `t_span[0]` and clips to `t_span[1]`. Golden beam/run data re-recorded (time grid only; species agree to 7.6e-9).
+- A beam whose configured ON time (pulse `on_time`, `micro_on_time`, macro train `on_time`, single pulse, constant beam limited by `max_dose`) is shorter than `MIN_BEAM_ON_TIME` = 1e-6 s (`radiopyo.physics.beam`, also `UnitCell.MIN_BEAM_ON_TIME`) raises `ShortBeamOnError` (`radiopyo.physics.exceptions`, a `BeamError` and a `ValueError`) when it is built or its parameters are updated. Such beams were accepted before.
+- `prepare_single_pulse`: the OFF chunks before the time of max dose use `max_step_size_trans` (they used `max_step_size_final`).
+- Faster config loading: the reaction-string parser (`RPARSER`) remembers each string it has parsed and returns a copy, so a string is parsed by Lark only once per process. `UnitCell.from_toml(LABARBE_CONFIG_FILE)` goes from about 2.3 s to 0.65 s on the first load and 0.04 s on the next ones in the same kernel. Results are unchanged. New `ReactionParser.clear_cache()`.
+- Faster runs when a species dips below 0 (overshoot relaxation, ADR 0007): the per-species tables of that path are built once with the matrices (`SimMatrices.overshoot`) instead of on every solver call, and the depletion switch and the mass-action / switch derivatives are vectorised. A pulsed 200-chunk run with `config_Labarbe` (`examples/bench_overshoot_pulsed.py`) goes from about 22.3 s to 14.9 s. Results are unchanged (checked against the former code at rtol 1e-12).
+- README shortened to install, update, usage, a condensed configuration table and citation; the full TOML, beam and run reference moved to `docs/configuration.md`.
+- Ruff rule set is now an explicit `select` (stable across ruff versions); mypy ignores missing h5py stubs and no longer reports unused ignores.
 
 ### Known issues (not fixed in this release)
 
@@ -74,6 +96,11 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
   stored in HDF5 files; `ODEResult.reconstruct_reactions` uses the beam of the result even for a run made with
   `use_beam=False`.
 - No golden output for a chunked run with a `MacroPulsedBeam`.
+
+### Removed
+
+- RON config format, `UnitCell.run_multi_doses`, `radiopyo.utils.e_LET` and the stale Jacobian (`use_jac=True` raises `NotImplementedError`).
+- `force_positive` (`RunOptions`, `run`, `prepare_chunked_run`, `prepare_single_pulse`, `derive`, `jacobian`, the `[parameters]` key) and `zero_depleted_consumption`: passing `force_positive` now raises `TypeError`. Old configs and stores that contain the key still load. Negative concentrations are handled by clipping instead (see Changed).
 
 ### Fixed
 
@@ -178,6 +205,20 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
     `ValueError` (`make_matrix` looped forever).
 - `BeamCollection.merge` always raised `TypeError` when both collections hold a beam of the same name
   and type.
+- `UnitCell.run` now applies the initial radiolytic burst and passes `force_positive` to the solver; a `y0` given by the caller is never modified.
+- One temperature source of truth: the `temperature` of a config and `set_temperature` now reach fixed species, initial values and results.
+- `[includes]`: every section is merged, a later include wins, and relative paths resolve next to the including file.
+- Beams: `MacroPulsedBeam` no longer hangs without `max_dose`, respects `stop` and counts partial micro pulses; average dose rates account for `start_time`.
+- Species order no longer depends on `PYTHONHASHSEED`, so runs are reproducible.
+- Arrhenius reactions load from config (`A`, `Ea` in kJ/mol); enzyme names with capitals parse; enzymatic `k_value` survives the HDF5 round trip.
+- A negative product of an enzymatic reaction was added in the stoichiometry instead of subtracted. No bundled config is affected.
+- LSODA stalled for minutes (and runs froze, then resumed) with a stiff radical near 0, e.g. Fenton with RH = 1 M and O2 = 50 µM; the dose-per-pulse × dose-rate maps of ROOH showed "islands". The Fenton benchmark now completes every point in under 30 s (a point that took 81 s takes 0.9 s).
+- `prepare_single_pulse` with several pulses before the max dose, or with a macro-pulsed beam, now delivers the right dose.
+- A beam ON span shorter than `MIN_BEAM_ON_TIME` met at run time (last pulse cut by `max_dose`, pulse clipped by `t_span`) no longer raises `ValueError("Too Short beam pulse")` in chunked, single-pulse and plain runs: it is not integrated, its radiolytic yield is added analytically, a warning is logged, and it is recorded in the new `ODEResult.short_on_spans` (`ShortOnSpan`: start, stop, dose rate; not stored in HDF5).
+- `radiopyo/data/reactions_biology.toml`: the superoxide dismutase reaction used `O2_r_minus`, a species
+  that no reaction produces (the water radiolysis config names superoxide `O2_minus`), so SOD never
+  acted. It now reads `2 O2_minus -> H2O2 + O2`. Results of configs that include this file change.
+- `ODEResult.integrate_production_of` / `detail_production_of` raised `IndexError` under pandas 3 (columns dropped while iterating).
 
 ### Removed (breaking)
 

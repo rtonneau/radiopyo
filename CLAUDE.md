@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Development uses the Anaconda Python on PATH (`radiobio` conda env in the hatch scripts). Install editable with `pip install -e ./`.
+Development uses the `radiobio` conda env (Python 3.11, same as CI; on this machine `E:\miniconda3\envs\radiobio`, Jupyter kernel "Python (radiobio)"). The Python on PATH is the miniconda base (3.14), not this env: call `conda run -n radiobio …` or the env's `python.exe` explicitly. Install editable with `pip install -e ".[dev,tqdm]" ruff`.
 
 ```bash
 python -m pytest                                   # all tests (pytest uses --import-mode=importlib)

@@ -1,0 +1,37 @@
+[includes]
+toml = "radiopyo/config_Labarbe.toml"
+
+#----------------------- Beams defined in N. Blond Master Thesis -----------------------
+[[beam.pulsed]]
+label          = "conv"
+dose_rate = 0.16
+on_time        = 1.2e-6    # Time [seconds] (used only for Pulsed beam)
+frequency      = 30        # Frequency [Hz]
+max_dose       = 10
+LET            =  0.2116     # [keV/µm] -> 9MeV electrons
+
+
+[[beam.pulsed]]
+label          = "UHDR_Emballement"
+max_dose = 10
+dose_rate  = 25   # Peak dose rate for pulsed beam [Gy/s]
+on_time        = 1.2e-6      # Time [seconds] (used only for Pulsed beam)
+frequency      = 12.5       # [Hz]
+LET            = 0.2116    # [keV/µm] -> 9MeV electrons
+
+
+[[beam.pulsed]]
+label          = "UHDR"
+max_dose = 10
+dose_rate  = 50   # Peak dose rate for pulsed beam [Gy/s]
+on_time        = 1.2e-6      # Time [seconds] (used only for Pulsed beam)
+frequency      = 25       # [Hz]
+LET            = 0.2116    # [keV/µm] -> 9MeV electrons
+
+[[beam.pulsed]]
+label          = "UHDR_Freeze"
+max_dose = 10
+dose_rate  = 0.4   # Peak dose rate for pulsed beam [Gy/s]
+on_time        = 1.2e-6      # Time [seconds] (used only for Pulsed beam)
+frequency      = 0.13       # [Hz]
+LET            = 0.2116    # [keV/µm] -> 9MeV electrons

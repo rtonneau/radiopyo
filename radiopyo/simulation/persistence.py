@@ -13,7 +13,7 @@ import dataclasses as dc
 import re
 import typing as tp
 from contextlib import AbstractContextManager, suppress
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import h5py
 import numpy as np
@@ -155,7 +155,7 @@ class SimIdentifier:
             ftype = types[field.name]
             if ftype is bool:
                 _ = {"True": True, "False": False}
-                kwargs[field.name] = _.get(kwargs[field.name], None)
+                kwargs[field.name] = _.get(kwargs[field.name])
             elif isinstance(ftype, type):
                 kwargs[field.name] = ftype(kwargs[field.name])
             else:
@@ -334,7 +334,7 @@ class H5Manager(AbstractContextManager):
         if "json_config" in grp[name].attrs:
             _p = Path(str(grp[name].attrs["json_config"]))
             if not _p.exists():
-                _p = self._store_folder / _p.name
+                _p = self._store_folder / PureWindowsPath(str(_p)).name
             _p.unlink()
         name_pr = self._dataset_name_to_prod_name(name)
         if name_pr in grp:
@@ -399,7 +399,7 @@ class H5Manager(AbstractContextManager):
             json_path = Path(str(grp[name].attrs["json_config"]))
             if not json_path.exists():
                 _ = self.hdf_path.parent / f".{self.hdf_path.stem}"
-                json_path = _ / json_path.name
+                json_path = _ / PureWindowsPath(str(json_path)).name
             out = ODEResult.from_json_config(json_path)
             dummy_result = DummyScipyOdeResult.from_dataframe(
                 self.read_dataset(name, grp),
