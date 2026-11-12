@@ -77,10 +77,6 @@ Internal refactoring: results are unchanged (bit-identical on the golden outputs
 
 ### Fixed
 
-- `radiopyo/data/reactions_biology.toml`: the superoxide dismutase reaction used `O2_r_minus`, a species
-  that no reaction produces (the water radiolysis config names superoxide `O2_minus`), so SOD never
-  acted. It now reads `2 O2_minus -> H2O2 + O2`. Results that include this file change; the derive and
-  runs golden data were re-recorded.
 - `[[reactions.arrhenius]]` could not be read from a config file (the reader asked for a `k_value`
   instead of `A` and `Ea`), and `Arrhenius.k_value` used `Ea` as a temperature
   (`A * exp(-Ea / T)`). `Ea` is now the activation energy in kJ/mol:
