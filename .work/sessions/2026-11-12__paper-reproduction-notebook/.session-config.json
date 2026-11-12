@@ -133,9 +133,33 @@
         "ticket": "03-notebook",
         "commit": "1ad97fd"
       }
+    },
+    {
+      "at": "2026-11-12T15:07:47.559Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-docs-packaging.md",
+        "03-implement/04-docs-packaging/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-packaging"
+      }
+    },
+    {
+      "at": "2026-11-12T15:09:18.343Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-docs-packaging/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-packaging",
+        "commit": "3cfa505"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "feat/paper-reproduction-notebook",
     "base_branch": "main",
