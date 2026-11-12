@@ -1,0 +1,22 @@
+{
+  "session_id": "2026-11-12__fenton-runaway-and-lsoda-convergence-failures-with-fe2-2.2e-8",
+  "feature_name": "fenton runaway and LSODA convergence failures with Fe2+ 2.2e-8",
+  "scratch_dir": ".scratch/tests/2026-11-12__fenton-runaway-and-lsoda-convergence-failures-with-fe2-2.2e-8",
+  "created_at": "2026-11-12T07:59:54.496Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-12T07:59:54.496Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ],
+      "detail": {
+        "kind": "issue"
+      }
+    }
+  ],
+  "kind": "issue",
+  "current_phase": "grill"
+}
