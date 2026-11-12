@@ -157,6 +157,11 @@ def _mass_action(
     reactant_index: NDArray[np.intp],
 ) -> NDArray[np.float64]:
     """``mass_action_rates`` on the raw arrays of KMatrices."""
+    if y_full.ndim == 1:  # one state (every derive call): fewer temporaries
+        y_one = np.empty(y_full.shape[0] + 1, dtype=np.float64)
+        np.maximum(y_full, 0.0, out=y_one[:-1])
+        y_one[-1] = 1.0  # unused reactant slots point to this extra 1.0
+        return np.multiply.reduce(y_one[reactant_index], axis=1) * k_values
     # Unused reactant slots point to this extra row of 1.0
     ones = np.ones((1, *y_full.shape[1:]), dtype=np.float64)
     y_ext = np.concatenate([np.maximum(y_full, 0.0), ones], axis=0)
@@ -197,8 +202,13 @@ def _switch(
     if negative_index.shape[1] == 0:  # no negative product at all
         return np.ones((negative_index.shape[0], *y_full.shape[1:]), dtype=np.float64)
     clipped = np.maximum(y_full, 0.0)
-    ones = np.ones((1, *y_full.shape[1:]), dtype=np.float64)
-    per_species = np.concatenate([clipped / (clipped + DEPLETION_LIMIT), ones], axis=0)
+    if y_full.ndim == 1:
+        per_species = np.append(clipped / (clipped + DEPLETION_LIMIT), 1.0)
+    else:
+        ones = np.ones((1, *y_full.shape[1:]), dtype=np.float64)
+        per_species = np.concatenate(
+            [clipped / (clipped + DEPLETION_LIMIT), ones], axis=0
+        )
     return np.prod(per_species[negative_index], axis=1)
 
 
@@ -329,12 +339,30 @@ def reaction_rates(
         ReactionRates [mol/L/s]
     """
     return ReactionRates(
-        k_reactions=mass_action_rates(y_full, mat.k_reactions)
-        * depletion_switch(y_full, mat.k_reactions),
+        k_reactions=_switched(
+            mass_action_rates(y_full, mat.k_reactions),
+            y_full,
+            mat.k_reactions.negative_index,
+        ),
         radiolytic=radiolytic_rates(dose_rates(t, beam), mat.radiolytic),
-        enzymatic=michaelis_menten_rates(y_full, mat.enzymatic)
-        * depletion_switch(y_full, mat.enzymatic),
+        enzymatic=_switched(
+            michaelis_menten_rates(y_full, mat.enzymatic),
+            y_full,
+            mat.enzymatic.negative_index,
+        ),
     )
+
+
+def _switched(
+    rates: NDArray[np.float64],
+    y_full: NDArray[np.float64],
+    negative_index: NDArray[np.intp],
+) -> NDArray[np.float64]:
+    """rates * depletion switch; the switch (1 everywhere) is skipped when
+    no reaction has a negative product (same values: x * 1.0 == x)."""
+    if negative_index.shape[1] == 0:
+        return rates
+    return rates * _switch(y_full, negative_index)
 
 
 def species_rates(
@@ -711,8 +739,9 @@ def derive(
     """
     y_full = mat.state.to_full_molar(y)
     dydt = species_rates(reaction_rates(t, y_full, mat, beam), mat)
-    negative = np.flatnonzero(y < 0.0)
-    if negative.size:
+    below = np.asarray(y) < 0.0
+    if below.any():
+        negative = np.flatnonzero(below)
         dydt[negative] += overshoot_slopes(y_full, negative, mat) * y_full[negative]
     return mat.state.to_dynamic_micromolar(dydt)
 

@@ -70,3 +70,11 @@ _Avoid_: jac, exact Jacobian
 **Short ON span**:
 A beam ON span shorter than `MIN_BEAM_ON_TIME` (1e-6 s) met at run time (last pulse cut by max_dose, pulse clipped by t_span); it is not integrated, its radiolytic yield is added analytically and it is recorded in `ODEResult.short_on_spans` (ADR 0008). A configured ON time that short raises `ShortBeamOnError` instead.
 _Avoid_: partial pulse, too short pulse, burst
+
+**Stored point**:
+A time point kept in `ODEResult.t` / `y`; by default every solver step is one, with point thinning only the chosen times are (the solver steps are unchanged).
+_Avoid_: sample, output step
+
+**Point thinning**:
+Storing a fixed number of log-spaced points per chunk (`points_per_chunk_on` / `points_per_chunk_off`, first and last kept) instead of every solver step, to bound the memory of long chunked runs; integrals over stored points then get coarser.
+_Avoid_: decimation, downsampling

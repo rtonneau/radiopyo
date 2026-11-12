@@ -116,6 +116,13 @@ class ODEResult(object):
             (one point at the end of the span). Counted by the production
             integrals. In memory only (empty for results read from a
             file).
+        thinned: bool
+            Some steps store fewer points than the solver steps (point
+            thinning: points_per_chunk_on / points_per_chunk_off of the
+            chunked runs). The integrals over the stored points
+            (integrate_production_of, integrate_species, ...) are then
+            coarser; a warning is logged once per result. In memory only
+            (False for results read from a file).
     """
 
     # Keep track of the original sim env
@@ -128,10 +135,13 @@ class ODEResult(object):
     burst_dose_rates: tp.Optional[tp.List[float]]
     step_dose_rates: tp.List[tp.Optional[float]]
     short_on_spans: tp.List[ShortOnSpan]
+    thinned: bool
+    _thinned_warned: bool
 
-    # Properties of the bunch object sent by scipy.integrate.solve_ivp
-    t: NDArray[np.float64]
-    y: NDArray[np.float64]
+    # Properties of the bunch object sent by scipy.integrate.solve_ivp.
+    # t and y are properties over per-step blocks (see _t_blocks).
+    _t_blocks: tp.List[NDArray[np.float64]]
+    _y_blocks: tp.List[NDArray[np.float64]]
     dydt: NDArray[np.float64]
     sol: tp.List[tp.Any]
     t_events: tp.List[tp.List[NDArray[np.float64]]]
@@ -208,8 +218,8 @@ class ODEResult(object):
         # Combine all together in a NEW object: neither operand is modified.
         # The (read-only) env, beam and matrices are shared with 'self'.
         out = copy.copy(self)
-        out.t = np.append(self.t, other.t)
-        out.y = np.hstack([self.y, other.y])
+        out._t_blocks = [*self._t_blocks, *other._t_blocks]
+        out._y_blocks = [*self._y_blocks, *other._y_blocks]
         out.dydt = self.dydt.copy()
         out.sol = [*self.sol, *other.sol]
         out.t_events = [*self.t_events, *other.t_events]
@@ -229,7 +239,55 @@ class ODEResult(object):
         out.short_on_spans = [*self.short_on_spans, *other.short_on_spans]
         out.n_points = [*self.n_points, *other.n_points]
         out.exec_time = [*self.exec_time, *other.exec_time]
+        out.thinned = self.thinned or other.thinned
+        out._thinned_warned = False
         return out
+
+    # ------------------------------- Storage ------------------------------- #
+    # The time points and concentrations are kept as one block per
+    # integration step (appending a step never copies the earlier ones:
+    # the cost of a chunked run stays linear in the number of chunks).
+    # Reading t or y joins the blocks into a single one, kept as the only
+    # block: later reads are free and in-place edits of the returned array
+    # persist. Reading t or y after every appended step (e.g. inside the
+    # loop of a SimChunksIter) joins the whole history every time.
+    def __copy__(self) -> ODEResult:
+        """Shallow copy owning its own lists of blocks (appending a step
+        to the copy leaves the original unchanged)."""
+        out = self.__class__.__new__(self.__class__)
+        out.__dict__.update(self.__dict__)
+        out._t_blocks = list(self._t_blocks)
+        out._y_blocks = list(self._y_blocks)
+        return out
+
+    @property
+    def t(self) -> NDArray[np.float64]:
+        """Time points [s] of every stored point."""
+        if not self._t_blocks:
+            return np.array([], dtype=np.float64)
+        if len(self._t_blocks) > 1:
+            self._t_blocks = [np.concatenate(self._t_blocks)]
+        return self._t_blocks[0]
+
+    @t.setter
+    def t(self, value: NDArray[np.float64]) -> None:
+        value = np.asarray(value)
+        self._t_blocks = [value] if value.size > 0 else []
+
+    @property
+    def y(self) -> NDArray[np.float64]:
+        """Concentrations [µmol/L] of the dynamic species, (n_species,
+        n_points); an empty 1-D array before the first step."""
+        if not self._y_blocks:
+            return np.array([], dtype=np.float64)
+        if len(self._y_blocks) > 1:
+            self._y_blocks = [np.concatenate(self._y_blocks, axis=1)]
+        return self._y_blocks[0]
+
+    @y.setter
+    def y(self, value: NDArray[np.float64]) -> None:
+        value = np.asarray(value)
+        self._y_blocks = [value] if value.ndim == 2 else []
 
     @property
     def time(self) -> NDArray[np.float64]:
@@ -241,8 +299,12 @@ class ODEResult(object):
 
     @property
     def final_cc(self) -> NDArray[np.float64]:
-        """ """
-        return copy.copy(self.y[:, -1])
+        """Last stored point [µmol/L] (a copy), read from the last
+        non-empty step without joining the history."""
+        for block in reversed(self._y_blocks):
+            if block.shape[-1] > 0:
+                return copy.copy(block[:, -1])
+        return copy.copy(self.y[:, -1])  # no point: same error as before
 
     @property
     def initial_cc(self) -> NDArray[np.float64]:
@@ -262,8 +324,8 @@ class ODEResult(object):
         return h5file
 
     def _default_init(self) -> None:
-        self.t = np.array([], dtype=np.float64)
-        self.y = np.array([], dtype=np.float64)
+        self._t_blocks = []
+        self._y_blocks = []
         self.dydt = np.array([], dtype=np.float64)
         self.sol = []
         self.t_events, self.y_events = [], []
@@ -272,6 +334,8 @@ class ODEResult(object):
         self.n_points, self.exec_time = [], []
         self.step_dose_rates = []
         self.short_on_spans = []
+        self.thinned = False
+        self._thinned_warned = False
 
     def append_sol(
         self,
@@ -280,6 +344,7 @@ class ODEResult(object):
         bursts: tp.Optional[tp.Sequence[float]] = None,
         dose_rate: tp.Optional[float] = None,
         short_on_span: tp.Optional[ShortOnSpan] = None,
+        thinned: bool = False,
     ) -> None:
         """
         Append an integration step.
@@ -300,16 +365,18 @@ class ODEResult(object):
             short_on_span: ShortOnSpan, optional
                 The step is a short ON span (not integrated, see
                 short_on_spans).
+            thinned: bool
+                The step stores fewer points than the solver steps (see
+                thinned).
         """
+        self.thinned = self.thinned or thinned
         if short_on_span is not None:
             self.short_on_spans.append(short_on_span)
         if bursts is not None:
             self.burst_dose_rates = [*(self.burst_dose_rates or []), *bursts]
-        self.t = np.append(self.t, sol.t)
-        if len(self.y) == 0:
-            self.y = sol.y
-        else:
-            self.y = np.hstack([self.y, sol.y])
+        # One block per step: the earlier steps are never copied here.
+        self._t_blocks.append(np.asarray(sol.t).ravel())
+        self._y_blocks.append(np.asarray(sol.y))
         if sol.sol is not None:
             self.sol.append(sol.sol)
         if sol.t_events is not None:
@@ -428,6 +495,18 @@ class ODEResult(object):
             parts.append(rates.stacked())
         return np.hstack(parts)
 
+    def _warn_if_thinned(self) -> None:
+        """Log once per result that the integrals over the stored points
+        of a thinned result are coarser than over the solver steps."""
+        if self.thinned and not self._thinned_warned:
+            self._thinned_warned = True
+            logger.warning(
+                "Integral over the stored points of a thinned result "
+                "(points_per_chunk_on / points_per_chunk_off): coarser than "
+                "over the solver steps; use more points per chunk, or no "
+                "thinning, for accurate integrals"
+            )
+
     def _burst_dose_rates(self) -> tp.List[float]:
         """
         Dose rates [Gy/s] of the initial bursts to account for in the
@@ -486,6 +565,7 @@ class ODEResult(object):
         include_radiolytic: bool = True,
     ) -> pd.DataFrame:
         """ """
+        self._warn_if_thinned()
         _slice = make_slice_from_time_boundaries(start, stop)
 
         dfr = self.reconstruct_reactions().loc[_slice, :]
@@ -549,6 +629,7 @@ class ODEResult(object):
         include_equilibrium: bool = True,
     ) -> pd.DataFrame:
         """ """
+        self._warn_if_thinned()
         _slice = make_slice_from_time_boundaries(start, stop)
 
         dfr = self.reconstruct_reactions().loc[_slice, :]
@@ -624,6 +705,7 @@ class ODEResult(object):
         stop: tp.Optional[float] = None,
     ) -> float:
         """ """
+        self._warn_if_thinned()
         _slice = make_slice_from_time_boundaries(start, stop)
         _ = self.get_reaction_rate_of(reaction).loc[_slice]
         return trapezoid(_.values, x=_.index)
@@ -724,6 +806,7 @@ class ODEResult(object):
         start: float = 0,
         stop: float = float("inf"),
     ) -> pd.Series:
+        self._warn_if_thinned()
         df = self.to_pandas()
         df = df[(df.index >= start) & (df.index < stop)]
         out = {}

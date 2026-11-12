@@ -386,6 +386,24 @@ The module currently supports 2 ways of running simulations:
    `t_span`) is not integrated: its radiolytic yield is added analytically, a warning is
    logged and the span is listed in `ODEResult.short_on_spans`.
 
+   Long pulsed runs (thousands of pulses) store every solver step by default. To keep
+   the memory and the result size down, store N log-spaced points per chunk instead
+   (the chunk start and end are always kept; the solver steps are unchanged):
+
+   ```python
+   res = sim.prepare_chunked_run(t_span=[1e-7, 10],
+                                 points_per_chunk_on=20,   # per beam ON chunk
+                                 points_per_chunk_off=50,  # per beam OFF chunk
+                                 ).run()
+   ```
+
+   `prepare_single_pulse` takes the same two options. The concentrations at the stored
+   points are exact (solver dense output), but the integrals computed from the result
+   (`integrate_production_of`, `integrate_consumption_of`, `integrate_species`, ...) are
+   computed over the stored points only and get coarser: a warning is logged and
+   `res.thinned` is `True`. `examples/bench_chunked_scaling.py` measures the cost per
+   chunk versus the number of pulses.
+
    If `scipy.integrate.solve_ivp` fails on a chunk, `SolverFailedError`
    (`radiopyo.simulation.exceptions`) is raised with the span, the last time reached and
    the message of scipy, instead of returning a truncated solution.

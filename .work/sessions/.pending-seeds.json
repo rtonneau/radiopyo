@@ -135,23 +135,6 @@
     "sourcePath": null,
     "createdAt": "2026-11-11T13:37:44.572Z"
   },
-  "chunked-run-scaling": {
-    "strength": "Worth exploring",
-    "severity": null,
-    "files": [
-      "radiopyo/simulation/ode_result.py",
-      "radiopyo/simulation/unit_cell.py",
-      "radiopyo/simulation/ode_functions_solver.py",
-      "radiopyo/physics/beam.py"
-    ],
-    "problem": "Each chunk has a fixed cost of about 37 ms. ODEResult.append_sol copies the whole history on every chunk (np.append/hstack, so the cost is quadratic in the number of chunks). dose_rates loops in Python over every time point when the rates are reconstructed, and every ODEResult deep-copies env, beam and matrices. A conventional pulsed linac (~1e4 pulses, 2e4 chunks) runs for minutes.",
-    "solution": "Accumulate the chunk arrays in lists and concatenate them lazily, vectorise beam.at for an array of times, share the read-only matrices instead of deep-copying them, and consider merging OFF chunks or capping the points stored per chunk.",
-    "benefits": null,
-    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
-    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
-    "sourcePath": null,
-    "createdAt": "2026-11-11T13:37:44.572Z"
-  },
   "notebook-rich-display": {
     "strength": "Strong",
     "severity": null,
@@ -250,5 +233,21 @@
     "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
     "sourcePath": null,
     "createdAt": "2026-11-11T13:37:44.572Z"
+  },
+  "exact-integrals-thinned-runs": {
+    "strength": "Worth exploring",
+    "severity": null,
+    "files": [
+      "radiopyo/simulation/ode_result.py",
+      "radiopyo/simulation/unit_cell.py",
+      "radiopyo/simulation/ode_functions_solver.py"
+    ],
+    "problem": "F1: production/consumption integrals are trapezoids over the stored points; with opt-in point thinning (chunked-run-scaling) they lose accuracy, and the session only warns.",
+    "solution": "Integrate reaction rates per chunk at full solver resolution during the run and store per-reaction totals per chunk; integrals read those totals. Result-changing for thinned runs only; golden checks and an ADR.",
+    "benefits": null,
+    "sourceDirection": "follow-up of chunked-run-scaling (thinned results)",
+    "sourceReport": "scout-reports/review-seed-review-2026-11-12T10-55-54-941Z.md",
+    "sourcePath": ".scratch/tests/2026-11-12__chunked-run-scaling/seed-review.md",
+    "createdAt": "2026-11-12T10:55:54.941Z"
   }
 }
