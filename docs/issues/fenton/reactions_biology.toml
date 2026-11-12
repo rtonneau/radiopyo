@@ -1,0 +1,365 @@
+[bio_param]
+pH = 7
+
+#---------------------- Definition of Constants concentrations -------------------------
+[concentrations.fixed] # Unit is [mol]/[l]
+H2O = 55
+catalase = 0
+Fe_plus_plus = 2.2e-8
+#GSH = 1.6e-1
+RH = 0.025
+
+unsat_lipid = 0
+
+#----------------------- Definition of initial concentrations --------------------------
+# Rem: if unspecified
+[concentrations.initial] # Unit is [mol]/[l]
+O2 = 50e-6
+
+
+# ----------------------------------------------------------------------------------
+#                             DEFINE RADIOLYTIC REACTIONS                            
+# ----------------------------------------------------------------------------------
+[reactions.radiolytic] # Unit is [radical / 100eV / incident particle]
+R_r = 0.59
+mol2 = 0.59
+
+
+# ----------------------------------------------------------------------------------
+#                                 DEFINE K-REACTIONS                             
+# ----------------------------------------------------------------------------------
+
+#For [X].[X] -> ... reactions 2k value is given
+
+#  --------------------------- Biological Reactions --------------------------------
+[[reactions.k_reaction]] # 26) Super Oxide Dismutase action on  O2_r_minus (H_plus?)
+reaction = "2 O2_r_minus -> H2O2 + O2"
+k_value = 4e9                          # i.e. 2e9 x 2
+
+[[reactions.k_reaction]] # 28) Fenton Reactions
+reaction = "Fe_plus_plus + H2O2 -> Fe_plus_plus_plus + OH_minus + OH_r"
+k_value = 1e3
+
+[[reactions.k_reaction]] # 29) Reaction of H_r with biological molecules (RdH in R.Labarbe)
+reaction = "RH + H_r -> R_r + molHr"
+k_value = 1e8
+
+[[reactions.k_reaction]] # 30) Reaction of e_aq with biological molecules (Rde in R.Labarbe)
+reaction = "RH + e_aq -> RH_r"
+k_value = 1.4e8
+
+[[reactions.k_reaction]] # 32) Hydrogen abstraction by OH_r (Rb2 in R.Labarbe)
+reaction = "OH_r + RH -> R_r + H2O + molOHr"
+k_value = 1e9
+
+[[reactions.k_reaction]] # 33) Reaction of Alkyl R_r with O2 to form alkylperoxyl radicals ROO_r (Rb3 in R.Labarbe)
+reaction = "R_r + O2 -> ROO_r + mol1"
+k_value = 7.00e+04
+
+[[reactions.k_reaction]] # 35) R^. + R^. --> R-R   1e5 < k < 1e9 M^-1s^-1 (Rbr2 in R.Labarbe)
+reaction = "2 R_r -> RR"
+k_value = 1.00e+08
+
+[[reactions.k_reaction]] # 36) self reaction of ROO_r (Rb6 in R.Labarbe)
+reaction = "2 ROO_r -> ROOR + O2"
+k_value = 2e5                         # i.e. 1e4 x 2
+
+ [[reactions.k_reaction]] # 37) Life time of ROO_r ~ 17 s (k~ln(2)/17) (Rb8 in R.Labarbe)
+reaction = "ROO_r -> x"
+k_value = 0.01
+
+[[reactions.k_reaction]]
+reaction = "R_r -> y"
+k_value = 0
+
+[[reactions.k_reaction]] # 38) ROO_r react with unsaturated lipids RH to initiate nex radical chain  (Rb11 in R.Labarbe)
+reaction = "ROO_r + RH -> ROOH + R_r + mol2"
+k_value = 50
+
+[[reactions.k_reaction]] # 31) Reaction of HO^. with thiols (RdOH in R.Labarbe)
+reaction = "OH_r + GSH -> RH_r"
+k_value = 1e10
+
+
+
+# ----------------------------------------------------------------------------------
+#                            DEFINE ENZYMATIC REACTIONS                             
+# ----------------------------------------------------------------------------------
+# These reactions are implemented via the Michaelis Menten kinetic
+
+[[reactions.enzymatic]] #  (Rb10 in R.Labarbe)
+reaction = "2 H2O2 -- catalase >> O2 + 2H2O"
+k_value = 1.324e8                            # i.e. 6.62e7 x 2 [1/s]
+k_micha = 1.1                                #  [mol/l]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
