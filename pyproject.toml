@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "radiopyo"
-version = "0.6.0"
+version = "0.7.0"
 authors = [{ name = "Romain Tonneau", email = "romain.tonneau@unamur.be" }]
 description = "A small module to perform UHDR/CONV simulations with resolution of ODE's"
 readme = "README.md"

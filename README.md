@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/logo.svg" alt="radiopyo" width="420"></p>
 
 [![Tests](https://github.com/rtonneau/radiopyo/actions/workflows/tests.yml/badge.svg)](https://github.com/rtonneau/radiopyo/actions/workflows/tests.yml)
-![version](https://img.shields.io/badge/version-0.6.0-blue)
+![version](https://img.shields.io/badge/version-0.7.0-blue)
 ![Python](https://img.shields.io/badge/Python-%3E%3D3.11-blue)
 ![License](https://img.shields.io/badge/License-LGPL--3.0-blue)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)

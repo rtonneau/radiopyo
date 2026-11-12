@@ -8,5 +8,11 @@
     "enabled": false,
     "consent": false,
     "detected_at": "2026-11-09T19:38:07.566Z"
+  },
+  "release": {
+    "versionFiles": [
+      "pyproject.toml"
+    ],
+    "versionFilesSource": "detected"
   }
 }
