@@ -85,6 +85,30 @@
         "ticket": "01-paper-runs-module",
         "commit": "8c66628"
       }
+    },
+    {
+      "at": "2026-11-12T14:57:02.879Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-golden-paper-data.md",
+        "03-implement/02-golden-paper-data/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-golden-paper-data"
+      }
+    },
+    {
+      "at": "2026-11-12T15:01:20.229Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-golden-paper-data/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-golden-paper-data",
+        "commit": "3bd6c60"
+      }
     }
   ],
   "current_phase": "ship",
