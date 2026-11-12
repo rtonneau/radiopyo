@@ -84,9 +84,33 @@
         "ticket": "01-map-helper",
         "commit": "098fd9b"
       }
+    },
+    {
+      "at": "2026-11-12T08:56:22.214Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-showcase-notebook.md",
+        "03-implement/02-showcase-notebook/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-showcase-notebook"
+      }
+    },
+    {
+      "at": "2026-11-12T09:17:04.365Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/02-showcase-notebook/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-showcase-notebook",
+        "commit": "5cbf6c4"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "docs/fenton-fix-showcase-notebook",
     "base_branch": "main",
