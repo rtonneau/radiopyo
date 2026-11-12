@@ -47,6 +47,13 @@ PAPER_ORIGINAL_FILE = Path(__file__).parent / "data" / "paper_tonneau_2025_origi
 # the solver path, so 1e-6 is far below any physical change.
 RTOL = 1e-6
 ATOL = 1e-9  # µM, for the near-zero integrals (H2O2 consumption at UHDR)
+# Time series: np.interp of the solver points onto TIME_GRID. The LSODA step
+# sequence moves with the floating-point rounding of the machine (BLAS
+# kernels differ between CI runners), and a linear interpolation between
+# other solver points shifts the sampled values by up to ~1e-5 relative
+# (seen on GitHub runners: 7e-6 on H2O2 at 0.1 Gy/s), while the final
+# values still agree to 1e-6.
+TS_RTOL = 1e-4
 
 # (dose rate [Gy/s], pO2 [%]) re-run at every dose: net yield, integrals and
 # time series at the last dose (both are time-series points of the grid)
@@ -182,7 +189,7 @@ def test_time_series(
     r = full_runs[point][-1]
     for key in ("ts_o2", "ts_h2o2", "ts_ph"):
         np.testing.assert_allclose(
-            getattr(r, key), golden[key][a, b], rtol=RTOL, atol=ATOL, err_msg=key
+            getattr(r, key), golden[key][a, b], rtol=TS_RTOL, atol=ATOL, err_msg=key
         )
 
 
