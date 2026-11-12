@@ -109,6 +109,30 @@
         "ticket": "02-derive-overhead",
         "commit": "f0d13fe"
       }
+    },
+    {
+      "at": "2026-11-12T11:08:15.217Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-point-thinning.md",
+        "03-implement/03-point-thinning/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-point-thinning"
+      }
+    },
+    {
+      "at": "2026-11-12T11:15:46.026Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-point-thinning/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-point-thinning",
+        "commit": "7de28dc"
+      }
     }
   ],
   "current_phase": "ship",
