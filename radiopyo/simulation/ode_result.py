@@ -651,11 +651,14 @@ class ODEResult(object):
 
         if include_equilibrium:
             eq_r = self.compute_yields_of_eq_reactions_by_species(species, _slice)
-            for _k, _s in eq_r.items():
-                # If net value is production, remove it
-                if trapezoid(_s.values, x=_s.index) > 0:
-                    eq_r.drop(_k, axis=1, inplace=True)
-                    continue
+            # If net value is production, remove it (collect first: dropping
+            # while iterating breaks under pandas 3)
+            to_drop = [
+                _k
+                for _k, _s in eq_r.items()
+                if trapezoid(_s.values, x=_s.index) > 0
+            ]
+            eq_r = eq_r.drop(columns=to_drop)
             rdf = pd.concat([rdf, eq_r], axis=1)
         return rdf
 
