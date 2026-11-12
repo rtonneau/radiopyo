@@ -85,6 +85,30 @@
         "ticket": "01-docs-and-logo",
         "commit": "57997c9"
       }
+    },
+    {
+      "at": "2026-11-12T09:24:06.977Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-ci-workflow.md",
+        "03-implement/02-ci-workflow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-ci-workflow"
+      }
+    },
+    {
+      "at": "2026-11-12T09:32:54.236Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-ci-workflow/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-ci-workflow",
+        "commit": "fc3e3ba"
+      }
     }
   ],
   "current_phase": "ship",
