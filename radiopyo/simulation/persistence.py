@@ -155,7 +155,7 @@ class SimIdentifier:
             ftype = types[field.name]
             if ftype is bool:
                 _ = {"True": True, "False": False}
-                kwargs[field.name] = _.get(kwargs[field.name], None)
+                kwargs[field.name] = _.get(kwargs[field.name])
             elif isinstance(ftype, type):
                 kwargs[field.name] = ftype(kwargs[field.name])
             else:

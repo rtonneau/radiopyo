@@ -69,7 +69,7 @@ class ABCouple(tp.NamedTuple):
     pKa: float
     k_forward: float
     k_backward: float
-    temperature: None | float
+    temperature: float | None
 
 
 class AcidBase(BiReaction):
