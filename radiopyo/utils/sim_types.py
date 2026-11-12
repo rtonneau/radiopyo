@@ -11,7 +11,7 @@ Author:
 from __future__ import annotations
 
 import typing as tp
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 
 import numpy as np
 
@@ -27,14 +27,18 @@ __all__ = [
     "ConcentrationDict",
     "ConfigDict",
     "EzMatrices",
+    "EzOvershootTable",
     "GVector",
     "KMatrices",
+    "KOvershootTable",
     "KwargsRun",
+    "OvershootTables",
     "ReactionsDict",
     "SimMatrices",
     "StateLayout",
     "deep_update",
     "default_ConfigDict",
+    "pad_slots",
 ]
 # --------------------------------------------------------------------------- #
 
@@ -62,6 +66,25 @@ def deep_update(
         else:
             original[key] = value  # Replace value
     return original
+
+
+def pad_slots(mask: NDArray[np.bool_]) -> NDArray[np.intp]:
+    """Padded index table of a (n_species, n_r) bool mask: row r holds the
+    species of column r (in species order), the unused slots hold
+    n_species (they point to an extra entry appended by the caller, the
+    same trick as ``KMatrices.reactant_index``).
+
+    Returns:
+        NDArray[np.intp]: (n_r, max over r of the column count).
+    """
+    n_species, n_r = mask.shape
+    counts = mask.sum(axis=0)
+    width = int(counts.max()) if n_r else 0
+    out = np.full((n_r, width), n_species, dtype=np.intp)
+    for r in np.flatnonzero(counts):
+        species = np.flatnonzero(mask[:, r])
+        out[r, : species.size] = species
+    return out
 
 
 def _lock_arrays(container: tp.Any) -> None:
@@ -209,14 +232,19 @@ class KMatrices:
             is a negative product of the reaction (written '- species' on
             the product side). Such a reaction is slowed by the depletion
             switch as that species runs out (ADR 0005).
+        negative_index: (n_kr, max_negative_products) intp, derived from
+            negative_products when the instance is built (``pad_slots``,
+            unused slots hold n_species). Not a constructor argument.
     """
 
     k_values: NDArray[np.float64]
     reactant_index: NDArray[np.intp]
     stoichiometry: NDArray[np.float64]
     negative_products: NDArray[np.bool_]
+    negative_index: NDArray[np.intp] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "negative_index", pad_slots(self.negative_products))
         _lock_arrays(self)
 
     @property
@@ -272,6 +300,8 @@ class EzMatrices:
             is a negative product of the reaction. Such a reaction is
             slowed by the depletion switch as that species runs out
             (ADR 0005).
+        negative_index: (n_ez, max_negative_products) intp, derived from
+            negative_products (see KMatrices). Not a constructor argument.
     """
 
     k_values: NDArray[np.float64]
@@ -280,13 +310,148 @@ class EzMatrices:
     enzyme_index: NDArray[np.intp]
     stoichiometry: NDArray[np.float64]
     negative_products: NDArray[np.bool_]
+    negative_index: NDArray[np.intp] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "negative_index", pad_slots(self.negative_products))
         _lock_arrays(self)
 
     @property
     def n_reactions(self) -> int:
         return int(self.k_values.shape[0])
+
+
+@dataclass(frozen=True)
+class KOvershootTable:
+    """
+    The k-reactions that change one dynamic species j, with what the
+    overshoot relaxation (ADR 0007) needs to evaluate J_jj(0+) and its
+    gradient. Depends only on the matrices: built once per SimMatrices.
+
+    Attributes:
+        k_values: (n_sub,) rate constants of the reactions.
+        reactant_index: (n_sub, max_reactants) reactant slots.
+        k_values_dj: (n_sub,) k of d law / d c_j at c_j = 0+: k for a
+            reaction holding j once, 0 otherwise (held twice, 2 j, the
+            derivative is 0 at 0; not held, it is 0).
+        reactant_index_dj: (n_sub, max_reactants) reactant slots with the
+            slots of j pointing to the extra 1.0 (index n_species).
+        weight: (n_sub,) stoichiometry of j in each reaction.
+        flag: (n_sub,) bool, True when j is a negative product.
+        negative_without_j: (n_sub, width) intp, padded index
+            (``pad_slots``) of the negative products of the reactions
+            without species j.
+    """
+
+    k_values: NDArray[np.float64]
+    reactant_index: NDArray[np.intp]
+    k_values_dj: NDArray[np.float64]
+    reactant_index_dj: NDArray[np.intp]
+    weight: NDArray[np.float64]
+    flag: NDArray[np.bool_]
+    negative_without_j: NDArray[np.intp]
+
+    def __post_init__(self) -> None:
+        _lock_arrays(self)
+
+    @classmethod
+    def build(cls, kmat: KMatrices, j: int) -> tp.Optional[KOvershootTable]:
+        """Table of species j, None when no k-reaction changes it."""
+        cols = np.flatnonzero(kmat.stoichiometry[j])
+        if cols.size == 0:
+            return None
+        slots = kmat.reactant_index[cols]
+        once = np.count_nonzero(slots == j, axis=1) == 1
+        k_values = kmat.k_values[cols]
+        negative = kmat.negative_products[:, cols].copy()
+        negative[j] = False
+        return cls(
+            k_values=k_values,
+            reactant_index=slots,
+            k_values_dj=np.where(once, k_values, 0.0),
+            reactant_index_dj=np.where(
+                slots == j, kmat.stoichiometry.shape[0], slots
+            ).astype(np.intp),
+            weight=kmat.stoichiometry[j, cols],
+            flag=kmat.negative_products[j, cols],
+            negative_without_j=pad_slots(negative),
+        )
+
+
+@dataclass(frozen=True)
+class EzOvershootTable:
+    """
+    The enzymatic reactions that change one dynamic species j (see
+    KOvershootTable).
+
+    Attributes:
+        k_values: (n_sub,) catalytic rate constants.
+        k_michaelis: (n_sub,) Michaelis constants [mol/L].
+        substrate_index: (n_sub,) substrate of each reaction.
+        enzyme_index: (n_sub,) enzyme of each reaction.
+        is_enzyme: (n_sub,) bool, True when j is the enzyme.
+        is_substrate: (n_sub,) bool, True when j is the substrate.
+        weight: (n_sub,) stoichiometry of j in each reaction.
+        flag: (n_sub,) bool, True when j is a negative product.
+        negative_without_j: (n_sub, width) intp, padded index
+            (``pad_slots``) of the negative products of the reactions
+            without species j.
+    """
+
+    k_values: NDArray[np.float64]
+    k_michaelis: NDArray[np.float64]
+    substrate_index: NDArray[np.intp]
+    enzyme_index: NDArray[np.intp]
+    is_enzyme: NDArray[np.bool_]
+    is_substrate: NDArray[np.bool_]
+    weight: NDArray[np.float64]
+    flag: NDArray[np.bool_]
+    negative_without_j: NDArray[np.intp]
+
+    def __post_init__(self) -> None:
+        _lock_arrays(self)
+
+    @classmethod
+    def build(cls, ezmat: EzMatrices, j: int) -> tp.Optional[EzOvershootTable]:
+        """Table of species j, None when no enzymatic reaction changes it."""
+        cols = np.flatnonzero(ezmat.stoichiometry[j])
+        if cols.size == 0:
+            return None
+        negative = ezmat.negative_products[:, cols].copy()
+        negative[j] = False
+        return cls(
+            k_values=ezmat.k_values[cols],
+            k_michaelis=ezmat.k_michaelis[cols],
+            substrate_index=ezmat.substrate_index[cols],
+            enzyme_index=ezmat.enzyme_index[cols],
+            is_enzyme=ezmat.enzyme_index[cols] == j,
+            is_substrate=ezmat.substrate_index[cols] == j,
+            weight=ezmat.stoichiometry[j, cols],
+            flag=ezmat.negative_products[j, cols],
+            negative_without_j=pad_slots(negative),
+        )
+
+
+@dataclass(frozen=True)
+class OvershootTables:
+    """
+    Per dynamic species tables of the overshoot relaxation (ADR 0007),
+    indexed by species index: ``k[j]`` / ``ez[j]`` is None when no
+    k-reaction / enzymatic reaction changes species j. Built once with
+    the SimMatrices, so the solver never rebuilds sub-matrices.
+    """
+
+    k: tp.Tuple[tp.Optional[KOvershootTable], ...]
+    ez: tp.Tuple[tp.Optional[EzOvershootTable], ...]
+
+    @classmethod
+    def build(
+        cls, kmat: KMatrices, ezmat: EzMatrices, n_dyn: int
+    ) -> OvershootTables:
+        return cls(
+            k=tuple(KOvershootTable.build(kmat, j) for j in range(n_dyn)),
+            ez=tuple(EzOvershootTable.build(ezmat, j) for j in range(n_dyn)),
+        )
 
 
 @dataclass(frozen=True)
@@ -301,12 +466,23 @@ class SimMatrices:
         radiolytic: GVector (radiolytic yields, stoichiometry)
         enzymatic: EzMatrices (Michaelis-Menten reactions)
         state: StateLayout (constant species, unit conversions)
+        overshoot: OvershootTables, derived from the above when the
+            instance is built (not a constructor argument).
     """
 
     k_reactions: KMatrices
     radiolytic: GVector
     enzymatic: EzMatrices
     state: StateLayout
+    overshoot: OvershootTables = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        n_dyn = self.n_species - self.state.n_cst
+        object.__setattr__(
+            self,
+            "overshoot",
+            OvershootTables.build(self.k_reactions, self.enzymatic, n_dyn),
+        )
 
     @property
     def cst_sp(self) -> NDArray[np.float64]:

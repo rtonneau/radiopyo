@@ -1,0 +1,178 @@
+{
+  "session_id": "2026-11-12__overshoot-path-precompute",
+  "feature_name": "overshoot-path-precompute",
+  "scratch_dir": ".scratch/tests/2026-11-12__overshoot-path-precompute",
+  "created_at": "2026-11-11T23:31:37.726Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-11T23:31:37.726Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T23:33:33.418Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-11T23:33:54.913Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T23:33:55.130Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-11T23:34:23.496Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "perf/overshoot-path-precompute",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-11T23:34:23.537Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-bench-and-reference.md",
+        "02-plan/tickets/02-overshoot-tables.md",
+        "02-plan/tickets/03-vectorise-helpers.md"
+      ],
+      "detail": {
+        "tickets": 3
+      }
+    },
+    {
+      "at": "2026-11-11T23:34:31.386Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-bench-and-reference.md",
+        "03-implement/01-bench-and-reference/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-bench-and-reference"
+      }
+    },
+    {
+      "at": "2026-11-11T23:40:33.845Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-bench-and-reference/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-bench-and-reference",
+        "commit": "4729c77"
+      }
+    },
+    {
+      "at": "2026-11-11T23:40:51.013Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-overshoot-tables.md",
+        "03-implement/02-overshoot-tables/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-tables"
+      }
+    },
+    {
+      "at": "2026-11-11T23:46:05.692Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-overshoot-tables/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-overshoot-tables",
+        "commit": "806b2b2"
+      }
+    },
+    {
+      "at": "2026-11-11T23:46:49.688Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-vectorise-helpers.md",
+        "03-implement/03-vectorise-helpers/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-vectorise-helpers"
+      }
+    },
+    {
+      "at": "2026-11-11T23:51:16.068Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/03-vectorise-helpers/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-vectorise-helpers",
+        "commit": "0cb3ab9"
+      }
+    },
+    {
+      "at": "2026-11-11T23:51:30.319Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "patch"
+      }
+    },
+    {
+      "at": "2026-11-11T23:51:40.497Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/8"
+      }
+    },
+    {
+      "at": "2026-11-11T23:51:34.885Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    }
+  ],
+  "current_phase": "finished",
+  "git": {
+    "branch": "perf/overshoot-path-precompute",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-11T23:34:23.496Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/8"
+  },
+  "ship_mode": "inline",
+  "changelog": {
+    "bump": "patch",
+    "floor": "patch",
+    "reason": null,
+    "bullets": 1,
+    "path": ".work/changelog/2026-11-12__overshoot-path-precompute.md",
+    "written_at": "2026-11-11T23:51:30.313Z"
+  },
+  "finished_at": "2026-11-11T23:51:34.885Z"
+}

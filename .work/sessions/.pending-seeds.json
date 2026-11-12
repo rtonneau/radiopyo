@@ -120,22 +120,6 @@
     "sourcePath": ".scratch/tests/2026-11-09__review-this-repo-to-improve-it-keep-all-actual-features-jocobian/evidence/18-followups.md",
     "createdAt": "2026-11-10T09:29:18.858Z"
   },
-  "overshoot-path-precompute": {
-    "strength": "Strong",
-    "severity": null,
-    "files": [
-      "radiopyo/simulation/ode_functions_solver.py",
-      "radiopyo/utils/sim_types.py",
-      "radiopyo/simulation/environment_build.py"
-    ],
-    "problem": "In a pulsed chunked run (200 chunks, 7.5 s), _k_relaxation_terms takes 38% of the time. With a species below 0, every derive/jacobian call rebuilds per-species sub-matrices with dataclasses.replace (23,640 _lock_arrays calls) and loops over np.delete (22,872 calls); depletion_switch_derivatives and mass_action_derivatives are Python loops.",
-    "solution": "Precompute the per-species reaction subsets and slot masks once, when SimMatrices is built (cached on the frozen dataclass), and vectorise the derivative helpers. Check the result against the existing Jacobian finite-difference tests and the Fenton stall regression.",
-    "benefits": "Pulsed and UHDR runs become faster where the solver spends most of its time.",
-    "sourceDirection": "review the code to highlight (1) area of improvement from efficiency point of view and (2) area of improvement from user usage point of view. restrict usage from jupyter lab notebook",
-    "sourceReport": "scout-reports/architecture-review-2026-11-11T13-37-44-572Z.html",
-    "sourcePath": null,
-    "createdAt": "2026-11-11T13:37:44.572Z"
-  },
   "rhs-call-overhead": {
     "strength": "Worth exploring",
     "severity": null,
