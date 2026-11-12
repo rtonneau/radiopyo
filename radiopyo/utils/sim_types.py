@@ -192,8 +192,9 @@ class StateLayout:
     def to_full_molar(self, y: NDArray[np.float64]) -> NDArray[np.float64]:
         """Solver state [µmol/L] -> full molar state [mol/L]."""
         y = np.asarray(y) * 1.0e-6  # µmol/L => mol/L
-        cst = self.cst_sp if y.ndim == 1 else self.cst_sp[:, np.newaxis]
-        cst = np.broadcast_to(cst, (self.n_cst, *y.shape[1:]))
+        if y.ndim == 1:  # one state (every derive call): no broadcast
+            return np.concatenate((y, self.cst_sp))
+        cst = np.broadcast_to(self.cst_sp[:, np.newaxis], (self.n_cst, *y.shape[1:]))
         return np.concatenate([y, cst], axis=0)
 
     def to_dynamic_micromolar(
