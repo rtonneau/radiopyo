@@ -129,9 +129,10 @@ class ODEResult(object):
     step_dose_rates: tp.List[tp.Optional[float]]
     short_on_spans: tp.List[ShortOnSpan]
 
-    # Properties of the bunch object sent by scipy.integrate.solve_ivp
-    t: NDArray[np.float64]
-    y: NDArray[np.float64]
+    # Properties of the bunch object sent by scipy.integrate.solve_ivp.
+    # t and y are properties over per-step blocks (see _t_blocks).
+    _t_blocks: tp.List[NDArray[np.float64]]
+    _y_blocks: tp.List[NDArray[np.float64]]
     dydt: NDArray[np.float64]
     sol: tp.List[tp.Any]
     t_events: tp.List[tp.List[NDArray[np.float64]]]
@@ -208,8 +209,8 @@ class ODEResult(object):
         # Combine all together in a NEW object: neither operand is modified.
         # The (read-only) env, beam and matrices are shared with 'self'.
         out = copy.copy(self)
-        out.t = np.append(self.t, other.t)
-        out.y = np.hstack([self.y, other.y])
+        out._t_blocks = [*self._t_blocks, *other._t_blocks]
+        out._y_blocks = [*self._y_blocks, *other._y_blocks]
         out.dydt = self.dydt.copy()
         out.sol = [*self.sol, *other.sol]
         out.t_events = [*self.t_events, *other.t_events]
@@ -231,6 +232,52 @@ class ODEResult(object):
         out.exec_time = [*self.exec_time, *other.exec_time]
         return out
 
+    # ------------------------------- Storage ------------------------------- #
+    # The time points and concentrations are kept as one block per
+    # integration step (appending a step never copies the earlier ones:
+    # the cost of a chunked run stays linear in the number of chunks).
+    # Reading t or y joins the blocks into a single one, kept as the only
+    # block: later reads are free and in-place edits of the returned array
+    # persist. Reading t or y after every appended step (e.g. inside the
+    # loop of a SimChunksIter) joins the whole history every time.
+    def __copy__(self) -> ODEResult:
+        """Shallow copy owning its own lists of blocks (appending a step
+        to the copy leaves the original unchanged)."""
+        out = self.__class__.__new__(self.__class__)
+        out.__dict__.update(self.__dict__)
+        out._t_blocks = list(self._t_blocks)
+        out._y_blocks = list(self._y_blocks)
+        return out
+
+    @property
+    def t(self) -> NDArray[np.float64]:
+        """Time points [s] of every stored point."""
+        if not self._t_blocks:
+            return np.array([], dtype=np.float64)
+        if len(self._t_blocks) > 1:
+            self._t_blocks = [np.concatenate(self._t_blocks)]
+        return self._t_blocks[0]
+
+    @t.setter
+    def t(self, value: NDArray[np.float64]) -> None:
+        value = np.asarray(value)
+        self._t_blocks = [value] if value.size > 0 else []
+
+    @property
+    def y(self) -> NDArray[np.float64]:
+        """Concentrations [µmol/L] of the dynamic species, (n_species,
+        n_points); an empty 1-D array before the first step."""
+        if not self._y_blocks:
+            return np.array([], dtype=np.float64)
+        if len(self._y_blocks) > 1:
+            self._y_blocks = [np.concatenate(self._y_blocks, axis=1)]
+        return self._y_blocks[0]
+
+    @y.setter
+    def y(self, value: NDArray[np.float64]) -> None:
+        value = np.asarray(value)
+        self._y_blocks = [value] if value.ndim == 2 else []
+
     @property
     def time(self) -> NDArray[np.float64]:
         return self.t
@@ -241,8 +288,12 @@ class ODEResult(object):
 
     @property
     def final_cc(self) -> NDArray[np.float64]:
-        """ """
-        return copy.copy(self.y[:, -1])
+        """Last stored point [µmol/L] (a copy), read from the last
+        non-empty step without joining the history."""
+        for block in reversed(self._y_blocks):
+            if block.shape[-1] > 0:
+                return copy.copy(block[:, -1])
+        return copy.copy(self.y[:, -1])  # no point: same error as before
 
     @property
     def initial_cc(self) -> NDArray[np.float64]:
@@ -262,8 +313,8 @@ class ODEResult(object):
         return h5file
 
     def _default_init(self) -> None:
-        self.t = np.array([], dtype=np.float64)
-        self.y = np.array([], dtype=np.float64)
+        self._t_blocks = []
+        self._y_blocks = []
         self.dydt = np.array([], dtype=np.float64)
         self.sol = []
         self.t_events, self.y_events = [], []
@@ -305,11 +356,9 @@ class ODEResult(object):
             self.short_on_spans.append(short_on_span)
         if bursts is not None:
             self.burst_dose_rates = [*(self.burst_dose_rates or []), *bursts]
-        self.t = np.append(self.t, sol.t)
-        if len(self.y) == 0:
-            self.y = sol.y
-        else:
-            self.y = np.hstack([self.y, sol.y])
+        # One block per step: the earlier steps are never copied here.
+        self._t_blocks.append(np.asarray(sol.t).ravel())
+        self._y_blocks.append(np.asarray(sol.y))
         if sol.sol is not None:
             self.sol.append(sol.sol)
         if sol.t_events is not None:

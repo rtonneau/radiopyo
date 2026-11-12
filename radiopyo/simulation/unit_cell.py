@@ -1156,8 +1156,9 @@ class SimChunksIter:
         res = self.sim._raw_run(
             (chunk.start, chunk.stop),
             dataclasses.replace(self.options, max_step=chunk.max_step_size),
-            # _raw_run copies y0: the stored last point stays untouched
-            y0=self.sol.y[:, -1] if self.current > 0 else self.y0,
+            # Last point of the previous chunk, read without joining the
+            # stored history (final_cc returns a copy).
+            y0=self.sol.final_cc if self.current > 0 else self.y0,
             beam_on=chunk.beam_on,
             dose_rate=chunk.dose_rate,
         )
