@@ -26,6 +26,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["mypy", "pytest", "pandas-stubs>=1.5.3"]
 tqdm = ["tqdm"]
+examples = ["matplotlib"]
 
 [project.urls]
 "Source" = "https://github.com/rtonneau/radiopyo"
