@@ -26,8 +26,8 @@ R_r = 0.59
 #For [X].[X] -> ... reactions 2k value is given
 
 #  --------------------------- Biological Reactions --------------------------------
-[[reactions.k_reaction]] # 26) Super Oxide Dismutase action on  O2_r_minus (H_plus?)
-reaction = "2 O2_r_minus -> H2O2 + O2"
+[[reactions.k_reaction]] # 26) Super Oxide Dismutase action on  O2_minus (H_plus?)
+reaction = "2 O2_minus -> H2O2 + O2"
 k_value = 4e9                          # i.e. 2e9 x 2
 
 [[reactions.k_reaction]] # 28) Fenton Reactions
