@@ -1,88 +1,152 @@
-<p align="center"><img src="docs/logo.svg" alt="radiopyo" width="420"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo.svg">
+    <img src="docs/assets/logo.svg" alt="radiopyo" width="360">
+  </picture>
+</p>
 
-[![Tests](https://github.com/rtonneau/radiopyo/actions/workflows/tests.yml/badge.svg)](https://github.com/rtonneau/radiopyo/actions/workflows/tests.yml)
-![version](https://img.shields.io/badge/version-0.7.0-blue)
-![Python](https://img.shields.io/badge/Python-%3E%3D3.11-blue)
-![License](https://img.shields.io/badge/License-LGPL--3.0-blue)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-![mypy](https://img.shields.io/badge/mypy-checked-blue)
-[![DOI](https://img.shields.io/badge/DOI-10.1088%2F1361--6560%2Fae1fcc-blue)](https://doi.org/10.1088/1361-6560/ae1fcc)
+<p align="center">
+  <strong>Water radiolysis and radiobiological chemistry under conventional and ultra-high-dose-rate irradiation.</strong>
+</p>
 
-radiopyo simulates water radiolysis and radiobiology chemistry under UHDR (FLASH) and
-conventional irradiation. It builds a system of ordinary differential equations from a
-[TOML](https://toml.io/en/) configuration file and solves it with
+<p align="center">
+  Dose rate and pulse timing change how long reactive species coexist, so the same dose
+  can lead to different chemistry. radiopyo follows that chemistry in time.
+</p>
+
+<p align="center">
+  <a href="https://github.com/rtonneau/radiopyo/actions/workflows/tests.yml"><img src="https://github.com/rtonneau/radiopyo/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/python-%E2%89%A53.11-12665E" alt="Python 3.11 or later">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-LGPL--3.0-12665E" alt="License: LGPL-3.0"></a>
+  <a href="https://doi.org/10.1088/1361-6560/ae1fcc"><img src="https://img.shields.io/badge/DOI-10.1088%2F1361--6560%2Fae1fcc-BB583D" alt="DOI 10.1088/1361-6560/ae1fcc"></a>
+</p>
+
+## What you can study
+
+radiopyo is a **homogeneous chemical-kinetics model**. Primary radiolytic yields (G-values)
+feed a system of rate equations for the concentrations of the species, which
 [scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html)
-(LSODA by default, with an analytic Jacobian).
+integrates (LSODA by default, with an analytic Jacobian). It does not simulate particle
+tracks or the spatial structure of the energy deposition. It started as a port of
+R. Labarbe's MatLab model.
 
-## Installation
+- **Dose rate and beam timing.** Constant, single-pulse, pulsed and macro-pulsed beams
+  (trains of micro pulses), with a maximum dose or a number of pulses. Pulsed runs are
+  cut exactly at the beam ON/OFF transitions.
+- **Chemical interactions.** Water radiolysis chemistry plus a biological layer (oxygen,
+  organic radicals R· and ROO·, catalase, Fenton chemistry). Rate-constant, Arrhenius,
+  acid/base, equilibrium and Michaelis–Menten reactions, all written in TOML.
+- **Oxygen and pH.** Initial concentrations (e.g. dissolved O₂) are inputs. The pH sets the
+  initial H₃O⁺/OH⁻ and can be held constant (`force_cst_pH`).
+- **LET.** A beam LET in 0.13–150 keV/µm sets the G-values of e⁻aq, OH·, H·, H₂, H₂O₂ and
+  H₃O⁺ from the [Boscolo et al. (2020)](https://doi.org/10.3390/ijms21020424) fit. An
+  optional dose-rate correction of these G-values exists, but its validity range is not
+  checked.
+- **Temperature.** Rate constants can depend on temperature (Arrhenius or polynomial).
+- **Analysis.** Concentrations over time, per-reaction rates, production and consumption
+  of each species, time-integrated concentrations, and HDF5 storage of runs.
 
-Python >= 3.11 is required; dependencies are installed automatically.
+## Quick start
+
+radiopyo needs **Python 3.11 or later**; the dependencies (numpy, scipy, pandas, lark,
+h5py, more-itertools) are installed automatically.
 
 ```bash
 pip install git+https://github.com/rtonneau/radiopyo.git
 ```
 
-For development, clone the repository and install it as an editable package:
-
-```bash
-git clone https://github.com/rtonneau/radiopyo.git && cd radiopyo && pip install -e ./
-```
-
-Optional: `pip install "radiopyo[tqdm]"` for a progress bar.
-
-## Update
-
-```bash
-pip install --upgrade git+https://github.com/rtonneau/radiopyo.git
-```
-
-For an editable install, run `git pull` instead.
-
-## Usage
-
-Single run:
+Run the bundled Labarbe configuration (pure-water radiolysis plus the biological layer,
+with a 10 Gy constant beam at 1e7 Gy/s) for 10 s:
 
 ```python
 import radiopyo as rp
 
 sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
-res = sim.run(t_span=[1e-7, 10])  # from 1e-7 s to 10 s
+res = sim.run(t_span=[1e-7, 10])   # [s]
 
-df = res.to_pandas()          # results as a pandas DataFrame
-s = res.integrate_species()   # time-integrated concentrations (pandas.Series)
+df = res.to_pandas()               # concentrations [µmol/L], one column per species
+print(df[["O2", "H2O2"]].iloc[-1]) # state at t = 10 s
 ```
 
-The radiolytic yield of the first 1e-7 s of a beam ON phase is added analytically to the
-initial concentrations, so the result starts at `t_span[0] + 1e-7`. Pass `use_jac=False`
-to `run` to replace the analytic Jacobian by scipy's finite differences.
+`res` is an `ODEResult`. `to_pandas()` gives a DataFrame indexed by time [s], one column
+per species (fixed species included), in µmol/L. The same object gives the
+time-integrated concentrations (`res.integrate_species()`) and the contribution of each
+reaction (`res.integrate_production_of("H2O2")`, `res.integrate_consumption_of("O2")`,
+`res.reconstruct_reactions()`).
 
-Chunked run, useful for pulsed beams (separate step sizes for beam ON and OFF):
+> [!NOTE]
+> The radiolytic yield of the first 1e-7 s of a beam ON phase is added analytically to
+> the initial concentrations, so the result starts at `t_span[0] + 1e-7`.
+
+## Irradiation and chemistry
+
+To compare dose rates, deliver the same dose with two different beams and look at the
+chemistry afterwards. Here 10 Gy is delivered at 0.1 Gy/s (CONV) and in 5 pulses of
+2 µs at 1e6 Gy/s (UHDR), and the oxygen consumed is read 200 s after the start:
 
 ```python
 import radiopyo as rp
 
-beam = rp.PulsedBeam.from_dose_rate_peak(
-    1000,         # dose_rate_peak [Gy/s]
-    1e-3,         # period [s]
-    5e-6,         # on_time [s]
-    max_dose=10,  # [Gy], pass it by keyword
-)
+beams = {
+    "CONV": rp.ConstantBeam(0.1, max_dose=10),          # 0.1 Gy/s for 100 s
+    "UHDR": rp.PulsedBeam.from_dose_rate_peak(
+        1e6,          # peak dose rate [Gy/s]
+        0.1,          # period [s], i.e. 10 Hz
+        2e-6,         # on_time [s]: 2 Gy per pulse
+        max_dose=10,  # [Gy], by keyword (the 4th positional argument is n_pulse)
+    ),
+}
 
-sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
-sim.set_beam(beam)
-res = sim.prepare_chunked_run(
-    t_span=[1e-7, 10],
-    max_step_size_on=1e-8,   # [s]
-    max_step_size_off=0.01,  # [s]
-).run()
+for name, beam in beams.items():
+    sim = rp.UnitCell.from_toml(rp.LABARBE_CONFIG_FILE)
+    sim.set_beam(beam, LET=0.201)  # [keV/µm], sets the G-values
+    res = sim.prepare_chunked_run(t_span=[0, 200]).run()
+    o2 = res.to_pandas()["O2"]
+    print(f"{name}: O2 consumed = {o2.iloc[0] - o2.iloc[-1]:.2f} µmol/L")
 ```
 
-A beam ON time shorter than 1e-6 s raises `ShortBeamOnError`. If scipy fails on a chunk,
-`SolverFailedError` is raised instead of returning a truncated result.
+`prepare_chunked_run` splits the run into beam ON and OFF chunks. Each chunk is integrated
+with a constant dose rate and can have its own maximum step (`max_step_size_on`,
+`max_step_size_off`). Which yield goes up or down with the dose rate depends on the
+chemistry, the oxygen content and the beam; the model gives no general rule.
 
-## Configuration
+Beam timing affects how the run is solved:
 
-A simulation is described by a TOML file. Full reference: [docs/configuration.md](docs/configuration.md).
+- A configured beam ON time below 1e-6 s raises `ShortBeamOnError` when the beam is built.
+- A run-time ON span shorter than that (a last pulse cut by `max_dose`, a pulse clipped by
+  `t_span`) is not integrated. Its radiolytic yield is added analytically, a warning is
+  logged, and the span is listed in `res.short_on_spans`.
+- If scipy fails on a chunk, `SolverFailedError` is raised instead of returning a
+  truncated result.
+- Long pulsed runs store every solver step. `points_per_chunk_on` / `points_per_chunk_off`
+  keep N points per chunk instead; integrals computed from such a thinned result are
+  coarser and log a warning.
+- `set_beam(beam)` without `LET` reuses the LET of the previously selected beam.
+
+## Documentation
+
+- **[Configuration reference](docs/configuration.md#configuring-simulation)**: includes,
+  parameters, concentrations and every reaction type.
+- **[Beam definitions](docs/configuration.md#possible-beam-definitions)**: constant, pulsed,
+  single-pulse and macro-pulsed beams, LET and G-values.
+- **[Running simulations](docs/configuration.md#ways-of-running-simulation)**: single and
+  chunked runs, point thinning, solver failures, overshoot handling.
+- **[Reaction model](docs/20230425_RPM_extended_doc.pdf)** (PDF): the equations and rate
+  laws behind the ODE system.
+- **[Bundled configurations](radiopyo/data/)**: the TOML files shipped with the package.
+- **[Basic usage notebook](examples/notebook_basic_usage.ipynb)**: a worked example.
+- **[Fenton showcase](docs/issues/fenton/Fenton_Fixed_Showcase.ipynb)** (notebook): a Fenton
+  runaway case and maps over dose per pulse and average dose rate.
+- **[Changelog](CHANGELOG.md)**: changes between versions.
+
+The bundled configurations are `advanced_water_radiolysis.toml` (pure water,
+`rp.PURE_WATER_CONFIG_FILE`), `reactions_biology.toml` (the biological layer, to be used
+with the former) and `config_Labarbe.toml` (both plus a constant beam,
+`rp.LABARBE_CONFIG_FILE`). Your own file can include them and override single values.
+
+<details>
+<summary><strong>Configuration sections at a glance</strong></summary>
 
 | Section | Purpose |
 | --- | --- |
@@ -95,30 +159,13 @@ A simulation is described by a TOML file. Full reference: [docs/configuration.md
 | `[[reactions.arrhenius]]` | Reaction with a temperature-dependent rate (`A`, `Ea` in kJ/mol) |
 | `[[reactions.acid_base]]` | Acid/base pair with `pKa`, `k_forward`, `k_backward` |
 | `[[reactions.equilibrium]]` | Forward/backward pair, 2 of 3 constants given |
-| `[[reactions.enzymatic]]` | Michaelis-Menten reaction (`k_value`, `k_micha`) |
-
-| Beam | Description |
-| --- | --- |
+| `[[reactions.enzymatic]]` | Michaelis–Menten reaction (`k_value`, `k_micha`) |
 | `[[beam.constant]]` | Constant dose rate, optional `max_dose` |
 | `[[beam.pulsed]]` | Regular pulses (`dose_rate_peak`, `on_time`, `period`) |
 | `[[beam.singlepulse]]` | One pulse of duration `on_time` |
 | `[[beam.macro_pulsed]]` | Trains of micro pulses |
 
-A beam `LET` [keV/um, 0.13 to 150] sets the G-values ([Boscolo et al.](https://doi.org/10.3390/ijms21020424)).
-
-Bundled configs live in [radiopyo/data/](radiopyo/data/): `advanced_water_radiolysis.toml`
-(pure water, `rp.PURE_WATER_CONFIG_FILE`), `reactions_biology.toml` (biological part, use
-it with the former) and `config_Labarbe.toml` (both plus a constant beam,
-`rp.LABARBE_CONFIG_FILE`).
-
-## Development
-
-```bash
-pip install -e ".[dev]" ruff
-ruff check radiopyo && mypy radiopyo && python -m pytest
-```
-
-Ruff and mypy must report zero errors. radiopyo is released under the LGPL-3.0 license.
+</details>
 
 ## Citation
 
@@ -143,7 +190,27 @@ DOI [10.1088/1361-6560/ae1fcc](https://doi.org/10.1088/1361-6560/ae1fcc).
 }
 ```
 
+## Development
+
+Clone the repository and install it as an editable package, with the test and type-check
+tools:
+
+```bash
+git clone https://github.com/rtonneau/radiopyo.git && cd radiopyo
+pip install -e ".[dev]" ruff
+ruff check radiopyo && mypy radiopyo && python -m pytest
+```
+
+Ruff and mypy must report zero errors. Optional: `pip install "radiopyo[tqdm]"` for a
+progress bar. To update a regular install, run
+`pip install --upgrade git+https://github.com/rtonneau/radiopyo.git`; for an editable
+install, `git pull`.
+
 ## Acknowledgement
 
-- This module was originally inspired by R. Labarbe
-  [validated](https://doi.org/10.1016/j.radonc.2020.06.001) MatLab code.
+This module was originally inspired by R. Labarbe's
+[validated](https://doi.org/10.1016/j.radonc.2020.06.001) MatLab code.
+
+## License
+
+radiopyo is released under the [LGPL-3.0](LICENSE) license.

@@ -352,7 +352,9 @@ The module currently supports 2 ways of running simulations:
 
    The initial radiolytic yield of the first 1e-7 s of a beam ON phase is added
    analytically to the initial concentrations: the result starts at
-   `t_span[0] + 1e-7`.
+   `t_span[0] + 1e-7`. The analytic Jacobian is passed to LSODA, BDF and Radau by
+   default; `use_jac=False` (also accepted by the chunked and single-pulse runs) falls
+   back to scipy's finite differences.
 
 - run in several chunks (useful for pulsed beams)
 

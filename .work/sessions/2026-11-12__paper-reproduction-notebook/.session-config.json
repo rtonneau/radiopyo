@@ -1,0 +1,18 @@
+{
+  "session_id": "2026-11-12__paper-reproduction-notebook",
+  "feature_name": "paper-reproduction-notebook",
+  "scratch_dir": ".scratch/tests/2026-11-12__paper-reproduction-notebook",
+  "created_at": "2026-11-12T14:28:40.875Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-12T14:28:40.875Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    }
+  ],
+  "current_phase": "grill"
+}
