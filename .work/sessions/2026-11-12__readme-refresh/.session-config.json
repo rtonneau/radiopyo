@@ -109,9 +109,33 @@
         "ticket": "02-ci-workflow",
         "commit": "fc3e3ba"
       }
+    },
+    {
+      "at": "2026-11-12T09:32:54.641Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-readme-rewrite.md",
+        "03-implement/03-readme-rewrite/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-readme-rewrite"
+      }
+    },
+    {
+      "at": "2026-11-12T09:34:46.805Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/03-readme-rewrite/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-readme-rewrite",
+        "commit": "0dbaace"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "docs/readme-refresh",
     "base_branch": "main",
