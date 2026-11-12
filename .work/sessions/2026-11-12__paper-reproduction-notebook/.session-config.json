@@ -109,6 +109,30 @@
         "ticket": "02-golden-paper-data",
         "commit": "3bd6c60"
       }
+    },
+    {
+      "at": "2026-11-12T15:01:21.225Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-notebook.md",
+        "03-implement/03-notebook/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-notebook"
+      }
+    },
+    {
+      "at": "2026-11-12T15:07:42.480Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-notebook/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-notebook",
+        "commit": "1ad97fd"
+      }
     }
   ],
   "current_phase": "ship",
