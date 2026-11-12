@@ -16,3 +16,5 @@ __pycache__
 /dist
 .coverage
 /tests/output/
+*blond_2026/
+.ipynb_checkpoints/

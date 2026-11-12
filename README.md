@@ -136,6 +136,20 @@ Beam timing affects how the run is solved:
   laws behind the ODE system.
 - **[Bundled configurations](radiopyo/data/)**: the TOML files shipped with the package.
 - **[Basic usage notebook](examples/notebook_basic_usage.ipynb)**: a worked example.
+- **[Paper reproduction notebook](examples/tonneau_2025_pmb/tonneau_2025_pmb.ipynb)**:
+  the main figures of Tonneau et al. 2025 (O2, H2O2 and pH time evolution, ΔO2 and net
+  H2O2 yield maps over dose rate and pO2, gross production / consumption bars) with a
+  comparison to the values quoted in the paper. Two scenarios: `"methods"` (what the paper's
+  methods describe: bundled config, LET 1.17 keV/µm) and `"original"` (the inputs of the runs
+  quoted in the text: the author's `CONFIG_PAPER_01.toml`, LET 0.56 keV/µm, which reproduces
+  the quoted values to about 1 %). It loads the recorded grid by default (`RECOMPUTE = True`
+  re-runs it, about 10 min); needs `pip install "radiopyo[examples]"`.
+- **[GF(DR) fit comparison notebook](examples/tonneau_2025_pmb/gf_fit_comparison.ipynb)**:
+  the same grid run with the GF(DR) fit printed in the paper, compared with the shipped fit
+  and with the values quoted in the paper.
+- **[Pre-refactoring comparison notebook](examples/tonneau_2025_pmb/pre_refactor_comparison.ipynb)**:
+  the same grid run with the code as it was before the refactoring (commit 2261b92,
+  `record_pre_refactor.py`), compared with the current code.
 - **[Fenton showcase](docs/issues/fenton/Fenton_Fixed_Showcase.ipynb)** (notebook): a Fenton
   runaway case and maps over dose per pulse and average dose rate.
 - **[Changelog](CHANGELOG.md)**: changes between versions.
@@ -205,6 +219,14 @@ Ruff and mypy must report zero errors. Optional: `pip install "radiopyo[tqdm]"` 
 progress bar. To update a regular install, run
 `pip install --upgrade git+https://github.com/rtonneau/radiopyo.git`; for an editable
 install, `git pull`.
+
+`tests/golden/` compares the outputs with recorded reference data, including the grid of
+the paper reproduction (`tests/golden/data/paper_tonneau_2025*.npz`). Re-record it only for
+an approved result-changing fix:
+
+```bash
+PYTHONHASHSEED=0 python tests/golden/record_golden.py --force --only paper --workers 8
+```
 
 ## Acknowledgement
 
