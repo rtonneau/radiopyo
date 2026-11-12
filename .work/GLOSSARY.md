@@ -75,6 +75,22 @@ _Avoid_: partial pulse, too short pulse, burst
 A time point kept in `ODEResult.t` / `y`; by default every solver step is one, with point thinning only the chosen times are (the solver steps are unchanged).
 _Avoid_: sample, output step
 
+**GF(DR)**:
+The dimensionless, species-independent factor that scales the Boscolo G-values with the beam peak dose rate when `variable_GValues` is on (`GValuesBoscolo._scale_factor`).
+_Avoid_: G-factor, dose-rate coefficient, Gfit
+
+**Net yield**:
+The slope of a linear fit of a species' concentration at the end of the run versus the delivered dose, in #/100 eV (1 #/100 eV ≈ 0.1036 µM/Gy); used for the H2O2 map of the paper reproduction.
+_Avoid_: net G-value, net production (as a G-value)
+
+**Gross production / gross consumption**:
+The time integral over the whole run of all rates producing (radiolytic yield included) or consuming one species, in µM (`integrate_production_of` / `integrate_consumption_of`).
+_Avoid_: total yield, production yield
+
+**Paper reproduction**:
+The notebook and golden data reproducing the main figures of Tonneau et al. 2025 (PMB 70 235021) with the bundled pure-water config.
+_Avoid_: paper notebook, foundational figures
+
 **Point thinning**:
 Storing a fixed number of log-spaced points per chunk (`points_per_chunk_on` / `points_per_chunk_off`, first and last kept) instead of every solver step, to bound the memory of long chunked runs; integrals over stored points then get coarser.
 _Avoid_: decimation, downsampling

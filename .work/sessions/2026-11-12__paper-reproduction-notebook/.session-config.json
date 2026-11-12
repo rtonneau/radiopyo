@@ -12,7 +12,62 @@
       "files": [
         "01-grill/resume.md"
       ]
+    },
+    {
+      "at": "2026-11-12T14:48:38.128Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-12T14:49:08.685Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-12T14:49:12.682Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-12T14:49:50.039Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/paper-reproduction-notebook",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-12T14:49:50.078Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-paper-runs-module.md",
+        "02-plan/tickets/02-golden-paper-data.md",
+        "02-plan/tickets/03-notebook.md",
+        "02-plan/tickets/04-docs-packaging.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
     }
   ],
-  "current_phase": "grill"
+  "current_phase": "ship",
+  "git": {
+    "branch": "feat/paper-reproduction-notebook",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-12T14:49:50.039Z",
+    "pr_url": null
+  }
 }
