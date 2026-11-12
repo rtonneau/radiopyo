@@ -133,9 +133,33 @@
         "ticket": "03-point-thinning",
         "commit": "7de28dc"
       }
+    },
+    {
+      "at": "2026-11-12T11:15:52.429Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-scaling-benchmark-docs.md",
+        "03-implement/04-scaling-benchmark-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-scaling-benchmark-docs"
+      }
+    },
+    {
+      "at": "2026-11-12T11:43:05.222Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-scaling-benchmark-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-scaling-benchmark-docs",
+        "commit": "680dd3a"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "perf/chunked-run-scaling",
     "base_branch": "main",
