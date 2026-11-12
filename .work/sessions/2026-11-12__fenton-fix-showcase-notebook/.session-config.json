@@ -60,6 +60,30 @@
       "detail": {
         "tickets": 2
       }
+    },
+    {
+      "at": "2026-11-12T08:49:50.434Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-map-helper.md",
+        "03-implement/01-map-helper/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-map-helper"
+      }
+    },
+    {
+      "at": "2026-11-12T08:56:21.827Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-map-helper/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-map-helper",
+        "commit": "098fd9b"
+      }
     }
   ],
   "current_phase": "ship",
@@ -68,5 +92,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-12T08:49:49.869Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "delegate"
 }
