@@ -61,6 +61,30 @@
       "detail": {
         "tickets": 4
       }
+    },
+    {
+      "at": "2026-11-12T10:59:37.947Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-lazy-result-storage.md",
+        "03-implement/01-lazy-result-storage/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-lazy-result-storage"
+      }
+    },
+    {
+      "at": "2026-11-12T11:04:30.607Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-lazy-result-storage/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-lazy-result-storage",
+        "commit": "8f17682"
+      }
     }
   ],
   "current_phase": "ship",
@@ -69,5 +93,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-12T10:59:29.966Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "inline"
 }
