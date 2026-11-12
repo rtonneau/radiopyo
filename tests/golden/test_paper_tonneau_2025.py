@@ -39,6 +39,9 @@ PAPER_FILE = Path(__file__).parent / "data" / "paper_tonneau_2025.npz"
 # Same grid with the GF(DR) fit printed in the paper (record_golden.py
 # --only paper-gf), for examples/tonneau_2025_pmb/gf_fit_comparison.ipynb
 PAPER_GF_FILE = Path(__file__).parent / "data" / "paper_tonneau_2025_paper_gf.npz"
+# Same grid with the inputs of the original runs quoted in the paper's text
+# (paper_runs.SCENARIOS["original"]; record_golden.py --only paper-original)
+PAPER_ORIGINAL_FILE = Path(__file__).parent / "data" / "paper_tonneau_2025_original.npz"
 
 # Same code, same inputs: only the summation order of a refactor may move
 # the solver path, so 1e-6 is far below any physical change.
@@ -228,3 +231,53 @@ def test_gf_fit_is_restored(pr: types.ModuleType) -> None:
     pr.run_point(1e7, 0.0, pr.DOSES[-1], gf_fit="paper")
     assert GValuesBoscolo._scale_factor(1e7) == before
     assert pr.gf_factor(1e7, "paper") == pytest.approx(0.982 * 1e7**-0.09)
+
+# ------------------------ Inputs of the original runs ---------------------- #
+# Final H2O2 [µM] at 30 Gy of the original runs whose values are quoted in the
+# paper's text (author's sim_GVal_Dr_pH3.h5, 2025-02-28, written by the code
+# of that time with CONFIG_PAPER_01.toml, LET 0.56 keV/µm, shipped GF fit),
+# rounded to 4 digits. The current code reproduces them to about 3e-4.
+ORIGINAL_RUNS_H2O2 = {(1e2, 1.0): 2.185, (1e7, 5.0): 1.103}
+
+
+@pytest.fixture(scope="module")
+def golden_original(pr: types.ModuleType) -> tp.Dict[str, np.ndarray]:
+    if not PAPER_ORIGINAL_FILE.exists():
+        pytest.fail(
+            f"{PAPER_ORIGINAL_FILE} is missing: run record_golden.py --only paper-original"
+        )
+    return pr.load_grid(PAPER_ORIGINAL_FILE)
+
+
+def test_original_layout(
+    golden: tp.Dict[str, np.ndarray], golden_original: tp.Dict[str, np.ndarray]
+) -> None:
+    """Same axes as the grid of the paper methods."""
+    for key in ("dose_rates", "po2", "doses", "ts_dose_rates", "ts_po2", "time"):
+        np.testing.assert_array_equal(golden_original[key], golden[key], err_msg=key)
+    for key in golden:
+        assert golden_original[key].shape == golden[key].shape, key
+
+
+@pytest.mark.parametrize(
+    "point", tuple(ORIGINAL_RUNS_H2O2), ids=lambda p: f"{p[0]:g}Gy/s-{p[1]:g}%"
+)
+def test_original_point(
+    pr: types.ModuleType,
+    golden_original: tp.Dict[str, np.ndarray],
+    point: tp.Tuple[float, float],
+) -> None:
+    """The original scenario matches its golden grid and the original runs."""
+    i = pr.index_of(golden_original["dose_rates"], point[0])
+    j = pr.index_of(golden_original["po2"], point[1])
+    r = pr.run_point(point[0], point[1], pr.DOSES[-1], integrals=True, scenario="original")
+    got = [r.h2o2_final, r.o2_final, r.ph_min] + [getattr(r, k) for k in INTEGRALS]
+    expected = [golden_original[k][i, j, -1] for k in ("h2o2_final", "o2_final", "ph_min")]
+    expected += [golden_original[k][i, j] for k in INTEGRALS]
+    np.testing.assert_allclose(got, expected, rtol=RTOL, atol=ATOL)
+    assert r.h2o2_final == pytest.approx(ORIGINAL_RUNS_H2O2[point], rel=1e-3)
+
+
+def test_unknown_scenario(pr: types.ModuleType) -> None:
+    with pytest.raises(KeyError, match="unknown scenario"):
+        pr.run_grid(dose_rates=(1.0,), po2=(1.0,), doses=(1.0,), scenario="nope")

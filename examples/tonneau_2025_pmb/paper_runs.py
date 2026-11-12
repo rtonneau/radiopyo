@@ -11,12 +11,24 @@ golden test ``tests/golden/test_paper_tonneau_2025.py`` (the golden data
 ``tests/golden/record_golden.py --only paper``), so that both run the
 very same code.
 
-Scenario (paper tables 3 and 5): bundled pure-water config, LET 1.17
-keV/µm, dose-rate dependent G-values (``variable_GValues``, the GF(DR) fit
-shipped in radiopyo, see ADR 0009), one single pulse per run delivered from
-t = 0, run over (0, 500 s) with ``prepare_single_pulse``; maximum step of
-pulse/500 with the beam ON and 0.1 s for the final beam OFF chunk; initial
-[O2] = pO2 [%] / 100 x 1300 µM (Henry); pH 7; 25 degC.
+Two scenarios (SCENARIOS), differing by their config and LET only:
+
+- ``"methods"`` (default, golden file ``paper_tonneau_2025.npz``): what the
+  paper's methods describe (tables 3 and 5), bundled pure-water config, LET
+  1.17 keV/µm;
+- ``"original"`` (golden file ``paper_tonneau_2025_original.npz``): the
+  inputs of the original runs whose results are quoted in the paper's text
+  (``sim_GVal_Dr_pH3.h5``, 2025-02-28): the author's config
+  ``data/CONFIG_PAPER_01.toml`` (four rate constants differ from the bundled
+  config, see its header) and LET 0.56 keV/µm. With the current code it
+  reproduces those runs to about 0.03 %.
+
+Common to both: dose-rate dependent G-values (``variable_GValues``, the
+GF(DR) fit shipped in radiopyo by default, see ADR 0009; the original runs
+used that fit too), one single pulse per run delivered from t = 0, run over
+(0, 500 s) with ``prepare_single_pulse``; maximum step of pulse/500 with the
+beam ON and 0.1 s for the final beam OFF chunk; initial [O2] = pO2 [%] / 100
+x 1300 µM (Henry); pH 7; 25 degC.
 
 Units: concentrations in µM, dose rates in Gy/s, doses in Gy, pO2 in %,
 net yields in #/100 eV, times in s.
@@ -61,10 +73,13 @@ __all__ = [
     "GRID_KEYS",
     "MAP_DOSE_RATES",
     "MAP_PO2",
+    "ORIGINAL_CONFIG_FILE",
     "PAPER_DOSE_RATES",
+    "SCENARIOS",
     "TIME_GRID",
     "TS_PO2",
     "PointResult",
+    "Scenario",
     "delta_o2",
     "gf_factor",
     "index_of",
@@ -86,7 +101,10 @@ logger = logging.getLogger("radiopyo")
 # --------------------------------------------------------------------------- #
 #                                  Constants                                  #
 # --------------------------------------------------------------------------- #
-LET = 1.17  # keV/µm (paper table 3)
+LET = 1.17  # keV/µm (paper table 3), LET of the "methods" scenario
+ORIGINAL_LET = 0.56  # keV/µm, LET of the original runs quoted in the text
+# Config of the original runs (author's CONFIG_PAPER_01.toml, see its header)
+ORIGINAL_CONFIG_FILE = Path(__file__).resolve().parent / "data" / "CONFIG_PAPER_01.toml"
 T_END = 500.0  # s
 HENRY = 1.3e3  # µM/atm, [O2] = pO2 [atm] x HENRY
 ON_STEPS = 500  # minimum number of solver steps over the pulse
@@ -125,6 +143,10 @@ GF_FITS: tp.Dict[str, tp.Optional[tp.Tuple[float, float]]] = {
     "radiopyo": None,
     "paper": (0.982, -0.09),
 }
+
+# Scenarios (config, LET), see the module docstring; filled after the
+# definition of the Scenario class.
+SCENARIOS: tp.Dict[str, Scenario] = {}
 
 # Keys of the npz file written by save_grid
 GRID_KEYS = (
@@ -184,22 +206,36 @@ def _use_gf_fit(gf_fit: str) -> tp.Iterator[None]:
         GValuesBoscolo._scale_factor = shipped  # type: ignore[method-assign]
 
 
-@functools.lru_cache(maxsize=1)
-def _template_cell() -> UnitCell:
+def _scenario(name: str) -> Scenario:
+    try:
+        return SCENARIOS[name]
+    except KeyError:
+        raise KeyError(f"unknown scenario {name!r}: {sorted(SCENARIOS)}") from None
+
+
+@functools.lru_cache(maxsize=None)
+def _template_cell(config: str = str(PURE_WATER_CONFIG_FILE)) -> UnitCell:
     with _quiet_radiopyo():
-        cell = UnitCell.from_toml(PURE_WATER_CONFIG_FILE)
+        cell = UnitCell.from_toml(config)
     cell.env.update_flag_GValues(True)
     return cell
 
 
-def _solve(dose_rate: float, po2: float, dose: float, gf_fit: str = "radiopyo") -> ODEResult:
+def _solve(
+    dose_rate: float,
+    po2: float,
+    dose: float,
+    gf_fit: str = "radiopyo",
+    scenario: str = "methods",
+) -> ODEResult:
     """One paper run: single pulse of `dose` at `dose_rate` from t = 0,
     initial pO2 `po2` [%], integrated over (0, T_END), G-values scaled by
-    the GF fit `gf_fit`."""
-    cell = copy.deepcopy(_template_cell())
+    the GF fit `gf_fit`, config and LET of `scenario`."""
+    sc = _scenario(scenario)
+    cell = copy.deepcopy(_template_cell(str(sc.config)))
     cell.env.species["O2"].set_initial_cc(o2_from_po2(po2) * 1e-6)  # mol/L
     with _quiet_radiopyo(), _use_gf_fit(gf_fit):
-        cell.set_beam(SinglePulseBeam(dose_rate=dose_rate, max_dose=dose), LET=LET)
+        cell.set_beam(SinglePulseBeam(dose_rate=dose_rate, max_dose=dose), LET=sc.let)
         chunks = cell.prepare_single_pulse(
             t_span=(0.0, T_END),
             max_step_size_on=dose / dose_rate / ON_STEPS,
@@ -219,6 +255,7 @@ def run_point(
     dose: float,
     integrals: bool = False,
     gf_fit: str = "radiopyo",
+    scenario: str = "methods",
 ) -> PointResult:
     """Run one grid point and analyse it.
 
@@ -236,11 +273,13 @@ def run_point(
         gf_fit: str, optional
             GF(DR) fit scaling the G-values, a key of GF_FITS (default:
             "radiopyo", the shipped fit).
+        scenario: str, optional
+            Config and LET, a key of SCENARIOS (default: "methods").
 
     Returns:
         PointResult
     """
-    res = _solve(dose_rate, po2, dose, gf_fit)
+    res = _solve(dose_rate, po2, dose, gf_fit, scenario)
     df = res.to_pandas()
     t = df.index.to_numpy(dtype=np.float64)
     o2 = df["O2"].to_numpy(dtype=np.float64)
@@ -286,7 +325,7 @@ def index_of(values: tp.Sequence[float] | NDArray[np.float64], value: float) -> 
     return int(hits[0])
 
 
-def _run_job(job: tp.Tuple[float, float, float, bool, str]) -> PointResult:
+def _run_job(job: tp.Tuple[float, float, float, bool, str, str]) -> PointResult:
     return run_point(*job)
 
 
@@ -299,6 +338,7 @@ def run_grid(
     workers: int = 1,
     progress: tp.Optional[tp.Callable[[int, int], None]] = None,
     gf_fit: str = "radiopyo",
+    scenario: str = "methods",
 ) -> tp.Dict[str, NDArray[np.float64]]:
     """Run every (dose rate, pO2, dose) of the grid.
 
@@ -318,6 +358,9 @@ def run_grid(
             Called with (done, total) after every run.
         gf_fit: str, optional
             GF(DR) fit of every run, a key of GF_FITS (default: "radiopyo").
+        scenario: str, optional
+            Config and LET of every run, a key of SCENARIOS (default:
+            "methods").
 
     Returns:
         Dict[str, NDArray]: arrays keyed by GRID_KEYS. Axes are
@@ -327,10 +370,11 @@ def run_grid(
     """
     if gf_fit not in GF_FITS:
         raise KeyError(f"unknown GF fit {gf_fit!r}: {sorted(GF_FITS)}")
+    _scenario(scenario)  # KeyError before any run
     n_dr, n_po2, n_d = len(dose_rates), len(po2), len(doses)
     last = n_d - 1
     jobs = [
-        (float(dr), float(p), float(d), k == last, gf_fit)
+        (float(dr), float(p), float(d), k == last, gf_fit, scenario)
         for dr in dose_rates
         for p in po2
         for k, d in enumerate(doses)
@@ -493,6 +537,31 @@ def load_grid(path: str | Path) -> tp.Dict[str, NDArray[np.float64]]:
 # --------------------------------------------------------------------------- #
 #                               CLASS DEFINITIONS                             #
 # --------------------------------------------------------------------------- #
+@dataclasses.dataclass(frozen=True)
+class Scenario:
+    """Inputs that differ between the scenarios of SCENARIOS."""
+
+    config: Path  # TOML config file
+    let: float  # keV/µm
+    description: str
+
+
+SCENARIOS.update(
+    {
+        "methods": Scenario(
+            config=Path(PURE_WATER_CONFIG_FILE),
+            let=LET,
+            description="paper methods: bundled pure-water config, LET 1.17 keV/µm",
+        ),
+        "original": Scenario(
+            config=ORIGINAL_CONFIG_FILE,
+            let=ORIGINAL_LET,
+            description="original runs: CONFIG_PAPER_01.toml, LET 0.56 keV/µm",
+        ),
+    }
+)
+
+
 @dataclasses.dataclass
 class PointResult:
     """Analysis of one run (concentrations in µM).

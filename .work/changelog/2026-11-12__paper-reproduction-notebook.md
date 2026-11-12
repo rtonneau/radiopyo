@@ -23,6 +23,13 @@ floor: minor
   (commit 2261b92, `record_pre_refactor.py` from a separate checkout, `data/paper_tonneau_2025_2261b92.npz`)
   against the current code. Final concentrations agree to 1e-8 relative, the minimum pH to 1e-7, the integrals
   to 1e-4; the gaps to the paper are the same before and after.
+- Scenario `"original"` of the paper reproduction (`paper_runs.SCENARIOS`, `run_point` / `run_grid(scenario=)`,
+  `SCENARIO` switch of `tonneau_2025_pmb.ipynb`): the inputs of the original runs whose values are quoted in the
+  paper's text, the author's config `examples/tonneau_2025_pmb/data/CONFIG_PAPER_01.toml` (e_aq + O2, H_r + O2,
+  H_r + HO2 rate constants differ from the bundled config) at LET 0.56 keV/µm. It reproduces those runs to about
+  0.03 % and the quoted values to about 1 %; the paper's methods (LET 1.17, GF fit of fig. 3B) describe a later
+  rerun. The default scenario `"methods"` (bundled config, LET 1.17) is unchanged. Golden data:
+  `tests/golden/data/paper_tonneau_2025_original.npz` (`record_golden.py --only paper-original`).
 - Optional dependency extra `examples` (matplotlib).
 
 ### Fixed

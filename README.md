@@ -139,8 +139,11 @@ Beam timing affects how the run is solved:
 - **[Paper reproduction notebook](examples/tonneau_2025_pmb/tonneau_2025_pmb.ipynb)**:
   the main figures of Tonneau et al. 2025 (O2, H2O2 and pH time evolution, ΔO2 and net
   H2O2 yield maps over dose rate and pO2, gross production / consumption bars) with a
-  comparison to the values quoted in the paper. It loads the recorded grid by default
-  (`RECOMPUTE = True` re-runs it, about 10 min); needs `pip install "radiopyo[examples]"`.
+  comparison to the values quoted in the paper. Two scenarios: `"methods"` (what the paper's
+  methods describe: bundled config, LET 1.17 keV/µm) and `"original"` (the inputs of the runs
+  quoted in the text: the author's `CONFIG_PAPER_01.toml`, LET 0.56 keV/µm, which reproduces
+  the quoted values to about 1 %). It loads the recorded grid by default (`RECOMPUTE = True`
+  re-runs it, about 10 min); needs `pip install "radiopyo[examples]"`.
 - **[GF(DR) fit comparison notebook](examples/tonneau_2025_pmb/gf_fit_comparison.ipynb)**:
   the same grid run with the GF(DR) fit printed in the paper, compared with the shipped fit
   and with the values quoted in the paper.
@@ -218,7 +221,7 @@ progress bar. To update a regular install, run
 install, `git pull`.
 
 `tests/golden/` compares the outputs with recorded reference data, including the grid of
-the paper reproduction (`tests/golden/data/paper_tonneau_2025.npz`). Re-record it only for
+the paper reproduction (`tests/golden/data/paper_tonneau_2025*.npz`). Re-record it only for
 an approved result-changing fix:
 
 ```bash
