@@ -144,6 +144,9 @@ Beam timing affects how the run is solved:
 - **[GF(DR) fit comparison notebook](examples/tonneau_2025_pmb/gf_fit_comparison.ipynb)**:
   the same grid run with the GF(DR) fit printed in the paper, compared with the shipped fit
   and with the values quoted in the paper.
+- **[Pre-refactoring comparison notebook](examples/tonneau_2025_pmb/pre_refactor_comparison.ipynb)**:
+  the same grid run with the code as it was before the refactoring (commit 2261b92,
+  `record_pre_refactor.py`), compared with the current code.
 - **[Fenton showcase](docs/issues/fenton/Fenton_Fixed_Showcase.ipynb)** (notebook): a Fenton
   runaway case and maps over dose per pulse and average dose rate.
 - **[Changelog](CHANGELOG.md)**: changes between versions.
