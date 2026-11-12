@@ -36,6 +36,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 PAPER_RUNS_FILE = ROOT / "examples" / "tonneau_2025_pmb" / "paper_runs.py"
 PAPER_FILE = Path(__file__).parent / "data" / "paper_tonneau_2025.npz"
+# Same grid with the GF(DR) fit printed in the paper (record_golden.py
+# --only paper-gf), for examples/tonneau_2025_pmb/gf_fit_comparison.ipynb
+PAPER_GF_FILE = Path(__file__).parent / "data" / "paper_tonneau_2025_paper_gf.npz"
 
 # Same code, same inputs: only the summation order of a refactor may move
 # the solver path, so 1e-6 is far below any physical change.
@@ -178,3 +181,50 @@ def test_time_series(
         np.testing.assert_allclose(
             getattr(r, key), golden[key][a, b], rtol=RTOL, atol=ATOL, err_msg=key
         )
+
+
+# ------------------------- GF fit of the paper ----------------------------- #
+# (dose rate, pO2) re-run at the last dose: the two fits differ most at UHDR
+GF_POINTS = ((0.1, 1.0), (1e7, 5.0))
+
+
+@pytest.fixture(scope="module")
+def golden_paper_gf(pr: types.ModuleType) -> tp.Dict[str, np.ndarray]:
+    if not PAPER_GF_FILE.exists():
+        pytest.fail(f"{PAPER_GF_FILE} is missing: run record_golden.py --only paper-gf")
+    return pr.load_grid(PAPER_GF_FILE)
+
+
+def test_paper_gf_layout(
+    golden: tp.Dict[str, np.ndarray], golden_paper_gf: tp.Dict[str, np.ndarray]
+) -> None:
+    """Same axes as the grid with the shipped fit."""
+    for key in ("dose_rates", "po2", "doses", "ts_dose_rates", "ts_po2", "time"):
+        np.testing.assert_array_equal(golden_paper_gf[key], golden[key], err_msg=key)
+    for key in golden:
+        assert golden_paper_gf[key].shape == golden[key].shape, key
+
+
+@pytest.mark.parametrize("point", GF_POINTS, ids=lambda p: f"{p[0]:g}Gy/s-{p[1]:g}%")
+def test_paper_gf_point(
+    pr: types.ModuleType,
+    golden_paper_gf: tp.Dict[str, np.ndarray],
+    point: tp.Tuple[float, float],
+) -> None:
+    i = pr.index_of(golden_paper_gf["dose_rates"], point[0])
+    j = pr.index_of(golden_paper_gf["po2"], point[1])
+    r = pr.run_point(point[0], point[1], pr.DOSES[-1], integrals=True, gf_fit="paper")
+    got = [r.h2o2_final, r.o2_final, r.ph_min] + [getattr(r, k) for k in INTEGRALS]
+    expected = [golden_paper_gf[k][i, j, -1] for k in ("h2o2_final", "o2_final", "ph_min")]
+    expected += [golden_paper_gf[k][i, j] for k in INTEGRALS]
+    np.testing.assert_allclose(got, expected, rtol=RTOL, atol=ATOL)
+
+
+def test_gf_fit_is_restored(pr: types.ModuleType) -> None:
+    """A run with the paper fit leaves the shipped GF(DR) in place."""
+    from radiopyo.utils.g_values import GValuesBoscolo
+
+    before = GValuesBoscolo._scale_factor(1e7)
+    pr.run_point(1e7, 0.0, pr.DOSES[-1], gf_fit="paper")
+    assert GValuesBoscolo._scale_factor(1e7) == before
+    assert pr.gf_factor(1e7, "paper") == pytest.approx(0.982 * 1e7**-0.09)

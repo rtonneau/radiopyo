@@ -45,6 +45,7 @@ from radiopyo import PURE_WATER_CONFIG_FILE
 from radiopyo.chemistry.radiolytic import kr_to_ge
 from radiopyo.physics.beam import SinglePulseBeam
 from radiopyo.simulation.unit_cell import UnitCell
+from radiopyo.utils.g_values import GValuesBoscolo
 
 # ----------------------------- Type checking ONLY -------------------------- #
 if tp.TYPE_CHECKING:
@@ -56,6 +57,7 @@ if tp.TYPE_CHECKING:
 __all__ = [
     "BAR_PO2",
     "DOSES",
+    "GF_FITS",
     "GRID_KEYS",
     "MAP_DOSE_RATES",
     "MAP_PO2",
@@ -64,11 +66,13 @@ __all__ = [
     "TS_PO2",
     "PointResult",
     "delta_o2",
+    "gf_factor",
     "index_of",
     "load_grid",
     "net_yield",
     "net_yield_map",
     "o2_from_po2",
+    "quoted_values",
     "run_grid",
     "run_point",
     "save_grid",
@@ -113,6 +117,15 @@ DOSES: tp.Tuple[float, ...] = (10.0, 20.0, 30.0)
 # Time grid on which O2, H2O2 and pH are stored (first stored point: 1e-7 s)
 TIME_GRID: NDArray[np.float64] = np.logspace(-7.0, np.log10(T_END), 300)
 
+# GF(DR) fits scaling the G-values (variable_GValues): name -> (a, b) of
+# GF = a * DR**b. None is the fit shipped by radiopyo (0.972 DR^-0.1097, a
+# later fit on the whole Blain data set); "paper" is the fit printed in
+# fig. 3B of the paper (ADR 0009).
+GF_FITS: tp.Dict[str, tp.Optional[tp.Tuple[float, float]]] = {
+    "radiopyo": None,
+    "paper": (0.982, -0.09),
+}
+
 # Keys of the npz file written by save_grid
 GRID_KEYS = (
     "dose_rates", "po2", "doses", "o2_initial",
@@ -142,6 +155,35 @@ def _quiet_radiopyo() -> tp.Iterator[None]:
         logger.setLevel(level)
 
 
+def gf_factor(dose_rate: float | NDArray[np.float64], gf_fit: str = "radiopyo") -> tp.Any:
+    """GF(DR) of the fit `gf_fit` (a key of GF_FITS)."""
+    coefs = GF_FITS[gf_fit]
+    if coefs is None:
+        return np.vectorize(GValuesBoscolo._scale_factor)(dose_rate)
+    return coefs[0] * np.power(dose_rate, coefs[1])
+
+
+@contextlib.contextmanager
+def _use_gf_fit(gf_fit: str) -> tp.Iterator[None]:
+    """Make GValuesBoscolo use the GF fit `gf_fit` (a key of GF_FITS),
+    then restore the shipped one."""
+    coefs = GF_FITS[gf_fit]  # KeyError on an unknown fit
+    if coefs is None:
+        yield
+        return
+    a, b = coefs
+    shipped = GValuesBoscolo.__dict__["_scale_factor"]
+
+    def scale(dose_rate: tp.Optional[float]) -> float:
+        return 1.0 if dose_rate is None else float(a * np.power(dose_rate, b))
+
+    GValuesBoscolo._scale_factor = staticmethod(scale)  # type: ignore[method-assign,assignment]
+    try:
+        yield
+    finally:
+        GValuesBoscolo._scale_factor = shipped  # type: ignore[method-assign]
+
+
 @functools.lru_cache(maxsize=1)
 def _template_cell() -> UnitCell:
     with _quiet_radiopyo():
@@ -150,12 +192,13 @@ def _template_cell() -> UnitCell:
     return cell
 
 
-def _solve(dose_rate: float, po2: float, dose: float) -> ODEResult:
+def _solve(dose_rate: float, po2: float, dose: float, gf_fit: str = "radiopyo") -> ODEResult:
     """One paper run: single pulse of `dose` at `dose_rate` from t = 0,
-    initial pO2 `po2` [%], integrated over (0, T_END)."""
+    initial pO2 `po2` [%], integrated over (0, T_END), G-values scaled by
+    the GF fit `gf_fit`."""
     cell = copy.deepcopy(_template_cell())
     cell.env.species["O2"].set_initial_cc(o2_from_po2(po2) * 1e-6)  # mol/L
-    with _quiet_radiopyo():
+    with _quiet_radiopyo(), _use_gf_fit(gf_fit):
         cell.set_beam(SinglePulseBeam(dose_rate=dose_rate, max_dose=dose), LET=LET)
         chunks = cell.prepare_single_pulse(
             t_span=(0.0, T_END),
@@ -175,6 +218,7 @@ def run_point(
     po2: float,
     dose: float,
     integrals: bool = False,
+    gf_fit: str = "radiopyo",
 ) -> PointResult:
     """Run one grid point and analyse it.
 
@@ -189,11 +233,14 @@ def run_point(
             Also compute the gross production and consumption of O2 and
             H2O2 over the run (default: False; they rebuild every reaction
             rate at every stored point).
+        gf_fit: str, optional
+            GF(DR) fit scaling the G-values, a key of GF_FITS (default:
+            "radiopyo", the shipped fit).
 
     Returns:
         PointResult
     """
-    res = _solve(dose_rate, po2, dose)
+    res = _solve(dose_rate, po2, dose, gf_fit)
     df = res.to_pandas()
     t = df.index.to_numpy(dtype=np.float64)
     o2 = df["O2"].to_numpy(dtype=np.float64)
@@ -239,7 +286,7 @@ def index_of(values: tp.Sequence[float] | NDArray[np.float64], value: float) -> 
     return int(hits[0])
 
 
-def _run_job(job: tp.Tuple[float, float, float, bool]) -> PointResult:
+def _run_job(job: tp.Tuple[float, float, float, bool, str]) -> PointResult:
     return run_point(*job)
 
 
@@ -251,6 +298,7 @@ def run_grid(
     ts_po2: tp.Sequence[float] = TS_PO2,
     workers: int = 1,
     progress: tp.Optional[tp.Callable[[int, int], None]] = None,
+    gf_fit: str = "radiopyo",
 ) -> tp.Dict[str, NDArray[np.float64]]:
     """Run every (dose rate, pO2, dose) of the grid.
 
@@ -268,6 +316,8 @@ def run_grid(
             than one, this module must be importable by name (on sys.path).
         progress: Callable[[int, int], None], optional
             Called with (done, total) after every run.
+        gf_fit: str, optional
+            GF(DR) fit of every run, a key of GF_FITS (default: "radiopyo").
 
     Returns:
         Dict[str, NDArray]: arrays keyed by GRID_KEYS. Axes are
@@ -275,10 +325,12 @@ def run_grid(
         (dose rate, pO2) for the integrals (at the last dose) and
         (ts dose rate, ts pO2, time) for the time series.
     """
+    if gf_fit not in GF_FITS:
+        raise KeyError(f"unknown GF fit {gf_fit!r}: {sorted(GF_FITS)}")
     n_dr, n_po2, n_d = len(dose_rates), len(po2), len(doses)
     last = n_d - 1
     jobs = [
-        (float(dr), float(p), float(d), k == last)
+        (float(dr), float(p), float(d), k == last, gf_fit)
         for dr in dose_rates
         for p in po2
         for k, d in enumerate(doses)
@@ -360,6 +412,67 @@ def net_yield_map(grid: tp.Mapping[str, NDArray[np.float64]]) -> NDArray[np.floa
             for i in range(h2o2.shape[0])
         ]
     )
+
+
+def quoted_values(
+    grid: tp.Mapping[str, NDArray[np.float64]], uhdr_limit: float = 100.0
+) -> tp.List[tp.Tuple[str, str, float, float, str]]:
+    """Values quoted in the text of the paper next to the grid's.
+
+    Returns:
+        List of (quantity, condition, paper value, grid value, source). A
+        range quoted over the CDR dose rates of table 5 (below
+        `uhdr_limit`) gives two rows, its minimum and its maximum.
+    """
+    dr, po2 = grid["dose_rates"], grid["po2"]
+
+    def ij(d: float, p: float) -> tp.Tuple[int, int]:
+        return index_of(dr, d), index_of(po2, p)
+
+    def h2o2(d: float, p: float) -> float:
+        return float(grid["h2o2_final"][ij(d, p)][-1])
+
+    def ph_min(d: float, p: float) -> float:
+        return float(grid["ph_min"][ij(d, p)][-1])
+
+    def net_h2o2(d: float, p: float) -> float:
+        i, j = ij(d, p)
+        return float(grid["h2o2_production"][i, j] - grid["h2o2_consumption"][i, j])
+
+    d_o2 = delta_o2(grid)
+    cdr = [float(d) for d in grid["ts_dose_rates"] if d < uhdr_limit]
+    cdr_d_o2 = [float(d_o2[ij(d, p)]) for d in cdr for p in (1.0, 5.0)]
+    dose = float(grid["doses"][-1])
+    return [
+        ("final H2O2 [µM]", "1 % pO2, 1e2 Gy/s", 2.2, h2o2(1e2, 1.0), "§3.3, fig. 7B"),
+        ("final H2O2 [µM]", "1 % pO2, 1e4 Gy/s", 2.45, h2o2(1e4, 1.0), "§3.3, fig. 7B"),
+        ("final H2O2 [µM]", "1 % pO2, 1e7 Gy/s", 1.25, h2o2(1e7, 1.0), "§3.3, fig. 7B"),
+        ("final H2O2 [µM]", "5 % pO2, 1e2 Gy/s", 1.75, h2o2(1e2, 5.0),
+         "§3.3 (1.7-1.8), fig. 7D"),
+        ("final H2O2 [µM]", "5 % pO2, 1e7 Gy/s", 1.1, h2o2(1e7, 5.0), "§3.3, fig. 7D"),
+        ("final H2O2 [µM], CDR min", "1 % pO2", 2.0,
+         min(h2o2(d, 1.0) for d in cdr), "§3.3 (2.0-2.7)"),
+        ("final H2O2 [µM], CDR max", "1 % pO2", 2.7,
+         max(h2o2(d, 1.0) for d in cdr), "§3.3 (2.0-2.7)"),
+        ("final H2O2 [µM], CDR min", "5 % pO2", 1.7,
+         min(h2o2(d, 5.0) for d in cdr), "§3.3 (1.7-3.3)"),
+        ("final H2O2 [µM], CDR max", "5 % pO2", 3.3,
+         max(h2o2(d, 5.0) for d in cdr), "§3.3 (1.7-3.3)"),
+        ("ΔO2 at 500 s [µM], CDR min", "1 and 5 % pO2", 0.8, min(cdr_d_o2),
+         "§3.2.1 (0.8-1.2)"),
+        ("ΔO2 at 500 s [µM], CDR max", "1 and 5 % pO2", 1.2, max(cdr_d_o2),
+         "§3.2.1 (0.8-1.2)"),
+        ("ΔO2 per Gy [µM/Gy]", "5 % pO2, 0.1 Gy/s", 0.03,
+         float(d_o2[ij(0.1, 5.0)]) / dose, "§4 (~0.03)"),
+        ("gross O2 production [µM]", "0 % pO2, 0.1 Gy/s", 7.5,
+         float(grid["o2_production"][ij(0.1, 0.0)]), "§3.2.1, fig. 6"),
+        ("gross O2 consumption [µM]", "0 % pO2, 0.1 Gy/s", 7.5,
+         float(grid["o2_consumption"][ij(0.1, 0.0)]), "§3.2.1, fig. 6"),
+        ("net H2O2 production [µM], CDR max", "21 % pO2", 3.5,
+         max(net_h2o2(d, 21.0) for d in cdr), "§3.3, fig. 9"),
+        ("minimum pH", "1 % pO2, 1e7 Gy/s", 5.8, ph_min(1e7, 1.0), "§4 (5.8), fig. 10B"),
+        ("minimum pH", "5 % pO2, 1e7 Gy/s", 5.8, ph_min(1e7, 5.0), "§4 (5.8), fig. 10D"),
+    ]
 
 
 def save_grid(grid: tp.Mapping[str, NDArray[np.float64]], path: str | Path) -> None:

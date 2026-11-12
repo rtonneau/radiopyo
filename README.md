@@ -141,6 +141,9 @@ Beam timing affects how the run is solved:
   H2O2 yield maps over dose rate and pO2, gross production / consumption bars) with a
   comparison to the values quoted in the paper. It loads the recorded grid by default
   (`RECOMPUTE = True` re-runs it, about 10 min); needs `pip install "radiopyo[examples]"`.
+- **[GF(DR) fit comparison notebook](examples/tonneau_2025_pmb/gf_fit_comparison.ipynb)**:
+  the same grid run with the GF(DR) fit printed in the paper, compared with the shipped fit
+  and with the values quoted in the paper.
 - **[Fenton showcase](docs/issues/fenton/Fenton_Fixed_Showcase.ipynb)** (notebook): a Fenton
   runaway case and maps over dose per pulse and average dose rate.
 - **[Changelog](CHANGELOG.md)**: changes between versions.

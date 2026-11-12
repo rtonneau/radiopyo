@@ -15,6 +15,10 @@ floor: minor
   provided.
 - Golden data of the paper grid: `tests/golden/data/paper_tonneau_2025.npz`, recorded with
   `record_golden.py --only paper` (new `--workers` option), and a fast test that re-runs 8 points against it.
+- `examples/tonneau_2025_pmb/gf_fit_comparison.ipynb`: the paper grid re-run with the GF(DR) fit printed in the
+  paper (0.982 DR^-0.09, `paper_runs.run_grid(gf_fit="paper")`) and compared with the shipped fit. The paper's fit
+  overshoots the quoted UHDR values by up to 35 %; the CDR gaps do not depend on the fit. Golden data:
+  `tests/golden/data/paper_tonneau_2025_paper_gf.npz` (`record_golden.py --only paper-gf`).
 - Optional dependency extra `examples` (matplotlib).
 
 ### Fixed

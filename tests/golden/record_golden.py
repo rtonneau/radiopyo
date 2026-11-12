@@ -17,14 +17,17 @@ The ``paper`` part (added 12/11/2026, session
 2026-11-12__paper-reproduction-notebook, recorded on the code of that
 session) runs the full grid of ``examples/tonneau_2025_pmb/paper_runs.py``
 (Tonneau et al. 2025 reproduction, 19 x 19 x 3 runs: about 10 min with a
-few workers); ``test_paper_tonneau_2025.py`` re-runs a few of its points.
+few workers); ``test_paper_tonneau_2025.py`` re-runs a few of its points. The
+``paper-gf`` part (added the same day) runs the same grid with the GF(DR)
+fit printed in the paper (``paper_runs.GF_FITS["paper"]``) for
+``examples/tonneau_2025_pmb/gf_fit_comparison.ipynb``; same cost.
 Same re-record rule as the other parts.
 
 Usage:
     python tests/golden/record_golden.py [--force] [--only PART ...]
                                          [--workers N]
 
-``--only`` re-records some parts (derive, runs, beams, hdf, paper) and
+``--only`` re-records some parts (derive, runs, beams, hdf, paper, paper-gf) and
 leaves the others untouched; ``--workers`` is the number of processes of
 the paper grid (default: half the CPUs).
 Run it with ``PYTHONHASHSEED`` fixed and radiopyo importable. Keep ``hdf`` out of it unless the stored format itself
@@ -45,6 +48,7 @@ Files written in tests/golden/data:
     .golden_results/     json configs stored next to the .h5 file
     hdf_expected.npz     expectation for the data stored in the .h5 file
     paper_tonneau_2025.npz  paper reproduction grid (paper_runs.GRID_KEYS)
+    paper_tonneau_2025_paper_gf.npz  same grid, GF fit of the paper
 
 Author:
     Romain Tonneau (romain.tonneau@unamur.be) - 09/11/2026
@@ -78,7 +82,7 @@ def _load_test_module(  # type: ignore[no-untyped-def]
     return module
 
 
-PARTS = ("derive", "runs", "beams", "hdf", "paper")
+PARTS = ("derive", "runs", "beams", "hdf", "paper", "paper-gf")
 
 
 def main() -> None:
@@ -112,6 +116,7 @@ def main() -> None:
         "beams": g.BEAMS_FILE,
         "hdf": g.HDF_FILE,
         "paper": p.PAPER_FILE,
+        "paper-gf": p.PAPER_GF_FILE,
     }
     existing = [files[part] for part in PARTS if part in only and files[part].exists()]
     if existing and not args.force:
@@ -143,16 +148,17 @@ def main() -> None:
         expected = g.compute_hdf(g.HDF_FILE)
         np.savez_compressed(g.HDF_EXPECTED_FILE, **expected)
 
-    if "paper" in only:
-        print(f"paper grid ({args.workers} workers) ...")
+    def progress(done: int, total: int) -> None:
+        if done % 50 == 0 or done == total:
+            print(f"  {done}/{total}", flush=True)
+
+    for part, gf_fit in (("paper", "radiopyo"), ("paper-gf", "paper")):
+        if part not in only:
+            continue
+        print(f"{part} grid, GF fit {gf_fit!r} ({args.workers} workers) ...")
         paper_runs = p.load_paper_runs()
-
-        def progress(done: int, total: int) -> None:
-            if done % 50 == 0 or done == total:
-                print(f"  {done}/{total}", flush=True)
-
-        grid = paper_runs.run_grid(workers=args.workers, progress=progress)
-        paper_runs.save_grid(grid, p.PAPER_FILE)
+        grid = paper_runs.run_grid(workers=args.workers, progress=progress, gf_fit=gf_fit)
+        paper_runs.save_grid(grid, files[part])
 
     for path in sorted(g.DATA_DIR.rglob("*")):
         if path.is_file():
