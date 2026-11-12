@@ -34,12 +34,13 @@ if (_REPO / "radiopyo" / "__init__.py").exists() and str(_REPO) not in sys.path:
 import radiopyo as rp
 from radiopyo.parser.file_parser import resolve_includes
 from radiopyo.parser.toml import TOMLFileParser
+from radiopyo.parser.utils import combine_config
 from radiopyo.physics.beam import PulsedBeam
 
 # --------------------------------------------------------------------------- #
 #                         Expose importable stuffs                            #
 # --------------------------------------------------------------------------- #
-__all__ = ["compute_map", "compute_point", "CONFIG_FILE", "CACHE_DIR"]
+__all__ = ["compute_map", "compute_point", "load_config", "CONFIG_FILE", "CACHE_DIR"]
 
 # --------------------------------------------------------------------------- #
 #                                   Logging                                   #
@@ -69,14 +70,28 @@ _CELLS: tp.Dict[tp.Optional[float], tp.Any] = {}
 # --------------------------------------------------------------------------- #
 
 
+def load_config(fe: tp.Optional[float] = None) -> tp.Any:
+    """ConfigDict of the Fenton case: the water radiolysis, THIS folder's
+    reactions_biology.toml and the beams of Configuration_Bordet_Emballement.toml
+    (both files unchanged; the Configuration file includes the packaged
+    biology, which is not the runaway case). The folder's biology file also
+    sets H2O = 55, which the water radiolysis already defines: it is dropped
+    in memory. Fe_plus_plus is overridden if `fe` is not None (mol/L)."""
+    own = TOMLFileParser(CONFIG_FILE).parse()
+    water = resolve_includes({**own, "includes": {"toml": ["radiopyo/advanced_water_radiolysis.toml"]}})
+    bio = TOMLFileParser(HERE / "reactions_biology.toml").parse()
+    bio["concentrations"]["fixed"].pop("H2O", None)
+    own["includes"] = {}
+    config = combine_config(combine_config(water, bio), own)
+    if fe is not None:
+        config["concentrations"]["fixed"]["Fe_plus_plus"] = fe
+    return config
+
+
 def _get_cell(fe: tp.Optional[float]) -> tp.Any:
-    """UnitCell of the folder's config, with Fe_plus_plus overridden if
-    `fe` is not None (mol/L)."""
+    """UnitCell of the Fenton case (see load_config)."""
     if fe not in _CELLS:
-        config = resolve_includes(TOMLFileParser(CONFIG_FILE).parse())
-        if fe is not None:
-            config["concentrations"]["fixed"]["Fe_plus_plus"] = fe
-        _CELLS[fe] = rp.UnitCell.from_config_dict(config)
+        _CELLS[fe] = rp.UnitCell.from_config_dict(load_config(fe))
     return _CELLS[fe]
 
 
