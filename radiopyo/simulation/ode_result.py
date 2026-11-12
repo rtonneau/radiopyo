@@ -116,6 +116,13 @@ class ODEResult(object):
             (one point at the end of the span). Counted by the production
             integrals. In memory only (empty for results read from a
             file).
+        thinned: bool
+            Some steps store fewer points than the solver steps (point
+            thinning: points_per_chunk_on / points_per_chunk_off of the
+            chunked runs). The integrals over the stored points
+            (integrate_production_of, integrate_species, ...) are then
+            coarser; a warning is logged once per result. In memory only
+            (False for results read from a file).
     """
 
     # Keep track of the original sim env
@@ -128,6 +135,8 @@ class ODEResult(object):
     burst_dose_rates: tp.Optional[tp.List[float]]
     step_dose_rates: tp.List[tp.Optional[float]]
     short_on_spans: tp.List[ShortOnSpan]
+    thinned: bool
+    _thinned_warned: bool
 
     # Properties of the bunch object sent by scipy.integrate.solve_ivp.
     # t and y are properties over per-step blocks (see _t_blocks).
@@ -230,6 +239,8 @@ class ODEResult(object):
         out.short_on_spans = [*self.short_on_spans, *other.short_on_spans]
         out.n_points = [*self.n_points, *other.n_points]
         out.exec_time = [*self.exec_time, *other.exec_time]
+        out.thinned = self.thinned or other.thinned
+        out._thinned_warned = False
         return out
 
     # ------------------------------- Storage ------------------------------- #
@@ -323,6 +334,8 @@ class ODEResult(object):
         self.n_points, self.exec_time = [], []
         self.step_dose_rates = []
         self.short_on_spans = []
+        self.thinned = False
+        self._thinned_warned = False
 
     def append_sol(
         self,
@@ -331,6 +344,7 @@ class ODEResult(object):
         bursts: tp.Optional[tp.Sequence[float]] = None,
         dose_rate: tp.Optional[float] = None,
         short_on_span: tp.Optional[ShortOnSpan] = None,
+        thinned: bool = False,
     ) -> None:
         """
         Append an integration step.
@@ -351,7 +365,11 @@ class ODEResult(object):
             short_on_span: ShortOnSpan, optional
                 The step is a short ON span (not integrated, see
                 short_on_spans).
+            thinned: bool
+                The step stores fewer points than the solver steps (see
+                thinned).
         """
+        self.thinned = self.thinned or thinned
         if short_on_span is not None:
             self.short_on_spans.append(short_on_span)
         if bursts is not None:
@@ -477,6 +495,18 @@ class ODEResult(object):
             parts.append(rates.stacked())
         return np.hstack(parts)
 
+    def _warn_if_thinned(self) -> None:
+        """Log once per result that the integrals over the stored points
+        of a thinned result are coarser than over the solver steps."""
+        if self.thinned and not self._thinned_warned:
+            self._thinned_warned = True
+            logger.warning(
+                "Integral over the stored points of a thinned result "
+                "(points_per_chunk_on / points_per_chunk_off): coarser than "
+                "over the solver steps; use more points per chunk, or no "
+                "thinning, for accurate integrals"
+            )
+
     def _burst_dose_rates(self) -> tp.List[float]:
         """
         Dose rates [Gy/s] of the initial bursts to account for in the
@@ -535,6 +565,7 @@ class ODEResult(object):
         include_radiolytic: bool = True,
     ) -> pd.DataFrame:
         """ """
+        self._warn_if_thinned()
         _slice = make_slice_from_time_boundaries(start, stop)
 
         dfr = self.reconstruct_reactions().loc[_slice, :]
@@ -595,6 +626,7 @@ class ODEResult(object):
         include_equilibrium: bool = True,
     ) -> pd.DataFrame:
         """ """
+        self._warn_if_thinned()
         _slice = make_slice_from_time_boundaries(start, stop)
 
         dfr = self.reconstruct_reactions().loc[_slice, :]
@@ -670,6 +702,7 @@ class ODEResult(object):
         stop: tp.Optional[float] = None,
     ) -> float:
         """ """
+        self._warn_if_thinned()
         _slice = make_slice_from_time_boundaries(start, stop)
         _ = self.get_reaction_rate_of(reaction).loc[_slice]
         return trapezoid(_.values, x=_.index)
@@ -770,6 +803,7 @@ class ODEResult(object):
         start: float = 0,
         stop: float = float("inf"),
     ) -> pd.Series:
+        self._warn_if_thinned()
         df = self.to_pandas()
         df = df[(df.index >= start) & (df.index < stop)]
         out = {}

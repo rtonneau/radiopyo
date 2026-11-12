@@ -453,6 +453,8 @@ _COMMON_CHUNKED = [
                 ("max_step_size_final", None),
                 ("y0", None),
                 ("use_beam", True),
+                ("points_per_chunk_on", None),
+                ("points_per_chunk_off", None),
             ],
         ),
         (
@@ -465,6 +467,8 @@ _COMMON_CHUNKED = [
                 ("trans_time", None),
                 ("y0", None),
                 ("use_beam", True),
+                ("points_per_chunk_on", None),
+                ("points_per_chunk_off", None),
             ],
         ),
         ("run_till_max_dose", [("time_start", 1e-9), ("kwargs", _EMPTY)]),
@@ -591,7 +595,9 @@ def test_sim_chunks_iter_calls(
         y0: tp.Any = None,
         beam_on: bool = True,
         dose_rate: tp.Optional[float] = None,
+        n_points: tp.Optional[int] = None,
     ) -> tp.Any:
+        assert n_points is None  # no thinning by default
         calls.append(
             {
                 "t_span": t_span,
@@ -601,7 +607,12 @@ def test_sim_chunks_iter_calls(
             }
         )
         return real_raw_run(
-            t_span, options, y0=y0, beam_on=beam_on, dose_rate=dose_rate
+            t_span,
+            options,
+            y0=y0,
+            beam_on=beam_on,
+            dose_rate=dose_rate,
+            n_points=n_points,
         )
 
     monkeypatch.setattr(cell, "_raw_run", spy)

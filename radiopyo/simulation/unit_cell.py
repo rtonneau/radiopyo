@@ -66,6 +66,41 @@ DEFAULT_RTOL: float = 1e-10
 JAC_METHODS: tp.Final = ("LSODA", "BDF", "Radau")
 # Duration [s] of the ON -> OFF transition chunk of prepare_single_pulse.
 DEFAULT_TRANS_TIME: float = 100e-6
+# Point thinning: first stored time after the chunk start, as a fraction of
+# the chunk span (the stored times are log-spaced from it to the span).
+THINNING_FIRST_OFFSET: float = 1e-6
+
+
+def check_points_per_chunk(value: tp.Optional[int], name: str) -> None:
+    """
+    Validate a number of stored points per chunk (point thinning): None
+    (every solver step stored) or an integer >= 2 (the chunk start and
+    end are always stored).
+
+    Raises:
+        ValueError: any other value
+    """
+    if value is None:
+        return
+    if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 2:
+        raise ValueError(f"{name} must be None or an integer >= 2, got {value!r}")
+
+
+def thinned_times(start: float, stop: float, n_points: int) -> NDArray[np.float64]:
+    """
+    Stored times of a thinned chunk [start, stop]: start, then n_points - 1
+    times log-spaced from start + span * THINNING_FIRST_OFFSET to stop
+    (stop exactly). Log spacing keeps the fast kinetics right after the
+    start of the chunk (pulse, end of pulse). Times that round to the same
+    float (tiny span at a large start time) are stored once.
+    """
+    span = stop - start
+    if not span > 0.0:
+        return np.unique(np.array([start, stop], dtype=np.float64))
+    offsets = np.geomspace(span * THINNING_FIRST_OFFSET, span, n_points - 1)
+    times = np.concatenate(([start], start + offsets))
+    times[-1] = stop
+    return np.unique(np.clip(times, start, stop))
 
 
 def widen_empty_span(t_span: tp.Tuple[float, float]) -> tp.Tuple[float, float]:
@@ -112,14 +147,17 @@ def _make_chunks(
     beam_on: tp.Sequence[bool] | NDArray[np.bool_],
     max_steps: tp.Sequence[tp.Optional[float]],
     beam: tp.Optional[ParticleBeam] = None,
+    n_points: tp.Optional[tp.Sequence[tp.Optional[int]]] = None,
 ) -> tp.List[SimChunk]:
     """
     Build consecutive chunks: chunk i spans [boundaries[i],
     boundaries[i+1]], with beam state beam_on[i] and max step size
     max_steps[i] (len(boundaries) == len(beam_on) + 1 == len(max_steps) + 1).
     With a beam, every chunk holds the (constant) dose rate of the beam
-    inside it (see chunk_dose_rate).
+    inside it (see chunk_dose_rate). n_points[i], if given, is the number
+    of points stored for chunk i (point thinning, None: every solver step).
     """
+    points = list(n_points) if n_points is not None else [None] * len(beam_on)
     return [
         SimChunk(
             start=start,
@@ -129,9 +167,10 @@ def _make_chunks(
             dose_rate=(
                 chunk_dose_rate(beam, start, stop) if beam is not None else None
             ),
+            n_points=n,
         )
-        for start, stop, on, max_step in zip(
-            boundaries[:-1], boundaries[1:], beam_on, max_steps, strict=True
+        for start, stop, on, max_step, n in zip(
+            boundaries[:-1], boundaries[1:], beam_on, max_steps, points, strict=True
         )
     ]
 
@@ -465,6 +504,7 @@ class UnitCell(object):
         y0: tp.Optional[NDArray[np.float64]] = None,
         beam_on: bool = True,
         dose_rate: tp.Optional[float] = None,
+        n_points: tp.Optional[int] = None,
     ) -> ScipyODEResult:
         """
         Integrate the ODE system over t_span with solve_ivp.
@@ -493,6 +533,12 @@ class UnitCell(object):
                 Dose rate [Gy/s] held constant over t_span (chunk of a
                 chunked run, and of its initial burst). None -> the
                 solver reads the beam at every time (plain run).
+            n_points: int, optional
+                Point thinning: store n_points log-spaced times of the
+                integrated span (thinned_times, after the initial burst)
+                instead of every solver step; replaces options.t_eval.
+                None -> options.t_eval is used. Ignored on an unbounded
+                span.
 
         Returns:
             ScipyODEResult: raw solve_ivp result
@@ -529,6 +575,10 @@ class UnitCell(object):
                 return self._short_on_span_step(t_span, y_start, dose_rate, options)
             t_span = self._apply_initial_burst(t_span, y_start, dose_rate)
             options = self._drop_skipped_t_eval(t_span, options)
+        if n_points is not None and np.isfinite(t_span[1]):
+            options = dataclasses.replace(
+                options, t_eval=thinned_times(t_span[0], t_span[1], n_points)
+            )
 
         sol = self._timed_solve(t_span, y_start, beam, options, solver_kwargs)
         if not sol.success:
@@ -836,6 +886,8 @@ class UnitCell(object):
         max_step_size_final: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        points_per_chunk_on: tp.Optional[int] = None,
+        points_per_chunk_off: tp.Optional[int] = None,
     ) -> SimChunksIter:
         """Method used to prepare a multi step ODE integration, one chunk
         per beam ON / beam OFF interval of the current beam (from
@@ -873,6 +925,15 @@ class UnitCell(object):
                 None). If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
+            points_per_chunk_on: int, optional
+                Point thinning: number of points stored per beam ON
+                chunk, log-spaced from the chunk start (after the initial
+                burst) to its end, both kept; the solver steps are
+                unchanged. None (default): every solver step is stored.
+                The integrals over the stored points (production,
+                consumption) get coarser: a warning is logged.
+            points_per_chunk_off: int, optional
+                Same for the beam OFF chunks (the last chunk follows its beam state).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE
@@ -880,8 +941,11 @@ class UnitCell(object):
 
         Raises:
             NoBeamDefinedError: no beam is defined
+            ValueError: a points_per_chunk is not None or an integer >= 2
         """
         self._require_beam()
+        check_points_per_chunk(points_per_chunk_on, "points_per_chunk_on")
+        check_points_per_chunk(points_per_chunk_off, "points_per_chunk_off")
         intervals = self.beam_list.current.make_time_intervals(
             start=t_span[0], stop=t_span[1]
         )
@@ -898,7 +962,13 @@ class UnitCell(object):
         max_steps.append(max_step)
 
         chunk_list = _make_chunks(
-            intervals[:, 0], beam_on, max_steps, self.beam_list.current
+            intervals[:, 0],
+            beam_on,
+            max_steps,
+            self.beam_list.current,
+            n_points=[
+                points_per_chunk_on if on else points_per_chunk_off for on in beam_on
+            ],
         )
         return self._chunks_iter(
             t_span,
@@ -927,6 +997,8 @@ class UnitCell(object):
         trans_time: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        points_per_chunk_on: tp.Optional[int] = None,
+        points_per_chunk_off: tp.Optional[int] = None,
     ) -> SimChunksIter:
         """Method used to prepare a multi step ODE integration of a
         single pulse (tm = time at max dose of the current beam):
@@ -974,6 +1046,15 @@ class UnitCell(object):
                 None). If None, calls EnvSim.initial_values()
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
+            points_per_chunk_on: int, optional
+                Point thinning: number of points stored per beam ON
+                chunk, log-spaced from the chunk start (after the initial
+                burst) to its end, both kept; the solver steps are
+                unchanged. None (default): every solver step is stored.
+                The integrals over the stored points (production,
+                consumption) get coarser: a warning is logged.
+            points_per_chunk_off: int, optional
+                Same for the beam OFF chunks (OFF chunks before tm, the transition and the final chunk).
 
         Returns:
             SimChunksIter: Iterable object performing the ODE
@@ -981,8 +1062,11 @@ class UnitCell(object):
 
         Raises:
             NoBeamDefinedError: no beam is defined
+            ValueError: a points_per_chunk is not None or an integer >= 2
         """
         self._require_beam()
+        check_points_per_chunk(points_per_chunk_on, "points_per_chunk_on")
+        check_points_per_chunk(points_per_chunk_off, "points_per_chunk_off")
         trans_time = trans_time if trans_time is not None else DEFAULT_TRANS_TIME
         t_max_dose = self.beam_list.current.time_at_max_dose
         t_beam_off = t_max_dose + trans_time
@@ -1021,6 +1105,9 @@ class UnitCell(object):
             beam_on=beam_on,
             max_steps=max_steps,
             beam=beam,
+            n_points=[
+                points_per_chunk_on if on else points_per_chunk_off for on in beam_on
+            ],
         )
         return self._chunks_iter(
             t_span,
@@ -1084,6 +1171,9 @@ class SimChunk(tp.NamedTuple):
         dose_rate: float, optional
             Dose rate [Gy/s] of the beam inside the chunk, held constant
             by the solver (None -> the beam is read at every time)
+        n_points: int, optional
+            Number of points stored for the chunk, log-spaced (point
+            thinning, see thinned_times); None -> every solver step
     """
 
     start: float
@@ -1091,6 +1181,7 @@ class SimChunk(tp.NamedTuple):
     max_step_size: float | None
     beam_on: bool
     dose_rate: float | None = None
+    n_points: int | None = None
 
 
 class SimChunksIter:
@@ -1161,6 +1252,7 @@ class SimChunksIter:
             y0=self.sol.final_cc if self.current > 0 else self.y0,
             beam_on=chunk.beam_on,
             dose_rate=chunk.dose_rate,
+            n_points=chunk.n_points,
         )
         short = self.sim.last_short_on_span
         dose_rate = chunk.dose_rate if self.options.use_beam else None
@@ -1174,6 +1266,7 @@ class SimChunksIter:
             bursts=self.sim._last_bursts(),
             dose_rate=dose_rate,
             short_on_span=short,
+            thinned=chunk.n_points is not None and short is None,
         )
         return self.sol
 
