@@ -21,6 +21,7 @@ pyo3 = { version = "0.30", features = ["abi3-py311"] }
 numpy = "0.30"
 toml = { version = "0.8", features = ["preserve_order"] }
 log = "0.4"
+rayon = "1"
 
 [profile.release]
 lto = "thin"

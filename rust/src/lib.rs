@@ -14,6 +14,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+use rayon::prelude::*;
 use radkin::RadkinError;
 use radkin::config::Config;
 use radkin::gvalues::GValuesBoscolo;
@@ -412,6 +413,59 @@ impl Cell {
     }
 }
 
+/// One batch item: (cell, mode, t_span, options).
+type BatchItem<'py> = (
+    Bound<'py, Cell>,
+    String,
+    (f64, f64),
+    Option<Bound<'py, PyDict>>,
+);
+
+/// Run several cells in parallel on a rayon pool, GIL released.
+///
+/// Args:
+///     items: list of ``(cell, mode, t_span, options)`` (as ``Cell.run``).
+///     n_threads: pool size (``None``: all cores).
+///
+/// Returns:
+///     One entry per item, in input order: the result dict of ``Cell.run``,
+///     or the ``RadkinRustError`` instance of a failed item (never raised).
+///     Invalid options raise ``ValueError`` before any solve.
+#[pyfunction]
+#[pyo3(signature = (items, n_threads=None))]
+fn run_batch<'py>(
+    py: Python<'py>,
+    items: Vec<BatchItem<'py>>,
+    n_threads: Option<usize>,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    let empty = PyDict::new(py);
+    let mut jobs = Vec::with_capacity(items.len());
+    for (_, mode, t_span, opts) in &items {
+        jobs.push(parse_job(mode, *t_span, opts.as_ref().unwrap_or(&empty))?);
+    }
+    let cells: Vec<&UnitCell> = items.iter().map(|(c, ..)| &c.get().inner).collect();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(n_threads.unwrap_or(0))
+        .build()
+        .map_err(|e| value_err(e.to_string()))?;
+    let results: Vec<radkin::Result<OdeResult>> = py.detach(|| {
+        pool.install(|| {
+            cells
+                .par_iter()
+                .zip(jobs.par_iter())
+                .map(|(cell, job)| execute(cell, job))
+                .collect()
+        })
+    });
+    results
+        .into_iter()
+        .map(|r| match r {
+            Ok(res) => Ok(result_to_py(py, &res)?.into_any()),
+            Err(e) => Ok(to_py_err(e).into_value(py).into_bound(py).into_any()),
+        })
+        .collect()
+}
+
 /// Names of the accepted options (for the Python side's checks).
 #[pyfunction]
 fn option_keys() -> Vec<&'static str> {
@@ -425,5 +479,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("RadkinRustError", m.py().get_type::<RadkinRustError>())?;
     m.add_class::<Cell>()?;
     m.add_function(wrap_pyfunction!(option_keys, m)?)?;
+    m.add_function(wrap_pyfunction!(run_batch, m)?)?;
     Ok(())
 }

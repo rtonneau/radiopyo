@@ -58,6 +58,7 @@ __all__ = [
     "check_parity",
     "is_available",
     "radkin_config",
+    "run_batch",
     "run_cell",
 ]
 
@@ -387,3 +388,103 @@ def run_cell(
     res = to_result(uc, out)
     logger.info(f"radkin simulation done! ({sum(out['exec_time']):.2g} s)")
     return res
+
+
+_RUN_OPTION_FIELDS: tp.Final = (
+    "atol",
+    "rtol",
+    "method",
+    "max_step",
+    "first_step",
+    "use_beam",
+    "use_jac",
+    "t_eval",
+)
+
+
+def run_batch(
+    cells: tp.Sequence[UnitCell],
+    t_span: tp.Tuple[float, float],
+    mode: str = "run",
+    n_threads: tp.Optional[int] = None,
+    return_exceptions: bool = False,
+    **options: tp.Any,
+) -> tp.List[tp.Union[ODEResult, BaseException]]:
+    """
+    Run several cells with radkin in parallel (one rayon pool, GIL
+    released): the way to sweep parameters from a notebook.
+
+    Args:
+        cells: Sequence[UnitCell]
+            Cells built from a config, each with its own beam, LET,
+            temperature, k values... (never modified)
+        t_span: Tuple[float, float]
+            Start and stop times shared by every cell [s]
+        mode: str
+            "run" (UnitCell.run), "chunked" (prepare_chunked_run) or
+            "single_pulse" (prepare_single_pulse; "single-pulse" accepted)
+        n_threads: int, optional
+            Pool size (None: all cores)
+        return_exceptions: bool
+            False (default): every cell is run, then the first error is
+            raised (a note names its index). True: the exception takes the
+            cell's slot in the returned list.
+        **options:
+            The keyword arguments of the method named by mode (atol, rtol,
+            max_step, use_beam, use_jac, t_eval, y0, max_step_size_on, ...,
+            points_per_chunk_on/off); method must be LSODA.
+
+    Returns:
+        List[ODEResult | BaseException]: one entry per cell, input order.
+
+    Raises:
+        ImportError: radiopyo-rs is not installed
+        ValueError: unknown mode or option (before any solve)
+        Any per-cell error (ParityError, NoBeamDefinedError,
+        SolverFailedError, RustBackendError...) unless return_exceptions.
+    """
+    from radiopyo.simulation.unit_cell import RunOptions
+
+    mode = mode.replace("-", "_")
+    if mode not in MODES:
+        raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
+    core = _core()
+    y0 = options.pop("y0", None)
+    run_opts = RunOptions(
+        **{k: options.pop(k) for k in _RUN_OPTION_FIELDS if k in options}
+    )
+    opts = _options_dict(run_opts, y0, options)
+    unknown = set(opts) - set(core.option_keys())
+    if unknown:
+        raise ValueError(f"unknown option(s) for the Rust backend: {sorted(unknown)}")
+
+    out: tp.List[tp.Union[ODEResult, BaseException, None]] = [None] * len(cells)
+    items = []
+    slots = []
+    for i, uc in enumerate(cells):
+        try:
+            uc._require_beam()
+            cell = build_cell(uc)
+            check_parity(uc, cell.system())
+        except Exception as exc:  # noqa: BLE001 (stored, raised below)
+            out[i] = exc
+            continue
+        items.append((cell, mode, (float(t_span[0]), float(t_span[1])), opts))
+        slots.append(i)
+
+    logger.info(f"Starting radkin batch ({mode}) of {len(items)} cell(s)")
+    for i, raw in zip(slots, core.run_batch(items, n_threads), strict=True):
+        if isinstance(raw, BaseException):
+            mapped = _map_error(raw)
+            mapped.__cause__ = raw
+            out[i] = mapped
+        else:
+            out[i] = to_result(cells[i], raw)
+    logger.info("radkin batch done!")
+
+    if not return_exceptions:
+        for i, res in enumerate(out):
+            if isinstance(res, BaseException):
+                res.add_note(f"radiopyo.rust.run_batch: raised by cell {i}")
+                raise res
+    return tp.cast(tp.List[tp.Union[ODEResult, BaseException]], out)
