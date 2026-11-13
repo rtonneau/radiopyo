@@ -94,3 +94,15 @@ _Avoid_: paper notebook, foundational figures
 **Point thinning**:
 Storing a fixed number of log-spaced points per chunk (`points_per_chunk_on` / `points_per_chunk_off`, first and last kept) instead of every solver step, to bound the memory of long chunked runs; integrals over stored points then get coarser.
 _Avoid_: decimation, downsampling
+
+**Rust backend**:
+The radkin solver (Rust port of radiopyo, called in-process through the optional `radiopyo-rs` extension) selected with `backend="rust"`; it runs the whole simulation from the config and returns a regular `ODEResult` (ADR 0010).
+_Avoid_: radkin mode, native solver, fast path
+
+**Parity guard**:
+The check run before every Rust-backend run that radkin built the same system as Python: species and reaction labels equal, k and G vectors equal at rtol 1e-12; a mismatch raises.
+_Avoid_: sanity check, consistency check
+
+**Batch run**:
+Several `UnitCell`s run in parallel by the Rust backend in one call (`radiopyo.rust.run_batch`), with one run mode and one set of solver options, returning one `ODEResult` per cell in order.
+_Avoid_: sweep, multi-run
