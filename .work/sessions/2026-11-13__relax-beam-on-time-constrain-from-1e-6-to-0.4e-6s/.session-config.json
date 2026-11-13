@@ -84,9 +84,33 @@
         "ticket": "01-radkin-min-on-time",
         "commit": "5b3d9b9"
       }
+    },
+    {
+      "at": "2026-11-13T14:58:59.539Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-radiopyo-min-on-time.md",
+        "03-implement/02-radiopyo-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-radiopyo-min-on-time"
+      }
+    },
+    {
+      "at": "2026-11-13T15:04:12.850Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/02-radiopyo-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-radiopyo-min-on-time",
+        "commit": "cdc4f7e"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "feat/min-beam-on-time-0.4us",
     "base_branch": "main",
