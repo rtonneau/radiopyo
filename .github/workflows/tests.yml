@@ -33,3 +33,51 @@ jobs:
 
       - name: Test
         run: python -m pytest
+
+  # Rust backend (radiopyo-rs, rust/): build the extension and run the
+  # full suite with tests/rust active (the job above skips them).
+  test-rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONHASHSEED: "0"
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Rust format and lint
+        working-directory: rust
+        run: |
+          cargo fmt --check
+          cargo clippy --release -- -D warnings
+
+      - name: Install
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]" maturin
+          python -m maturin build --release -m rust/Cargo.toml -o dist-rs
+          python -m pip install dist-rs/*.whl
+
+      - name: Check the Rust tests run
+        run: python -c "import radiopyo; assert radiopyo.rust.is_available()"
+
+      - name: Test
+        run: python -m pytest

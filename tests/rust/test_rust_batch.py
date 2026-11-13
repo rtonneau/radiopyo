@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import time
+import typing as tp
 
 import numpy as np
 import pytest
@@ -118,15 +119,24 @@ def test_batch_is_faster_than_serial():
     cells = [template("labarbe") for _ in range(4)]
     for cell in cells:
         cell.set_beam(
-            PulsedBeam.from_dose_rate_peak(1e6, 1e-3, 1e-5, max_dose=50.0), LET=0.201
+            PulsedBeam.from_dose_rate_peak(1e6, 1e-3, 1e-5, max_dose=500.0), LET=0.201
         )
-    span = (0.0, 2e-2)
+    span = (0.0, 0.5)
     rust.run_batch(cells[:1], span, mode="chunked")  # warm up
-    t0 = time.perf_counter()
-    for cell in cells:
-        cell.prepare_chunked_run(t_span=span).run(backend="rust")
-    serial = time.perf_counter() - t0
-    t0 = time.perf_counter()
-    rust.run_batch(cells, span, mode="chunked")
-    batch = time.perf_counter() - t0
-    assert batch < serial
+
+    def serial() -> None:
+        for cell in cells:
+            cell.prepare_chunked_run(t_span=span).run(backend="rust")
+
+    def batch() -> None:
+        rust.run_batch(cells, span, mode="chunked")
+
+    def best(fn: tp.Callable[[], None]) -> float:
+        times = []
+        for _ in range(3):
+            t0 = time.perf_counter()
+            fn()
+            times.append(time.perf_counter() - t0)
+        return min(times)
+
+    assert best(batch) < best(serial)

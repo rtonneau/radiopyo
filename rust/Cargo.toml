@@ -22,6 +22,7 @@ numpy = "0.30"
 toml = { version = "0.8", features = ["preserve_order"] }
 log = "0.4"
 rayon = "1"
+mimalloc = { version = "0.1", default-features = false }
 
 [profile.release]
 lto = "thin"

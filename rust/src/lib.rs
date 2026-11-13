@@ -6,7 +6,8 @@
 //! matrices (parity guard), then calls [`Cell::run`]. The returned dict holds
 //! what `ODEResult.append_sol` needs, one entry per solved block.
 
-use std::sync::OnceLock;
+use std::cell::Cell as StdCell;
+use std::sync::{Mutex, OnceLock};
 
 use numpy::ndarray::Array2;
 use numpy::{IntoPyArray, PyArray1};
@@ -14,7 +15,6 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
-use rayon::prelude::*;
 use radkin::RadkinError;
 use radkin::config::Config;
 use radkin::gvalues::GValuesBoscolo;
@@ -22,6 +22,12 @@ use radkin::physics::Beam;
 use radkin::result::OdeResult;
 use radkin::solver::JacobianMode;
 use radkin::unit_cell::{ChunkOptions, RunOptions, UnitCell};
+use rayon::prelude::*;
+
+/// mimalloc: the system allocator (Windows heap) serializes the parallel
+/// solves of `run_batch`, which allocate on every step.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 create_exception!(
     radiopyo_rs._core,
@@ -61,6 +67,28 @@ struct PyLogger;
 
 static LOGGER: PyLogger = PyLogger;
 static PY_LOGGER: OnceLock<Py<PyAny>> = OnceLock::new();
+/// Records of the batch workers, replayed by `run_batch` once the GIL is
+/// back: taking the GIL per record would serialize the workers.
+static DEFERRED: Mutex<Vec<(u8, String)>> = Mutex::new(Vec::new());
+
+thread_local! {
+    static DEFER_LOGS: StdCell<bool> = const { StdCell::new(false) };
+}
+
+fn forward(py: Python<'_>, logger: &Py<PyAny>, level: u8, msg: String) {
+    // A failing Python logger must never abort a solve.
+    let _ = logger.call_method1(py, "log", (level, msg));
+}
+
+/// Log the records deferred by the batch workers (GIL held).
+fn replay_deferred(py: Python<'_>) {
+    let records = std::mem::take(&mut *DEFERRED.lock().unwrap_or_else(|e| e.into_inner()));
+    if let Some(logger) = PY_LOGGER.get() {
+        for (level, msg) in records {
+            forward(py, logger, level, msg);
+        }
+    }
+}
 
 impl log::Log for PyLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
@@ -81,10 +109,14 @@ impl log::Log for PyLogger {
             log::Level::Debug | log::Level::Trace => 10,
         };
         let msg = record.args().to_string();
-        Python::attach(|py| {
-            // A failing Python logger must never abort a solve.
-            let _ = logger.call_method1(py, "log", (level, msg));
-        });
+        if DEFER_LOGS.with(StdCell::get) {
+            DEFERRED
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push((level, msg));
+            return;
+        }
+        Python::attach(|py| forward(py, logger, level, msg));
     }
 
     fn flush(&self) {}
@@ -453,10 +485,14 @@ fn run_batch<'py>(
             cells
                 .par_iter()
                 .zip(jobs.par_iter())
-                .map(|(cell, job)| execute(cell, job))
+                .map(|(cell, job)| {
+                    DEFER_LOGS.with(|d| d.set(true));
+                    execute(cell, job)
+                })
                 .collect()
         })
     });
+    replay_deferred(py);
     results
         .into_iter()
         .map(|r| match r {

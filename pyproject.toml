@@ -27,6 +27,11 @@ dependencies = [
 dev = ["mypy", "pytest", "pandas-stubs>=1.5.3"]
 tqdm = ["tqdm"]
 examples = ["matplotlib"]
+# Rust backend (backend="rust", radiopyo.rust). radiopyo-rs is not on PyPI:
+# install it first from a release wheel (GitHub release assets) or from
+# source, `pip install ./rust` (needs a Rust toolchain); the extra then only
+# pins it alongside radiopyo.
+rust = ["radiopyo-rs"]
 
 [project.urls]
 "Source" = "https://github.com/rtonneau/radiopyo"
