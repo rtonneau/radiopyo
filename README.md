@@ -113,7 +113,7 @@ chemistry, the oxygen content and the beam; the model gives no general rule.
 
 Beam timing affects how the run is solved:
 
-- A configured beam ON time below 1e-6 s raises `ShortBeamOnError` when the beam is built.
+- A configured beam ON time below 0.4e-6 s raises `ShortBeamOnError` when the beam is built.
 - A run-time ON span shorter than that (a last pulse cut by `max_dose`, a pulse clipped by
   `t_span`) is not integrated. Its radiolytic yield is added analytically, a warning is
   logged, and the span is listed in `res.short_on_spans`.

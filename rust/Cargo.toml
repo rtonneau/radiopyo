@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 # radkin pinned by revision (same pattern as radkin -> rsoda). A local
 # checkout can be used for testing with a [patch] in rust/.cargo/config.toml
 # (git-ignored); never commit a path dependency.
-radkin = { git = "https://github.com/rtonneau/radkin", rev = "5e0d181" }
+radkin = { git = "https://github.com/rtonneau/radkin", rev = "088f06b" }
 pyo3 = { version = "0.30", features = ["abi3-py311"] }
 numpy = "0.30"
 toml = { version = "0.8", features = ["preserve_order"] }

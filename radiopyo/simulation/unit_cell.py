@@ -275,7 +275,7 @@ class UnitCell(object):
             radiolytic production over it is added analytically to the
             initial concentrations (default=1e-7 s)
         MIN_BEAM_ON_TIME: float
-            Shortest configured beam ON time accepted (default=1e-6 s,
+            Shortest configured beam ON time accepted (default=0.4e-6 s,
             same value as radiopyo.physics.beam.MIN_BEAM_ON_TIME, checked
             when a beam is built: ShortBeamOnError). A beam ON span
             shorter than it at run time (pulse cut by max_dose or

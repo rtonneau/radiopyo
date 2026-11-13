@@ -82,7 +82,7 @@ MODES: tp.Final = ("run", "chunked", "single_pulse")
 _RADKIN_CONSTANTS: tp.Final = {
     "FIRST_STEP": 1e-15,
     "T_ZERO": 1e-7,
-    "MIN_BEAM_ON_TIME": 1e-6,
+    "MIN_BEAM_ON_TIME": 0.4e-6,
 }
 
 

@@ -42,7 +42,7 @@ def _cell(base: UnitCell, max_dose: float) -> UnitCell:
 
 # ------------------------------ is_short_on_span ---------------------------- #
 def test_is_short_on_span_threshold():
-    assert is_short_on_span((0.0, 5e-7))
+    assert is_short_on_span((0.0, 3e-7))
     assert not is_short_on_span((0.0, MIN_BEAM_ON_TIME))
     # rounding of a chunk boundary computed at a large start time
     start = 1234.5
@@ -65,7 +65,7 @@ def test_partial_pulse_is_a_short_on_span(base_cell, caplog, max_dose):
     assert res.t[-1] == pytest.approx(3e-3)
 
 
-@pytest.mark.parametrize("max_dose", [10.1, 10.5, 0.1])
+@pytest.mark.parametrize("max_dose", [10.1, 10.3, 0.1])
 def test_production_integral_counts_the_short_span_once(base_cell, max_dose):
     cell = _cell(base_cell, max_dose)
     res = cell.prepare_chunked_run(t_span=(0.0, 3e-3)).run()
@@ -90,37 +90,37 @@ def test_reconstruct_and_pandas_work_with_a_short_span(base_cell):
 
 def test_span_clipped_by_t_span_is_a_short_on_span(base_cell):
     cell = _cell(base_cell, 50.0)
-    res = cell.prepare_chunked_run(t_span=(9.5e-6, 2e-3)).run()
+    res = cell.prepare_chunked_run(t_span=(9.7e-6, 2e-3)).run()
     assert len(res.short_on_spans) == 1
-    assert res.short_on_spans[0].start == pytest.approx(9.5e-6)
+    assert res.short_on_spans[0].start == pytest.approx(9.7e-6)
 
 
 def test_plain_run_short_span(base_cell, caplog):
     cell = _cell(base_cell, 50.0)
     with caplog.at_level(logging.WARNING, logger="radiopyo"):
-        res = cell.run(t_span=(0.0, 5e-7))
+        res = cell.run(t_span=(0.0, 3e-7))
     assert len(res.short_on_spans) == 1
-    assert res.t[-1] == pytest.approx(5e-7)
+    assert res.t[-1] == pytest.approx(3e-7)
     assert not [dr for dr in (res.burst_dose_rates or []) if dr is not None]
     (r,) = cell.env.radiolytic_reaction_involving("e_aq")
     idx = r.species().index
     gained = res.y[idx, -1] - cell.env.initial_values()[idx]
-    expected = r.compute_initial_cc_before(5e-7, PEAK) * 1e6
+    expected = r.compute_initial_cc_before(3e-7, PEAK) * 1e6
     assert gained == pytest.approx(expected, rel=1e-9)
     assert any("shorter than MIN_BEAM_ON_TIME" in m for m in caplog.messages)
 
 
 def test_single_pulse_clipped_by_t_span(base_cell):
     cell = _cell(base_cell, 50.0)
-    res = cell.prepare_single_pulse(t_span=(0.0, PERIOD + 5e-7)).run()
+    res = cell.prepare_single_pulse(t_span=(0.0, PERIOD + 3e-7)).run()
     assert len(res.short_on_spans) == 1
     assert res.short_on_spans[0].start == pytest.approx(PERIOD)
 
 
 def test_add_concatenates_short_on_spans(base_cell):
     cell = _cell(base_cell, 50.0)
-    first = cell.run(t_span=(0.0, 5e-7))
-    second = cell.run(t_span=(5e-7, 9e-7), y0=first.y[:, -1])
+    first = cell.run(t_span=(0.0, 3e-7))
+    second = cell.run(t_span=(3e-7, 4e-7), y0=first.y[:, -1])
     total = first + second
     assert total.short_on_spans == [*first.short_on_spans, *second.short_on_spans]
     assert len(total.short_on_spans) == 2
@@ -133,7 +133,7 @@ def test_micro_pulse_cut_by_its_train_end_is_a_short_on_span(base_cell):
     beam = MacroPulsedBeam(
         dose_rate_peak=PEAK,
         period=1e-3,
-        on_time=2.05e-5,
+        on_time=2.03e-5,
         micro_period=1e-5,
         micro_on_time=5e-6,
     )
@@ -142,7 +142,7 @@ def test_micro_pulse_cut_by_its_train_end_is_a_short_on_span(base_cell):
     assert len(res.short_on_spans) == 1
     span = res.short_on_spans[0]
     assert span.start == pytest.approx(2e-5)
-    assert span.stop == pytest.approx(2.05e-5)
+    assert span.stop == pytest.approx(2.03e-5)
 
 
 def test_result_loaded_from_hdf5_has_no_short_on_span(base_cell, tmp_path):
