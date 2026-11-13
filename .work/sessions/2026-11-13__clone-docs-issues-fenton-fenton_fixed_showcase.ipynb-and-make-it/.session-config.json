@@ -83,9 +83,33 @@
         "ticket": "01-fenton-map-rust-backend",
         "commit": "977e8f9"
       }
+    },
+    {
+      "at": "2026-11-13T14:29:37.231Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-rust-showcase-notebook.md",
+        "03-implement/02-rust-showcase-notebook/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-rust-showcase-notebook"
+      }
+    },
+    {
+      "at": "2026-11-13T14:33:34.960Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/02-rust-showcase-notebook/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-rust-showcase-notebook",
+        "commit": "8927ea9"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "docs/fenton-showcase-rust",
     "base_branch": "main",
