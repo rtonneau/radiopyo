@@ -147,6 +147,30 @@
         "ticket": "03-chunked-and-single-pulse",
         "commit": "ec5922c"
       }
+    },
+    {
+      "at": "2026-11-13T12:12:24.204Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-run-batch.md",
+        "03-implement/04-run-batch/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-run-batch"
+      }
+    },
+    {
+      "at": "2026-11-13T12:15:56.534Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/04-run-batch/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-run-batch",
+        "commit": "3470614"
+      }
     }
   ],
   "current_phase": "ship",
