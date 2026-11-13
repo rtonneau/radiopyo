@@ -124,6 +124,28 @@ Beam timing affects how the run is solved:
   coarser and log a warning.
 - `set_beam(beam)` without `LET` reuses the LET of the previously selected beam.
 
+### Rust backend (optional)
+
+The same simulation can be solved by [radkin](https://github.com/rtonneau/radkin), a Rust
+port of radiopyo, through the `radiopyo-rs` extension in [`rust/`](rust/). Install it
+from a release wheel (GitHub release assets, `pip install radiopyo_rs-<version>-cp311-abi3-<platform>.whl`)
+or from source with a Rust toolchain (`pip install ./rust`, or
+`pip install "git+https://github.com/rtonneau/radiopyo#subdirectory=rust"`). Then:
+
+```python
+res = uc.run(t_span=(0, 10), backend="rust")
+res = uc.prepare_chunked_run(t_span=(0, 1e-2)).run(backend="rust")   # also prepare_single_pulse
+results = rp.rust.run_batch(cells, (0, 1e-2), mode="chunked")       # parallel, all cores
+```
+
+The result is a normal `ODEResult` (plots, `to_pandas`, `reconstruct_reactions`, HDF5).
+`run_batch` raises the first error after every cell has finished, or returns the
+exceptions in their slots with `return_exceptions=True`. Limits: LSODA only; only cells built from a
+config file or dict; before solving, a parity guard checks that radkin built the same
+species, reactions, k values and G-values (rtol 1e-12) and raises `ParityError` otherwise
+(for instance after editing a k value by hand: use the Python backend then). Worked
+example: [Rust backend notebook](examples/notebook_rust_backend.ipynb).
+
 ## Documentation
 
 - **[Configuration reference](docs/configuration.md#configuring-simulation)**: includes,
@@ -136,6 +158,8 @@ Beam timing affects how the run is solved:
   laws behind the ODE system.
 - **[Bundled configurations](radiopyo/data/)**: the TOML files shipped with the package.
 - **[Basic usage notebook](examples/notebook_basic_usage.ipynb)**: a worked example.
+- **[Rust backend notebook](examples/notebook_rust_backend.ipynb)**: both backends side by
+  side, a chunked pulsed run, a `run_batch` LET sweep and timings.
 - **[Paper reproduction notebook](examples/tonneau_2025_pmb/tonneau_2025_pmb.ipynb)**:
   the main figures of Tonneau et al. 2025 (O2, H2O2 and pH time evolution, ΔO2 and net
   H2O2 yield maps over dose rate and pO2, gross production / consumption bars) with a
