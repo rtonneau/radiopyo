@@ -123,6 +123,30 @@
         "ticket": "02-adapter-and-single-run",
         "commit": "98f5e6a"
       }
+    },
+    {
+      "at": "2026-11-13T12:03:49.837Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-chunked-and-single-pulse.md",
+        "03-implement/03-chunked-and-single-pulse/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunked-and-single-pulse"
+      }
+    },
+    {
+      "at": "2026-11-13T12:12:11.407Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-chunked-and-single-pulse/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chunked-and-single-pulse",
+        "commit": "ec5922c"
+      }
     }
   ],
   "current_phase": "ship",
