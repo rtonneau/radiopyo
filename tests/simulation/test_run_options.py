@@ -442,6 +442,7 @@ _COMMON_CHUNKED = [
                 ("max_step", None),
                 ("y0", None),
                 ("use_beam", True),
+                ("backend", "python"),  # appended (Rust backend, ADR 0010)
             ],
         ),
         (

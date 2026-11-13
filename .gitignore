@@ -22,3 +22,5 @@ __pycache__
 # Rust backend (radiopyo-rs)
 /rust/target/
 /rust/.cargo/
+/rust/python/radiopyo_rs/_core.*
+!/rust/python/radiopyo_rs/_core.pyi

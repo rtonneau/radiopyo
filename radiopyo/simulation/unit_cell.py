@@ -12,6 +12,7 @@ Author:
 from __future__ import annotations
 
 import collections
+import copy
 import dataclasses
 import logging
 import time
@@ -64,6 +65,8 @@ DEFAULT_ATOL: float = 1e-12
 DEFAULT_RTOL: float = 1e-10
 # solve_ivp methods that accept a Jacobian (the others would warn)
 JAC_METHODS: tp.Final = ("LSODA", "BDF", "Radau")
+# Simulation backends of UnitCell.run & co ("rust": radiopyo.rust, ADR 0010).
+BACKENDS: tp.Final = ("python", "rust")
 # Duration [s] of the ON -> OFF transition chunk of prepare_single_pulse.
 DEFAULT_TRANS_TIME: float = 100e-6
 # Point thinning: first stored time after the chunk start, as a fraction of
@@ -101,6 +104,12 @@ def thinned_times(start: float, stop: float, n_points: int) -> NDArray[np.float6
     times = np.concatenate(([start], start + offsets))
     times[-1] = stop
     return np.unique(np.clip(times, start, stop))
+
+
+def check_backend(backend: str) -> None:
+    """Raise ValueError unless backend is one of BACKENDS."""
+    if backend not in BACKENDS:
+        raise ValueError(f"backend must be one of {BACKENDS}, got {backend!r}")
 
 
 def widen_empty_span(t_span: tp.Tuple[float, float]) -> tp.Tuple[float, float]:
@@ -254,6 +263,11 @@ class UnitCell(object):
             integrated, see _short_on_span_step), None otherwise
         g_val: GValuesBoscolo
             GValues from the literature to possibly update the LET
+        config: ConfigDict, optional
+            Merged configuration (includes resolved) the cell was built
+            from by from_config_dict / from_parser / from_toml; None for
+            a cell built from a SimEnv. Needed by the Rust backend
+            (backend="rust", ADR 0010), which rebuilds the system from it.
         FIRST_STEP: float
             Initial time step of all simulation (default=1e-15 s)
         T_ZERO: float
@@ -281,6 +295,7 @@ class UnitCell(object):
     last_burst_dose_rate: tp.Optional[float]
     last_short_on_span: tp.Optional[ShortOnSpan]
     g_val: GValuesBoscolo
+    config: tp.Optional[ConfigDict]
 
     def __init__(
         self,
@@ -289,6 +304,7 @@ class UnitCell(object):
         init: bool = True,
     ) -> None:
         self.env = env
+        self.config = None
         self.g_val = GValuesBoscolo()  # To do before set_beam
 
         if init:
@@ -354,7 +370,9 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
-        return cls(env=SimEnv.from_dict(config), beam=beam_list, init=init)
+        cell = cls(env=SimEnv.from_dict(config), beam=beam_list, init=init)
+        cell.config = copy.deepcopy(config)
+        return cell
 
     @classmethod
     def from_parser(
@@ -803,6 +821,7 @@ class UnitCell(object):
         max_step: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        backend: str = "python",
     ) -> ODEResult:
         """Solve ODE over t_span
 
@@ -830,6 +849,10 @@ class UnitCell(object):
                 None). If None, calls EnvSim.initial_values().
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
+            backend: str
+                "python" (default: scipy solve_ivp) or "rust" (radkin,
+                needs the optional radiopyo-rs extension and a cell built
+                from a config; LSODA only; see radiopyo.rust).
 
         The beam is assumed switched ON at t_span[0]: unless
         use_beam=False, the first T_ZERO seconds are skipped and the
@@ -844,7 +867,10 @@ class UnitCell(object):
             NoBeamDefinedError: no beam is defined
             ValueError: beam ON at t_span[0] and t_span not longer than
                 T_ZERO (the initial burst would cover the whole span)
+            RustBackendError: backend="rust" failed (ParityError: radkin
+                built another system)
         """
+        check_backend(backend)
         logger.info(
             f"Starting simulation with t_span: {t_span} (jacobian use: {use_jac})"
         )
@@ -857,6 +883,10 @@ class UnitCell(object):
             use_jac=use_jac,
             t_eval=t_eval,
         )
+        if backend == "rust":
+            from radiopyo import rust
+
+            return rust.run_cell(self, "run", t_span, options, y0=y0)
         sol = self._raw_run(t_span, options, y0=y0, beam_on=True)
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
         res = ODEResult(
