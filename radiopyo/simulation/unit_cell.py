@@ -12,6 +12,7 @@ Author:
 from __future__ import annotations
 
 import collections
+import copy
 import dataclasses
 import logging
 import time
@@ -64,6 +65,8 @@ DEFAULT_ATOL: float = 1e-12
 DEFAULT_RTOL: float = 1e-10
 # solve_ivp methods that accept a Jacobian (the others would warn)
 JAC_METHODS: tp.Final = ("LSODA", "BDF", "Radau")
+# Simulation backends of UnitCell.run & co ("rust": radiopyo.rust, ADR 0010).
+BACKENDS: tp.Final = ("python", "rust")
 # Duration [s] of the ON -> OFF transition chunk of prepare_single_pulse.
 DEFAULT_TRANS_TIME: float = 100e-6
 # Point thinning: first stored time after the chunk start, as a fraction of
@@ -101,6 +104,12 @@ def thinned_times(start: float, stop: float, n_points: int) -> NDArray[np.float6
     times = np.concatenate(([start], start + offsets))
     times[-1] = stop
     return np.unique(np.clip(times, start, stop))
+
+
+def check_backend(backend: str) -> None:
+    """Raise ValueError unless backend is one of BACKENDS."""
+    if backend not in BACKENDS:
+        raise ValueError(f"backend must be one of {BACKENDS}, got {backend!r}")
 
 
 def widen_empty_span(t_span: tp.Tuple[float, float]) -> tp.Tuple[float, float]:
@@ -254,6 +263,11 @@ class UnitCell(object):
             integrated, see _short_on_span_step), None otherwise
         g_val: GValuesBoscolo
             GValues from the literature to possibly update the LET
+        config: ConfigDict, optional
+            Merged configuration (includes resolved) the cell was built
+            from by from_config_dict / from_parser / from_toml; None for
+            a cell built from a SimEnv. Needed by the Rust backend
+            (backend="rust", ADR 0010), which rebuilds the system from it.
         FIRST_STEP: float
             Initial time step of all simulation (default=1e-15 s)
         T_ZERO: float
@@ -281,6 +295,7 @@ class UnitCell(object):
     last_burst_dose_rate: tp.Optional[float]
     last_short_on_span: tp.Optional[ShortOnSpan]
     g_val: GValuesBoscolo
+    config: tp.Optional[ConfigDict]
 
     def __init__(
         self,
@@ -289,6 +304,7 @@ class UnitCell(object):
         init: bool = True,
     ) -> None:
         self.env = env
+        self.config = None
         self.g_val = GValuesBoscolo()  # To do before set_beam
 
         if init:
@@ -354,7 +370,9 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
-        return cls(env=SimEnv.from_dict(config), beam=beam_list, init=init)
+        cell = cls(env=SimEnv.from_dict(config), beam=beam_list, init=init)
+        cell.config = copy.deepcopy(config)
+        return cell
 
     @classmethod
     def from_parser(
@@ -803,6 +821,7 @@ class UnitCell(object):
         max_step: tp.Optional[float] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
         use_beam: bool = True,
+        backend: str = "python",
     ) -> ODEResult:
         """Solve ODE over t_span
 
@@ -830,6 +849,10 @@ class UnitCell(object):
                 None). If None, calls EnvSim.initial_values().
             use_beam: bool, optional
                 whether to use the beam or not (default: True).
+            backend: str
+                "python" (default: scipy solve_ivp) or "rust" (radkin,
+                needs the optional radiopyo-rs extension and a cell built
+                from a config; LSODA only; see radiopyo.rust).
 
         The beam is assumed switched ON at t_span[0]: unless
         use_beam=False, the first T_ZERO seconds are skipped and the
@@ -844,7 +867,10 @@ class UnitCell(object):
             NoBeamDefinedError: no beam is defined
             ValueError: beam ON at t_span[0] and t_span not longer than
                 T_ZERO (the initial burst would cover the whole span)
+            RustBackendError: backend="rust" failed (ParityError: radkin
+                built another system)
         """
+        check_backend(backend)
         logger.info(
             f"Starting simulation with t_span: {t_span} (jacobian use: {use_jac})"
         )
@@ -857,6 +883,10 @@ class UnitCell(object):
             use_jac=use_jac,
             t_eval=t_eval,
         )
+        if backend == "rust":
+            from radiopyo import rust
+
+            return rust.run_cell(self, "run", t_span, options, y0=y0)
         sol = self._raw_run(t_span, options, y0=y0, beam_on=True)
         logger.info(f"Simulation done! ({self.last_exec_time:.2g} s)")
         res = ODEResult(
@@ -982,6 +1012,17 @@ class UnitCell(object):
             ),
             y0,
             n_beam_intervals=len(intervals),
+            rust_request=RustRequest(
+                "chunked",
+                t_span,
+                {
+                    "max_step_size_on": max_step_size_on,
+                    "max_step_size_off": max_step_size_off,
+                    "max_step_size_final": max_step_size_final,
+                    "points_per_chunk_on": points_per_chunk_on,
+                    "points_per_chunk_off": points_per_chunk_off,
+                },
+            ),
         )
 
     def prepare_single_pulse(
@@ -1120,6 +1161,18 @@ class UnitCell(object):
                 use_jac=use_jac,
             ),
             y0,
+            rust_request=RustRequest(
+                "single_pulse",
+                t_span,
+                {
+                    "max_step_size_on": max_step_size_on,
+                    "max_step_size_trans": max_step_size_trans,
+                    "max_step_size_final": max_step_size_final,
+                    "trans_time": trans_time,
+                    "points_per_chunk_on": points_per_chunk_on,
+                    "points_per_chunk_off": points_per_chunk_off,
+                },
+            ),
         )
 
     def _last_bursts(self) -> tp.List[float]:
@@ -1140,16 +1193,43 @@ class UnitCell(object):
         options: RunOptions,
         y0: tp.Optional[NDArray[np.float64]],
         n_beam_intervals: tp.Optional[int] = None,
+        rust_request: tp.Optional[RustRequest] = None,
     ) -> SimChunksIter:
         """Log the chunk layout and wrap the chunks in a SimChunksIter."""
         logger.info(f"Beam span ==> [{t_span[0]} - {t_span[1]}]")
         if n_beam_intervals is not None:
             logger.info(f"From beam chunks ==> {n_beam_intervals}")
         logger.info(f"Simulation divided in {len(chunk_list)} chunks")
-        return SimChunksIter(sim=self, chunks=chunk_list, options=options, y0=y0)
+        return SimChunksIter(
+            sim=self,
+            chunks=chunk_list,
+            options=options,
+            y0=y0,
+            rust_request=rust_request,
+        )
 
 
 # -------------------------- Chunked Simulation Run ------------------------- #
+
+
+class RustRequest(tp.NamedTuple):
+    """
+    What the Rust backend needs to cut the chunks of a SimChunksIter
+    itself (radkin reproduces prepare_chunked_run / prepare_single_pulse).
+
+    Attributes:
+        mode: str
+            "chunked" or "single_pulse"
+        t_span: Tuple[float, float]
+            Span given to the prepare_* method [s]
+        chunk_options: Dict[str, Any]
+            Its max step sizes, trans_time and points per chunk (None:
+            default)
+    """
+
+    mode: str
+    t_span: tp.Tuple[float, float]
+    chunk_options: tp.Dict[str, tp.Any]
 
 
 class SimChunk(tp.NamedTuple):
@@ -1203,6 +1283,10 @@ class SimChunksIter:
             Initial concentration of DynSpecies [µmol/L] (default:
             None). If None, calls EnvSim.initial_values(). Later chunks
             start from the last point of the previous one.
+        rust_request: RustRequest, optional
+            Set by prepare_chunked_run / prepare_single_pulse: lets
+            run(backend="rust") hand the whole run to radkin. None for
+            chunks built by hand (Python backend only).
     Usage:
         >>> res = cell.prepare_chunked_run(t_span=(0, 1)).run()
     """
@@ -1213,6 +1297,7 @@ class SimChunksIter:
     current: int
     options: RunOptions
     y0: tp.Optional[NDArray[np.float64]]
+    rust_request: tp.Optional[RustRequest]
 
     def __init__(
         self,
@@ -1220,6 +1305,7 @@ class SimChunksIter:
         chunks: tp.List[SimChunk],
         options: tp.Optional[RunOptions] = None,
         y0: tp.Optional[NDArray[np.float64]] = None,
+        rust_request: tp.Optional[RustRequest] = None,
     ):
         self.sim = sim
         self.chunks = chunks
@@ -1233,6 +1319,7 @@ class SimChunksIter:
         self.options = options if options is not None else RunOptions()
         self.current = -1
         self.y0 = y0
+        self.rust_request = rust_request
 
     def __iter__(self) -> SimChunksIter:
         return self
@@ -1273,8 +1360,12 @@ class SimChunksIter:
     def __len__(self) -> int:
         return len(self.chunks)
 
-    def run(self) -> ODEResult:
+    def run(self, backend: str = "python") -> ODEResult:
         """Run all simulation chunks
+
+        backend: "python" (default) or "rust": radkin runs the whole
+        chunked run in one call (radiopyo.rust; LSODA only; needs a fresh
+        iterator returned by prepare_chunked_run / prepare_single_pulse).
         Tries to import tqdm to give a nice progressbar to the user.
         But it can safely fail.
         get_ipython().__class__.__name__ --> detect if python was
@@ -1282,6 +1373,9 @@ class SimChunksIter:
         If ran from a regular python, the call to "get_ipython()"
         produces a NameError.
         """
+        check_backend(backend)
+        if backend == "rust":
+            return self._run_rust()
         logger.info("Running all simulation chunks")
         try:
             from tqdm import tqdm  # type: ignore[import-untyped]
@@ -1301,4 +1395,29 @@ class SimChunksIter:
         # last element.
         res = collections.deque(sim, maxlen=1).pop()
         logger.info("Simulation done!")
+        return res
+
+    def _run_rust(self) -> ODEResult:
+        from radiopyo import rust
+
+        if self.rust_request is None:
+            raise rust.RustBackendError(
+                "backend='rust' needs the iterator returned by "
+                "prepare_chunked_run or prepare_single_pulse"
+            )
+        if self.current != -1:
+            raise rust.RustBackendError(
+                "backend='rust' needs a fresh iterator (chunks already run)"
+            )
+        req = self.rust_request
+        res = rust.run_cell(
+            self.sim,
+            req.mode,
+            req.t_span,
+            self.options,
+            y0=self.y0,
+            extra=req.chunk_options,
+        )
+        self.current = len(self.chunks)
+        self.sol = res
         return res

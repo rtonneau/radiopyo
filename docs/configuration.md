@@ -415,3 +415,16 @@ The module currently supports 2 ways of running simulations:
    [`.work/adr/0007-overshoot-relaxation.md`](../.work/adr/0007-overshoot-relaxation.md)), which keeps LSODA from stalling on stiff
    radicals such as OH_r in a high-RH medium.
 
+- with the Rust backend (optional `radiopyo-rs` extension, see the README)
+
+   Every way of running above takes the Rust backend: `sim.run(..., backend="rust")`
+   (and `run_till_max_dose(..., backend="rust")`) and `sim.prepare_chunked_run(...).run(backend="rust")`
+   (same for `prepare_single_pulse`). radkin receives the config and the current state
+   (temperature, beam, LET, initial concentrations) and runs the whole simulation; the
+   chunk options are forwarded, so the chunks are cut the same way. Only LSODA is
+   available, the cell must come from a config (`from_toml` / `from_config_dict`), and a
+   parity guard raises `ParityError` if radkin built a different system (rtol 1e-12).
+   `radiopyo.rust.run_batch(cells, t_span, mode="run" | "chunked" | "single_pulse",
+   n_threads=None, return_exceptions=False, **options)` runs several cells in parallel.
+   `options` are the keyword arguments of the matching method.
+

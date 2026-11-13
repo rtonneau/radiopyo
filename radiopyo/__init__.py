@@ -11,6 +11,7 @@ import typing as tp
 from pathlib import Path
 
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo import rust
 from radiopyo.physics.beam import (
     ConstantBeam,
     MacroPulsedBeam,
@@ -46,6 +47,7 @@ __all__: tp.List = [
     "UnitCell",
     "disable_logging",
     "enable_logging",
+    "rust",
     "set_logging_level",
 ]
 

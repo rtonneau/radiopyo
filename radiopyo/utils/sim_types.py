@@ -116,6 +116,7 @@ class KwargsRun(tp.TypedDict, total=False):
     max_step: tp.Optional[float]
     y0: tp.Optional[NDArray[np.float64]]
     use_beam: bool
+    backend: str
 
 
 class ConcentrationDict(tp.TypedDict):

@@ -18,3 +18,9 @@ __pycache__
 /tests/output/
 *blond_2026/
 .ipynb_checkpoints/
+
+# Rust backend (radiopyo-rs)
+/rust/target/
+/rust/.cargo/
+/rust/python/radiopyo_rs/_core.*
+!/rust/python/radiopyo_rs/_core.pyi

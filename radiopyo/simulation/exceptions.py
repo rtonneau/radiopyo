@@ -14,7 +14,9 @@ from radiopyo.exceptions import RadioPyoError
 
 __all__ = [
     "NoBeamDefinedError",
+    "ParityError",
     "RadioPyoError",
+    "RustBackendError",
     "SimulationError",
     "SolverFailedError",
 ]
@@ -34,3 +36,11 @@ class NoBeamDefinedError(SimulationError):
 
 class SolverFailedError(SimulationError):
     """solve_ivp returned success=False (integration did not reach t_span[1])."""
+
+
+class RustBackendError(SimulationError):
+    """The Rust backend (radkin, backend="rust") failed or cannot run."""
+
+
+class ParityError(RustBackendError):
+    """radkin built another system than Python (parity guard, ADR 0010)."""

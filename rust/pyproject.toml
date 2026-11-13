@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "radiopyo-rs"
+# Lockstep with radiopyo's pyproject.toml (release versionFiles).
+version = "0.7.0"
+description = "Rust backend of radiopyo (Python binding of radkin)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "LGPL-3.0-only"
+authors = [{ name = "Romain Tonneau" }]
+dependencies = ["numpy>=1.24.3"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Rust",
+]
+
+[project.urls]
+"Source" = "https://github.com/rtonneau/radiopyo"
+
+[tool.maturin]
+python-source = "python"
+module-name = "radiopyo_rs._core"
+features = []

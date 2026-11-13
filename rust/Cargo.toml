@@ -1,0 +1,29 @@
+[package]
+name = "radiopyo-rs"
+# Lockstep with radiopyo's pyproject.toml (release versionFiles).
+version = "0.7.0"
+edition = "2024"
+license = "LGPL-3.0-only"
+description = "Rust backend of radiopyo: Python binding of radkin (Rust port of radiopyo)"
+repository = "https://github.com/rtonneau/radiopyo"
+publish = false
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+# radkin pinned by revision (same pattern as radkin -> rsoda). A local
+# checkout can be used for testing with a [patch] in rust/.cargo/config.toml
+# (git-ignored); never commit a path dependency.
+radkin = { git = "https://github.com/rtonneau/radkin", rev = "5e0d181" }
+pyo3 = { version = "0.30", features = ["abi3-py311"] }
+numpy = "0.30"
+toml = { version = "0.8", features = ["preserve_order"] }
+log = "0.4"
+rayon = "1"
+mimalloc = { version = "0.1", default-features = false }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
