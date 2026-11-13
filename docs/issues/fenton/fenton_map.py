@@ -12,6 +12,7 @@ Author:
 # --------------------------------------------------------------------------- #
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -40,7 +41,7 @@ from radiopyo.physics.beam import PulsedBeam
 # --------------------------------------------------------------------------- #
 #                         Expose importable stuffs                            #
 # --------------------------------------------------------------------------- #
-__all__ = ["compute_map", "compute_point", "load_config", "CONFIG_FILE", "CACHE_DIR"]
+__all__ = ["compute_map", "compute_point", "load_config", "BACKENDS", "CONFIG_FILE", "CACHE_DIR"]
 
 # --------------------------------------------------------------------------- #
 #                                   Logging                                   #
@@ -61,6 +62,7 @@ DPP_RANGE = (0.03, 15.0)  # Gy per pulse
 DR_RANGE = (0.2, 1000.0)  # average dose rate, Gy/s
 MAX_STEP_ON = 1e-4
 MAX_STEP_OFF = 0.5
+BACKENDS = ("python", "rust")
 
 # One UnitCell per worker process and per Fe2+ value (building is slow)
 _CELLS: tp.Dict[tp.Optional[float], tp.Any] = {}
@@ -95,6 +97,36 @@ def _get_cell(fe: tp.Optional[float]) -> tp.Any:
     return _CELLS[fe]
 
 
+def _make_beam(
+    dose_per_pulse: float,
+    avg_dose_rate: float,
+    period: float,
+    on_time: float = ON_TIME,
+    max_dose: float = MAX_DOSE,
+) -> tp.Optional[PulsedBeam]:
+    """Pulsed beam of one map point, None if the point is infeasible (pulse
+    period shorter than the pulse, max dose not reached within `period`)."""
+    pulse_period = 1.0 / (avg_dose_rate / dose_per_pulse)  # 1 / frequency
+    if pulse_period <= on_time:
+        return None
+    beam = PulsedBeam.from_dose_per_pulse(
+        dose_per_pulse, pulse_period, on_time, max_dose=max_dose
+    )
+    if beam.time_at_max_dose >= period:
+        return None
+    return beam
+
+
+def _rooh_pair(res: tp.Any, beam: PulsedBeam) -> tp.Tuple[float, float]:
+    """(ROOH at max dose, ROOH at the end) of a run, in umol/L."""
+    df = res.to_pandas()
+    rooh = df["ROOH"].to_numpy()
+    t = df.index.to_numpy()
+    # last sample at (or just after) the end of the last pulse
+    i_max = max(int(np.searchsorted(t, beam.time_at_max_dose * (1 + 1e-9), side="right")) - 1, 0)
+    return float(rooh[i_max]), float(rooh[-1])
+
+
 def compute_point(
     dose_per_pulse: float,
     avg_dose_rate: float,
@@ -104,7 +136,7 @@ def compute_point(
     max_dose: float = MAX_DOSE,
     let: float = LET,
 ) -> tp.Tuple[float, float]:
-    """Run one point of the map.
+    """Run one point of the map (Python backend).
 
     Args:
         dose_per_pulse: Gy
@@ -118,16 +150,10 @@ def compute_point(
         not reached within `period`) or if the solver failed.
     """
     nan = float("nan")
-    frequency = avg_dose_rate / dose_per_pulse
-    pulse_period = 1.0 / frequency
-    if pulse_period <= on_time:
-        return nan, nan
     t0 = time.perf_counter()
     try:
-        beam = PulsedBeam.from_dose_per_pulse(
-            dose_per_pulse, pulse_period, on_time, max_dose=max_dose
-        )
-        if beam.time_at_max_dose >= period:
+        beam = _make_beam(dose_per_pulse, avg_dose_rate, period, on_time, max_dose)
+        if beam is None:
             return nan, nan
         uc = _get_cell(fe)
         uc.set_beam(beam, LET=let)
@@ -136,12 +162,7 @@ def compute_point(
             max_step_size_on=MAX_STEP_ON,
             max_step_size_off=MAX_STEP_OFF,
         ).run()
-        df = res.to_pandas()
-        rooh = df["ROOH"].to_numpy()
-        t = df.index.to_numpy()
-        # last sample at (or just after) the end of the last pulse
-        i_max = max(int(np.searchsorted(t, beam.time_at_max_dose * (1 + 1e-9), side="right")) - 1, 0)
-        out = float(rooh[i_max]), float(rooh[-1])
+        out = _rooh_pair(res, beam)
     except Exception:  # noqa: BLE001 - a failed point must not kill the map
         logger.exception(
             f"Point failed (dpp={dose_per_pulse:.3g} Gy, dr={avg_dose_rate:.3g} Gy/s)"
@@ -151,6 +172,50 @@ def compute_point(
         f"point dpp={dose_per_pulse:.3g} Gy dr={avg_dose_rate:.3g} Gy/s "
         f"done in {time.perf_counter() - t0:.1f} s"
     )
+    return out
+
+
+def _map_rust(
+    tasks: tp.Sequence[tp.Tuple[float, float]],
+    period: float,
+    fe: tp.Optional[float],
+    n_threads: tp.Optional[int] = None,
+) -> tp.List[tp.Tuple[float, float]]:
+    """All points of the map with the Rust backend, in one rp.rust.run_batch
+    call (rayon pool). Same feasibility rules and ROOH extraction as
+    compute_point; an infeasible or failed point is (nan, nan)."""
+    nan = float("nan")
+    out: tp.List[tp.Tuple[float, float]] = [(nan, nan)] * len(tasks)
+    base = _get_cell(fe)
+    cells, beams, slots = [], [], []
+    for i, (dpp, dr) in enumerate(tasks):
+        try:
+            beam = _make_beam(dpp, dr, period)
+        except Exception:  # noqa: BLE001 - a failed point must not kill the map
+            logger.exception(f"Point failed (dpp={dpp:.3g} Gy, dr={dr:.3g} Gy/s)")
+            continue
+        if beam is None:
+            continue
+        cell = copy.deepcopy(base)
+        cell.set_beam(beam, LET=LET)
+        cells.append(cell)
+        beams.append(beam)
+        slots.append(i)
+    results = rp.rust.run_batch(
+        cells,
+        (1e-9, period),
+        mode="chunked",
+        n_threads=n_threads,
+        return_exceptions=True,
+        max_step_size_on=MAX_STEP_ON,
+        max_step_size_off=MAX_STEP_OFF,
+    )
+    for i, beam, res in zip(slots, beams, results, strict=True):
+        dpp, dr = tasks[i]
+        if isinstance(res, BaseException):
+            logger.error(f"Point failed (dpp={dpp:.3g} Gy, dr={dr:.3g} Gy/s): {res!r}")
+            continue
+        out[i] = _rooh_pair(res, beam)
     return out
 
 
@@ -173,8 +238,13 @@ def compute_map(
     fe: tp.Optional[float] = None,
     cache: tp.Optional[str | Path] = CACHE_DIR,
     max_workers: tp.Optional[int] = None,
+    backend: str = "python",
 ) -> tp.Dict[str, np.ndarray]:
     """Compute ROOH on a log-spaced n x n grid.
+
+    backend="python" runs the points in a process pool (max_workers
+    processes); backend="rust" runs them all in one rp.rust.run_batch call
+    (max_workers rayon threads, None: all cores).
 
     Returns:
         dict with `dose_per_pulse` (n,), `avg_dose_rate` (n,),
@@ -190,17 +260,24 @@ def compute_map(
         "fe": fe, "on_time": ON_TIME, "let": LET, "max_dose": MAX_DOSE,
         "step_on": MAX_STEP_ON, "step_off": MAX_STEP_OFF,
     }  # fmt: skip
+    if backend not in BACKENDS:
+        raise ValueError(f"backend must be one of {BACKENDS}, got {backend!r}")
+    if backend != "python":
+        params["backend"] = backend  # the Python key stays as before
     path = _cache_path(cache, params)
     if path is not None and path.exists():
         logger.info(f"Loading cached map {path}")
         with np.load(path) as f:
             return {k: f[k] for k in f.files}
 
-    tasks = [(float(p), float(r), period, fe) for r in dr for p in dpp]
+    points = [(float(p), float(r)) for r in dr for p in dpp]
     t0 = time.perf_counter()
-    with ProcessPoolExecutor(max_workers=max_workers) as pool:
-        results = list(pool.map(_point_task, tasks))
-    logger.info(f"Map of {len(tasks)} points done in {time.perf_counter() - t0:.0f} s")
+    if backend == "rust":
+        results = _map_rust(points, period, fe, n_threads=max_workers)
+    else:
+        with ProcessPoolExecutor(max_workers=max_workers) as pool:
+            results = list(pool.map(_point_task, [(*pt, period, fe) for pt in points]))
+    logger.info(f"Map of {len(points)} points ({backend}) done in {time.perf_counter() - t0:.1f} s")
 
     arr = np.array(results, dtype=np.float64).reshape(n, n, 2)
     out = {
