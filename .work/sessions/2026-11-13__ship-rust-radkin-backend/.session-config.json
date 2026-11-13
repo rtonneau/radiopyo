@@ -63,6 +63,42 @@
       "detail": {
         "tickets": 6
       }
+    },
+    {
+      "at": "2026-11-13T10:49:27.094Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-rust-binding-crate.md",
+        "03-implement/01-rust-binding-crate/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-rust-binding-crate"
+      }
+    },
+    {
+      "at": "2026-11-13T11:02:21.548Z",
+      "event": "ticket_blocked",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-rust-binding-crate/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-rust-binding-crate",
+        "reason": "waiting for the user to merge radkin PR https://github.com/rtonneau/radkin/pull/5; then bump rust/Cargo.toml rev to the merge commit, rebuild without the local [patch], ticket-complete"
+      }
+    },
+    {
+      "at": "2026-11-13T11:51:00.070Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-rust-binding-crate/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-rust-binding-crate",
+        "commit": "d45a37b"
+      }
     }
   ],
   "current_phase": "ship",
@@ -71,5 +107,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-13T10:49:14.596Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "inline"
 }
