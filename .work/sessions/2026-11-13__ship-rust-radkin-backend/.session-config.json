@@ -99,6 +99,30 @@
         "ticket": "01-rust-binding-crate",
         "commit": "d45a37b"
       }
+    },
+    {
+      "at": "2026-11-13T11:51:11.958Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-adapter-and-single-run.md",
+        "03-implement/02-adapter-and-single-run/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-adapter-and-single-run"
+      }
+    },
+    {
+      "at": "2026-11-13T12:03:38.697Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-adapter-and-single-run/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-adapter-and-single-run",
+        "commit": "98f5e6a"
+      }
     }
   ],
   "current_phase": "ship",
