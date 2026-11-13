@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests of the shortest configured beam ON time (MIN_BEAM_ON_TIME = 1e-6 s):
+Tests of the shortest configured beam ON time (MIN_BEAM_ON_TIME = 0.4e-6 s):
 a beam whose configured ON time is shorter raises ShortBeamOnError when it
 is built (or its timing is updated); a pulse cut short by max_dose is not
 a configured ON time and is accepted.
@@ -28,11 +28,11 @@ from radiopyo.physics.beam import (
 from radiopyo.physics.exceptions import BeamError, ShortBeamOnError
 from radiopyo.simulation.unit_cell import UnitCell
 
-SHORT = 5e-7
+SHORT = 3e-7
 
 
 def test_threshold_value():
-    assert MIN_BEAM_ON_TIME == 1e-6
+    assert MIN_BEAM_ON_TIME == 0.4e-6
     assert UnitCell.MIN_BEAM_ON_TIME == MIN_BEAM_ON_TIME
     assert UnitCell.T_ZERO < UnitCell.MIN_BEAM_ON_TIME
 
@@ -86,13 +86,13 @@ def test_short_configured_on_time_raises(name: str):
 
 
 def test_macro_train_shorter_than_threshold_raises_on_the_train():
-    with pytest.raises(ShortBeamOnError, match=r"on_time=5e-07"):
+    with pytest.raises(ShortBeamOnError, match=r"on_time=3e-07"):
         MacroPulsedBeam(
             dose_rate_peak=1e6,
             period=1e-3,
             on_time=SHORT,
             micro_period=2e-6,
-            micro_on_time=1e-6,
+            micro_on_time=MIN_BEAM_ON_TIME,
             micro_start_time=0.0,
         )
 
@@ -170,3 +170,19 @@ ACCEPTED_BEAMS: tp.Dict[str, tp.Callable[[], ParticleBeam]] = {
 def test_configured_on_time_at_or_above_threshold_is_accepted(name: str):
     beam = ACCEPTED_BEAMS[name]()
     assert beam.time_at_max_dose > 0
+
+
+def test_half_microsecond_pulse_builds_and_runs():
+    import radiopyo as rp
+
+    cell = UnitCell.from_toml(rp.PURE_WATER_CONFIG_FILE)
+    beam = PulsedBeam(dose_rate_peak=1e7, period=1e-3, on_time=5e-7)
+    cell.set_beam(beam, LET=10.0)
+    res = cell.run(t_span=(0.0, 1e-3))
+    assert res.t[-1] == pytest.approx(1e-3)
+    assert not res.short_on_spans
+
+
+def test_three_tenth_microsecond_pulse_raises():
+    with pytest.raises(ShortBeamOnError):
+        PulsedBeam(dose_rate_peak=1e7, period=1e-3, on_time=3e-7)

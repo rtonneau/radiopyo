@@ -1,0 +1,154 @@
+{
+  "session_id": "2026-11-13__relax-beam-on-time-constrain-from-1e-6-to-0.4e-6s",
+  "feature_name": "Relax beam ON time constrain from 1e-6 to 0.4e-6s",
+  "scratch_dir": ".scratch/tests/2026-11-13__relax-beam-on-time-constrain-from-1e-6-to-0.4e-6s",
+  "created_at": "2026-11-13T14:41:44.139Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-13T14:41:44.139Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-13T14:43:21.908Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish",
+        "shipMode": "delegate"
+      }
+    },
+    {
+      "at": "2026-11-13T14:43:36.155Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-13T14:43:36.418Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-13T14:49:15.453Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/min-beam-on-time-0.4us",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-13T14:49:15.486Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-radkin-min-on-time.md",
+        "02-plan/tickets/02-radiopyo-min-on-time.md"
+      ],
+      "detail": {
+        "tickets": 2
+      }
+    },
+    {
+      "at": "2026-11-13T14:49:21.332Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-radkin-min-on-time.md",
+        "03-implement/01-radkin-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-radkin-min-on-time"
+      }
+    },
+    {
+      "at": "2026-11-13T14:58:58.535Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-radkin-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-radkin-min-on-time",
+        "commit": "5b3d9b9"
+      }
+    },
+    {
+      "at": "2026-11-13T14:58:59.539Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-radiopyo-min-on-time.md",
+        "03-implement/02-radiopyo-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-radiopyo-min-on-time"
+      }
+    },
+    {
+      "at": "2026-11-13T15:04:12.850Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/02-radiopyo-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-radiopyo-min-on-time",
+        "commit": "cdc4f7e"
+      }
+    },
+    {
+      "at": "2026-11-13T15:04:22.407Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-13T15:04:34.302Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/16"
+      }
+    },
+    {
+      "at": "2026-11-13T15:04:28.102Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    }
+  ],
+  "current_phase": "finished",
+  "git": {
+    "branch": "feat/min-beam-on-time-0.4us",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-13T14:49:15.453Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/16"
+  },
+  "ship_mode": "delegate",
+  "changelog": {
+    "bump": "minor",
+    "floor": "minor",
+    "reason": null,
+    "bullets": 1,
+    "path": ".work/changelog/2026-11-13__relax-beam-on-time-constrain-from-1e-6-to-0.4e-6s.md",
+    "written_at": "2026-11-13T15:04:22.391Z"
+  },
+  "finished_at": "2026-11-13T15:04:28.102Z"
+}

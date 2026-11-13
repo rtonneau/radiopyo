@@ -59,7 +59,7 @@ logger = logging.getLogger("radiopyo")
 # pulse cannot be integrated correctly (UnitCell.T_ZERO = 1e-7 s is
 # skipped at the start of every beam ON interval). UnitCell exposes the
 # same value as UnitCell.MIN_BEAM_ON_TIME.
-MIN_BEAM_ON_TIME: float = 1e-6
+MIN_BEAM_ON_TIME: float = 0.4e-6
 
 # Relative tolerance of the ON time check (an on_time computed as
 # pulse_dose / dose_rate_peak may land just below the threshold).

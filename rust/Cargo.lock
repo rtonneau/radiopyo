@@ -933,7 +933,7 @@ dependencies = [
 [[package]]
 name = "radkin"
 version = "0.1.0"
-source = "git+https://github.com/rtonneau/radkin?rev=5e0d181#5e0d181a338323d39b61c62a0e7c740b5c1739ab"
+source = "git+https://github.com/rtonneau/radkin?rev=088f06b#088f06bffea730568d6ac4dd146b464a39e0e25c"
 dependencies = [
  "clap",
  "env_logger",
