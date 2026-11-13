@@ -11,7 +11,9 @@
   },
   "release": {
     "versionFiles": [
-      "pyproject.toml"
+      "pyproject.toml",
+      "rust/pyproject.toml",
+      "rust/Cargo.toml"
     ],
     "versionFilesSource": "detected"
   }

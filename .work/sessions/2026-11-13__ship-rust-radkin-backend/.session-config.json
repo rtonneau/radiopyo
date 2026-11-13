@@ -171,6 +171,42 @@
         "ticket": "04-run-batch",
         "commit": "3470614"
       }
+    },
+    {
+      "at": "2026-11-13T12:15:57.540Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/05-ci-and-release-wheels.md",
+        "03-implement/05-ci-and-release-wheels/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-ci-and-release-wheels"
+      }
+    },
+    {
+      "at": "2026-11-13T12:26:53.917Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/06-notebook-and-docs.md",
+        "03-implement/06-notebook-and-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "06-notebook-and-docs"
+      }
+    },
+    {
+      "at": "2026-11-13T12:27:07.539Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/05-ci-and-release-wheels/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "05-ci-and-release-wheels",
+        "commit": "f565911"
+      }
     }
   ],
   "current_phase": "ship",
