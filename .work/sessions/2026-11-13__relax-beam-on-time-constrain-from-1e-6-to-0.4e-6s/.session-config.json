@@ -60,6 +60,30 @@
       "detail": {
         "tickets": 2
       }
+    },
+    {
+      "at": "2026-11-13T14:49:21.332Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-radkin-min-on-time.md",
+        "03-implement/01-radkin-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-radkin-min-on-time"
+      }
+    },
+    {
+      "at": "2026-11-13T14:58:58.535Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-radkin-min-on-time/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-radkin-min-on-time",
+        "commit": "5b3d9b9"
+      }
     }
   ],
   "current_phase": "ship",
@@ -68,5 +92,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-13T14:49:15.453Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "delegate"
 }
