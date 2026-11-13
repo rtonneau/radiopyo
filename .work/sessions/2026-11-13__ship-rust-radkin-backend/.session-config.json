@@ -207,9 +207,21 @@
         "ticket": "05-ci-and-release-wheels",
         "commit": "f565911"
       }
+    },
+    {
+      "at": "2026-11-13T12:33:08.698Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/06-notebook-and-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "06-notebook-and-docs",
+        "commit": "9b19eb2"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "feat/rust-backend",
     "base_branch": "main",
