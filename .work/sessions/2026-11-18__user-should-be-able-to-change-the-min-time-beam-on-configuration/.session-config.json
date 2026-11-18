@@ -109,6 +109,30 @@
         "ticket": "02-radkin-threshold-input",
         "commit": "b6717c9"
       }
+    },
+    {
+      "at": "2026-11-18T18:51:46.703Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-rust-wiring.md",
+        "03-implement/03-rust-wiring/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-rust-wiring"
+      }
+    },
+    {
+      "at": "2026-11-18T18:51:47.636Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-rust-wiring/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-rust-wiring",
+        "commit": "e43d526"
+      }
     }
   ],
   "current_phase": "ship",
