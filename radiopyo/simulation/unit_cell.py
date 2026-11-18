@@ -17,7 +17,6 @@ import dataclasses
 import logging
 import time
 import typing as tp
-from contextlib import suppress
 
 import numpy as np
 from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
@@ -27,7 +26,12 @@ from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.toml import TOMLFileParser
 from radiopyo.parser.utils import drop_disabled_reactions
-from radiopyo.physics.beam import MIN_BEAM_ON_TIME, ConstantDoseRate, ParticleBeam
+from radiopyo.physics.beam import (
+    T_ZERO,
+    ConstantDoseRate,
+    ParticleBeam,
+    min_beam_on_time,
+)
 from radiopyo.physics.beam_collection import BeamCollection
 from radiopyo.simulation import exceptions as rp_excep
 from radiopyo.simulation.environment_build import SimEnv
@@ -38,6 +42,7 @@ from radiopyo.simulation.ode_functions_solver import (
 )
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult, ShortOnSpan
 from radiopyo.utils.g_values import GValuesBoscolo
+from radiopyo.utils.progress import with_progress_bar
 
 # ------------------------- Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
@@ -129,18 +134,25 @@ def widen_empty_span(t_span: tp.Tuple[float, float]) -> tp.Tuple[float, float]:
 
 
 def is_short_on_span(
-    t_span: tp.Tuple[float, float], min_on_time: float = MIN_BEAM_ON_TIME
+    t_span: tp.Tuple[float, float], min_on_time: tp.Optional[float] = None
 ) -> bool:
     """
     Whether a beam ON span is shorter than min_on_time (a short ON span,
-    see ShortOnSpan). The slack covers the rounding of a span computed
+    see ShortOnSpan; None -> the current min_beam_on_time()). The slack
+    covers the rounding of a span computed
     from chunk boundaries (stop - start, large start times): a full pulse
     of exactly min_on_time is not short.
     """
-    slack = min_on_time * 1e-9 + 4 * float(np.finfo(np.float64).eps) * max(
+    if min_on_time is None:
+        min_on_time = min_beam_on_time()
+    return bool(t_span[1] - t_span[0] < min_on_time - _span_slack(t_span, min_on_time))
+
+
+def _span_slack(t_span: tp.Tuple[float, float], duration: float) -> float:
+    """Rounding slack when comparing stop - start with duration."""
+    return duration * 1e-9 + 4 * float(np.finfo(np.float64).eps) * max(
         abs(t_span[0]), abs(t_span[1])
     )
-    return bool(t_span[1] - t_span[0] < min_on_time - slack)
 
 
 def chunk_dose_rate(beam: ParticleBeam, start: float, stop: float) -> float:
@@ -234,6 +246,20 @@ class RunOptions:
     t_eval: tp.Optional[NDArray[np.float64]] = None
 
 
+class _MinBeamOnTime:
+    """Read-only view of the global min beam ON time (class and instance
+    access); set it with radiopyo.set_min_beam_on_time."""
+
+    def __get__(self, obj: tp.Any, objtype: tp.Any = None) -> float:
+        return min_beam_on_time()
+
+    def __set__(self, obj: tp.Any, value: tp.Any) -> None:
+        raise AttributeError(
+            "UnitCell.MIN_BEAM_ON_TIME is read-only: use "
+            "radiopyo.set_min_beam_on_time"
+        )
+
+
 class UnitCell(object):
     """
     Class UnitCell represents the tiniest simulation volume. All
@@ -277,18 +303,19 @@ class UnitCell(object):
             radiolytic production over it is added analytically to the
             initial concentrations (default=1e-7 s)
         MIN_BEAM_ON_TIME: float
-            Shortest configured beam ON time accepted (default=0.4e-6 s,
-            same value as radiopyo.physics.beam.MIN_BEAM_ON_TIME, checked
+            Shortest beam ON time, read-only view of the global setting
+            (radiopyo.set_min_beam_on_time, default 0.4e-6 s; checked
             when a beam is built: ShortBeamOnError). A beam ON span
             shorter than it at run time (pulse cut by max_dose or
-            clipped by t_span) is a short ON span: not integrated, its
-            radiolytic yield is added analytically, with a warning
+            clipped by t_span), or not longer than T_ZERO, is a short ON
+            span: not integrated, its radiolytic yield is added
+            analytically, with a warning
 
     """
 
     FIRST_STEP: float = 1e-15
-    T_ZERO: float = 1e-7
-    MIN_BEAM_ON_TIME: float = MIN_BEAM_ON_TIME
+    T_ZERO: float = T_ZERO
+    MIN_BEAM_ON_TIME: tp.ClassVar[_MinBeamOnTime] = _MinBeamOnTime()
 
     env: SimEnv
     mat: SimMatrices
@@ -606,7 +633,7 @@ class UnitCell(object):
         self.last_burst_dose_rate = None
         self.last_short_on_span = None
         if beam_on and options.use_beam:  # beam switched ON at t_span[0]
-            if is_short_on_span(t_span, self.MIN_BEAM_ON_TIME):
+            if self._is_short_on_span(t_span):
                 return self._short_on_span_step(t_span, y_start, dose_rate, options)
             t_span = self._apply_initial_burst(t_span, y_start, dose_rate)
             options = self._drop_skipped_t_eval(t_span, options)
@@ -652,6 +679,14 @@ class UnitCell(object):
         if kwargs["first_step"] > t_span[1] - t_span[0]:
             kwargs["first_step"] = (t_span[1] - t_span[0]) / 1e3
         return kwargs
+
+    def _is_short_on_span(self, t_span: tp.Tuple[float, float]) -> bool:
+        """Short ON span: shorter than MIN_BEAM_ON_TIME, or not longer
+        than T_ZERO (cannot be integrated whatever the setting)."""
+        return (
+            is_short_on_span(t_span, self.MIN_BEAM_ON_TIME)
+            or t_span[1] - t_span[0] <= self.T_ZERO + _span_slack(t_span, self.T_ZERO)
+        )
 
     def _apply_initial_burst(
         self,
@@ -1377,36 +1412,24 @@ class SimChunksIter:
     def __len__(self) -> int:
         return len(self.chunks)
 
-    def run(self, backend: str = "python") -> ODEResult:
+    def run(
+        self, backend: str = "python", progress: tp.Optional[bool] = None
+    ) -> ODEResult:
         """Run all simulation chunks
 
         backend: "python" (default) or "rust": radkin runs the whole
         chunked run in one call (radiopyo.rust; LSODA only; needs a fresh
         iterator returned by prepare_chunked_run / prepare_single_pulse).
-        Tries to import tqdm to give a nice progressbar to the user.
-        But it can safely fail.
-        get_ipython().__class__.__name__ --> detect if python was
-        started from a Jupyter Notebook (=="ZMQInteractiveShell").
-        If ran from a regular python, the call to "get_ipython()"
-        produces a NameError.
+        progress: tqdm progress bar of the Python backend (tqdm is
+        optional: no bar and no error without it). True / False forces it
+        on / off; None (default) reads radiopyo.set_progress_bar (on by
+        default). tqdm.notebook is used under a Jupyter kernel.
         """
         check_backend(backend)
         if backend == "rust":
             return self._run_rust()
         logger.info("Running all simulation chunks")
-        try:
-            from tqdm import tqdm  # type: ignore[import-untyped]
-
-            with suppress(NameError):
-                gip = get_ipython()  # type: ignore[name-defined] # noqa: F821
-                if gip.__class__.__name__ == "ZMQInteractiveShell":
-                    from tqdm.notebook import (  # type: ignore[import-untyped]
-                        tqdm,
-                    )
-            # Perform Simulation with TQDM.
-            sim = tqdm(self)
-        except ImportError:
-            sim = self
+        sim = with_progress_bar(self, progress, total=len(self))
 
         # Efficient way to consume the iterator while returning the
         # last element.
