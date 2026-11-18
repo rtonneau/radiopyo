@@ -82,7 +82,6 @@ MODES: tp.Final = ("run", "chunked", "single_pulse")
 _RADKIN_CONSTANTS: tp.Final = {
     "FIRST_STEP": 1e-15,
     "T_ZERO": 1e-7,
-    "MIN_BEAM_ON_TIME": 0.4e-6,
 }
 
 
@@ -187,7 +186,9 @@ def build_cell(uc: UnitCell) -> tp.Any:
         )
     csv = (_data_dir / GValuesBoscolo.DATA).read_text(encoding="utf-8")
     try:
-        return core.Cell(radkin_config(uc), csv, float(uc.T), beam)
+        return core.Cell(
+            radkin_config(uc), csv, float(uc.T), beam, uc.MIN_BEAM_ON_TIME
+        )
     except core.RadkinRustError as exc:
         raise _map_error(exc) from exc
 
@@ -223,7 +224,7 @@ def check_parity(uc: UnitCell, system: tp.Dict[str, tp.Any]) -> None:
     Parity guard: raise ParityError unless radkin's system (Cell.system())
     is the one of uc: species labels (by index) and reaction labels (by
     global index) equal, k, G, enzymatic constants, fixed concentrations
-    and initial values equal at rtol PARITY_RTOL.
+    and initial values equal at rtol PARITY_RTOL, same min beam ON time.
     """
     problems: tp.List[str] = []
     species = uc.env.species_labels()
@@ -262,6 +263,11 @@ def check_parity(uc: UnitCell, system: tp.Dict[str, tp.Any]) -> None:
         msg = _compare(name, expected, system[key])
         if msg is not None:
             problems.append(msg)
+    if float(system["min_beam_on_time"]) != uc.MIN_BEAM_ON_TIME:
+        problems.append(
+            f"min beam ON time: Python {uc.MIN_BEAM_ON_TIME!r}, "
+            f"radkin {system['min_beam_on_time']!r}"
+        )
     if problems:
         raise ParityError(
             "radkin did not build the same system as Python:\n- "

@@ -11,3 +11,7 @@ A beam ON span shorter than T_ZERO could not be integrated (ValueError) and one 
 ## Amendment 2026-11-13
 
 `MIN_BEAM_ON_TIME` is now 0.4e-6 s (still 4x `T_ZERO` = 1e-7 s) instead of 1e-6 s, because real UHDR machines deliver 0.4 to 1 us pulses. Everything above holds with the new value; radkin carries the same threshold (rev `088f06b`).
+
+## Amendment 2026-11-18
+
+The minimum is a process-wide setting: `rp.set_min_beam_on_time(value)` (any positive finite time; `None` restores the default 0.4e-6 s), read by `rp.min_beam_on_time()` and seen read-only as `UnitCell.MIN_BEAM_ON_TIME`. Beams built and runs started afterwards use the new value; beams already built are not re-checked. A run-time ON span not longer than `T_ZERO` is always added analytically, whatever the setting (a value below `T_ZERO` is accepted with a warning). radkin has the same setting (`radkin::consts::set_min_beam_on_time`, rev `5f7bba8`): the Rust backend sends the value in use and the parity guard compares it (session 2026-11-18__user-should-be-able-to-change-the-min-time-beam-on-configuration).
