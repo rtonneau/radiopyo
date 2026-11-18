@@ -61,6 +61,30 @@
       "detail": {
         "tickets": 4
       }
+    },
+    {
+      "at": "2026-11-18T16:31:55.853Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-build-warnings.md",
+        "03-implement/01-build-warnings/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-build-warnings"
+      }
+    },
+    {
+      "at": "2026-11-18T16:34:45.435Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-build-warnings/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-build-warnings",
+        "commit": "aa6698d"
+      }
     }
   ],
   "current_phase": "ship",
@@ -69,5 +93,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-18T16:31:47.943Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "inline"
 }
