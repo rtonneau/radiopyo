@@ -1,5 +1,5 @@
 [includes]
-toml = "radiopyo/config_Labarbe.toml"
+toml = ".\\config_Labarbe.toml"
 
 #----------------------- Beams defined in N. Blond Master Thesis -----------------------
 [[beam.pulsed]]

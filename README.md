@@ -160,7 +160,9 @@ example: [Rust backend notebook](examples/notebook_rust_backend.ipynb).
 ## Documentation
 
 - **[Configuration reference](docs/configuration.md#configuring-simulation)**: includes,
-  parameters, concentrations and every reaction type.
+  parameters, concentrations and every reaction type,
+  [disabling a reaction](docs/configuration.md#disabling-a-reaction) (rate constant 0) and
+  the [chemistry check](docs/configuration.md#chemistry-check) (`sim.check_chemistry()`).
 - **[Beam definitions](docs/configuration.md#possible-beam-definitions)**: constant, pulsed,
   single-pulse and macro-pulsed beams, LET and G-values.
 - **[Running simulations](docs/configuration.md#ways-of-running-simulation)**: single and
@@ -194,7 +196,11 @@ example: [Rust backend notebook](examples/notebook_rust_backend.ipynb).
 The bundled configurations are `advanced_water_radiolysis.toml` (pure water,
 `rp.PURE_WATER_CONFIG_FILE`), `reactions_biology.toml` (the biological layer, to be used
 with the former) and `config_Labarbe.toml` (both plus a constant beam,
-`rp.LABARBE_CONFIG_FILE`). Your own file can include them and override single values.
+`rp.LABARBE_CONFIG_FILE`). Your own file can include them and override single values;
+a rate constant set to 0 removes a reaction (also an included one), with a warning. When a
+configuration is loaded, a chemistry check warns about species aliases (`OH` / `OH_r`),
+unbalanced charges, reactants that are never present and unused species; call
+`sim.check_chemistry()` to get the findings.
 
 <details>
 <summary><strong>Configuration sections at a glance</strong></summary>
@@ -203,7 +209,7 @@ with the former) and `config_Labarbe.toml` (both plus a constant beam,
 | --- | --- |
 | `[includes]` | Other config files to load first; the including file overrides them |
 | `[parameters]` | `pH`, `force_cst_pH`, `temperature`, `variable_GValues`, `species_order` |
-| `[concentrations.fixed]` | Species held at a constant concentration [mol/L] |
+| `[concentrations.fixed]` | Species held at a constant concentration [mol/L] (H2O cannot be set) |
 | `[concentrations.initial]` | Initial concentrations [mol/L] (default 0) |
 | `[reactions.radiolytic]` | G-values of the species created by the radiation |
 | `[[reactions.k_reaction]]` | Reaction with a rate constant `k_value` |

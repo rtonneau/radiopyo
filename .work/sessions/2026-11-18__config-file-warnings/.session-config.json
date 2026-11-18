@@ -1,0 +1,203 @@
+{
+  "session_id": "2026-11-18__config-file-warnings",
+  "feature_name": "config-file-warnings",
+  "scratch_dir": ".scratch/tests/2026-11-18__config-file-warnings",
+  "created_at": "2026-11-18T16:19:49.648Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-18T16:19:49.648Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:30:21.963Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-18T16:30:52.904Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:30:57.515Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:31:47.943Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/config-file-warnings",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-18T16:31:47.992Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-build-warnings.md",
+        "02-plan/tickets/02-disabled-reactions.md",
+        "02-plan/tickets/03-chemistry-check.md",
+        "02-plan/tickets/04-docs-changelog.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
+    },
+    {
+      "at": "2026-11-18T16:31:55.853Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-build-warnings.md",
+        "03-implement/01-build-warnings/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-build-warnings"
+      }
+    },
+    {
+      "at": "2026-11-18T16:34:45.435Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-build-warnings/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-build-warnings",
+        "commit": "aa6698d"
+      }
+    },
+    {
+      "at": "2026-11-18T16:34:50.256Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-disabled-reactions.md",
+        "03-implement/02-disabled-reactions/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-disabled-reactions"
+      }
+    },
+    {
+      "at": "2026-11-18T16:37:52.517Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-disabled-reactions/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-disabled-reactions",
+        "commit": "e33ef0e"
+      }
+    },
+    {
+      "at": "2026-11-18T16:37:59.334Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-chemistry-check.md",
+        "03-implement/03-chemistry-check/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chemistry-check"
+      }
+    },
+    {
+      "at": "2026-11-18T18:55:37.221Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-chemistry-check/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chemistry-check",
+        "commit": "e458755"
+      }
+    },
+    {
+      "at": "2026-11-18T18:55:44.567Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-docs-changelog.md",
+        "03-implement/04-docs-changelog/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-changelog"
+      }
+    },
+    {
+      "at": "2026-11-18T18:58:32.848Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-docs-changelog/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-changelog",
+        "commit": "342762b"
+      }
+    },
+    {
+      "at": "2026-11-18T18:58:47.790Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-18T19:00:49.309Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/19"
+      }
+    },
+    {
+      "at": "2026-11-18T19:00:43.390Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    }
+  ],
+  "current_phase": "finished",
+  "git": {
+    "branch": "feat/config-file-warnings",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-18T16:31:47.943Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/19"
+  },
+  "ship_mode": "inline",
+  "changelog": {
+    "bump": "minor",
+    "floor": "minor",
+    "reason": null,
+    "bullets": 5,
+    "path": ".work/changelog/2026-11-18__config-file-warnings.md",
+    "written_at": "2026-11-18T18:58:47.774Z"
+  },
+  "finished_at": "2026-11-18T19:00:43.390Z"
+}

@@ -35,6 +35,8 @@ __all__: tp.List[str] = [
     "ReactionKey",
     "blank_config",
     "combine_config",
+    "disabled_constant",
+    "drop_disabled_reactions",
     "include_path",
     "reaction_key",
 ]
@@ -71,6 +73,18 @@ _EQUILIBRIUM_CONSTANTS: tp.Tuple[str, ...] = (
     "k_backward",
     "k_equilibrium",
 )
+
+# Scalar rate constants of each reaction section: one of them equal to 0
+# disables the reaction (the whole pair for acid_base and equilibrium),
+# see drop_disabled_reactions and ADR 0011.
+_RATE_CONSTANTS: tp.Dict[str, tp.Tuple[str, ...]] = {
+    "acid_base": ("k_forward", "k_backward"),
+    "equilibrium": _EQUILIBRIUM_CONSTANTS,
+    "k_reaction": ("k_value",),
+    "constant": ("k_value",),
+    "arrhenius": ("A",),
+    "enzymatic": ("k_value",),
+}
 
 # --------------------------------------------------------------------------- #
 #                            DECORATOR DEFINITIONS                            #
@@ -238,6 +252,59 @@ def _merge_reaction_list(
                     merged[idx].pop(constant, None)
         merged[idx] |= entry
     return merged
+
+
+def disabled_constant(section: str, reaction: tp.Mapping[str, tp.Any]) -> str | None:
+    """
+    Name of the first scalar rate constant of `reaction` (a reaction dict
+    of the config section `section`) equal to 0, None if there is none.
+    A polynomial constant (a list) is never zero: its coefficients are
+    those of log10(k).
+    """
+    for name in _RATE_CONSTANTS.get(section, ()):
+        value = reaction.get(name)
+        is_scalar = isinstance(value, (int, float)) and not isinstance(value, bool)
+        if is_scalar and value == 0:
+            return name
+    return None
+
+
+def drop_disabled_reactions(config: ConfigDict) -> ConfigDict:
+    """
+    The config without its disabled reactions: a reaction whose scalar
+    rate constant is 0 (k_value, Arrhenius A, or k_forward / k_backward /
+    k_equilibrium of an acid/base or equilibrium pair, which drops the
+    whole pair) is removed, with one warning each (ADR 0011). Applied on
+    the merged config, so a reaction of an included file can be disabled
+    by overriding its rate constant with 0. 'config' is not modified;
+    calling it again on the result removes nothing.
+    """
+    reactions = tp.cast("tp.Dict[str, tp.Any]", config.get("reactions", {}))
+    kept: tp.Dict[str, tp.Any] = {}
+    dropped = False
+    for section, entries in reactions.items():
+        if section not in _RATE_CONSTANTS:
+            kept[section] = entries
+            continue
+        out = []
+        for entry in _as_list(entries):
+            name = disabled_constant(section, entry)
+            if name is None:
+                out.append(entry)
+                continue
+            dropped = True
+            what = "pair " if section in ("acid_base", "equilibrium") else ""
+            logger.warning(
+                f"CONFIG::[[reactions.{section}]] '{entry.get('reaction')}' has "
+                f"{name} = 0: this reaction {what}is disabled (removed from the "
+                "simulation)."
+            )
+        kept[section] = out
+    if not dropped:
+        return config
+    new = tp.cast("tp.Dict[str, tp.Any]", dict(config))
+    new["reactions"] = kept
+    return tp.cast("ConfigDict", new)
 
 
 # --------------------------------------------------------------------------- #

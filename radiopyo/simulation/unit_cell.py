@@ -25,6 +25,7 @@ from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser.file_parser import FileParser, resolve_includes
 from radiopyo.parser.toml import TOMLFileParser
+from radiopyo.parser.utils import drop_disabled_reactions
 from radiopyo.physics.beam import (
     T_ZERO,
     ConstantDoseRate,
@@ -50,6 +51,7 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.physics.beam import DoseRateSource
+    from radiopyo.simulation.chemistry_check import ChemistryFinding
     from radiopyo.utils.sim_types import ConfigDict, KwargsRun, SimMatrices
 
 # ------------------------- Expose importable stuffs ------------------------ #
@@ -397,6 +399,9 @@ class UnitCell(object):
         else:
             logger.info("No beam configuration detected")
 
+        # Disabled reactions are dropped from the stored config too: the
+        # Rust backend rebuilds the system from it (ADR 0010, 0011).
+        config = drop_disabled_reactions(config)
         cell = cls(env=SimEnv.from_dict(config), beam=beam_list, init=init)
         cell.config = copy.deepcopy(config)
         return cell
@@ -503,6 +508,18 @@ class UnitCell(object):
             )
         self.change_LET(LET)  # Update GValues
         return self
+
+    def check_chemistry(self, log: bool = True) -> tp.List[ChemistryFinding]:
+        """
+        Chemistry check of the cell's environment (see SimEnv.check_chemistry).
+
+        Args:
+            log: log one warning per finding (default: True)
+
+        Returns:
+            List of ChemistryFinding, empty when nothing was found.
+        """
+        return self.env.check_chemistry(log=log)
 
     def change_LET(self, let: float) -> None:
         """

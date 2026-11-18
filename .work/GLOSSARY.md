@@ -106,3 +106,15 @@ _Avoid_: sanity check, consistency check
 **Batch run**:
 Several `UnitCell`s run in parallel by the Rust backend in one call (`radiopyo.rust.run_batch`), with one run mode and one set of solver options, returning one `ODEResult` per cell in order.
 _Avoid_: sweep, multi-run
+
+**Disabled reaction**:
+A config reaction with a zero scalar rate constant (`k_value`, Arrhenius `A`, or either constant of an acid/base or equilibrium pair, which drops the whole pair); it is removed from the config after the include merge, with a warning, so neither the Python nor the Rust backend builds it.
+_Avoid_: zeroed reaction, switched-off reaction
+
+**Species alias**:
+Two labels naming the same species: equal once their `_r` tokens are removed (same formula and charge means same electron count), or listed in the alias table (e.g. `e_aq`/`e_minus`, `H_plus`/`H3O_plus`).
+_Avoid_: duplicate species, synonym
+
+**Chemistry check**:
+The set of warnings-only tests on a built `SimEnv` (`check_chemistry()`): species aliases, charge balance per reaction, dead reactants, unused species. It returns its findings; run automatically at build, it logs them once per distinct chemistry per process.
+_Avoid_: sanity check (taken by the parity guard), validation, lint

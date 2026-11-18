@@ -38,6 +38,12 @@ from radiopyo.chemistry.species import H2O, BasicSpecies, SimSpecies
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
+from radiopyo.parser.utils import drop_disabled_reactions
+from radiopyo.simulation.chemistry_check import (
+    ChemistryFinding,
+    auto_check_chemistry,
+    check_chemistry,
+)
 from radiopyo.utils.sim_types import (
     EzMatrices,
     GVector,
@@ -299,7 +305,9 @@ class SimEnv:
         if not log:
             logger.setLevel(logging.ERROR)
         try:
-            return cls._from_validated_dict(config)
+            env = cls._from_validated_dict(config)
+            auto_check_chemistry(env)  # logged once per distinct chemistry
+            return env
         finally:
             logger.setLevel(_prev_log_lvl)  # restore log level, even on error
 
@@ -331,7 +339,9 @@ class SimEnv:
                 "CONFIG::No 'reactions' section in the provided configuration"
             )
 
-        _config = deep_update(default_ConfigDict(), config)  # type: ignore[type-var]
+        _config = deep_update(  # type: ignore[type-var]
+            default_ConfigDict(), drop_disabled_reactions(config)
+        )
         out = SimEnv(*SimEnv._chemistry_builder(_config))
 
         ### FeedBack
@@ -368,16 +378,22 @@ class SimEnv:
             SimParameters
             Dict[str, float]
         """
-        # Read Constant species and create the species collection
-        list_sp = constant_species_from_dict(config["concentrations"].get("fixed", {}))
-        # Copy initial cc and strip species name on the fly.
-        initial_cc = {}
+        # Read Constant species and create the species collection (H2O is
+        # always the built-in fixed species: a configured value is ignored).
+        list_sp = constant_species_from_dict(
+            _without_water(config["concentrations"].get("fixed", {}), "fixed")
+        )
         assert H2O.cc_init is not None  # module constant, always defined
         list_sp.add_cst_species(
             RPARSER.parse_species("H2O"), cc=tp.cast("list[float]", H2O.cc_init.coef)
         )
-        for key, cc in config["concentrations"].get("initial", {}).items():
-            initial_cc[key.strip()] = cc
+        # Copy initial cc and strip species name on the fly.
+        initial_cc = {
+            key.strip(): cc
+            for key, cc in _without_water(
+                config["concentrations"].get("initial", {}), "initial"
+            ).items()
+        }
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
         if config["parameters"].get("force_cst_pH", False):
@@ -419,10 +435,16 @@ class SimEnv:
 
         # Read and set initial concentrations
         for label, value in initial_cc.items():
-            with suppress(KeyError):
-                sp = list_sp[label]
-                if isinstance(sp, SimSpecies):
-                    sp.set_initial_cc(value)
+            if label not in list_sp:
+                logger.warning(
+                    f"CONFIG::[concentrations.initial] '{label}' matches no "
+                    "species of the reactions: its value is ignored (check "
+                    "the spelling of the label)."
+                )
+                continue
+            sp = list_sp[label]
+            if isinstance(sp, SimSpecies):
+                sp.set_initial_cc(value)
 
         # Convert the "trash" species, if presents, to Cst.
         if "trash" in list_sp and list_sp.is_dyn_species("trash"):
@@ -553,6 +575,21 @@ class SimEnv:
             List[str]
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
+
+    def check_chemistry(self, log: bool = True) -> tp.List[ChemistryFinding]:
+        """
+        Chemistry check of this environment: species aliases, charge
+        balance, dead reactants and unused species (warnings only, see
+        radiopyo.simulation.chemistry_check). Unlike the automatic check
+        run by from_dict, the findings are logged on every call.
+
+        Args:
+            log: log one warning per finding (default: True)
+
+        Returns:
+            List of ChemistryFinding, empty when nothing was found.
+        """
+        return check_chemistry(self, log=log)
 
     def build_all_matrices(
         self,
@@ -988,7 +1025,38 @@ def _copy_optional_k_constants(gen: GenericReaction, r: tp.Dict) -> None:
         gen["constants"]["k_backward"] = r["k_backward"]
 
 
+def _warn_old_acid_base_syntax(r: tp.Dict) -> bool:
+    """
+    Log a warning showing the current syntax if `r` uses the old acid/base
+    syntax ('acid' and 'base' keys instead of a 'reaction' string).
+
+    Returns:
+        bool: whether the old syntax was found.
+    """
+    if "reaction" in r or not ("acid" in r or "base" in r):
+        return False
+    acid = r.get("acid", "<acid>")
+    base = r.get("base", "<base>")
+    pka = r.get("pKa", "<pKa>")
+    logger.warning(
+        "CONFIG::[[reactions.acid_base]] uses the old syntax "
+        f"(acid = {acid!r}, base = {base!r}). Write it as:\n"
+        "    [[reactions.acid_base]]\n"
+        f'    reaction = "{acid} <-> H3O_plus + {base}"\n'
+        f"    pKa = {pka}\n"
+        "    k_forward = <value>   # required\n"
+        "    k_backward = <value>  # required"
+    )
+    return True
+
+
 def _build_acid_base(r: tp.Dict, list_sp: ListSpecies) -> AcidBase:
+    if _warn_old_acid_base_syntax(r):
+        raise AttributeError(
+            "Old acid/base syntax ('acid'/'base' keys) is no longer supported: "
+            "use a 'reaction' string, a 'pKa', 'k_forward' and 'k_backward' "
+            "(see the warning above for the converted entry)."
+        )
     try:
         gen = RPARSER.parse_reaction(r["reaction"])
         pKa = r["pKa"]
@@ -1131,6 +1199,26 @@ def radiolytic_from_dict(
         ],
         list_sp,
     )
+
+
+def _without_water(cc: tp.Mapping[str, tp.Any], section: str) -> tp.Dict[str, tp.Any]:
+    """
+    Copy of the concentrations `cc` of the [concentrations.<section>]
+    config section without H2O, logging a warning if it was there: H2O
+    is always the built-in fixed species (its temperature polynomial),
+    a configured value cannot replace it.
+    """
+    out = {}
+    for label, value in cc.items():
+        if label.strip() == "H2O":
+            logger.warning(
+                f"CONFIG::[concentrations.{section}] H2O = {value}: the "
+                "concentration of H2O cannot be replaced (it is always the "
+                "built-in fixed species), this value is ignored."
+            )
+            continue
+        out[label] = value
+    return out
 
 
 def constant_species_from_dict(
