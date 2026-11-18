@@ -116,9 +116,13 @@ chemistry, the oxygen content and the beam; the model gives no general rule.
 
 Beam timing affects how the run is solved:
 
-- A configured beam ON time below 0.4e-6 s raises `ShortBeamOnError` when the beam is built.
-- A run-time ON span shorter than that (a last pulse cut by `max_dose`, a pulse clipped by
-  `t_span`) is not integrated. Its radiolytic yield is added analytically, a warning is
+- A configured beam ON time below the minimum beam ON time (default 0.4e-6 s) raises
+  `ShortBeamOnError` when the beam is built. `rp.set_min_beam_on_time(2e-7)` changes the
+  minimum for every beam built and run started afterwards (`None` restores the default,
+  `rp.min_beam_on_time()` reads it); the Rust backend uses the same value.
+- A run-time ON span shorter than the minimum, or not longer than `T_ZERO` = 1e-7 s
+  whatever the setting (a last pulse cut by `max_dose`, a pulse clipped by `t_span`), is
+  not integrated. Its radiolytic yield is added analytically, a warning is
   logged, and the span is listed in `res.short_on_spans`.
 - If scipy fails on a chunk, `SolverFailedError` is raised instead of returning a
   truncated result.
