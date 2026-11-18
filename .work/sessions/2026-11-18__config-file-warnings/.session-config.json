@@ -1,0 +1,73 @@
+{
+  "session_id": "2026-11-18__config-file-warnings",
+  "feature_name": "config-file-warnings",
+  "scratch_dir": ".scratch/tests/2026-11-18__config-file-warnings",
+  "created_at": "2026-11-18T16:19:49.648Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-18T16:19:49.648Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:30:21.963Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-18T16:30:52.904Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:30:57.515Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:31:47.943Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/config-file-warnings",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-18T16:31:47.992Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-build-warnings.md",
+        "02-plan/tickets/02-disabled-reactions.md",
+        "02-plan/tickets/03-chemistry-check.md",
+        "02-plan/tickets/04-docs-changelog.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
+    }
+  ],
+  "current_phase": "ship",
+  "git": {
+    "branch": "feat/config-file-warnings",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-18T16:31:47.943Z",
+    "pr_url": null
+  }
+}
