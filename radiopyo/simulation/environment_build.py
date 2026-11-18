@@ -39,6 +39,11 @@ from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
 from radiopyo.parser.utils import drop_disabled_reactions
+from radiopyo.simulation.chemistry_check import (
+    ChemistryFinding,
+    auto_check_chemistry,
+    check_chemistry,
+)
 from radiopyo.utils.sim_types import (
     EzMatrices,
     GVector,
@@ -300,7 +305,9 @@ class SimEnv:
         if not log:
             logger.setLevel(logging.ERROR)
         try:
-            return cls._from_validated_dict(config)
+            env = cls._from_validated_dict(config)
+            auto_check_chemistry(env)  # logged once per distinct chemistry
+            return env
         finally:
             logger.setLevel(_prev_log_lvl)  # restore log level, even on error
 
@@ -568,6 +575,21 @@ class SimEnv:
             List[str]
         """
         return [elt.label for elt in sorted(self.species, key=lambda x: x.index)]
+
+    def check_chemistry(self, log: bool = True) -> tp.List[ChemistryFinding]:
+        """
+        Chemistry check of this environment: species aliases, charge
+        balance, dead reactants and unused species (warnings only, see
+        radiopyo.simulation.chemistry_check). Unlike the automatic check
+        run by from_dict, the findings are logged on every call.
+
+        Args:
+            log: log one warning per finding (default: True)
+
+        Returns:
+            List of ChemistryFinding, empty when nothing was found.
+        """
+        return check_chemistry(self, log=log)
 
     def build_all_matrices(
         self,

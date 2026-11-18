@@ -46,6 +46,7 @@ if tp.TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from radiopyo.physics.beam import DoseRateSource
+    from radiopyo.simulation.chemistry_check import ChemistryFinding
     from radiopyo.utils.sim_types import ConfigDict, KwargsRun, SimMatrices
 
 # ------------------------- Expose importable stuffs ------------------------ #
@@ -480,6 +481,18 @@ class UnitCell(object):
             )
         self.change_LET(LET)  # Update GValues
         return self
+
+    def check_chemistry(self, log: bool = True) -> tp.List[ChemistryFinding]:
+        """
+        Chemistry check of the cell's environment (see SimEnv.check_chemistry).
+
+        Args:
+            log: log one warning per finding (default: True)
+
+        Returns:
+            List of ChemistryFinding, empty when nothing was found.
+        """
+        return self.env.check_chemistry(log=log)
 
     def change_LET(self, let: float) -> None:
         """
