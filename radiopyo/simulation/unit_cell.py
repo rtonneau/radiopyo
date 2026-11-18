@@ -17,7 +17,6 @@ import dataclasses
 import logging
 import time
 import typing as tp
-from contextlib import suppress
 
 import numpy as np
 from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
@@ -37,6 +36,7 @@ from radiopyo.simulation.ode_functions_solver import (
 )
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult, ShortOnSpan
 from radiopyo.utils.g_values import GValuesBoscolo
+from radiopyo.utils.progress import with_progress_bar
 
 # ------------------------- Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
@@ -1360,36 +1360,24 @@ class SimChunksIter:
     def __len__(self) -> int:
         return len(self.chunks)
 
-    def run(self, backend: str = "python") -> ODEResult:
+    def run(
+        self, backend: str = "python", progress: tp.Optional[bool] = None
+    ) -> ODEResult:
         """Run all simulation chunks
 
         backend: "python" (default) or "rust": radkin runs the whole
         chunked run in one call (radiopyo.rust; LSODA only; needs a fresh
         iterator returned by prepare_chunked_run / prepare_single_pulse).
-        Tries to import tqdm to give a nice progressbar to the user.
-        But it can safely fail.
-        get_ipython().__class__.__name__ --> detect if python was
-        started from a Jupyter Notebook (=="ZMQInteractiveShell").
-        If ran from a regular python, the call to "get_ipython()"
-        produces a NameError.
+        progress: tqdm progress bar of the Python backend (tqdm is
+        optional: no bar and no error without it). True / False forces it
+        on / off; None (default) reads radiopyo.set_progress_bar (on by
+        default). tqdm.notebook is used under a Jupyter kernel.
         """
         check_backend(backend)
         if backend == "rust":
             return self._run_rust()
         logger.info("Running all simulation chunks")
-        try:
-            from tqdm import tqdm  # type: ignore[import-untyped]
-
-            with suppress(NameError):
-                gip = get_ipython()  # type: ignore[name-defined] # noqa: F821
-                if gip.__class__.__name__ == "ZMQInteractiveShell":
-                    from tqdm.notebook import (  # type: ignore[import-untyped]
-                        tqdm,
-                    )
-            # Perform Simulation with TQDM.
-            sim = tqdm(self)
-        except ImportError:
-            sim = self
+        sim = with_progress_bar(self, progress, total=len(self))
 
         # Efficient way to consume the iterator while returning the
         # last element.
