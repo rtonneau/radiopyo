@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import typing as tp
 from dataclasses import dataclass, field
-from math import floor, isclose, isinf
+from math import floor, isclose, isfinite, isinf
 
 import numpy as np
 
@@ -37,6 +37,7 @@ if tp.TYPE_CHECKING:
 __all__ = [
     "BEAM_TYPES",
     "MIN_BEAM_ON_TIME",
+    "T_ZERO",
     "BaseTimer",
     "BeamCollection",
     "ConstantBeam",
@@ -50,20 +51,76 @@ __all__ = [
     "TimeMessage",
     "Timer",
     "TimerState",
+    "min_beam_on_time",
+    "set_min_beam_on_time",
 ]
 
 # ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
 
-# Shortest configured beam ON time [s] accepted by the beams: a shorter
-# pulse cannot be integrated correctly (UnitCell.T_ZERO = 1e-7 s is
-# skipped at the start of every beam ON interval). UnitCell exposes the
-# same value as UnitCell.MIN_BEAM_ON_TIME.
+# Default shortest configured beam ON time [s] accepted by the beams: a
+# shorter pulse is poorly resolved (UnitCell.T_ZERO = 1e-7 s is skipped
+# at the start of every beam ON interval). The value in use is the global
+# setting (set_min_beam_on_time / min_beam_on_time), exposed read-only as
+# UnitCell.MIN_BEAM_ON_TIME.
 MIN_BEAM_ON_TIME: float = 0.4e-6
+
+# Duration skipped at the start of every beam ON interval [s] (default of
+# UnitCell.T_ZERO): a beam ON span not longer than it cannot be integrated.
+T_ZERO: float = 1e-7
+
+# Current shortest beam ON time [s] (global setting).
+_min_beam_on_time: float = MIN_BEAM_ON_TIME
 
 # Relative tolerance of the ON time check (an on_time computed as
 # pulse_dose / dose_rate_peak may land just below the threshold).
 _ON_TIME_RTOL: float = 1e-9
+
+# --------------------------------------------------------------------------- #
+#                              FUNCTION DEFINITIONS                           #
+# --------------------------------------------------------------------------- #
+
+
+def set_min_beam_on_time(value: tp.Optional[float]) -> None:
+    """
+    Set the shortest beam ON time [s], for every beam built and every run
+    started afterwards (process-wide; default MIN_BEAM_ON_TIME = 0.4e-6 s).
+
+    A beam whose configured ON time is shorter raises ShortBeamOnError when
+    it is built (beams already built are not re-checked); a beam ON span
+    shorter than it at run time is not integrated, its radiolytic yield is
+    added analytically (short ON span). A value below T_ZERO (1e-7 s) is
+    accepted with a warning: spans not longer than T_ZERO are always added
+    analytically. The Rust backend receives the value in use.
+
+    Args:
+        value: float or None
+            Any positive finite time [s]; None restores the default.
+
+    Raises:
+        ValueError: value is not a positive finite number
+    """
+    global _min_beam_on_time
+    if value is None:
+        _min_beam_on_time = MIN_BEAM_ON_TIME
+        return
+    value = float(value)
+    if not (isfinite(value) and value > 0.0):
+        raise ValueError(
+            f"min beam ON time must be a positive finite time [s], got {value!r}"
+        )
+    if value < T_ZERO:
+        logger.warning(
+            f"min beam ON time {value:.3g} s is below T_ZERO={T_ZERO:.3g} s: beam "
+            "ON spans not longer than T_ZERO are still added analytically"
+        )
+    _min_beam_on_time = value
+
+
+def min_beam_on_time() -> float:
+    """Shortest beam ON time [s] in use (see set_min_beam_on_time)."""
+    return _min_beam_on_time
+
 
 # --------------------------------------------------------------------------- #
 #                              CLASS DEFINITIONS                              #
@@ -190,14 +247,16 @@ class ParticleBeam:
     def _check_on_times(self) -> None:
         """
         Raise ShortBeamOnError when a configured ON time is shorter than
-        MIN_BEAM_ON_TIME.
+        the current min beam ON time (min_beam_on_time()).
         """
-        threshold = MIN_BEAM_ON_TIME * (1.0 - _ON_TIME_RTOL)
+        min_on = _min_beam_on_time
+        threshold = min_on * (1.0 - _ON_TIME_RTOL)
         for name, on_time in self._configured_on_times().items():
             if on_time < threshold:
                 raise ShortBeamOnError(
                     f"{type(self).__name__}: beam ON time {name}={on_time:.3g} s "
-                    f"is shorter than MIN_BEAM_ON_TIME={MIN_BEAM_ON_TIME:.3g} s"
+                    f"is shorter than MIN_BEAM_ON_TIME={min_on:.3g} s "
+                    "(radiopyo.set_min_beam_on_time)"
                 )
 
     def set_name(self, name: str) -> None:

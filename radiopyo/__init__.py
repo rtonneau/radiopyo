@@ -17,6 +17,8 @@ from radiopyo.physics.beam import (
     MacroPulsedBeam,
     PulsedBeam,
     SinglePulseBeam,
+    min_beam_on_time,
+    set_min_beam_on_time,
 )
 from radiopyo.simulation.unit_cell import UnitCell
 from radiopyo.utils import (
@@ -47,8 +49,10 @@ __all__: tp.List = [
     "UnitCell",
     "disable_logging",
     "enable_logging",
+    "min_beam_on_time",
     "rust",
     "set_logging_level",
+    "set_min_beam_on_time",
 ]
 
 
