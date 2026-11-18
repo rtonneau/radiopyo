@@ -3,7 +3,7 @@ pH = 7
 
 #---------------------- Definition of Constants concentrations -------------------------
 [concentrations.fixed] # Unit is [mol]/[l]
-H2O = 55
+#H2O = 55  # already defined by advanced_water_radiolysis.toml
 catalase = 0
 Fe_plus_plus = 2.2e-8
 #GSH = 1.6e-1
