@@ -1,0 +1,73 @@
+{
+  "session_id": "2026-11-18__user-should-be-able-to-change-the-min-time-beam-on-configuration",
+  "feature_name": "User should be able to change the min time BEAM ON configuration",
+  "scratch_dir": ".scratch/tests/2026-11-18__user-should-be-able-to-change-the-min-time-beam-on-configuration",
+  "created_at": "2026-11-18T14:25:43.307Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-18T14:25:43.307Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:47:48.176Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-18T16:48:06.529Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:48:06.633Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-18T16:50:42.092Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/configurable-min-beam-on-time",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-18T16:50:42.132Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-python-global-setting.md",
+        "02-plan/tickets/02-radkin-threshold-input.md",
+        "02-plan/tickets/03-rust-wiring.md",
+        "02-plan/tickets/04-docs.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
+    }
+  ],
+  "current_phase": "ship",
+  "git": {
+    "branch": "feat/configurable-min-beam-on-time",
+    "base_branch": "feat/config-file-warnings",
+    "branch_created_at": "2026-11-18T16:50:42.092Z",
+    "pr_url": null
+  }
+}
