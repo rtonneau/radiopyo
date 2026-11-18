@@ -85,6 +85,30 @@
         "ticket": "01-build-warnings",
         "commit": "aa6698d"
       }
+    },
+    {
+      "at": "2026-11-18T16:34:50.256Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-disabled-reactions.md",
+        "03-implement/02-disabled-reactions/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-disabled-reactions"
+      }
+    },
+    {
+      "at": "2026-11-18T16:37:52.517Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-disabled-reactions/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-disabled-reactions",
+        "commit": "e33ef0e"
+      }
     }
   ],
   "current_phase": "ship",
