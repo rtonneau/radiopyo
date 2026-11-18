@@ -39,7 +39,6 @@ Author:
 # ----------------------------- External imports ---------------------------- #
 from __future__ import annotations
 
-import collections
 import contextlib
 import copy
 import dataclasses
@@ -241,8 +240,7 @@ def _solve(
             max_step_size_on=dose / dose_rate / ON_STEPS,
             max_step_size_final=MAX_STEP_OFF,
         )
-        # Consume the chunks without the tqdm bar of SimChunksIter.run
-        return collections.deque(chunks, maxlen=1).pop()
+        return chunks.run(progress=False)
 
 
 def _on_grid(t: NDArray[np.float64], y: NDArray[np.float64]) -> NDArray[np.float64]:

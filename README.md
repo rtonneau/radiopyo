@@ -114,6 +114,10 @@ with a constant dose rate and can have its own maximum step (`max_step_size_on`,
 `max_step_size_off`). Which yield goes up or down with the dose rate depends on the
 chemistry, the oxygen content and the beam; the model gives no general rule.
 
+`run()` shows a tqdm progress bar when tqdm is installed (optional, the `tqdm` extra;
+`tqdm.notebook` under Jupyter). `run(progress=False)` hides it for one run,
+`rp.set_progress_bar(False)` for every later run; an explicit `progress=` on the call wins.
+
 Beam timing affects how the run is solved:
 
 - A configured beam ON time below 0.4e-6 s raises `ShortBeamOnError` when the beam is built.
