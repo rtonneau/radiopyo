@@ -133,9 +133,33 @@
         "ticket": "03-rust-wiring",
         "commit": "e43d526"
       }
+    },
+    {
+      "at": "2026-11-18T18:51:54.450Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-docs.md",
+        "03-implement/04-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs"
+      }
+    },
+    {
+      "at": "2026-11-18T18:52:38.080Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-docs/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs",
+        "commit": "28ea86d"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "feat/configurable-min-beam-on-time",
     "base_branch": "feat/config-file-warnings",
