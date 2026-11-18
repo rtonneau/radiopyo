@@ -133,9 +133,33 @@
         "ticket": "03-chemistry-check",
         "commit": "e458755"
       }
+    },
+    {
+      "at": "2026-11-18T18:55:44.567Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/04-docs-changelog.md",
+        "03-implement/04-docs-changelog/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-changelog"
+      }
+    },
+    {
+      "at": "2026-11-18T18:58:32.848Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-docs-changelog/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-changelog",
+        "commit": "342762b"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "feat/config-file-warnings",
     "base_branch": "main",
