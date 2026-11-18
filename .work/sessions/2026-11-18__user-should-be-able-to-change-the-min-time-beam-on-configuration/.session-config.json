@@ -85,6 +85,30 @@
         "ticket": "01-python-global-setting",
         "commit": "267f36e"
       }
+    },
+    {
+      "at": "2026-11-18T16:56:58.320Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-radkin-threshold-input.md",
+        "03-implement/02-radkin-threshold-input/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-radkin-threshold-input"
+      }
+    },
+    {
+      "at": "2026-11-18T18:51:33.459Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-radkin-threshold-input/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-radkin-threshold-input",
+        "commit": "b6717c9"
+      }
     }
   ],
   "current_phase": "ship",
