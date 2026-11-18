@@ -48,6 +48,7 @@ fn error_kind(e: &RadkinError) -> &'static str {
         RadkinError::SolverFailed { .. } => "solver_failed",
         RadkinError::GValue(_) => "gvalue",
         RadkinError::Value(_) => "value",
+        RadkinError::Checkpoint(_) => "checkpoint",
     }
 }
 
@@ -368,14 +369,19 @@ impl Cell {
     ///     temperature: [degC].
     ///     beam: ``None`` or ``(type, label, params, LET)`` with ``params``
     ///         the beam's ``as_dict()``.
+    ///     min_beam_on_time: shortest beam ON time [s] (radiopyo's
+    ///         ``min_beam_on_time()``); radkin's setting is process-wide, it
+    ///         is set before the beam is built. ``None``: radkin's default.
     #[new]
-    #[pyo3(signature = (config, gvalues_csv, temperature, beam=None))]
+    #[pyo3(signature = (config, gvalues_csv, temperature, beam=None, min_beam_on_time=None))]
     fn new(
         config: &Bound<'_, PyDict>,
         gvalues_csv: &str,
         temperature: f64,
         beam: Option<(String, String, Bound<'_, PyDict>, Option<f64>)>,
+        min_beam_on_time: Option<f64>,
     ) -> PyResult<Self> {
+        radkin::consts::set_min_beam_on_time(min_beam_on_time).map_err(to_py_err)?;
         let mut table = dict_to_table(config, "")?;
         table.remove("includes");
         table.remove("beam");
@@ -402,7 +408,8 @@ impl Cell {
     /// then fixed, by index), reaction strings (global index order: k pairs
     /// first, then k-reactions, radiolytic, enzymatic), k values, radiolytic
     /// yields [mol/L/Gy], enzymatic k and Michaelis constants, fixed
-    /// concentrations [mol/L] and initial values [µmol/L].
+    /// concentrations [mol/L], initial values [µmol/L] and the shortest beam
+    /// ON time in use [s].
     fn system<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let c = &self.inner;
         let out = PyDict::new(py);
@@ -418,6 +425,7 @@ impl Cell {
         out.set_item("cst_sp", c.mat.cst_sp.clone())?;
         out.set_item("initial_values", c.env.initial_values())?;
         out.set_item("temperature", c.env.temperature)?;
+        out.set_item("min_beam_on_time", radkin::consts::min_beam_on_time())?;
         Ok(out)
     }
 
