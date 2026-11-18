@@ -56,7 +56,9 @@ included file may itself include other files.
   `k_forward`, `k_backward` and `k_equilibrium`: it is then fully defined by the new
   entry and the constants of the included one are dropped. The values are never
   rescaled (for "2 A -> B" the value to write is still 2k). Redefined reactions keep their
-  place, new ones are appended.
+  place, new ones are appended. An include cannot be "un-written", but a reaction it
+  defines can be switched off: redefine it with a rate constant of 0 (see
+  "Disabling a reaction" below).
 - Beams: see "Possible beam definitions" below.
 
 Files defined at the package level are the following:
@@ -106,6 +108,10 @@ For example:
 catalase = 8.0e-8
 ```
 
+H2O is always a fixed species set by radiopyo (55.5 mol/L, temperature dependent): an
+`H2O` entry in `[concentrations.fixed]` or `[concentrations.initial]` cannot replace it.
+It is ignored, with a warning.
+
 ### \[concentrations.initial\]
 
 Contains the initial concentrations of the species.
@@ -117,6 +123,9 @@ For example:
 [concentrations.initial] # Unit is [mol]/[l]
 O2 = 50e-6
 ```
+
+A label that matches no species of the reactions (a typo, or a species whose reactions
+were all removed) is ignored, with a warning.
 
 ### \[reactions.radiolytic\]
 
@@ -149,6 +158,11 @@ k_backward = 5.02e10
 ```
 
 ps: note the double "\[\[" and "\]\]", mandatory for each entry!
+
+The old syntax (`acid = "H2O2"`, `base = "HO2_minus"`, `pKa = 11.7`, without a
+`reaction` string) is no longer supported. Such an entry raises an error, after a warning
+that prints the entry to write instead (`reaction = "H2O2 <-> H3O_plus + HO2_minus"`, the
+same `pKa`, plus the `k_forward` and `k_backward` that must now be given).
 
 ### \[\[reactions.equilibrium\]\]
 
@@ -237,6 +251,61 @@ vanishes as the product is depleted. Rate laws always read the clipped concentra
 max(c, 0), so a species that overshoots below 0 is never consumed.
 
 ps: note the double "\[\[" and "\]\]", mandatory for each entry!
+
+### Disabling a reaction
+
+A reaction whose rate constant is 0 is **removed** from the simulation, with a warning
+naming it. The constants checked are the single numbers `k_value` (`k_reaction`,
+`constant`, `enzymatic`), `A` (`arrhenius`) and `k_forward` / `k_backward` /
+`k_equilibrium` (`acid_base`, `equilibrium`): a 0 on either side of a pair removes the
+whole pair. A temperature polynomial (a list) is never read as 0. Species used only by
+removed reactions disappear with them.
+
+This is the way to switch off a reaction defined in an included file: redefine it in your
+own file with only its constant set to 0.
+
+```toml
+[includes]
+toml = ["radiopyo/advanced_water_radiolysis.toml"]
+
+[[reactions.k_reaction]]   # switched off, removed with a warning
+reaction = "e_aq + OH_r -> OH_minus"
+k_value = 0
+```
+
+### Chemistry check
+
+When a configuration is loaded, radiopyo checks the chemistry it defines and logs a
+warning (prefix `CHEMISTRY::`) for each finding:
+
+- **alias**: two labels that name the same species, simulated as two separate species:
+  `OH` and `OH_r`, `O_minus` and `O_r_minus` (a radical written without `_r`, recognized
+  by the odd number of electrons of its formula; a molecule and its radical such as `RH`
+  and `RH_r` are not flagged), `e_minus` and `e_aq`, `H_plus` and `H3O_plus`;
+- **charge**: a reaction whose total charge (read from the `_plus` / `_minus` tokens of the
+  labels, `e_aq` = -1) differs between its two sides; enzymes, `trash` and radiolytic
+  yields are left out;
+- **dead_reactant**: a species needed by reactions but never present: no initial
+  concentration, not fixed, no radiolytic yield, and not produced by any reaction that can
+  run. The reactions listed with it never happen;
+- **unused_species**: a species given a concentration or a radiolytic yield but used by
+  no reaction.
+
+These are warnings only: the simulation runs as written. The findings of a chemistry are
+logged the first time it is built in a Python process, then again only when the
+chemistry changes (reactions or species, not the rate constants); `log=False` builds
+stay silent. The bundled `config_Labarbe.toml` gives two **charge** warnings on purpose:
+the superoxide dismutation `2 O2_minus -> H2O2 + O2` leaves out its protons and `RH_r` in
+`RH + e_aq -> RH_r` is the radical anion of RH.
+
+To get the findings at any time (they are logged on every call):
+
+```python
+findings = sim.check_chemistry()          # rp.UnitCell, or SimEnv.check_chemistry()
+for f in findings:
+    print(f.kind, f.species, f.reactions, f.message)
+findings = sim.check_chemistry(log=False)  # same list, nothing logged
+```
 
 ### Possible beam definitions
 
