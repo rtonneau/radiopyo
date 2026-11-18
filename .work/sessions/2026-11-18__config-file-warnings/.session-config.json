@@ -109,6 +109,30 @@
         "ticket": "02-disabled-reactions",
         "commit": "e33ef0e"
       }
+    },
+    {
+      "at": "2026-11-18T16:37:59.334Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-chemistry-check.md",
+        "03-implement/03-chemistry-check/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chemistry-check"
+      }
+    },
+    {
+      "at": "2026-11-18T18:55:37.221Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-chemistry-check/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-chemistry-check",
+        "commit": "e458755"
+      }
     }
   ],
   "current_phase": "ship",
