@@ -56,6 +56,9 @@ h5py, more-itertools) are installed automatically.
 pip install git+https://github.com/rtonneau/radiopyo.git
 ```
 
+Updating an old version (e.g. from the former GitLab repository) on Windows: follow
+[docs/tuto_update.md](docs/tuto_update.md), step by step.
+
 Run the bundled Labarbe configuration (pure-water radiolysis plus the biological layer,
 with a 10 Gy constant beam at 1e7 Gy/s) for 10 s:
 
@@ -176,6 +179,8 @@ example: [Rust backend notebook](examples/notebook_rust_backend.ipynb).
   `record_pre_refactor.py`), compared with the current code.
 - **[Fenton showcase](docs/issues/fenton/Fenton_Fixed_Showcase.ipynb)** (notebook): a Fenton
   runaway case and maps over dose per pulse and average dose rate.
+- **[Update guide](docs/tuto_update.md)**: updating an old install to the current release
+  on a Windows desktop (conda, git URL or editable clone, Jupyter kernel, Rust wheel).
 - **[Changelog](CHANGELOG.md)**: changes between versions.
 
 The bundled configurations are `advanced_water_radiolysis.toml` (pure water,
