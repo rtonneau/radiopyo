@@ -38,6 +38,7 @@ from radiopyo.chemistry.species import H2O, BasicSpecies, SimSpecies
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
+from radiopyo.parser.utils import drop_disabled_reactions
 from radiopyo.utils.sim_types import (
     EzMatrices,
     GVector,
@@ -331,7 +332,9 @@ class SimEnv:
                 "CONFIG::No 'reactions' section in the provided configuration"
             )
 
-        _config = deep_update(default_ConfigDict(), config)  # type: ignore[type-var]
+        _config = deep_update(  # type: ignore[type-var]
+            default_ConfigDict(), drop_disabled_reactions(config)
+        )
         out = SimEnv(*SimEnv._chemistry_builder(_config))
 
         ### FeedBack
