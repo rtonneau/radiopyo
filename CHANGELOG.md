@@ -2,6 +2,80 @@
 
 All notable changes to this project. Versions follow [semantic versioning](https://semver.org/).
 
+## 1.0.0 (2026-11-18)
+
+### Added
+
+- Point thinning of the chunked runs (opt-in): `prepare_chunked_run` and `prepare_single_pulse` take
+  `points_per_chunk_on` / `points_per_chunk_off` (None by default: every solver step is stored). With an
+  integer N >= 2, N log-spaced points are stored per chunk (start and end kept, first point 1e-6 of the span
+  after the start); the solver steps, hence the state passed from chunk to chunk, are unchanged. The
+  production / consumption / species integrals of such a result are computed over the stored points only
+  (coarser): `ODEResult.thinned` is set and a warning is logged once per result.
+- `examples/bench_chunked_scaling.py`: wall time and cost per chunk of pulsed chunked runs versus the number
+  of pulses (config_Labarbe), with optional thinning.
+- `examples/tonneau_2025_pmb/tonneau_2025_pmb.ipynb`: reproduction of the main findings of Tonneau et al.
+  2025 (Phys. Med. Biol. 70 235021). It shows the O2, H2O2 and pH time evolution (figs 4, 7, 10), the ΔO2 and net
+  H2O2 yield maps over dose rate and pO2 (figs 5, 8), and the gross production / consumption bars (figs 6, 9).
+  A table compares the results with the values quoted in the paper. The results use the GF(DR) fit that ships
+  with radiopyo, which differs from the paper's by up to 28 % at 1e7 Gy/s, so most values are 3-8 % below the
+  paper's. By default the notebook loads the recorded grid; `RECOMPUTE = True` re-runs it (about 10 min).
+- `examples/tonneau_2025_pmb/paper_runs.py`: the runs behind the notebook. `run_point` handles one dose rate,
+  pO2 and dose; `run_grid` runs the whole grid in parallel; `net_yield` and `save_grid` / `load_grid` are also
+  provided.
+- Golden data of the paper grid: `tests/golden/data/paper_tonneau_2025.npz`, recorded with
+  `record_golden.py --only paper` (new `--workers` option), and a fast test that re-runs 8 points against it.
+- `examples/tonneau_2025_pmb/gf_fit_comparison.ipynb`: the paper grid re-run with the GF(DR) fit printed in the
+  paper (0.982 DR^-0.09, `paper_runs.run_grid(gf_fit="paper")`) and compared with the shipped fit. The paper's fit
+  overshoots the quoted UHDR values by up to 35 %; the CDR gaps do not depend on the fit. Golden data:
+  `tests/golden/data/paper_tonneau_2025_paper_gf.npz` (`record_golden.py --only paper-gf`).
+- `examples/tonneau_2025_pmb/pre_refactor_comparison.ipynb`: the paper grid run with the pre-refactoring code
+  (commit 2261b92, `record_pre_refactor.py` from a separate checkout, `data/paper_tonneau_2025_2261b92.npz`)
+  against the current code. Final concentrations agree to 1e-8 relative, the minimum pH to 1e-7, the integrals
+  to 1e-4; the gaps to the paper are the same before and after.
+- Scenario `"original"` of the paper reproduction (`paper_runs.SCENARIOS`, `run_point` / `run_grid(scenario=)`,
+  `SCENARIO` switch of `tonneau_2025_pmb.ipynb`): the inputs of the original runs whose values are quoted in the
+  paper's text, the author's config `examples/tonneau_2025_pmb/data/CONFIG_PAPER_01.toml` (e_aq + O2, H_r + O2,
+  H_r + HO2 rate constants differ from the bundled config) at LET 0.56 keV/µm. It reproduces those runs to about
+  0.03 % and the quoted values to about 1 %; the paper's methods (LET 1.17, GF fit of fig. 3B) describe a later
+  rerun. The default scenario `"methods"` (bundled config, LET 1.17) is unchanged. Golden data:
+  `tests/golden/data/paper_tonneau_2025_original.npz` (`record_golden.py --only paper-original`).
+- Optional dependency extra `examples` (matplotlib).
+- `docs/issues/fenton/Fenton_Fixed_Showcase_Rust.ipynb`: the Fenton runaway showcase run entirely with the Rust backend (`backend="rust"`), with the 12x12 ROOH map computed live in about 15 s.
+- `docs/issues/fenton/fenton_map.compute_map(backend="rust")` solves every map point in one `rp.rust.run_batch` call. The Python path and its cache are unchanged.
+- Optional Rust backend: the `radiopyo-rs` extension (`rust/`, PyO3 binding of radkin, the Rust port of
+  radiopyo, pinned by git revision) solves a simulation from the cell's config and current state
+  (temperature, beam, LET, initial concentrations) and returns a normal `ODEResult`. Select it with
+  `backend="rust"` on `UnitCell.run`, `run_till_max_dose` and `SimChunksIter.run` (chunked and single-pulse
+  runs, same chunk options, thinning and short ON spans). LSODA only; cells built from a config only.
+- Parity guard (`radiopyo.rust.check_parity`): before solving, the species, reactions, k values, G-values,
+  enzymatic constants, fixed and initial concentrations built by radkin are compared with Python's
+  (rtol 1e-12); a mismatch raises `ParityError` (`RustBackendError` for the other radkin errors).
+- `radiopyo.rust.run_batch(cells, t_span, mode=..., n_threads=None, return_exceptions=False, **options)`:
+  parallel runs on a rayon pool with the GIL released. By default the first error is raised once every cell
+  has finished; with `return_exceptions=True` each error takes its cell's slot.
+- `rust` extra (`radiopyo-rs`; install it from a release wheel or `pip install ./rust`). Release wheels
+  (abi3, Windows x64 and Linux x86_64) and an sdist are built on `v*` tags (`.github/workflows/wheels.yml`);
+  the tests workflow gets a Rust job on Ubuntu and Windows.
+- `examples/notebook_rust_backend.ipynb`: both backends side by side, a chunked pulsed run, a `run_batch`
+  LET sweep and timings.
+
+### Changed
+
+- Chunked runs scale linearly with the number of chunks: `ODEResult` stores every chunk as a block and
+  joins `t` / `y` only when they are read (it used to copy the whole history at every chunk), and the next
+  chunk starts from `final_cc`, read from the last block. `derive` allocates less per call (1-D fast paths,
+  no depletion switch without negative products, no `flatnonzero` when no species is below 0): about 35%
+  faster per call, results bit-identical. 1600 pulses on config_Labarbe: 455 s -> 160 s, about 50 ms per
+  chunk whatever the number of chunks.
+- `MIN_BEAM_ON_TIME` lowered from 1e-6 s to 0.4e-6 s (still 4x `T_ZERO` = 1e-7 s) so real UHDR pulses of 0.4 to 1 µs can be simulated: a configured beam ON time in that range no longer raises `ShortBeamOnError`, and a run-time ON span of that length is integrated instead of added analytically. The Rust backend (radkin rev `088f06b`) uses the same threshold.
+
+### Fixed
+
+- `ODEResult.detail_consumption_of` (used by the consumption integrals) raised an `IndexError` under pandas 3
+  for a species with an equilibrium of net production (H2O2, OH_minus). Values computed before the fix do not
+  change.
+
 ## 0.7.0 (2026-11-12)
 
 ### Added
