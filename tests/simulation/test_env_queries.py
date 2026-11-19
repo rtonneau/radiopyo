@@ -22,6 +22,7 @@ import pytest
 
 # ----------------------------- Internal imports ---------------------------- #
 import radiopyo as rp
+from radiopyo.parser.exceptions import ConfigError
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.simulation.environment_build import (
     ReactionsList,
@@ -423,8 +424,9 @@ def test_from_dict_restores_log_level_on_error(log: bool) -> None:
         "concentrations": {"fixed": {}, "initial": {}},
         "reactions": {"k_reaction": [{"reaction": "A + B -> C"}]},  # no k_value
     }
-    with pytest.raises(KeyError):
+    with pytest.raises(ConfigError) as err:
         SimEnv.from_dict(bad_config, log=log)  # type: ignore[arg-type]
+    assert isinstance(err.value.__cause__, KeyError)
     assert logger.level == before
 
 

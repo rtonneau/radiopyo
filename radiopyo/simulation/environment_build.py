@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import typing as tp
-from contextlib import suppress
+from contextlib import nullcontext, suppress
 from dataclasses import dataclass, field
 from itertools import chain
 
@@ -38,6 +38,8 @@ from radiopyo.chemistry.species import H2O, BasicSpecies, SimSpecies
 from radiopyo.chemistry.species_collection import ListSpecies
 from radiopyo.chemistry.utils.units import Temperature
 from radiopyo.parser import RPARSER
+from radiopyo.parser.exceptions import DICT_ORIGIN, ConfigError
+from radiopyo.parser.origins import ConfigOrigins, config_entry
 from radiopyo.parser.utils import drop_disabled_reactions
 from radiopyo.simulation.chemistry_check import (
     ChemistryFinding,
@@ -281,38 +283,53 @@ class SimEnv:
         )
 
     @classmethod
-    def from_dict(cls, config: ConfigDict, log: bool = True) -> SimEnv:
+    def from_dict(
+        cls,
+        config: ConfigDict,
+        log: bool = True,
+        origins: tp.Optional[ConfigOrigins] = None,
+    ) -> SimEnv:
         """Build the simulation environment from a config dictionary.
 
         Args:
             config: dictionary (see ConfigDict), it must at least contain
                 the 'concentrations' and 'parameters' sections.
             log: if False, only errors are logged during the build.
+            origins: the file each entry of 'config' comes from (see
+                resolve_includes_with_origins), named in the errors;
+                without it, the origin is '<dict>'.
 
         Raises:
-            ValueError: if the 'concentrations' or 'parameters' section
-                is missing from the config.
+            ConfigError: (a ValueError) if the 'concentrations' or
+                'parameters' section is missing, or for any error while
+                building a fixed species, a concentration, the pH, a
+                radiolytic yield or a reaction: it names the entry and its
+                origin, the original error is its __cause__.
         """
+        origins = ConfigOrigins() if origins is None else origins
         for section in ("concentrations", "parameters"):
             if section not in config:
-                raise ValueError(
-                    f"CONFIG::No '{section}' section found in the provided"
+                raise ConfigError(
+                    f"No '{section}' section found in the provided"
                     f" configuration (sections found: {sorted(config)})."
-                    f" An empty '{section}' section is enough."
+                    f" An empty '{section}' section is enough.",
+                    origin=DICT_ORIGIN,
                 )
 
         _prev_log_lvl = logger.level
         if not log:
             logger.setLevel(logging.ERROR)
         try:
-            env = cls._from_validated_dict(config)
+            env = cls._from_validated_dict(config, origins)
             auto_check_chemistry(env)  # logged once per distinct chemistry
             return env
         finally:
             logger.setLevel(_prev_log_lvl)  # restore log level, even on error
 
     @classmethod
-    def _from_validated_dict(cls, config: ConfigDict) -> SimEnv:
+    def _from_validated_dict(
+        cls, config: ConfigDict, origins: tp.Optional[ConfigOrigins] = None
+    ) -> SimEnv:
         """from_dict() once the mandatory sections are known to exist."""
         parameters: SimParameters = default_SimParameters()
 
@@ -342,7 +359,7 @@ class SimEnv:
         _config = deep_update(  # type: ignore[type-var]
             default_ConfigDict(), drop_disabled_reactions(config)
         )
-        out = SimEnv(*SimEnv._chemistry_builder(_config))
+        out = SimEnv(*SimEnv._chemistry_builder(_config, origins))
 
         ### FeedBack
         logger.info(
@@ -367,6 +384,7 @@ class SimEnv:
     @staticmethod
     def _chemistry_builder(
         config: ConfigDict,
+        origins: tp.Optional[ConfigOrigins] = None,
     ) -> tp.Tuple[ReactionsList, ListSpecies, SimParameters, tp.Dict[str, float]]:
         """
         Build the ReactionsList, ListSpecies, SimParameters and initial_cc
@@ -377,11 +395,17 @@ class SimEnv:
             ListSpecies
             SimParameters
             Dict[str, float]
+
+        Raises:
+            ConfigError: naming the faulty entry and its origin ('origins',
+                '<dict>' if not given).
         """
+        origins = ConfigOrigins() if origins is None else origins
         # Read Constant species and create the species collection (H2O is
         # always the built-in fixed species: a configured value is ignored).
         list_sp = constant_species_from_dict(
-            _without_water(config["concentrations"].get("fixed", {}), "fixed")
+            _without_water(config["concentrations"].get("fixed", {}), "fixed"),
+            origins=origins,
         )
         assert H2O.cc_init is not None  # module constant, always defined
         list_sp.add_cst_species(
@@ -396,42 +420,43 @@ class SimEnv:
         }
 
         # Manually add H_plus & OH_minus as constant A/B partners (pH related)
-        if config["parameters"].get("force_cst_pH", False):
-            with suppress(radiopyo_exceptions.IsSimSpeciesError):
-                list_sp.add_cst_species(
-                    RPARSER.parse_species(SimEnv.PH_SPECIES),
-                    10 ** (-config["parameters"]["pH"]),
-                )
-            with suppress(radiopyo_exceptions.IsSimSpeciesError):
-                list_sp.add_cst_species(
-                    RPARSER.parse_species("OH_minus"),
-                    10 ** (-14 + config["parameters"]["pH"]),
-                )
-        else:
-            list_sp.add_dyn_species(
-                RPARSER.parse_species(SimEnv.PH_SPECIES),
-                cc_init=10 ** (-config["parameters"]["pH"]),
-            )
-            list_sp.add_dyn_species(
-                RPARSER.parse_species("OH_minus"),
-                cc_init=10 ** (-14 + config["parameters"]["pH"]),
-            )
+        pH = config["parameters"].get("pH")
+        with _entry(origins, f"[parameters] pH = {pH!r}", "parameters", "pH"):
+            SimEnv._add_pH_species(config, list_sp)
 
         # Read the reactions. The order matters: species get created in
-        # list_sp as the reactions are parsed.
+        # list_sp as the reactions are parsed. Each error names its entry.
         reactions = config["reactions"]
-        ab, list_sp = acid_base_from_dict(reactions.get("acid_base", []), list_sp)
-        er, list_sp = eq_reaction_from_dict(reactions.get("equilibrium", []), list_sp)
-        kr, list_sp = kreaction_from_dict(reactions.get("k_reaction", []), list_sp)
-        cr, list_sp = cst_reaction_from_dict(reactions.get("constant", []), list_sp)
-        ar, list_sp = arrhenius_from_dict(reactions.get("arrhenius", []), list_sp)
+        ab, list_sp = reactions_from_dict(
+            "acid_base", reactions.get("acid_base", []), list_sp, origins
+        )
+        er, list_sp = reactions_from_dict(
+            "equilibrium", reactions.get("equilibrium", []), list_sp, origins
+        )
+        kr, list_sp = _as_collection(
+            *reactions_from_dict(
+                "k_reaction", reactions.get("k_reaction", []), list_sp, origins
+            )
+        )
+        cr, list_sp = _as_collection(
+            *reactions_from_dict(
+                "constant", reactions.get("constant", []), list_sp, origins
+            )
+        )
+        ar, list_sp = reactions_from_dict(
+            "arrhenius", reactions.get("arrhenius", []), list_sp, origins
+        )
 
         # Merge Arrhenius & Constant with KReaction Collection
         for elt in chain(ar, cr):
             kr.add_reaction(elt)
 
-        enz, list_sp = michaelis_from_dict(reactions.get("enzymatic", []), list_sp)
-        rad, list_sp = radiolytic_from_dict(reactions.get("radiolytic", {}), list_sp)
+        enz, list_sp = reactions_from_dict(
+            "enzymatic", reactions.get("enzymatic", []), list_sp, origins
+        )
+        rad, list_sp = radiolytic_from_dict(
+            reactions.get("radiolytic", {}), list_sp, origins
+        )
 
         # Read and set initial concentrations
         for label, value in initial_cc.items():
@@ -444,7 +469,13 @@ class SimEnv:
                 continue
             sp = list_sp[label]
             if isinstance(sp, SimSpecies):
-                sp.set_initial_cc(value)
+                with _entry(
+                    origins,
+                    f"[concentrations.initial] {label} = {value!r}",
+                    "concentrations.initial",
+                    label,
+                ):
+                    sp.set_initial_cc(value)
 
         # Convert the "trash" species, if presents, to Cst.
         if "trash" in list_sp and list_sp.is_dyn_species("trash"):
@@ -473,6 +504,28 @@ class SimEnv:
             config["parameters"],
             initial_cc,
         )
+
+    @staticmethod
+    def _add_pH_species(config: ConfigDict, list_sp: ListSpecies) -> None:
+        """Add H3O_plus and OH_minus, set by the pH (fixed species if
+        'force_cst_pH', dynamic ones otherwise)."""
+        pH = config["parameters"]["pH"]
+        if config["parameters"].get("force_cst_pH", False):
+            with suppress(radiopyo_exceptions.IsSimSpeciesError):
+                list_sp.add_cst_species(
+                    RPARSER.parse_species(SimEnv.PH_SPECIES), 10 ** (-pH)
+                )
+            with suppress(radiopyo_exceptions.IsSimSpeciesError):
+                list_sp.add_cst_species(
+                    RPARSER.parse_species("OH_minus"), 10 ** (-14 + pH)
+                )
+        else:
+            list_sp.add_dyn_species(
+                RPARSER.parse_species(SimEnv.PH_SPECIES), cc_init=10 ** (-pH)
+            )
+            list_sp.add_dyn_species(
+                RPARSER.parse_species("OH_minus"), cc_init=10 ** (-14 + pH)
+            )
 
     @property
     def temperature(self) -> Temperature:
@@ -1113,6 +1166,7 @@ def reactions_from_dict(
     section: str,
     reactions: tp.List[tp.Dict] | tp.Dict,
     list_sp: tp.Optional[ListSpecies] = None,
+    origins: tp.Optional[ConfigOrigins] = None,
 ) -> tp.Tuple[tp.List[tp.Any], ListSpecies]:
     """Make the reactions of one config section ("acid_base", "equilibrium",
     "arrhenius", "k_reaction", "constant" or "enzymatic").
@@ -1121,13 +1175,49 @@ def reactions_from_dict(
         section: name of the config section (key of _REACTION_BUILDERS)
         reactions: list of reaction dicts, or a single reaction dict
         list_sp: species collection to fill (default: a new one)
+        origins: if given, an error building a reaction is raised as a
+            ConfigError naming the reaction and its origin (see
+            ConfigOrigins); otherwise it is raised as is.
 
     Returns:
         The list of reactions and the species collection.
     """
     build = _REACTION_BUILDERS[section]
     list_sp = ListSpecies() if list_sp is None else list_sp
-    return [build(r, list_sp) for r in _only_one_reaction_as_list(reactions)], list_sp
+    out = []
+    for r in _only_one_reaction_as_list(reactions):
+        reaction = r.get("reaction") if isinstance(r, dict) else r
+        with _entry(
+            origins,
+            f"[[reactions.{section}]] {reaction!r}",
+            section,
+            r,
+        ):
+            out.append(build(r, list_sp))
+    return out, list_sp
+
+
+def _entry(
+    origins: tp.Optional[ConfigOrigins],
+    what: str,
+    section: str,
+    entry: tp.Any,
+) -> tp.ContextManager[None]:
+    """
+    config_entry for 'entry' (a reaction dict for a reaction section,
+    a name otherwise) of 'section', or nothing when 'origins' is None
+    (the errors are then raised as is).
+    """
+    if origins is None:
+        return nullcontext()
+    found = origins  # the origin is only looked up on error
+
+    def origin() -> str:
+        if section in _REACTION_BUILDERS:
+            return found.reaction(section, entry)
+        return found.describe(section, entry)
+
+    return config_entry(what, origin)
 
 
 def acid_base_from_dict(
@@ -1185,20 +1275,24 @@ def _as_collection(
 def radiolytic_from_dict(
     reactions: tp.Dict,
     list_sp: tp.Optional[ListSpecies] = None,
+    origins: tp.Optional[ConfigOrigins] = None,
 ) -> tp.Tuple[tp.List[RadiolyticReaction], ListSpecies]:
+    """The radiolytic yields ('origins': see reactions_from_dict)."""
     list_sp = ListSpecies() if list_sp is None else list_sp
-
-    return (
-        [
-            RadiolyticReaction.from_product(
-                RPARSER.parse_species(product.strip()),
-                ge,
-                list_sp,
+    out = []
+    for product, ge in reactions.items():
+        with _entry(
+            origins,
+            f"[reactions.radiolytic] {product} = {ge!r}",
+            "reactions.radiolytic",
+            product,
+        ):
+            out.append(
+                RadiolyticReaction.from_product(
+                    RPARSER.parse_species(product.strip()), ge, list_sp
+                )
             )
-            for product, ge in reactions.items()
-        ],
-        list_sp,
-    )
+    return out, list_sp
 
 
 def _without_water(cc: tp.Mapping[str, tp.Any], section: str) -> tp.Dict[str, tp.Any]:
@@ -1224,8 +1318,16 @@ def _without_water(cc: tp.Mapping[str, tp.Any], section: str) -> tp.Dict[str, tp
 def constant_species_from_dict(
     species: tp.Dict[str, float],
     list_sp: tp.Optional[ListSpecies] = None,
+    origins: tp.Optional[ConfigOrigins] = None,
 ) -> ListSpecies:
+    """The fixed species ('origins': see reactions_from_dict)."""
     list_sp = ListSpecies() if list_sp is None else list_sp
     for sp, cc in species.items():
-        list_sp.add_cst_species(RPARSER.parse_species(sp.strip()), cc)
+        with _entry(
+            origins,
+            f"[concentrations.fixed] {sp} = {cc!r}",
+            "concentrations.fixed",
+            sp,
+        ):
+            list_sp.add_cst_species(RPARSER.parse_species(sp.strip()), cc)
     return list_sp

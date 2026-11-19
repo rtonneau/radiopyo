@@ -33,6 +33,7 @@ if tp.TYPE_CHECKING:
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List[str] = [
     "BACKSLASH_HINT",
+    "EQUILIBRIUM_CONSTANTS",
     "PACKAGE_PREFIX",
     "REACTION_LISTS",
     "ReactionKey",
@@ -90,6 +91,7 @@ _EQUILIBRIUM_CONSTANTS: tp.Tuple[str, ...] = (
 
 # Public name: the parsers check the reaction strings of these sections
 REACTION_LISTS = _REACTION_LISTS
+EQUILIBRIUM_CONSTANTS = _EQUILIBRIUM_CONSTANTS
 
 # Scalar rate constants of each reaction section: one of them equal to 0
 # disables the reaction (the whole pair for acid_base and equilibrium),
@@ -247,7 +249,12 @@ def reaction_key(reaction: str) -> ReactionKey:
     )
 
 
-def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
+def combine_config(
+    root: ConfigDict,
+    other: ConfigDict,
+    *,
+    beam_origin: tp.Callable[[str], str] | None = None,
+) -> ConfigDict:
     """
     Merge two config dicts; 'other' has the precedence over 'root'.
     Neither of them is modified, a new config is returned.
@@ -274,6 +281,9 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
     Args:
         root: lowest precedence config
         other: highest precedence config
+        beam_origin: origin of a beam from its label (see ConfigOrigins);
+            if given, a beam that cannot be built raises a ConfigError
+            naming it.
 
     Returns:
         ConfigDict: the merged config.
@@ -288,11 +298,17 @@ def combine_config(root: ConfigDict, other: ConfigDict) -> ConfigDict:
 
     # Beams: make sure to keep only the latest beam definition if
     # multiple beam types
-    root_beams = BeamCollection.from_config_dict(out["beam"], verbose=False)
-    other_beams = BeamCollection.from_config_dict(new["beam"], verbose=False)
+    root_beams = BeamCollection.from_config_dict(
+        out["beam"], verbose=False, origin_of=beam_origin
+    )
+    other_beams = BeamCollection.from_config_dict(
+        new["beam"], verbose=False, origin_of=beam_origin
+    )
     if "default" in root_beams and len(other_beams) > 0:
         root_beams.remove_beam("default")
-    out["beam"] = root_beams.merge(other_beams, verbose=False).as_dict()
+    out["beam"] = root_beams.merge(
+        other_beams, verbose=False, origin_of=beam_origin
+    ).as_dict()
 
     # Reactions
     out["reactions"]["radiolytic"] |= new["reactions"]["radiolytic"]

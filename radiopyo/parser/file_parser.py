@@ -21,16 +21,17 @@ from abc import ABC, abstractmethod
 
 # ------------------------------ Internal imports --------------------------- #
 from radiopyo.parser.exceptions import (
+    DICT_ORIGIN,
     ConfigError,
     IncludeNotFoundError,
     describe_chain,
 )
+from radiopyo.parser.origins import ConfigOrigins, combine_with_origins
 from radiopyo.parser.utils import (
     BACKSLASH_HINT,
     PACKAGE_PREFIX,
     REACTION_LISTS,
     blank_config,
-    combine_config,
     include_suggestions,
     locate_include,
     reaction_key,
@@ -45,8 +46,10 @@ __all__ = [
     "FileParser",
     "list_available_parsers",
     "load_config",
+    "load_config_with_origins",
     "normalize_includes",
     "resolve_includes",
+    "resolve_includes_with_origins",
 ]
 
 # Accepted forms of the [includes] section, quoted in the errors.
@@ -89,6 +92,19 @@ def resolve_includes(
     source: str | pathlib.Path | None = None,
 ) -> ConfigDict:
     """
+    The config with its includes merged in: the config part of
+    resolve_includes_with_origins (see it for the details).
+    """
+    return resolve_includes_with_origins(config, _chain, source=source)[0]
+
+
+def resolve_includes_with_origins(
+    config: ConfigDict,
+    _chain: tp.Tuple[pathlib.Path, ...] = (),
+    *,
+    source: str | pathlib.Path | None = None,
+) -> tp.Tuple[ConfigDict, ConfigOrigins]:
+    """
     Resolves the includes in the given configuration dictionary.
 
     The included files are loaded (recursively) and merged in the order
@@ -108,6 +124,8 @@ def resolve_includes(
         ConfigDict: The configuration with all the includes merged in,
             and none left in its 'includes' section. 'config' itself is
             not modified. Without any include, 'config' is returned.
+        ConfigOrigins: the file each entry (and field) of it comes from
+            ('<dict>' for 'config' itself without 'source').
 
     Raises:
         IncludeNotFoundError: If an included file does not exist (it is a
@@ -119,14 +137,16 @@ def resolve_includes(
     """
     if source is not None and not _chain:
         _chain = (pathlib.Path(source).resolve(),)
+    own = ConfigOrigins.of(config, str(_chain[-1]) if _chain else DICT_ORIGIN)
     includes = config["includes"]
     if len(includes) == 0:
-        return config  # Do nothing
+        return config, own  # Do nothing
     available_parsers = list_available_parsers()
     base = _chain[-1].parent if _chain else None
 
     # Lowest precedence first: each included file overrides the previous ones
     merged = blank_config()
+    origins = ConfigOrigins()
 
     for ext, entry in normalize_includes(includes, _chain):
         if ("." + ext) not in available_parsers:
@@ -147,10 +167,14 @@ def resolve_includes(
         except ConfigError as err:
             # The parser only knows its own file: name the whole chain
             raise err.with_chain((*_chain, resolved)) from err.__cause__
-        included = resolve_includes(parsed, (*_chain, resolved))
-        merged = combine_config(merged, included)
+        included, included_origins = resolve_includes_with_origins(
+            parsed, (*_chain, resolved)
+        )
+        merged, origins = combine_with_origins(
+            merged, origins, included, included_origins
+        )
 
-    return combine_config(merged, config)
+    return combine_with_origins(merged, origins, config, own)
 
 
 def _first_line(err: Exception) -> str:
@@ -172,6 +196,13 @@ def load_config(path: str | pathlib.Path) -> ConfigDict:
         ConfigError: for an unknown extension, or any error of the file
             or of its includes (see resolve_includes).
     """
+    return load_config_with_origins(path)[0]
+
+
+def load_config_with_origins(
+    path: str | pathlib.Path,
+) -> tp.Tuple[ConfigDict, ConfigOrigins]:
+    """load_config, and the file each entry comes from (ConfigOrigins)."""
     parsers = list_available_parsers()
     suffix = pathlib.Path(path).suffix
     if suffix not in parsers:
@@ -179,7 +210,7 @@ def load_config(path: str | pathlib.Path) -> ConfigDict:
             f"no parser for '{suffix}' files (known: {', '.join(sorted(parsers))})",
             chain=(pathlib.Path(path),),
         )
-    return resolve_includes(parsers[suffix](path).parse(), source=path)
+    return resolve_includes_with_origins(parsers[suffix](path).parse(), source=path)
 
 
 def normalize_includes(

@@ -23,7 +23,8 @@ from scipy.integrate import solve_ivp  # type: ignore[import-untyped]
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo.chemistry.utils.units import Temperature
-from radiopyo.parser.file_parser import FileParser, resolve_includes
+from radiopyo.parser.file_parser import FileParser, resolve_includes_with_origins
+from radiopyo.parser.origins import ConfigOrigins
 from radiopyo.parser.toml import TOMLFileParser
 from radiopyo.parser.utils import drop_disabled_reactions
 from radiopyo.physics.beam import (
@@ -380,6 +381,7 @@ class UnitCell(object):
         cls,
         config: ConfigDict,
         init: bool = True,
+        origins: tp.Optional[ConfigOrigins] = None,
     ) -> tp.Self:
         """
         Create a Simulation Environment from a the generic ConfigDict:
@@ -388,22 +390,35 @@ class UnitCell(object):
             config: ConfigDict
                 Dictionary (see radiopyo.sim_types.py) containing
                 simulation parameters.
+            origins: ConfigOrigins, optional
+                The file each entry of 'config' comes from (see
+                resolve_includes_with_origins), named in the errors;
+                without it, the origin is '<dict>'.
+
+        Raises:
+            ConfigError: for an entry (beam, species, reaction, ...) that
+                cannot be built, naming it and its origin.
 
         Returns:
             UnitCell
         """
         beam_list: tp.Optional[BeamCollection] = None
+        origins = ConfigOrigins() if origins is None else origins
 
         if len(config["beam"]) > 0:
             logger.info("Beam configuration detected in config file")
-            beam_list = BeamCollection.from_config_dict(config["beam"])
+            beam_list = BeamCollection.from_config_dict(
+                config["beam"], origin_of=origins.beam
+            )
         else:
             logger.info("No beam configuration detected")
 
         # Disabled reactions are dropped from the stored config too: the
         # Rust backend rebuilds the system from it (ADR 0010, 0011).
         config = drop_disabled_reactions(config)
-        cell = cls(env=SimEnv.from_dict(config), beam=beam_list, init=init)
+        cell = cls(
+            env=SimEnv.from_dict(config, origins=origins), beam=beam_list, init=init
+        )
         cell.config = copy.deepcopy(config)
         return cell
 
@@ -428,8 +443,10 @@ class UnitCell(object):
         """
         logger.info(f"radiopyo version {VERSION}")
         logger.info(f"Loading config from file: {file}")
-        config = resolve_includes(Parser(file).parse(), source=file)
-        return cls.from_config_dict(config, init)
+        config, origins = resolve_includes_with_origins(
+            Parser(file).parse(), source=file
+        )
+        return cls.from_config_dict(config, init, origins=origins)
 
     @classmethod
     def from_toml(cls, file: str | Path, init: bool = True) -> tp.Self:
