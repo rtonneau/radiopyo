@@ -133,9 +133,21 @@
         "ticket": "03-build-error-origins",
         "commit": "b48c794"
       }
+    },
+    {
+      "at": "2026-11-19T13:41:47.897Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-docs-changelog/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-changelog",
+        "commit": "d076781"
+      }
     }
   ],
-  "current_phase": "ship",
+  "current_phase": "finish-pending",
   "git": {
     "branch": "feat/friendlier-config-includes",
     "base_branch": "main",
