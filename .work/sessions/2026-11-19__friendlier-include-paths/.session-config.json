@@ -109,6 +109,30 @@
         "ticket": "02-per-file-parse-errors",
         "commit": "804c558"
       }
+    },
+    {
+      "at": "2026-11-19T13:26:36.616Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-build-error-origins.md",
+        "03-implement/03-build-error-origins/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-build-error-origins"
+      }
+    },
+    {
+      "at": "2026-11-19T13:38:25.894Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-build-error-origins/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-build-error-origins",
+        "commit": "b48c794"
+      }
     }
   ],
   "current_phase": "ship",
