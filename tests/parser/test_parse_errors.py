@@ -11,6 +11,7 @@ Author:
 from __future__ import annotations
 
 import pathlib
+import sys
 
 import pytest
 
@@ -69,6 +70,7 @@ def test_windows_path_read_as_escapes_gets_a_hint(tmp_path):
         load_config(top)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="backslash paths are Windows-only")
 def test_windows_path_in_single_quotes_works(tmp_path):
     inc = write(tmp_path / "inc.toml", "[parameters]\npH = 6\n")
     windows = str(inc.resolve()).replace("/", "\\")
