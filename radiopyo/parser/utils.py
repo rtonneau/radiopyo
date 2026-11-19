@@ -32,7 +32,9 @@ if tp.TYPE_CHECKING:
 
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: tp.List[str] = [
+    "BACKSLASH_HINT",
     "PACKAGE_PREFIX",
+    "REACTION_LISTS",
     "ReactionKey",
     "blank_config",
     "bundled_configs",
@@ -51,6 +53,14 @@ logger = logging.getLogger("radiopyo")
 # An include entry starting with this exact prefix refers to the data
 # shipped with the package (PACKAGE_DATA_PATH).
 PACKAGE_PREFIX = "radiopyo/"
+
+# A backslash in a double-quoted TOML string starts an escape sequence
+# ("C:\temp" is "C:" + TAB + "emp"): the usual Windows path mistake.
+BACKSLASH_HINT = (
+    "Hint: in a double-quoted TOML string a backslash starts an escape "
+    "(\\t is a tab, \\n a new line). Write Windows paths with single quotes "
+    "('C:\\data\\my.toml') or forward slashes (\"C:/data/my.toml\")."
+)
 
 # Identity of a reaction, whatever the order of its species: reactants
 # {(label, stoichiometry)}, products {(label, stoichiometry, operation)},
@@ -77,6 +87,9 @@ _EQUILIBRIUM_CONSTANTS: tp.Tuple[str, ...] = (
     "k_backward",
     "k_equilibrium",
 )
+
+# Public name: the parsers check the reaction strings of these sections
+REACTION_LISTS = _REACTION_LISTS
 
 # Scalar rate constants of each reaction section: one of them equal to 0
 # disables the reaction (the whole pair for acid_base and equilibrium),

@@ -26,11 +26,14 @@ from radiopyo.parser.exceptions import (
     describe_chain,
 )
 from radiopyo.parser.utils import (
+    BACKSLASH_HINT,
     PACKAGE_PREFIX,
+    REACTION_LISTS,
     blank_config,
     combine_config,
     include_suggestions,
     locate_include,
+    reaction_key,
 )
 
 # -------------------------- Type checking ONLY imports---------------------- #
@@ -139,12 +142,25 @@ def resolve_includes(
             cycle = " -> ".join(str(p) for p in (*_chain, resolved))
             raise ConfigError(f"Circular include: {cycle}", chain=_chain)
         logger.info(f"Resolving include: {path}")
-        included = resolve_includes(
-            available_parsers["." + ext](path).parse(), (*_chain, resolved)
-        )
+        try:
+            parsed = available_parsers["." + ext](path).parse()
+        except ConfigError as err:
+            # The parser only knows its own file: name the whole chain
+            raise err.with_chain((*_chain, resolved)) from err.__cause__
+        included = resolve_includes(parsed, (*_chain, resolved))
         merged = combine_config(merged, included)
 
     return combine_config(merged, config)
+
+
+def _first_line(err: Exception) -> str:
+    """The first line of the message of 'err' (lark adds token lists)."""
+    text = str(err).strip()
+    first = text.splitlines()[0] if text else type(err).__name__
+    return (
+        f"{first} (expected e.g. 'A + B -> 2 C' or "
+        "'2 H2O2 -- catalase >> O2 + 2 H2O')"
+    )
 
 
 def load_config(path: str | pathlib.Path) -> ConfigDict:
@@ -241,6 +257,8 @@ def _found_include(
             "radiopyo.bundled_configs()); a relative path is relative to the "
             "including file."
         )
+        if any(c in entry for c in "\t\n\r\b\f"):
+            lines.append("The entry holds a tab or a new line. " + BACKSLASH_HINT)
         raise IncludeNotFoundError("\n".join(lines), chain=chain)
     relative = not (
         entry.startswith(PACKAGE_PREFIX) or pathlib.Path(entry).is_absolute()
@@ -338,7 +356,7 @@ class FileParser(ABC):
                 parser, naming the file.
         """
         base = pathlib.Path(self.path).absolute().parent
-        chain = (pathlib.Path(self.path).absolute(),)
+        chain = (self.absolute_path,)
         parsers = list_available_parsers()
         out: tp.Dict[str, tp.List[str]] = {}
         for ext, entry in normalize_includes(includes, chain):
@@ -359,6 +377,49 @@ class FileParser(ABC):
             return entry
         candidate = base / entry
         return str(candidate) if candidate.exists() else entry
+
+    @property
+    def absolute_path(self) -> pathlib.Path:
+        """The parsed file, as an absolute path (named in the errors)."""
+        return pathlib.Path(self.path).resolve()
+
+    def check_reactions(self, config: ConfigDict) -> None:
+        """
+        Check that every reaction of the parsed file has a valid reaction
+        string, so that an error names this file (it would otherwise
+        only show up once all the files are merged).
+
+        Raises:
+            ConfigError: for an entry that is not a table, without a
+                'reaction' string, or whose string is not a reaction.
+        """
+        reactions = tp.cast("tp.Mapping[str, tp.Any]", config["reactions"])
+        chain = (self.absolute_path,)
+        for section in REACTION_LISTS:
+            entries = reactions.get(section, [])
+            for idx, entry in enumerate(
+                [entries] if isinstance(entries, dict) else entries
+            ):
+                where = f"[[reactions.{section}]] #{idx + 1}"
+                if not isinstance(entry, dict):
+                    raise ConfigError(
+                        f"{where} must be a table, got {entry!r}", chain=chain
+                    )
+                reaction = entry.get("reaction")
+                if not isinstance(reaction, str):
+                    raise ConfigError(
+                        f"{where} has no 'reaction' string (keys: "
+                        f"{', '.join(entry) or 'none'})",
+                        chain=chain,
+                    )
+                try:
+                    reaction_key(reaction)
+                except Exception as err:  # lark errors, TypeError
+                    raise ConfigError(
+                        f"{where}: invalid reaction '{reaction}': "
+                        f"{_first_line(err)}",
+                        chain=chain,
+                    ) from err
 
     def file_type(self) -> str:
         """

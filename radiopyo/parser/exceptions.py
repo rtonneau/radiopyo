@@ -62,8 +62,15 @@ class ConfigError(RadioPyoError, ValueError):
         chain: tp.Sequence[str | pathlib.Path] = (),
     ):
         self.message = message
+        self.chain = tuple(chain)
         self.origin = origin if origin is not None else describe_chain(chain)
         super().__init__(f"In config {self.origin}: {message}")
+
+    def with_chain(self, chain: tp.Sequence[str | pathlib.Path]) -> tp.Self:
+        """The same error, located by the given include chain."""
+        new = type(self)(self.message, chain=chain)
+        new.__cause__ = self.__cause__
+        return new
 
 
 class IncludeNotFoundError(ConfigError, FileNotFoundError):
