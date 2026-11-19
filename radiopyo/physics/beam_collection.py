@@ -215,6 +215,7 @@ class BeamCollection(object):
         config: tp.Dict[str, float],
         LET: tp.Optional[float] = None,
         verbose: bool = True,
+        origin_of: tp.Callable[[str], str] | None = None,
     ) -> None:
         """
         Add new beam defined in a dictionary.
@@ -227,14 +228,32 @@ class BeamCollection(object):
                 LET of the beam
             verbose: bool, optional (default=True)
                 Enable or disable logging
+            origin_of: callable, optional
+                Origin of a beam from its label (see ConfigOrigins.beam):
+                if given, an error building the beam is raised as a
+                ConfigError naming the beam and its origin.
 
         Raises:
             NotImplementedError
                 beam_type not recognized
+            ConfigError
+                any error building the beam, if 'origin_of' is given
         """
-        label, beam, LET = BeamCollection.build_beam_from_dict(
-            beam_type, config, LET, verbose
-        )
+        if origin_of is None:
+            label, beam, LET = BeamCollection.build_beam_from_dict(
+                beam_type, config, LET, verbose
+            )
+        else:
+            # Imported here: the parser package imports this module
+            from radiopyo.parser.origins import config_entry
+
+            name = str(config.get("label", "default"))
+            with config_entry(
+                f"[[beam.{beam_type}]] '{name}'", lambda: origin_of(name)
+            ):
+                label, beam, LET = BeamCollection.build_beam_from_dict(
+                    beam_type, config, LET, verbose
+                )
 
         if verbose and label in self:
             msg = (
@@ -250,6 +269,7 @@ class BeamCollection(object):
         cls,
         param: tp.Dict[str, tp.List[tp.Dict]],
         verbose: bool = True,
+        origin_of: tp.Callable[[str], str] | None = None,
     ) -> BeamCollection:
         """
         Create a BeamCollection out of a Dict containing multiple beam
@@ -261,6 +281,8 @@ class BeamCollection(object):
             param: Dict
                 Dict structure whose keywords are valid beam type names.
             verbose: bool, optional (default=True)
+            origin_of: callable, optional
+                see add_beam_from_dict
         """
         beams = cls()
 
@@ -276,7 +298,7 @@ class BeamCollection(object):
                 with suppress(KeyError):
                     LET = config.pop("LET")
 
-                beams.add_beam_from_dict(beam_type, config, LET, verbose)
+                beams.add_beam_from_dict(beam_type, config, LET, verbose, origin_of)
         return beams
 
     def as_dict(self) -> tp.Dict[str, tp.List[tp.Dict]]:
@@ -304,6 +326,7 @@ class BeamCollection(object):
         self,
         other: BeamCollection,
         verbose: bool = True,
+        origin_of: tp.Callable[[str], str] | None = None,
     ) -> BeamCollection:
         """
         Merge two BeamCollection. Do not modify the current definition
@@ -339,6 +362,8 @@ class BeamCollection(object):
 
         out = BeamCollection()
         for _, (beam, beam_type) in s.items():
-            out.add_beam_from_dict(beam_type, beam, verbose=verbose)
+            out.add_beam_from_dict(
+                beam_type, beam, verbose=verbose, origin_of=origin_of
+            )
 
         return out

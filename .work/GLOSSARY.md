@@ -118,3 +118,11 @@ _Avoid_: duplicate species, synonym
 **Chemistry check**:
 The set of warnings-only tests on a built `SimEnv` (`check_chemistry()`): species aliases, charge balance per reaction, dead reactants, unused species. It returns its findings; run automatically at build, it logs them once per distinct chemistry per process.
 _Avoid_: sanity check (taken by the parity guard), validation, lint
+
+**Include entry**:
+One string of a config's `[includes]` section, as written: `radiopyo/<file>` (a bundled config), an absolute path, or a path relative to the including file (the working directory is only a fallback, with a warning).
+_Avoid_: include path (the resolved file), import
+
+**Bundled config**:
+A TOML file shipped in `radiopyo/data/`, referred to by the include entry `radiopyo/<path below data>`; `rp.bundled_configs()` lists them.
+_Avoid_: internal config, package config, default config

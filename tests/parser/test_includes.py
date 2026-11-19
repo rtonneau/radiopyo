@@ -21,6 +21,7 @@ import pytest
 
 # ----------------------------- Internal imports ---------------------------- #
 import radiopyo.parser
+from radiopyo.parser.exceptions import ConfigError
 from radiopyo.parser.file_parser import resolve_includes
 from radiopyo.parser.toml import TOMLFileParser
 from radiopyo.parser.utils import combine_config, include_path, reaction_key
@@ -256,13 +257,14 @@ def test_missing_include_raises(tmp_path):
         load(top)
 
 
-def test_unknown_extension_is_skipped(tmp_path):
+def test_unknown_extension_is_an_error(tmp_path):
+    # It used to be skipped with a warning only (the include was lost)
     top = write(
         tmp_path / "top.toml",
         '[includes]\nxyz = ["whatever.xyz"]\n' + k_reaction_toml(REACTION, 1e9),
     )
-    config = load(top)
-    assert k_values(config) == {REACTION: pytest.approx(1e9)}
+    with pytest.raises(ConfigError, match="no parser for '.xyz' files"):
+        load(top)
 
 
 # --------------------------------------------------------------------------- #

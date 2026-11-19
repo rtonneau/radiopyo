@@ -12,6 +12,12 @@ from pathlib import Path
 
 # ----------------------------- Internal imports ---------------------------- #
 from radiopyo import rust
+from radiopyo.parser.exceptions import (
+    ConfigError,
+    ConfigSyntaxError,
+    IncludeNotFoundError,
+)
+from radiopyo.parser.utils import bundled_configs
 from radiopyo.physics.beam import (
     ConstantBeam,
     MacroPulsedBeam,
@@ -46,12 +52,16 @@ __all__: tp.List = [
     "LABARBE_CONFIG_FILE",
     "PACKAGE_DATA_PATH",
     "PURE_WATER_CONFIG_FILE",
+    "ConfigError",
+    "ConfigSyntaxError",
     "ConstantBeam",
+    "IncludeNotFoundError",
     "MacroPulsedBeam",
     "PulsedBeam",
     "SinglePulseBeam",
     "UnitCell",
     "__version__",
+    "bundled_configs",
     "disable_logging",
     "enable_logging",
     "min_beam_on_time",
