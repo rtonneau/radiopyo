@@ -85,6 +85,30 @@
         "ticket": "01-include-diagnostics",
         "commit": "9db6f04"
       }
+    },
+    {
+      "at": "2026-11-19T13:22:29.123Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-per-file-parse-errors.md",
+        "03-implement/02-per-file-parse-errors/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-per-file-parse-errors"
+      }
+    },
+    {
+      "at": "2026-11-19T13:26:29.509Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-per-file-parse-errors/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-per-file-parse-errors",
+        "commit": "804c558"
+      }
     }
   ],
   "current_phase": "ship",
