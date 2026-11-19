@@ -1,15 +1,15 @@
 # Updating radiopyo on a Windows desktop
-<!-- radiopyo-version: 1.0.0 (scripts/bump_doc_version.py rewrites this version below at each release) -->
+<!-- radiopyo-version: 1.1.0 (scripts/bump_doc_version.py rewrites this version below at each release) -->
 
 This guide updates an existing radiopyo (0.x, often installed from the former GitLab
-repository `gitlab.unamur.be`) to the current release, **v1.0.0**, on Windows with
+repository `gitlab.unamur.be`) to the current release, **v1.1.0**, on Windows with
 Anaconda or Miniconda. Every command is typed in the **Anaconda Prompt** (Start menu →
 "Anaconda Prompt").
 
 radiopyo now lives on GitHub: <https://github.com/rtonneau/radiopyo> (public, no login
 needed). The GitHub history continues the GitLab one.
 
-What changed between your version and v1.0.0 is listed in the [changelog](../CHANGELOG.md).
+What changed between your version and v1.1.0 is listed in the [changelog](../CHANGELOG.md).
 
 ## 1. Find out how the old version was installed
 
@@ -34,7 +34,7 @@ Note the Python version, then compare the `pip freeze` line with this table (ign
 
 ## 2. Choose the environment
 
-radiopyo v1.0.0 needs **Python 3.11 or later**. Old versions accepted Python 3.9.
+radiopyo v1.1.0 needs **Python 3.11 or later**. Old versions accepted Python 3.9.
 
 - **`python --version` shows 3.11 or later:** you can update in place, in the same
   environment.
@@ -61,18 +61,18 @@ and open a new Anaconda Prompt).
 
 ## 3a. Installed with pip from a git URL
 
-Remove the old version, then install v1.0.0 from GitHub:
+Remove the old version, then install v1.1.0 from GitHub:
 
 ```bat
 pip uninstall -y radiopyo
-pip install "radiopyo[tqdm,examples] @ git+https://github.com/rtonneau/radiopyo.git@v1.0.0"
+pip install "radiopyo[tqdm,examples] @ git+https://github.com/rtonneau/radiopyo.git@v1.1.0"
 ```
 
 The extras are optional: `tqdm` gives the progress bar (it used to be installed
 automatically), `examples` installs matplotlib for the notebooks. `pip install
-"radiopyo @ git+https://github.com/rtonneau/radiopyo.git@v1.0.0"` installs radiopyo alone.
+"radiopyo @ git+https://github.com/rtonneau/radiopyo.git@v1.1.0"` installs radiopyo alone.
 
-To follow the development version instead of the release, drop `@v1.0.0` from the URL.
+To follow the development version instead of the release, drop `@v1.1.0` from the URL.
 
 ## 3b. Editable install of a local clone
 
@@ -92,11 +92,11 @@ release:
 git remote -v
 git remote set-url origin https://github.com/rtonneau/radiopyo.git
 git fetch origin --tags
-git checkout v1.0.0
+git checkout v1.1.0
 ```
 
 `git remote -v` shows where `origin` pointed before (the GitLab URL for an old clone).
-`git checkout v1.0.0` puts the clone exactly on the release (git reports a "detached
+`git checkout v1.1.0` puts the clone exactly on the release (git reports a "detached
 HEAD": expected). To follow the development version instead, run `git checkout main` then
 `git pull origin main`.
 
@@ -115,7 +115,7 @@ In the same Anaconda Prompt:
 python -c "import importlib.metadata as m, radiopyo; print(m.version('radiopyo'), radiopyo.__file__)"
 ```
 
-It must print `1.0.0` and a path inside the environment (`...\envs\<name>\Lib\site-packages\radiopyo\...`),
+It must print `1.1.0` and a path inside the environment (`...\envs\<name>\Lib\site-packages\radiopyo\...`),
 or inside your clone for an editable install. Then run the Quick start example: save these
 lines as `check_radiopyo.py` in any folder **other than** a radiopyo clone and run
 `python check_radiopyo.py`.
@@ -147,12 +147,12 @@ Then select "Python (radiopyo)" in Jupyter or VS Code (Kernel → Change kernel)
 
 ## 6. Rust backend (optional)
 
-v1.0.0 can solve a simulation with radkin, a Rust port of radiopyo, through the
+v1.1.0 can solve a simulation with radkin, a Rust port of radiopyo, through the
 `radiopyo-rs` extension (LSODA only). On Windows, install the
 wheel of the release (64-bit Python 3.11 or later, no Rust toolchain needed):
 
 ```bat
-pip install https://github.com/rtonneau/radiopyo/releases/download/v1.0.0/radiopyo_rs-1.0.0-cp311-abi3-win_amd64.whl
+pip install https://github.com/rtonneau/radiopyo/releases/download/v1.1.0/radiopyo_rs-1.1.0-cp311-abi3-win_amd64.whl
 python -c "import radiopyo as rp; print(rp.rust.is_available())"
 ```
 

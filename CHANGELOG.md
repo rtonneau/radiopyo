@@ -2,12 +2,28 @@
 
 All notable changes to this project. Versions follow [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.1.0 (2026-11-19)
 
 ### Added
 
 - `radiopyo.__version__`: the `pyproject.toml` version of the source checkout when imported from one (an editable install shows a bump without reinstalling), else the installed package metadata. Loading a config file now logs `radiopyo version X` before `Loading config from file: ...`.
 - `/gps release` post-bump commands (`.work/gps-config.json`): `rust/Cargo.lock` is refreshed (`cargo update --workspace --offline`) and `scripts/bump_doc_version.py` rewrites the release version in `docs/tuto_update.md`.
+- Chemistry check (`radiopyo.simulation.chemistry_check`): `UnitCell.check_chemistry()` / `SimEnv.check_chemistry()` return a list of `ChemistryFinding` (`kind`, `species`, `reactions`, `message`) for species aliases (`OH` / `OH_r`, `O_minus` / `O_r_minus`, `e_minus` / `e_aq`, `H_plus` / `H3O_plus`), reactions whose charge is not balanced, dead reactants (needed but never present) and unused species. `SimEnv.from_dict` runs it and logs the findings (`CHEMISTRY::` warnings) once per distinct chemistry in a process; a manual call logs every time (`log=False` to only return them). The bundled `config_Labarbe.toml` gives two charge warnings (superoxide dismutation without its protons, `RH_r` as the radical anion of RH), kept on purpose.
+- The tqdm progress bar of chunked runs can be turned off: `SimChunksIter.run(progress=False)` for one run,
+  `radiopyo.set_progress_bar(False)` for every later run (`radiopyo.progress_bar_enabled()` reads the setting).
+  `progress=None` (default) follows the global setting, which is on by default; an explicit `progress=` wins.
+  tqdm stays optional (the `tqdm` extra): without it no bar is shown and nothing fails.
+- `docs/tuto_update.md`: step-by-step guide to update an old radiopyo (e.g. installed from the former GitLab repository) to the current release on a Windows desktop with conda: detect the install type, choose a Python 3.11 environment, update a pip-from-git or editable-clone install, check it, register the Jupyter kernel, add the Rust wheel, troubleshooting. Linked from the README.
+- `rp.set_min_beam_on_time(value)` changes the shortest beam ON time (default 0.4e-6 s) for every beam built and run started afterwards; `None` restores the default and `rp.min_beam_on_time()` reads it. `UnitCell.MIN_BEAM_ON_TIME` is now a read-only view of it.
+- The Rust backend uses the same value (radkin pinned to rev 5f7bba8), and the parity guard checks it.
+
+### Changed
+
+- A reaction whose scalar rate constant is 0 (`k_value`, `A`, or either constant of an acid/base or equilibrium pair, which removes the whole pair) is removed from the simulation with a warning (ADR 0011). Redefining an included reaction with `k_value = 0` is the way to switch it off. Results do not change, since such a reaction contributed nothing; species used only by removed reactions are no longer in the state vector.
+- `H2O` in `[concentrations.fixed]` or `[concentrations.initial]` is ignored with a warning: it cannot replace the built-in H2O.
+- A label of `[concentrations.initial]` that matches no species is reported by a warning instead of being ignored silently.
+- An acid/base entry in the old syntax (`acid` / `base` keys) logs the converted entry to write before raising its error.
+- A run-time beam ON span not longer than `T_ZERO` (1e-7 s) is always added analytically, whatever the setting; a setting below `T_ZERO` logs a warning.
 
 ## 1.0.0 (2026-11-18)
 
