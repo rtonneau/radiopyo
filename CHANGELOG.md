@@ -6,7 +6,8 @@ All notable changes to this project. Versions follow [semantic versioning](https
 
 ### Added
 
-- `radiopyo.__version__` (read from the installed package metadata). Loading a config file now logs `radiopyo version X` before `Loading config from file: ...`.
+- `radiopyo.__version__`: the `pyproject.toml` version of the source checkout when imported from one (an editable install shows a bump without reinstalling), else the installed package metadata. Loading a config file now logs `radiopyo version X` before `Loading config from file: ...`.
+- `/gps release` post-bump commands (`.work/gps-config.json`): `rust/Cargo.lock` is refreshed (`cargo update --workspace --offline`) and `scripts/bump_doc_version.py` rewrites the release version in `docs/tuto_update.md`.
 
 ## 1.0.0 (2026-11-18)
 

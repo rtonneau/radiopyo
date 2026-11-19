@@ -1,4 +1,5 @@
 # Updating radiopyo on a Windows desktop
+<!-- radiopyo-version: 1.0.0 (scripts/bump_doc_version.py rewrites this version below at each release) -->
 
 This guide updates an existing radiopyo (0.x, often installed from the former GitLab
 repository `gitlab.unamur.be`) to the current release, **v1.0.0**, on Windows with

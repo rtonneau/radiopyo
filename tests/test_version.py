@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import logging
-from importlib import metadata
+import tomllib
+from pathlib import Path
 
 import pytest
 
 import radiopyo as rp
 
 
-def test_version_matches_metadata() -> None:
-    assert rp.__version__ == metadata.version("radiopyo")
+def test_version_matches_pyproject() -> None:
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    version = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+    assert rp.__version__ == version
 
 
 def test_version_logged_before_config(caplog: pytest.LogCaptureFixture) -> None:

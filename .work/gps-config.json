@@ -15,6 +15,10 @@
       "rust/pyproject.toml",
       "rust/Cargo.toml"
     ],
-    "versionFilesSource": "detected"
+    "versionFilesSource": "detected",
+    "postBump": [
+      "cd rust && cargo update --workspace --offline",
+      "python scripts/bump_doc_version.py"
+    ]
   }
 }
