@@ -428,7 +428,7 @@ class UnitCell(object):
         """
         logger.info(f"radiopyo version {VERSION}")
         logger.info(f"Loading config from file: {file}")
-        config = resolve_includes(Parser(file).parse())
+        config = resolve_includes(Parser(file).parse(), source=file)
         return cls.from_config_dict(config, init)
 
     @classmethod

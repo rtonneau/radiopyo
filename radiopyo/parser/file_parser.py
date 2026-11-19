@@ -20,11 +20,17 @@ import typing as tp
 from abc import ABC, abstractmethod
 
 # ------------------------------ Internal imports --------------------------- #
+from radiopyo.parser.exceptions import (
+    ConfigError,
+    IncludeNotFoundError,
+    describe_chain,
+)
 from radiopyo.parser.utils import (
     PACKAGE_PREFIX,
     blank_config,
     combine_config,
-    include_path,
+    include_suggestions,
+    locate_include,
 )
 
 # -------------------------- Type checking ONLY imports---------------------- #
@@ -35,8 +41,16 @@ if tp.TYPE_CHECKING:
 __all__ = [
     "FileParser",
     "list_available_parsers",
+    "load_config",
+    "normalize_includes",
     "resolve_includes",
 ]
+
+# Accepted forms of the [includes] section, quoted in the errors.
+INCLUDES_FORMS = (
+    "Write either 'includes = [\"a.toml\", ...]' or a table keyed by "
+    "extension: '[includes]' then 'toml = [\"a.toml\", ...]'."
+)
 
 # ---------------------------------- Logging -------------------------------- #
 logger = logging.getLogger("radiopyo")
@@ -66,7 +80,10 @@ def list_available_parsers() -> tp.Dict[str, tp.Type[FileParser]]:
 
 
 def resolve_includes(
-    config: ConfigDict, _chain: tp.Tuple[pathlib.Path, ...] = ()
+    config: ConfigDict,
+    _chain: tp.Tuple[pathlib.Path, ...] = (),
+    *,
+    source: str | pathlib.Path | None = None,
 ) -> ConfigDict:
     """
     Resolves the includes in the given configuration dictionary.
@@ -80,7 +97,9 @@ def resolve_includes(
     Args:
         config (ConfigDict): The configuration dictionary.
         _chain (Tuple[pathlib.Path, ...]): internal, the files being resolved
-            (used to detect circular includes).
+            (used to detect circular includes and named in the errors).
+        source: the file 'config' was read from, if known: errors name
+            it, and relative includes are also looked for next to it.
 
     Returns:
         ConfigDict: The configuration with all the includes merged in,
@@ -88,46 +107,153 @@ def resolve_includes(
             not modified. Without any include, 'config' is returned.
 
     Raises:
-        FileNotFoundError: If the included file does not exist.
-        ValueError: If a file includes itself (directly or not).
+        IncludeNotFoundError: If an included file does not exist (it is a
+            FileNotFoundError); the message lists the places tried and
+            close matches.
+        ConfigError: If a file includes itself (directly or not), for an
+            include of an unknown file type or a malformed section.
 
     """
+    if source is not None and not _chain:
+        _chain = (pathlib.Path(source).resolve(),)
     includes = config["includes"]
     if len(includes) == 0:
         return config  # Do nothing
     available_parsers = list_available_parsers()
+    base = _chain[-1].parent if _chain else None
 
     # Lowest precedence first: each included file overrides the previous ones
     merged = blank_config()
 
-    # Loop over all files in 'includes' section (sorted by extension)
-    for ext, f_list in includes.items():
-        # Check that it is a known extension
+    for ext, entry in normalize_includes(includes, _chain):
         if ("." + ext) not in available_parsers:
-            logger.warning(f"Unable to include .{ext} file. No parser available")
-            continue
-
-        if not isinstance(f_list, (list, tuple)):
-            f_list = [
-                f_list,
-            ]
-
-        # Loop over all file with the same extension ('ext')
-        for f in f_list:
-            path = include_path(f)
-            if not path.exists():
-                raise FileNotFoundError(path)
-            resolved = path.resolve()
-            if resolved in _chain:
-                cycle = " -> ".join(str(p) for p in (*_chain, resolved))
-                raise ValueError(f"Circular include: {cycle}")
-            logger.info(f"Resolving include: {path}")
-            included = resolve_includes(
-                available_parsers["." + ext](path).parse(), (*_chain, resolved)
+            raise ConfigError(
+                f"cannot include '{entry}': no parser for '.{ext}' files "
+                f"(known: {', '.join(sorted(available_parsers))}). "
+                + INCLUDES_FORMS,
+                chain=_chain,
             )
-            merged = combine_config(merged, included)
+        path = _found_include(entry, base, _chain)
+        resolved = path.resolve()
+        if resolved in _chain:
+            cycle = " -> ".join(str(p) for p in (*_chain, resolved))
+            raise ConfigError(f"Circular include: {cycle}", chain=_chain)
+        logger.info(f"Resolving include: {path}")
+        included = resolve_includes(
+            available_parsers["." + ext](path).parse(), (*_chain, resolved)
+        )
+        merged = combine_config(merged, included)
 
     return combine_config(merged, config)
+
+
+def load_config(path: str | pathlib.Path) -> ConfigDict:
+    """
+    The config of a file, includes resolved, read by the parser of its
+    extension (see list_available_parsers).
+
+    Raises:
+        ConfigError: for an unknown extension, or any error of the file
+            or of its includes (see resolve_includes).
+    """
+    parsers = list_available_parsers()
+    suffix = pathlib.Path(path).suffix
+    if suffix not in parsers:
+        raise ConfigError(
+            f"no parser for '{suffix}' files (known: {', '.join(sorted(parsers))})",
+            chain=(pathlib.Path(path),),
+        )
+    return resolve_includes(parsers[suffix](path).parse(), source=path)
+
+
+def normalize_includes(
+    includes: tp.Any, chain: tp.Sequence[pathlib.Path] = ()
+) -> tp.List[tp.Tuple[str, str]]:
+    """
+    The [includes] section as a list of (extension without dot, entry),
+    in the order written. Accepted forms: a table {extension: entry or
+    list of entries}, a list of entries or a single entry (the extension
+    is then the suffix of each entry).
+
+    Args:
+        includes: the section, as read.
+        chain: the files being read (named in the errors).
+
+    Raises:
+        ConfigError: for anything else (an entry that is not a string, an
+            entry without suffix in the list form).
+    """
+    out: tp.List[tp.Tuple[str, str]] = []
+    if isinstance(includes, (str, list, tuple)):
+        entries = [includes] if isinstance(includes, str) else list(includes)
+        for entry in _check_entries(entries, "includes", chain):
+            ext = pathlib.PurePath(entry.strip()).suffix.lstrip(".")
+            if not ext:
+                raise ConfigError(
+                    f"cannot include '{entry}': no file extension. " + INCLUDES_FORMS,
+                    chain=chain,
+                )
+            out.append((ext, entry))
+        return out
+    if not isinstance(includes, tp.Mapping):
+        raise ConfigError(
+            f"invalid [includes] section ({type(includes).__name__}). "
+            + INCLUDES_FORMS,
+            chain=chain,
+        )
+    for ext, entries in includes.items():
+        if isinstance(entries, str):
+            entries = [entries]
+        out += [(ext, e) for e in _check_entries(entries, f"includes.{ext}", chain)]
+    return out
+
+
+def _check_entries(
+    entries: tp.Any, where: str, chain: tp.Sequence[pathlib.Path]
+) -> tp.List[str]:
+    """'entries' if it is a list of strings, ConfigError else."""
+    if not isinstance(entries, (list, tuple)) or not all(
+        isinstance(e, str) for e in entries
+    ):
+        raise ConfigError(
+            f"'{where}' must hold file paths (strings), got {entries!r}. "
+            + INCLUDES_FORMS,
+            chain=chain,
+        )
+    return list(entries)
+
+
+def _found_include(
+    entry: str, base: pathlib.Path | None, chain: tp.Sequence[pathlib.Path]
+) -> pathlib.Path:
+    """The file designated by 'entry' (see locate_include), or raise."""
+    entry = entry.strip()
+    path, tried = locate_include(entry, base)
+    if path is None:
+        lines = [f"included file '{entry}' not found. Looked for:"]
+        lines += [f"  - {p}" for p in tried]
+        suggestions = include_suggestions(entry, base)
+        if suggestions:
+            quoted = ", ".join(f"'{s}'" for s in suggestions)
+            lines.append(f"Did you mean: {quoted}?")
+        lines.append(
+            f"Bundled configs are written '{PACKAGE_PREFIX}<file>' (see "
+            "radiopyo.bundled_configs()); a relative path is relative to the "
+            "including file."
+        )
+        raise IncludeNotFoundError("\n".join(lines), chain=chain)
+    relative = not (
+        entry.startswith(PACKAGE_PREFIX) or pathlib.Path(entry).is_absolute()
+    )
+    if relative and (base is None or path != tried[0]):
+        where = "the folder of the including file" if base is None else str(base)
+        logger.warning(
+            f"CONFIG::include '{entry}' (in {describe_chain(chain)}) is not in "
+            f"{where}: using {path}, found in the working directory. Relative "
+            "includes are looked for next to the including file first: move "
+            "the file there or write its absolute path."
+        )
+    return path
 
 
 # --------------------------------------------------------------------------- #
@@ -185,10 +311,7 @@ class FileParser(ABC):
                 Environment.
         """
 
-    def anchor_includes(
-        self,
-        includes: tp.Mapping[str, str | tp.Sequence[str]],
-    ) -> tp.Dict[str, tp.List[str]]:
+    def anchor_includes(self, includes: tp.Any) -> tp.Dict[str, tp.List[str]]:
         """
         The 'includes' section of the file being parsed, with its relative
         paths anchored to the folder of the file: a relative path is
@@ -198,24 +321,34 @@ class FileParser(ABC):
         the working directory (see resolve_includes).
 
         Entries referring to the package data ('radiopyo/...') and
-        absolute paths are kept as written.
+        absolute paths are kept as written. The section is a table keyed
+        by extension or a list of paths (see normalize_includes).
 
         Parsers should use it to fill the 'includes' section of the
         ConfigDict they produce.
 
         Args:
-            includes: the section as read from the file, extensions as
-                keys, one path or a list of paths as values.
+            includes: the section as read from the file.
 
         Returns:
-            Dict[str, List[str]]
+            Dict[str, List[str]]: extensions (without dot) as keys.
+
+        Raises:
+            ConfigError: for a malformed section or an extension without
+                parser, naming the file.
         """
         base = pathlib.Path(self.path).absolute().parent
+        chain = (pathlib.Path(self.path).absolute(),)
+        parsers = list_available_parsers()
         out: tp.Dict[str, tp.List[str]] = {}
-        for ext, entries in includes.items():
-            if isinstance(entries, str):
-                entries = [entries]
-            out[ext] = [self._anchored(entry, base) for entry in entries]
+        for ext, entry in normalize_includes(includes, chain):
+            if "." + ext not in parsers:
+                raise ConfigError(
+                    f"cannot include '{entry}': no parser for '.{ext}' files "
+                    f"(known: {', '.join(sorted(parsers))}). " + INCLUDES_FORMS,
+                    chain=chain,
+                )
+            out.setdefault(ext, []).append(self._anchored(entry, base))
         return out
 
     @staticmethod

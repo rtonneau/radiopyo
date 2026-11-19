@@ -15,6 +15,7 @@ Author:
 from __future__ import annotations
 
 import copy
+import difflib
 import logging
 import pathlib
 import typing as tp
@@ -34,10 +35,13 @@ __all__: tp.List[str] = [
     "PACKAGE_PREFIX",
     "ReactionKey",
     "blank_config",
+    "bundled_configs",
     "combine_config",
     "disabled_constant",
     "drop_disabled_reactions",
     "include_path",
+    "include_suggestions",
+    "locate_include",
     "reaction_key",
 ]
 
@@ -125,6 +129,83 @@ def include_path(entry: str) -> pathlib.Path:
     if entry.startswith(PACKAGE_PREFIX):
         return PACKAGE_DATA_PATH / entry[len(PACKAGE_PREFIX) :]
     return pathlib.Path(entry).absolute()
+
+
+def bundled_configs() -> tp.Dict[str, pathlib.Path]:
+    """
+    The TOML files shipped with the package (in PACKAGE_DATA_PATH, sub
+    folders included), as {include entry: absolute path}, sorted by
+    entry. The include entry is what to write in an [includes] section,
+    e.g. 'radiopyo/advanced_water_radiolysis.toml'.
+    """
+    found = {
+        PACKAGE_PREFIX + f.relative_to(PACKAGE_DATA_PATH).as_posix(): f.absolute()
+        for f in PACKAGE_DATA_PATH.rglob("*.toml")
+    }
+    return dict(sorted(found.items()))
+
+
+def locate_include(
+    entry: str, base: pathlib.Path | None = None
+) -> tp.Tuple[pathlib.Path | None, tp.List[pathlib.Path]]:
+    """
+    Where an [includes] entry is looked for, in order, and the first of
+    those places holding a file.
+
+    - 'radiopyo/<file>': PACKAGE_DATA_PATH / '<file>' only.
+    - an absolute path: that path only.
+    - a relative path: next to the including file ('base', its folder,
+      when known), then in the current working directory.
+
+    Args:
+        entry: the entry, as written in the config.
+        base: folder of the including file, None if unknown.
+
+    Returns:
+        (the path found or None, the list of the places tried)
+    """
+    entry = entry.strip()
+    if entry.startswith(PACKAGE_PREFIX) or pathlib.Path(entry).is_absolute():
+        tried = [include_path(entry)]
+    else:
+        tried = [] if base is None else [(base / entry).absolute()]
+        cwd = include_path(entry)
+        if cwd not in tried:
+            tried.append(cwd)
+    found = next((p for p in tried if p.is_file()), None)
+    return found, tried
+
+
+def include_suggestions(entry: str, base: pathlib.Path | None = None) -> tp.List[str]:
+    """
+    Entries close to 'entry' that would designate an existing file: the
+    bundled configs (whatever the folder written before their name, e.g.
+    'radiopyo/data/x.toml' or a bare 'x.toml' gives 'radiopyo/x.toml')
+    and the config files next to the including file (folder 'base').
+    """
+    entry = entry.strip().replace("\\", "/")
+    name = pathlib.PurePosixPath(entry).name
+    bundled = bundled_configs()
+    out = [key for key, path in bundled.items() if path.name == name]
+    if out:  # the very file name of a bundled config: nothing else to say
+        return out
+
+    candidates = list(bundled)
+    if base is not None and base.is_dir():
+        candidates += sorted(
+            f.relative_to(base).as_posix()
+            for f in base.rglob("*.toml")
+            if len(f.relative_to(base).parts) <= 3
+        )
+    for match in difflib.get_close_matches(entry, candidates, n=3, cutoff=0.6):
+        if match not in out:
+            out.append(match)
+    # A close name in another folder (e.g. a typo in a bundled file name)
+    names = {pathlib.PurePosixPath(c).name: c for c in reversed(candidates)}
+    for match in difflib.get_close_matches(name, list(names), n=3, cutoff=0.75):
+        if names[match] not in out:
+            out.append(names[match])
+    return out[:5]
 
 
 def reaction_key(reaction: str) -> ReactionKey:

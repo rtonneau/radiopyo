@@ -8,6 +8,8 @@ Sub-Module containing all parsers used in the radiopyo module.
         FileParser subclass for toml syntax.
     - utils.py:
         Provides some useful tools for module usage only.
+    - exceptions.py:
+        Config errors (ConfigError and subclasses), naming their file.
     - reaction_parser.py:
         Parser for reaction defined as single string.
 
@@ -18,6 +20,11 @@ Author:
 """
 # ------------------------------- External imports -------------------------- #
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.parser.exceptions import (
+    ConfigError,
+    ConfigSyntaxError,
+    IncludeNotFoundError,
+)
 from radiopyo.parser.reaction_parser import ReactionParser
 
 # -------------------------- Type checking ONLY imports---------------------- #
@@ -25,6 +32,9 @@ from radiopyo.parser.reaction_parser import ReactionParser
 # ------------------------- Expose importable stuffs ------------------------ #
 __all__: list = [
     "RPARSER",
+    "ConfigError",
+    "ConfigSyntaxError",
+    "IncludeNotFoundError",
 ]
 
 # Expose a instance (sharable) of ReactionParser
