@@ -16,12 +16,23 @@ It is then, for example, possible to modify a rate constant of a given reaction 
 in an included file.
 
 ```toml
-[includes]
-toml = [
+includes = [
     "radiopyo/advanced_water_radiolysis.toml",
     "radiopyo/reactions_biology.toml",
 ]
 ```
+
+A single file can be given as a string (`includes = "my_chemistry.toml"`). The older
+table form, keyed by file extension, still works:
+
+```toml
+[includes]
+toml = ["radiopyo/advanced_water_radiolysis.toml"]
+```
+
+The parser of an entry is chosen from its file extension (only `.toml` exists). An entry
+without extension, an unknown extension or an unknown key of the table (e.g.
+`files = [...]`) is an error naming the file; it used to be skipped silently.
 
 **Where the files are looked for**
 
@@ -32,8 +43,55 @@ toml = [
   (e.g. "radiopyo_extra.toml").
 - A relative path is resolved against the folder of the file containing the entry
   (so nested includes keep working wherever the program is started from). If the file
-  is not there, the current working directory is tried.
+  is not there, the current working directory is tried, with a warning: the result then
+  depends on where the program is started, move the file next to the one including it
+  (or write its absolute path).
 - An absolute path towards a valid configuration file is always possible.
+
+`rp.bundled_configs()` lists the files shipped with the package, keyed by the entry to
+write in `includes`:
+
+```python
+>>> import radiopyo as rp
+>>> list(rp.bundled_configs())
+['radiopyo/IBA/20240311/20240311_DATA_AERIAL.toml', 'radiopyo/advanced_water_radiolysis.toml',
+ 'radiopyo/config_Labarbe.toml', 'radiopyo/reactions_biology.toml']
+```
+
+**Windows paths**
+
+In a double-quoted TOML string a backslash starts an escape: `"C:\temp\new.toml"` reads
+as `C:`, a tab, `emp`, a new line, `ew.toml`. Write Windows paths with single quotes
+(`'C:\temp\new.toml'`, no escapes) or with forward slashes (`"C:/temp/new.toml"`).
+radiopyo adds this hint to the error when it sees such a path.
+
+**Errors name their file**
+
+Every error found while reading a configuration is a `rp.ConfigError` (a `ValueError`)
+whose message starts with where the faulty entry comes from: the file, the chain of
+files including it, or `<dict>` for a config given as a Python dict
+(`UnitCell.from_config_dict`). The original error, if any, is kept as `__cause__`.
+
+- A missing include (`rp.IncludeNotFoundError`, also a `FileNotFoundError`) lists the
+  places tried and close matches:
+
+  ```text
+  In config C:\sim\main.toml: included file 'radiopyo/advanced_water_radiolisys.toml' not found. Looked for:
+    - C:\...\radiopyo\data\advanced_water_radiolisys.toml
+  Did you mean: 'radiopyo/advanced_water_radiolysis.toml'?
+  Bundled configs are written 'radiopyo/<file>' (see radiopyo.bundled_configs()); a relative path is relative to the including file.
+  ```
+
+- Invalid TOML (`rp.ConfigSyntaxError`) or an invalid reaction string names the file
+  (and the include chain `main.toml -> a.toml` for an included file) and shows the
+  faulty line.
+- An entry that cannot be built (a wrong value type, a missing rate constant, a bad
+  beam, ...) names the entry, the file that defined it and, when a later file
+  redefined some of its fields, which file wrote them:
+
+  ```text
+  In config C:\sim\a.toml (k_value from C:\sim\main.toml): [[reactions.k_reaction]] 'e_aq + OH_r -> OH_minus': ...
+  ```
 
 **Precedence**
 
