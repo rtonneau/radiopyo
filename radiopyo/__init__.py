@@ -33,6 +33,9 @@ from radiopyo.utils.logging import (
     set_logging_level,
 )
 from radiopyo.utils.progress import progress_bar_enabled, set_progress_bar
+from radiopyo.utils.version import VERSION
+
+__version__ = VERSION
 
 # ------------------------- Type checking ONLY imports----------------------- #
 if tp.TYPE_CHECKING:
@@ -48,6 +51,7 @@ __all__: tp.List = [
     "PulsedBeam",
     "SinglePulseBeam",
     "UnitCell",
+    "__version__",
     "disable_logging",
     "enable_logging",
     "min_beam_on_time",

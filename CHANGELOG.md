@@ -2,6 +2,12 @@
 
 All notable changes to this project. Versions follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- `radiopyo.__version__` (read from the installed package metadata). Loading a config file now logs `radiopyo version X` before `Loading config from file: ...`.
+
 ## 1.0.0 (2026-11-18)
 
 ### Added

@@ -43,6 +43,7 @@ from radiopyo.simulation.ode_functions_solver import (
 from radiopyo.simulation.ode_result import DummyScipyOdeResult, ODEResult, ShortOnSpan
 from radiopyo.utils.g_values import GValuesBoscolo
 from radiopyo.utils.progress import with_progress_bar
+from radiopyo.utils.version import VERSION
 
 # ------------------------- Type checking ONLY imports------------------------ #
 if tp.TYPE_CHECKING:
@@ -425,6 +426,7 @@ class UnitCell(object):
         Returns:
             UnitCell
         """
+        logger.info(f"radiopyo version {VERSION}")
         logger.info(f"Loading config from file: {file}")
         config = resolve_includes(Parser(file).parse())
         return cls.from_config_dict(config, init)
