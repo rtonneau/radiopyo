@@ -145,14 +145,47 @@
         "ticket": "04-docs-changelog",
         "commit": "d076781"
       }
+    },
+    {
+      "at": "2026-11-19T13:42:37.442Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-19T13:43:01.670Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/20"
+      }
+    },
+    {
+      "at": "2026-11-19T13:42:56.357Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
     }
   ],
-  "current_phase": "finish-pending",
+  "current_phase": "finished",
   "git": {
     "branch": "feat/friendlier-config-includes",
     "base_branch": "main",
     "branch_created_at": "2026-11-19T13:16:24.072Z",
-    "pr_url": null
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/20"
   },
-  "ship_mode": "inline"
+  "ship_mode": "inline",
+  "changelog": {
+    "bump": "minor",
+    "floor": "minor",
+    "reason": null,
+    "bullets": 7,
+    "path": ".work/changelog/2026-11-19__friendlier-include-paths.md",
+    "written_at": "2026-11-19T13:42:37.435Z"
+  },
+  "finished_at": "2026-11-19T13:42:56.357Z"
 }
