@@ -61,6 +61,30 @@
       "detail": {
         "tickets": 4
       }
+    },
+    {
+      "at": "2026-11-19T13:16:29.822Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-include-diagnostics.md",
+        "03-implement/01-include-diagnostics/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-include-diagnostics"
+      }
+    },
+    {
+      "at": "2026-11-19T13:22:19.634Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-include-diagnostics/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-include-diagnostics",
+        "commit": "9db6f04"
+      }
     }
   ],
   "current_phase": "ship",
@@ -69,5 +93,6 @@
     "base_branch": "main",
     "branch_created_at": "2026-11-19T13:16:24.072Z",
     "pr_url": null
-  }
+  },
+  "ship_mode": "inline"
 }
