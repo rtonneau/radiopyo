@@ -1,0 +1,73 @@
+{
+  "session_id": "2026-11-19__friendlier-include-paths",
+  "feature_name": "friendlier-include-paths",
+  "scratch_dir": ".scratch/tests/2026-11-19__friendlier-include-paths",
+  "created_at": "2026-11-19T13:04:01.254Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-19T13:04:01.254Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-19T13:14:52.007Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-19T13:15:16.514Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-19T13:15:20.347Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-19T13:16:24.072Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/friendlier-config-includes",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-19T13:16:24.147Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-include-diagnostics.md",
+        "02-plan/tickets/02-per-file-parse-errors.md",
+        "02-plan/tickets/03-build-error-origins.md",
+        "02-plan/tickets/04-docs-changelog.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
+    }
+  ],
+  "current_phase": "ship",
+  "git": {
+    "branch": "feat/friendlier-config-includes",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-19T13:16:24.072Z",
+    "pr_url": null
+  }
+}
