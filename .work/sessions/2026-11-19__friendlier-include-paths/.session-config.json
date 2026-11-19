@@ -1,0 +1,191 @@
+{
+  "session_id": "2026-11-19__friendlier-include-paths",
+  "feature_name": "friendlier-include-paths",
+  "scratch_dir": ".scratch/tests/2026-11-19__friendlier-include-paths",
+  "created_at": "2026-11-19T13:04:01.254Z",
+  "template_version": 2,
+  "history": [
+    {
+      "at": "2026-11-19T13:04:01.254Z",
+      "event": "session_started",
+      "phase": "grill",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-19T13:14:52.007Z",
+      "event": "auto_started",
+      "phase": "grill",
+      "detail": {
+        "target": "finish",
+        "steps": "write:grill → plan → write:plan → ship → finish"
+      }
+    },
+    {
+      "at": "2026-11-19T13:15:16.514Z",
+      "event": "grill_written",
+      "phase": "plan-not-started",
+      "files": [
+        "01-grill/resume.md"
+      ]
+    },
+    {
+      "at": "2026-11-19T13:15:20.347Z",
+      "event": "plan_started",
+      "phase": "plan",
+      "files": [
+        "02-plan/plan.md"
+      ]
+    },
+    {
+      "at": "2026-11-19T13:16:24.072Z",
+      "event": "branch_created",
+      "phase": "plan",
+      "detail": {
+        "branch": "feat/friendlier-config-includes",
+        "base": "main"
+      }
+    },
+    {
+      "at": "2026-11-19T13:16:24.147Z",
+      "event": "plan_written",
+      "phase": "ship",
+      "files": [
+        "02-plan/plan.md",
+        "02-plan/tickets/01-include-diagnostics.md",
+        "02-plan/tickets/02-per-file-parse-errors.md",
+        "02-plan/tickets/03-build-error-origins.md",
+        "02-plan/tickets/04-docs-changelog.md"
+      ],
+      "detail": {
+        "tickets": 4
+      }
+    },
+    {
+      "at": "2026-11-19T13:16:29.822Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/01-include-diagnostics.md",
+        "03-implement/01-include-diagnostics/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-include-diagnostics"
+      }
+    },
+    {
+      "at": "2026-11-19T13:22:19.634Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/01-include-diagnostics/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "01-include-diagnostics",
+        "commit": "9db6f04"
+      }
+    },
+    {
+      "at": "2026-11-19T13:22:29.123Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/02-per-file-parse-errors.md",
+        "03-implement/02-per-file-parse-errors/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-per-file-parse-errors"
+      }
+    },
+    {
+      "at": "2026-11-19T13:26:29.509Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/02-per-file-parse-errors/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "02-per-file-parse-errors",
+        "commit": "804c558"
+      }
+    },
+    {
+      "at": "2026-11-19T13:26:36.616Z",
+      "event": "ticket_started",
+      "phase": "ship",
+      "files": [
+        "02-plan/tickets/03-build-error-origins.md",
+        "03-implement/03-build-error-origins/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-build-error-origins"
+      }
+    },
+    {
+      "at": "2026-11-19T13:38:25.894Z",
+      "event": "ticket_done",
+      "phase": "ship",
+      "files": [
+        "03-implement/03-build-error-origins/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "03-build-error-origins",
+        "commit": "b48c794"
+      }
+    },
+    {
+      "at": "2026-11-19T13:41:47.897Z",
+      "event": "ticket_done",
+      "phase": "finish-pending",
+      "files": [
+        "03-implement/04-docs-changelog/commit-log.md"
+      ],
+      "detail": {
+        "ticket": "04-docs-changelog",
+        "commit": "d076781"
+      }
+    },
+    {
+      "at": "2026-11-19T13:42:37.442Z",
+      "event": "changelog_written",
+      "phase": "finish-pending",
+      "detail": {
+        "bump": "minor"
+      }
+    },
+    {
+      "at": "2026-11-19T13:43:01.670Z",
+      "event": "pr_opened",
+      "phase": "finish-pending",
+      "detail": {
+        "url": "https://github.com/rtonneau/radiopyo/pull/20"
+      }
+    },
+    {
+      "at": "2026-11-19T13:42:56.357Z",
+      "event": "session_finished",
+      "phase": "finished",
+      "files": [
+        "INDEX.md"
+      ]
+    }
+  ],
+  "current_phase": "finished",
+  "git": {
+    "branch": "feat/friendlier-config-includes",
+    "base_branch": "main",
+    "branch_created_at": "2026-11-19T13:16:24.072Z",
+    "pr_url": "https://github.com/rtonneau/radiopyo/pull/20"
+  },
+  "ship_mode": "inline",
+  "changelog": {
+    "bump": "minor",
+    "floor": "minor",
+    "reason": null,
+    "bullets": 7,
+    "path": ".work/changelog/2026-11-19__friendlier-include-paths.md",
+    "written_at": "2026-11-19T13:42:37.435Z"
+  },
+  "finished_at": "2026-11-19T13:42:56.357Z"
+}

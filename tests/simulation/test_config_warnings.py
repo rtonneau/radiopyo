@@ -14,6 +14,7 @@ import logging
 import pytest
 
 # ----------------------------- Internal imports ---------------------------- #
+from radiopyo.parser.exceptions import ConfigError
 from radiopyo.simulation.environment_build import SimEnv
 
 
@@ -42,8 +43,10 @@ def caplog_radiopyo(caplog):
 
 def test_old_acid_base_syntax_warns_then_raises(caplog_radiopyo):
     old = {"acid": "H2O2", "base": "HO2_minus", "pKa": 11.7}
-    with pytest.raises(AttributeError, match="Old acid/base syntax"):
+    # A ConfigError naming the entry, the original error as its cause
+    with pytest.raises(ConfigError, match="Old acid/base syntax") as err:
         SimEnv.from_dict(config(acid_base=[old]))
+    assert isinstance(err.value.__cause__, AttributeError)
     msgs = warnings_of(caplog_radiopyo)
     assert len(msgs) == 1
     assert 'reaction = "H2O2 <-> H3O_plus + HO2_minus"' in msgs[0]
@@ -52,8 +55,9 @@ def test_old_acid_base_syntax_warns_then_raises(caplog_radiopyo):
 
 
 def test_acid_base_without_reaction_nor_old_keys_keeps_error(caplog_radiopyo):
-    with pytest.raises(AttributeError, match="Need a reaction string AND a pKa"):
+    with pytest.raises(ConfigError, match="Need a reaction string AND a pKa") as err:
         SimEnv.from_dict(config(acid_base=[{"pKa": 11.7}]))
+    assert isinstance(err.value.__cause__, AttributeError)
     assert not any("old syntax" in m for m in warnings_of(caplog_radiopyo))
 
 
